@@ -35,6 +35,7 @@ func TestFakeBotPauseResumeWakeAndRedactedTrace(t *testing.T) {
 	var mu sync.Mutex
 	var updates []telegram.Update
 	sent := []string{}
+	failSend := false
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		mu.Lock()
 		defer mu.Unlock()
@@ -49,6 +50,11 @@ func TestFakeBotPauseResumeWakeAndRedactedTrace(t *testing.T) {
 			t.Error(err)
 		}
 		sent = append(sent, body.Text)
+		if failSend {
+			w.WriteHeader(http.StatusInternalServerError)
+			w.Write([]byte(`{"ok":false,"description":"Synthetic private failure response"}`))
+			return
+		}
 		json.NewEncoder(w).Encode(map[string]any{"ok": true, "result": map[string]any{"message_id": len(sent), "chat": map[string]int64{"id": 700007}}})
 	}))
 	defer server.Close()
@@ -150,6 +156,27 @@ func TestFakeBotPauseResumeWakeAndRedactedTrace(t *testing.T) {
 	}
 	if err = svc.Flush(ctx); err != nil {
 		t.Fatal(err)
+	}
+	mu.Lock()
+	failSend = true
+	mu.Unlock()
+	if _, err = svc.QueueOwner(ctx, tmpl.ID, "Synthetic private failed notification.", false); err != nil {
+		t.Fatal(err)
+	}
+	if err = svc.Flush(ctx); err == nil {
+		t.Fatal("fake HTTP delivery failure hidden")
+	}
+	mu.Lock()
+	attempts := len(sent)
+	mu.Unlock()
+	if err = svc.Flush(ctx); err != nil {
+		t.Fatal(err)
+	}
+	mu.Lock()
+	after := len(sent)
+	mu.Unlock()
+	if after != attempts {
+		t.Fatal("uncertain fake HTTP send replayed")
 	}
 	trace := events.String()
 	for _, secret := range []string{"synthetic-private-bot", "700007", "900009", "offline-dummy-key", "Synthetic private", "Synthetic answer", "synthetic_user", "https://"} {

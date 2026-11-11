@@ -27,8 +27,9 @@ type BotAPI interface {
 	SendMessage(context.Context, int64, string, int64) (int64, error)
 }
 type ServiceOptions struct {
-	Store *store.Store
-	Bot   BotAPI
+	Secrets []config.Secret
+	Store   *store.Store
+	Bot     BotAPI
 	// BotKey is a one-way digest of bot identity, never the credential itself.
 	BotKey      string
 	OwnerChatID int64
@@ -75,6 +76,11 @@ func NewService(opts ServiceOptions) (*Service, error) {
 			if v := secret.Expose(); v != "" {
 				s.secrets = append(s.secrets, v)
 			}
+		}
+	}
+	for _, secret := range opts.Secrets {
+		if raw := secret.Expose(); raw != "" {
+			s.secrets = append(s.secrets, raw)
 		}
 	}
 	sort.Strings(s.ids)

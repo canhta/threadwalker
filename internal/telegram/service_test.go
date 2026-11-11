@@ -488,3 +488,32 @@ func TestQuestionCorrelationIncludesConfiguredOwnerChat(t *testing.T) {
 		t.Fatal("new owner chat correlated an old chat question")
 	}
 }
+
+func TestOwnerAnswersRedactOtherConfiguredAgentSecretsBeforePersistence(t *testing.T) {
+	ctx := context.Background()
+	st, err := store.Open(ctx, ":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	st.EnsureAgent(ctx, "one")
+	bot := &fakeBot{}
+	svc, err := telegram.NewService(telegram.ServiceOptions{Store: st, Bot: bot, BotKey: "fake", OwnerChatID: 77, Templates: []config.Template{{ID: "one"}}, Secrets: []config.Secret{config.NewSecret("another-agent-key")}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = svc.QueueOwner(ctx, "one", "Question?", true); err != nil {
+		t.Fatal(err)
+	}
+	if err = svc.Flush(ctx); err != nil {
+		t.Fatal(err)
+	}
+	bot.updates = []telegram.Update{{UpdateID: 1, Message: &telegram.Message{Chat: telegram.Chat{ID: 77}, Text: "Answer another-agent-key", ReplyToMessage: &telegram.Message{MessageID: 1}}}}
+	if err = svc.Poll(ctx, 0); err != nil {
+		t.Fatal(err)
+	}
+	answers, err := st.OwnerAnswers(ctx, "one", 10)
+	if err != nil || len(answers) != 1 || answers[0].Text != "Answer [REDACTED]" {
+		t.Fatalf("cross-agent configured secret persisted %+v %v", answers, err)
+	}
+}

@@ -23,6 +23,10 @@ func Services(st *store.Store, templates []config.Template, now func() time.Time
 		templates []config.Template
 	}
 	groups := map[string]*group{}
+	secrets := []config.Secret{}
+	for _, t := range templates {
+		secrets = append(secrets, t.LLM.APIKey, t.Telegram.BotToken, t.Telegram.OwnerChatID)
+	}
 	for _, t := range templates {
 		if !t.Telegram.Enabled {
 			continue
@@ -56,7 +60,7 @@ func Services(st *store.Store, templates []config.Template, now func() time.Time
 		if err != nil {
 			return nil, nil, err
 		}
-		s, err := NewService(ServiceOptions{Store: st, Bot: client, BotKey: key, OwnerChatID: g.owner, Templates: g.templates, Now: now, Logger: logger})
+		s, err := NewService(ServiceOptions{Store: st, Bot: client, BotKey: key, OwnerChatID: g.owner, Templates: g.templates, Now: now, Logger: logger, Secrets: secrets})
 		if err != nil {
 			return nil, nil, err
 		}

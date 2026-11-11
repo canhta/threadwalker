@@ -48,7 +48,10 @@ func (s *Store) QueueOwner(ctx context.Context, agentID, kind, text, key string,
 		return id, nil
 	}
 	id, err := r.LastInsertId()
-	return id, err
+	if err != nil {
+		return 0, fmt.Errorf("identifying owner message: %w", err)
+	}
+	return id, nil
 }
 
 func (s *Store) PendingOwner(ctx context.Context, ids []string) ([]OwnerMessage, error) {
@@ -83,7 +86,10 @@ func (s *Store) ClaimOwner(ctx context.Context, id int64, botKey string) (bool, 
 		return false, fmt.Errorf("claiming owner delivery: %w", err)
 	}
 	n, err := r.RowsAffected()
-	return n == 1, err
+	if err != nil {
+		return false, fmt.Errorf("checking owner delivery claim: %w", err)
+	}
+	return n == 1, nil
 }
 func (s *Store) FinishOwner(ctx context.Context, id, messageID int64, sent bool) error {
 	status := "failed"
@@ -135,7 +141,10 @@ func (s *Store) AnswerOwner(ctx context.Context, ids []string, botKey string, me
 		return false, fmt.Errorf("saving owner answer: %w", err)
 	}
 	n, err := r.RowsAffected()
-	return n == 1, err
+	if err != nil {
+		return false, fmt.Errorf("checking owner answer write: %w", err)
+	}
+	return n == 1, nil
 }
 func (s *Store) OwnerAnswers(ctx context.Context, id string, limit int) ([]OwnerMessage, error) {
 	if limit < 1 || limit > 20 {
@@ -154,7 +163,10 @@ func (s *Store) OwnerAnswers(ctx context.Context, id string, limit int) ([]Owner
 		}
 		out = append(out, m)
 	}
-	return out, rows.Err()
+	if err = rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterating owner answers: %w", err)
+	}
+	return out, nil
 }
 func (s *Store) OwnerOffset(ctx context.Context, agentID, key string) (int64, error) {
 	var n int64
