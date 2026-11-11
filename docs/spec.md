@@ -25,7 +25,7 @@ Weekly measures on the agent's own account: followers, views, replies received, 
 | Self-editing | The agent edits its playbook and notes in the DB, never code or its template | decision |
 | Account | A disposable side account whose bio states it is an AI experiment | decision (AI label: author's condition, owner has not objected) |
 | Threads access | Browser automation; the official API needs Business Verification the owner does not have | decision |
-| LLM | Pluggable by config; no model is hardcoded | decision |
+| LLM | Configurable named providers and model profiles; provider IDs, model IDs and key environment-variable names are chosen by the operator | decision |
 | Language | Go | proposed |
 | Host | Owner's VPS: Ubuntu 24.04, 2 vCPU, 3.6 GB RAM (about 2.6 GB free), 48 GB disk free; no Go, Docker or Chromium installed yet | measured |
 | Several agents | Yes, after one agent runs stably | proposed |
@@ -39,8 +39,15 @@ Two layers:
 - **Agent (LLM):** on each wake it receives its goal, playbook, metrics and remaining budget, and
   decides what to do by calling tools.
 
-One agent, one hand-written tool-calling loop over the Chat Completions API. No fixed
-triage/compose/critic pipeline and no same-model critic. **(sourced)**: first-party guidance says
+Each agent uses one hand-written tool-calling loop with the LLM configuration resolved from
+its template. The optional catalog supports multiple providers and model profiles, including
+several profiles sharing one provider; selecting a profile resolves only that provider's key.
+The existing runtime client uses OpenAI-compatible Chat Completions. Protocols name implementation
+adapters: a vendor's arbitrary API does not become compatible merely by configuring its key.
+Native Anthropic runtime support remains follow-up [#15](https://github.com/canhta/threadwalker/issues/15).
+**(decision)**
+
+No fixed triage/compose/critic pipeline and no same-model critic. **(sourced)**: first-party guidance says
 to maximise a single agent first, and in Anthropic's Project Vend a same-model supervisor shared
 the blind spots of the agent it supervised.
 
@@ -120,7 +127,8 @@ How fast it opens is one of the experiment's results.
 
 ## 8. Budget
 
-- A local token ledger per agent, priced from the rates in the template. **(sourced)**: flat
+- A local token ledger per agent, priced from the template's resolved LLM configuration (inline
+  rates or the selected model profile). **(sourced)**: flat
   subscriptions expose no balance to read.
 - The agent always sees its remaining budget and decides how to spend it; the harness only blocks
   at the limit.
@@ -139,7 +147,7 @@ How fast it opens is one of the experiment's results.
 |---|---|---|
 | Language | Go, single binary | Research read the repos; nothing was run |
 | DB | SQLite via a pure-Go driver (`modernc.org/sqlite`) | Research read the repo; nothing was run |
-| LLM | OpenAI-compatible client: `base_url`, `api_key`, `model` per agent | DeepSeek works; Google Antigravity is ruled out by its terms; OpenCode Go is risky |
+| LLM | Optional provider/model catalog ([canonical example](../llms.example.yaml)); templates select a profile or declare inline LLM settings | Configuration accepts `openai` and `anthropic` protocols; the current client implements OpenAI-compatible Chat Completions, with native Anthropic runtime in [#15](https://github.com/canhta/threadwalker/issues/15) |
 | Browser | Headless Chromium over CDP | **Untested**: which Go library, real memory use, whether Threads challenges datacenter IPs |
 | Deploy | systemd unit on the VPS | proposed |
 
@@ -177,7 +185,7 @@ is in its GitHub issue.
 threadwalker/
 ├── cmd/threadwalker/main.go     # entrypoint: load config, open DB, run scheduler
 ├── internal/
-│   ├── config/                  # load and validate agents/*.yaml
+│   ├── config/                  # load templates, optional LLM catalog and selected secrets
 │   ├── store/                   # SQLite, migrations, queries
 │   ├── llm/                     # OpenAI-compatible client and ledger
 │   ├── agent/                   # one wake: context assembly and tool loop
@@ -188,6 +196,7 @@ threadwalker/
 │   └── telegram/                # owner notifications and commands
 ├── agents/                      # one template per agent
 │   └── solo-builder.example.yaml
+├── llms.example.yaml             # canonical provider/model catalog example
 ├── deploy/threadwalker.service
 └── docs/
 ```
@@ -221,11 +230,22 @@ Each agent template in `agents/*.yaml` (see [`agents/solo-builder.example.yaml`]
   `voice`, `research_focus` (what to search, read and track across wakes), `style_rules`, `topics`,
   `avoid_topics`, `good_posts`, `good_replies`, `bad_examples`, and `forbidden_phrases`.
 - `seed_playbook`: initial `testing` hypotheses for the agent's first wakes.
-- `llm`: `base_url`, `model`, `api_key_env`, `price_per_mtok_in_usd`, `price_per_mtok_out_usd`.
+- `llm`: either a `profile` selecting a model profile in the optional catalog, or the existing
+  inline provider/model settings. Inline `protocol` defaults to `openai`; configured protocols
+  are `openai` or `anthropic`. Never combine a profile with an inline LLM field, even an empty one.
+  Missing catalog/profile/provider references, duplicate IDs and invalid values are errors.
+  Provider and profile IDs, model names, endpoints and key environment-variable names are
+  operator inputs, with no vendor/model allowlist. The canonical catalog shape lives in
+  [`llms.example.yaml`](../llms.example.yaml); the canonical inline shape lives in
+  [`agents/solo-builder.example.yaml`](../agents/solo-builder.example.yaml).
 - `limits` (all positive): `posts_per_day`, `replies_per_day`, `replies_per_user_7d`,
   `min_seconds_between_actions`, `max_steps_per_wake`, `max_usd_per_day`,
   `min_minutes_between_wakes`.
 - `threads`: `profile_dir`.
 - `telegram`: `bot_token_env`, `owner_chat_id_env`.
 
-Secrets live only in environment variables named by `*_env`, never in a template, a log or the LLM context.
+Secrets live only in environment variables named by `*_env`, never in a template, catalog, log
+or the LLM context. Catalog loading validates references and configuration without reading keys;
+loading a template resolves only its selected provider's key into a redacting `config.Secret`.
+`check` accepts an optional `-llms` catalog path and preserves legacy inline invocation without it.
+See [`docs/setup.md`](setup.md) for setup and validation commands. **(decision)**

@@ -38,6 +38,7 @@ func runCheck(ctx context.Context, args []string, getenv func(string) string, lo
 	fs := flag.NewFlagSet("check", flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	agentsDir := fs.String("agents", "agents", "directory containing agent YAML templates")
+	llmsPath := fs.String("llms", "", "optional LLM provider and model catalog YAML file")
 	dbPath := fs.String("db", "data/threadwalker.db", "path to SQLite database")
 	if err := fs.Parse(args); err != nil {
 		return 1
@@ -45,7 +46,19 @@ func runCheck(ctx context.Context, args []string, getenv func(string) string, lo
 
 	var failed bool
 
-	tmpls, err := config.LoadDir(*agentsDir, getenv)
+	var catalog *config.Catalog
+	if *llmsPath != "" {
+		var err error
+		catalog, err = config.LoadCatalog(*llmsPath)
+		if err != nil {
+			for _, subErr := range unwrapErrors(err) {
+				fmt.Fprintln(stderr, subErr.Error())
+			}
+			return 1
+		}
+	}
+
+	tmpls, err := config.LoadDirWithCatalog(*agentsDir, getenv, catalog)
 	if err != nil {
 		for _, subErr := range unwrapErrors(err) {
 			fmt.Fprintln(stderr, subErr.Error())

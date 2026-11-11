@@ -97,6 +97,11 @@ type TelegramConfig struct {
 
 // LoadDir loads and validates all *.yaml templates in dir.
 func LoadDir(dir string, getenv func(string) string) ([]Template, error) {
+	return LoadDirWithCatalog(dir, getenv, nil)
+}
+
+// LoadDirWithCatalog loads templates with an optional catalog for named LLM profiles.
+func LoadDirWithCatalog(dir string, getenv func(string) string, catalog *Catalog) ([]Template, error) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		return nil, fmt.Errorf("reading templates directory %s: %w", dir, err)
@@ -118,7 +123,7 @@ func LoadDir(dir string, getenv func(string) string) ([]Template, error) {
 	var tmpls []Template
 	var errs []error
 	for _, p := range paths {
-		tmpl, err := LoadFile(p, getenv)
+		tmpl, err := LoadFileWithCatalog(p, getenv, catalog)
 		if err != nil {
 			errs = append(errs, err)
 			continue
@@ -134,6 +139,12 @@ func LoadDir(dir string, getenv func(string) string) ([]Template, error) {
 // LoadFile loads a template from path, validates it against spec section 16,
 // and resolves secrets using getenv.
 func LoadFile(path string, getenv func(string) string) (Template, error) {
+	return LoadFileWithCatalog(path, getenv, nil)
+}
+
+// LoadFileWithCatalog loads a template and resolves its selected LLM profile.
+// A nil catalog preserves inline configuration and rejects profile selection.
+func LoadFileWithCatalog(path string, getenv func(string) string, catalog *Catalog) (Template, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return Template{}, fmt.Errorf("reading template %s: %w", path, err)
@@ -218,11 +229,40 @@ func LoadFile(path string, getenv func(string) string) (Template, error) {
 	tmpl.Persona.ForbiddenPhrases = requireStringList("persona.forbidden_phrases")
 	tmpl.SeedPlaybook = requireStringList("seed_playbook")
 
-	tmpl.LLM.BaseURL = requireString("llm.base_url")
-	tmpl.LLM.Model = requireString("llm.model")
-	tmpl.LLM.APIKeyEnv = requireString("llm.api_key_env")
-	tmpl.LLM.PricePerMTokInUSD = requireFloat("llm.price_per_mtok_in_usd", true)
-	tmpl.LLM.PricePerMTokOutUSD = requireFloat("llm.price_per_mtok_out_usd", true)
+	hasProfile := doc.keys["llm.profile"]
+	if hasProfile {
+		profile := requireString("llm.profile")
+		ambiguous := false
+		for field := range doc.keys {
+			if strings.HasPrefix(field, "llm.") && field != "llm.profile" {
+				addErr(field, "cannot combine inline LLM fields with llm.profile")
+				ambiguous = true
+			}
+		}
+		if catalog == nil {
+			addErr("llm.profile", "selecting a profile requires an LLM catalog")
+		} else if profile != "" && !ambiguous {
+			resolved, err := catalog.Resolve(profile, getenv)
+			if err != nil {
+				addErr("llm.profile", err.Error())
+			} else {
+				tmpl.LLM = resolved
+			}
+		}
+	} else {
+		tmpl.LLM.Protocol = strings.TrimSpace(doc.scalars["llm.protocol"])
+		if !doc.keys["llm.protocol"] {
+			tmpl.LLM.Protocol = "openai"
+		}
+		if tmpl.LLM.Protocol != "openai" && tmpl.LLM.Protocol != "anthropic" {
+			addErr("llm.protocol", "must be openai or anthropic")
+		}
+		tmpl.LLM.BaseURL = requireString("llm.base_url")
+		tmpl.LLM.Model = requireString("llm.model")
+		tmpl.LLM.APIKeyEnv = requireString("llm.api_key_env")
+		tmpl.LLM.PricePerMTokInUSD = requireFloat("llm.price_per_mtok_in_usd", true)
+		tmpl.LLM.PricePerMTokOutUSD = requireFloat("llm.price_per_mtok_out_usd", true)
+	}
 
 	tmpl.Limits.PostsPerDay = requirePositiveInt("limits.posts_per_day")
 	tmpl.Limits.RepliesPerDay = requirePositiveInt("limits.replies_per_day")
@@ -262,7 +302,9 @@ func LoadFile(path string, getenv func(string) string) (Template, error) {
 		return NewSecret(val)
 	}
 
-	tmpl.LLM.APIKey = resolveSecret("llm.api_key_env", tmpl.LLM.APIKeyEnv)
+	if !hasProfile {
+		tmpl.LLM.APIKey = resolveSecret("llm.api_key_env", tmpl.LLM.APIKeyEnv)
+	}
 	tmpl.Telegram.BotToken = resolveSecret("telegram.bot_token_env", tmpl.Telegram.BotTokenEnv)
 	tmpl.Telegram.OwnerChatID = resolveSecret("telegram.owner_chat_id_env", tmpl.Telegram.OwnerChatIDEnv)
 
