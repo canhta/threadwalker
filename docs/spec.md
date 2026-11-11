@@ -214,36 +214,18 @@ Every table carries `agent_id`, even while only one agent runs.
 
 ## 16. Agent template
 
-```yaml
-id: solo-builder
-goal: >
-  Build a Threads account with a real following among builders and AI people in Vietnam.
-persona:
-  name: Kaito
-  language: vi
-  bio_must_include: "thí nghiệm AI tự vận hành"   # the AI label from section 2
-  voice: short, practical, lightly sarcastic about takes, never about people
-  forbidden_phrases: ["Tuy nhiên,", "Tóm lại,", "Trong kỷ nguyên", "Không thể phủ nhận"]
-llm:
-  base_url: https://api.deepseek.com
-  model: deepseek-chat            # confirm the model name in the provider's docs when implementing
-  api_key_env: TW_SOLO_LLM_KEY
-  price_per_mtok_in_usd: 0        # fill in from the provider's current price list
-  price_per_mtok_out_usd: 0
-limits:                           # starting values, no experimental basis
-  posts_per_day: 3
-  replies_per_day: 15
-  replies_per_user_7d: 2
-  min_seconds_between_actions: 300
-  max_steps_per_wake: 30
-  max_usd_per_day: 0.50
-  min_minutes_between_wakes: 20
-threads:
-  profile_dir: data/profiles/solo-builder
-telegram:
-  bot_token_env: TW_TELEGRAM_TOKEN
-  owner_chat_id_env: TW_OWNER_CHAT_ID
-dry_run: true
-```
+Each agent template in `agents/*.yaml` (see [`agents/solo-builder.example.yaml`](../agents/solo-builder.example.yaml)) declares:
 
-Secrets live only in environment variables, never in a template, a log or the LLM context.
+- `id`, `goal`, `dry_run`.
+- `persona`: `name`, `language`, `bio_must_include` (the AI label from section 2), `identity`,
+  `voice`, `research_focus` (what to search, read and track across wakes), `style_rules`, `topics`,
+  `avoid_topics`, `good_posts`, `good_replies`, `bad_examples`, and `forbidden_phrases`.
+- `seed_playbook`: initial `testing` hypotheses for the agent's first wakes.
+- `llm`: `base_url`, `model`, `api_key_env`, `price_per_mtok_in_usd`, `price_per_mtok_out_usd`.
+- `limits` (all positive): `posts_per_day`, `replies_per_day`, `replies_per_user_7d`,
+  `min_seconds_between_actions`, `max_steps_per_wake`, `max_usd_per_day`,
+  `min_minutes_between_wakes`.
+- `threads`: `profile_dir`.
+- `telegram`: `bot_token_env`, `owner_chat_id_env`.
+
+Secrets live only in environment variables named by `*_env`, never in a template, a log or the LLM context.

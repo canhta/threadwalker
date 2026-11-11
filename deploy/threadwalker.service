@@ -1,0 +1,23 @@
+[Unit]
+Description=ThreadWalker autonomous Threads experiment
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=threadwalker
+Group=threadwalker
+WorkingDirectory=/opt/threadwalker
+EnvironmentFile=/etc/threadwalker/threadwalker.env
+ExecStartPre=/opt/threadwalker/threadwalker check -agents /opt/threadwalker/agents -db /opt/threadwalker/data/threadwalker.db
+ExecStart=/opt/threadwalker/threadwalker check -agents /opt/threadwalker/agents -db /opt/threadwalker/data/threadwalker.db
+Restart=on-failure
+RestartSec=10s
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/threadwalker/data
+
+[Install]
+WantedBy=multi-user.target

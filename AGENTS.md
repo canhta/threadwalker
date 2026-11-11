@@ -21,7 +21,9 @@ The issue is done when every "Done when" box is ticked with evidence and
 - A PR changes what its issue's Scope lists. Anything else you notice becomes a new issue.
 - If the issue and the spec disagree, or the spec is silent, ask in the issue before writing code.
 - A changed decision is an edit to `docs/spec.md` in the same PR. The repo holds one statement of
-  each decision, and one file per topic: extend the existing file.
+  each decision, and one file per topic: extend the existing file. Never keep dual copies of
+  templates, schemas or code in `docs/spec.md` once the canonical file exists in the repo; keep the
+  contract in `docs/spec.md` and point to the file.
 - Where the spec says "untested" or lists an unknown, measure it and record the result in
   `docs/research/`.
 - `AGENTS.md`, the guards and the invariants below change only in a PR the owner asked for.
