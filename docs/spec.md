@@ -78,7 +78,7 @@ step and output bounds; they never access Threads, Telegram or the VPS. Canonica
 report/runner code live in [`internal/eval`](../internal/eval); reproduce, comparison and failure
 inspection commands live in [`docs/evals.md`](evals.md). Issues #5/#6/#7/#8/#9/#10/#12 must extend
 the suite as their components land; these evaluations certify only implemented client,
-protocol, configuration and accounting behavior. **(decision)**
+protocol, configuration, accounting and local runtime behavior. **(decision)**
 
 ## 4. One wake
 
@@ -88,6 +88,24 @@ protocol, configuration and accounting behavior. **(decision)**
 3. The agent calls tools until it ends the wake or hits the step or token limit.
 4. Every tool call passes through the guards, is written to the audit log, then executes.
 5. The agent writes a note for next time and schedules its next wake.
+
+The local runtime serializes wakes across configured agents. `schedule_next_wake` clamps to
+`now + min_minutes_between_wakes` through `now + 24h`; the configured minimum is 1..1440 minutes.
+A wake reserves a fallback schedule of `now + 60min` (or the configured minimum if longer) before
+any tool runs. Startup closes open wakes as `interrupted`, retires unfinished tool audit outcomes
+as unknown/assumed sent with retry disabled, and advances the affected agent's schedule to at
+least that fallback interval after restart. It never reloads the interrupted conversation or
+executes its pending tool/action intent. Paused and killed agents stay stopped. **(decision)**
+
+`run -once -offline` uses an isolated temporary DB, a built-in synthetic template with dummy
+credentials, an in-process scripted LLM transport and synthetic trend/Threads fixtures. It reads
+no environment credentials and makes no network request. `-soak-hours` uses injected logical time
+and an actual local SQLite close/reopen to simulate a restart; its exported evidence is synthetic,
+not elapsed live qualification. The canonical implementation and fixtures are in
+[`internal/agent`](../internal/agent) and [`internal/eval/testdata/runtime-v1.json`](../internal/eval/testdata/runtime-v1.json).
+Normal `run` loads configured LLM settings, with custom endpoints supported by that configuration.
+All runtime startup requires `dry_run`; the #5 Threads backend only writes dry-run actions and
+never publishes. Playbook and metrics context are empty until their implementing issues land.
 
 Two rules keep a wake from doing damage **(sourced: patterns in `docs/research/reference-repos.md`)**:
 
@@ -105,11 +123,11 @@ profile/model/protocol IDs, wake ID, a local request sequence, attempt and a loc
 call ID (wake/step), never provider-supplied IDs. Durations use the injected client clock. Events
 carry operation, outcome/reason, HTTP status when known, steps, tokens and locally computed USD;
 unknown or malformed tool names are omitted. `check` emits validation start/configuration/result.
-These are client boundaries; they do not claim scheduler, guard, action audit or browser coverage.
+The runtime adds wake, scheduler and context events; guarded tool events cover the local running-state and audit boundary. Browser and full rule-policy coverage remain in their implementing issues.
 
-Future event ownership is an acceptance requirement in the implementing issues: #5 adds wake
+Event ownership is an acceptance requirement in the implementing issues: #5 implements wake
 lifecycle (`wake.started/finished/stopped`) and tool lifecycle (`tool.started/finished`) plus
-scheduler/context/note/trend outcomes; #6 adds `guard.checked` and `tool.blocked`; #7 adds
+scheduler/context/note/trend outcomes and initial `guard.checked`, `tool.blocked` and `audit.recorded` outcomes; #6 extends full rule-policy coverage; #7 adds
 `telegram.operation.finished` and kill-switch outcomes; #8 adds `browser.operation.finished`
 and real Threads-tool outcomes; #9 validates those events in the integrated live run. Each adds
 captured-log and offline eval cases through the same logger/record contract before completion.
@@ -121,7 +139,7 @@ No future component is considered instrumented until its issue implements and te
 | Group | Tools | Notes |
 |---|---|---|
 | Threads (browser) | `read_feed`, `search`, `read_post`, `post`, `reply`, `read_own_metrics` | One browser profile per agent |
-| Outside sources | `fetch_trends` (Hacker News API, Product Hunt RSS, Google Trends VN RSS) | All three responded when the research called them |
+| Outside sources | `fetch_trends` (Hacker News API, Product Hunt RSS, Google Trends VN RSS) | Bounded results round-robin across sources; any source failure fails the call. Network behavior is tested offline with fixtures, not claimed as current live availability |
 | Notes | `note_write`, `note_search` | SQLite FTS5; vector search is not justified at this scale **(sourced)** |
 | Playbook | `playbook_read`, `playbook_propose` | See section 7 |
 | Owner | `notify_owner`, `ask_owner` | Telegram; `ask_owner` never blocks the wake |
@@ -319,7 +337,7 @@ Each agent template in `agents/*.yaml` (see [`agents/solo-builder.example.yaml`]
   `min_seconds_between_actions`, `max_steps_per_wake`, `max_usd_per_day`,
   `min_minutes_between_wakes`.
 - `threads`: `profile_dir`.
-- `telegram`: `bot_token_env`, `owner_chat_id_env`.
+- `telegram`: optional `enabled` (defaults to `false`); `bot_token_env` and `owner_chat_id_env` are required and resolved only when enabled. The canonical example keeps this optional integration disabled for local operation without a bot.
 
 Secrets live only in environment variables named by `*_env`, never in a template, catalog, log
 or the LLM context. Catalog loading validates references and configuration without reading keys;

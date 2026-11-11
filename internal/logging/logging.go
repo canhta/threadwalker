@@ -13,6 +13,20 @@ import (
 // Stable events emitted by the components implemented today. LLM tool events
 // describe only the client dispatcher boundary, not a guard or audit outcome.
 const (
+	WakeStarted        = "wake.started"
+	WakeFinished       = "wake.finished"
+	WakeStopped        = "wake.stopped"
+	SchedulerScheduled = "scheduler.scheduled"
+	SchedulerChecked   = "scheduler.checked"
+	ContextBuilt       = "context.built"
+	ToolStarted        = "tool.started"
+	ToolFinished       = "tool.finished"
+	GuardChecked       = "guard.checked"
+	ToolBlocked        = "tool.blocked"
+	AuditRecorded      = "audit.recorded"
+	NoteWritten        = "note.written"
+	NoteSearched       = "note.searched"
+	TrendsFetched      = "trends.fetched"
 	CheckStarted       = "check.started"
 	CheckConfigured    = "check.configured"
 	CheckFinished      = "check.finished"

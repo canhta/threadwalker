@@ -100,10 +100,10 @@ func TestLoadFile_ValidExampleTemplate(t *testing.T) {
 	if tmpl.Threads.ProfileDir != "data/profiles/solo-builder" {
 		t.Errorf("Threads.ProfileDir = %q", tmpl.Threads.ProfileDir)
 	}
-	if tmpl.Telegram.BotToken.Expose() != "secret-tg-token-value" {
+	if tmpl.Telegram.Enabled || tmpl.Telegram.BotToken.Expose() != "" {
 		t.Errorf("Telegram.BotToken.Expose() = %q", tmpl.Telegram.BotToken.Expose())
 	}
-	if tmpl.Telegram.OwnerChatID.Expose() != "secret-owner-chat-id" {
+	if tmpl.Telegram.OwnerChatID.Expose() != "" {
 		t.Errorf("Telegram.OwnerChatID.Expose() = %q", tmpl.Telegram.OwnerChatID.Expose())
 	}
 	if !tmpl.DryRun {
@@ -162,7 +162,7 @@ func TestLoadFile_MissingRequiredFields(t *testing.T) {
 	if err != nil {
 		t.Fatalf("reading example template: %v", err)
 	}
-	baseYAML := string(rawBytes)
+	baseYAML := strings.Replace(string(rawBytes), "enabled: false", "enabled: true", 1)
 
 	for _, tc := range requiredFields {
 		t.Run(tc.field, func(t *testing.T) {
@@ -295,7 +295,14 @@ func TestLoadFile_UnsetSecretVariables(t *testing.T) {
 		{field: "telegram.owner_chat_id_env", envVar: "TELEGRAM_OWNER_CHAT_ID"},
 	}
 
-	examplePath := filepath.Join("..", "..", "agents", "solo-builder.example.yaml")
+	raw, err := os.ReadFile(filepath.Join("..", "..", "agents", "solo-builder.example.yaml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	examplePath := filepath.Join(t.TempDir(), "enabled.yaml")
+	if err = os.WriteFile(examplePath, []byte(strings.Replace(string(raw), "enabled: false", "enabled: true", 1)), 0600); err != nil {
+		t.Fatal(err)
+	}
 	for _, tc := range cases {
 		t.Run(tc.field, func(t *testing.T) {
 			base := validEnv()

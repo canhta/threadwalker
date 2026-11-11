@@ -7,6 +7,8 @@ import (
 	"io"
 	"log/slog"
 	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/canhta/threadwalker/internal/config"
@@ -15,7 +17,9 @@ import (
 )
 
 func main() {
-	os.Exit(run(context.Background(), os.Args[1:], os.Getenv, os.Stdout, os.Stderr))
+	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer cancel()
+	os.Exit(run(ctx, os.Args[1:], os.Getenv, os.Stdout, os.Stderr))
 }
 
 func run(ctx context.Context, args []string, getenv func(string) string, stdout, stderr io.Writer) int {
@@ -23,18 +27,20 @@ func run(ctx context.Context, args []string, getenv func(string) string, stdout,
 
 	if len(args) == 0 {
 		logging.Emit(ctx, logger, slog.LevelError, logging.Record{Event: logging.CheckFinished, Operation: "check", Outcome: "error", Reason: "missing_command"})
-		fmt.Fprintln(stderr, "usage: threadwalker <check|eval>")
+		fmt.Fprintln(stderr, "usage: threadwalker <check|run|eval>")
 		return 1
 	}
 
 	switch args[0] {
+	case "run":
+		return runRuntime(ctx, args[1:], getenv, stdout, stderr)
 	case "eval":
 		return runEval(ctx, args[1:], getenv, stdout, stderr)
 	case "check":
 		return runCheck(ctx, args[1:], getenv, stdout, stderr)
 	default:
 		logging.Emit(ctx, logger, slog.LevelError, logging.Record{Event: logging.CheckFinished, Operation: "check", Outcome: "error", Reason: "unknown_command"})
-		fmt.Fprintln(stderr, "unknown command (expected: check or eval)")
+		fmt.Fprintln(stderr, "unknown command (expected: check, run or eval)")
 		return 1
 	}
 }

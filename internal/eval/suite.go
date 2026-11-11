@@ -109,12 +109,12 @@ func validateSuite(s *Suite) error {
 	}
 	seen := map[string]bool{}
 	for _, c := range s.Cases {
-		if !safeID(c.ID) || seen[c.ID] || len(c.Messages) == 0 || len(c.Responses) == 0 {
+		if !safeID(c.ID) || seen[c.ID] || (c.Runtime == nil && (len(c.Messages) == 0 || len(c.Responses) == 0)) {
 			return invalid()
 		}
 		seen[c.ID] = true
 		switch c.Expect.EndReason {
-		case "completed", "step_limit", "budget", "provider_error", "invalid_response", "cancelled", "accounting_error":
+		case "completed", "step_limit", "budget", "provider_error", "invalid_response", "cancelled", "accounting_error", "stall_stop":
 		default:
 			return invalid()
 		}
@@ -123,6 +123,18 @@ func validateSuite(s *Suite) error {
 		}
 		if c.Limits.MaxSteps < 0 || c.Limits.MaxOutputTokens < 0 || !finiteNonnegative(c.Limits.MaxUSD) {
 			return invalid()
+		}
+		if c.Runtime != nil {
+			rt := c.Runtime
+			if len(c.Messages) > 0 || len(c.Responses) > 0 || len(c.Tools) > 0 || len(c.ToolOutputs) > 0 || rt.ExpectedNextMinutes < 1 || rt.ExpectedNextMinutes > 1440 || rt.ExpectedActions < 0 || len(rt.Calls) > 30 {
+				return invalid()
+			}
+			for _, call := range rt.Calls {
+				if call.Type != "function" || !safeID(call.Function.Name) || !jsonObject([]byte(call.Function.Arguments)) {
+					return invalid()
+				}
+			}
+			continue
 		}
 		names := map[string]bool{}
 		for _, t := range c.Tools {

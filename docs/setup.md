@@ -6,6 +6,30 @@ Use the Go version declared in [`go.mod`](../go.mod). From the repo root:
 go vet ./... && go test ./...
 ```
 
+## Local smoke and logical soak
+
+No account, bot, environment file or provider key is needed for the offline runtime:
+
+```sh
+go run ./cmd/threadwalker run -once -offline
+```
+
+The command runs one real guarded wake with synthetic LLM/trend/Threads services and an isolated
+temporary SQLite database, removed on exit. Add `-db /tmp/threadwalker-smoke.db` to inspect its
+rows afterward. Every action has `dry_run=1`; this cannot publish to Threads.
+
+From the repository root, export a deterministic 48-hour **logical-time** soak with one simulated
+restart and the shared runtime eval report to a fresh directory:
+
+```sh
+go run ./cmd/threadwalker run -offline -soak-hours 48 -evidence /tmp/threadwalker-soak
+```
+
+`wakes.json` contains redacted lifecycle/count evidence, `events.jsonl` contains metadata-only
+operational events (JSON by default), and `eval.json` uses the existing eval report contract.
+The soak uses an isolated empty database; a supplied `-db` must also be empty. This takes seconds,
+not 48 elapsed hours, and does not qualify the real services tracked in #2/#18/#21.
+
 ## Private configuration
 
 Keep credentials in `.env` at the repo root, which Git ignores. Create it from
@@ -99,7 +123,9 @@ by its `api_key_env`. Set `threads.profile_dir` to the saved browser profile on
 the machine where the agent will run. The template's `*_env` fields can select
 different Telegram variable names when needed.
 
-Once the selected LLM key and both Telegram entries are available, run `check`.
+Set `telegram.enabled: false` (or omit the Telegram block) for local operation without a bot.
+The canonical example sets `enabled: false`; only `enabled: true` requires both Telegram
+entries. Once the selected LLM key and any enabled Telegram entries are available, run `check`.
 Add `-llms llms.example.yaml` when the template selects a profile; omit it for a
 legacy inline template:
 
@@ -109,7 +135,7 @@ go run ./cmd/threadwalker check -agents agents -db data/threadwalker.db
 
 `check` validates templates and SQLite migrations without calling external
 services. At its default `info` level it emits JSON lifecycle records to stdout.
-Telegram entries are currently required even in dry run.
+Telegram is disabled by default; disabled integrations do not read their credentials.
 
 ## Operational logs
 
@@ -158,17 +184,17 @@ Tool IDs are local `wake/step` values, rather than arbitrary provider IDs.
 
 The `wake_id 42` above and any durations or costs are synthetic example values,
 not production evidence. `llm.tool.finished` covers only the client dispatcher
-boundary. [`deploy/threadwalker.service`](../deploy/threadwalker.service) still
-runs `check` only, so journald will not contain wake-loop events until a
-scheduler issue implements them.
+boundary. The runtime additionally emits wake, scheduler, context, guarded tool, audit,
+note and trend outcomes. The optional systemd unit runs the dry-run scheduler; it does not
+qualify real browser or Telegram operation.
 
 ## Accounts and live checks
 
 For the [browser spike (#2)](https://github.com/canhta/threadwalker/issues/2),
-provide SSH access to the VPS and a disposable Threads account with an
-AI-experiment disclosure in its bio. Complete login and 2FA yourself, and leave
-the logged-in browser profile on the VPS. The SSH target, saved profile path and
-approved reply URL are setup inputs, not environment variables. Passwords and
+provide a disposable Threads account with an AI-experiment disclosure in its bio.
+Complete login and 2FA yourself on the chosen host, and leave the saved browser profile there.
+A VPS is optional; an IP-specific conclusion requires measurement from that IP.
+The saved profile path and approved reply URL are setup inputs. Passwords and
 session cookies stay out of chat and Git.
 
 For [Telegram (#7)](https://github.com/canhta/threadwalker/issues/7), create a bot
@@ -182,10 +208,14 @@ needs your approval before `dry_run` becomes `false`. The
 another disposable account and saved login. Keep these issues open until their
 measured acceptance criteria hold.
 
-[`deploy/threadwalker.service`](../deploy/threadwalker.service) currently runs
-only `check`. It expects environment variables in
-`/etc/threadwalker/threadwalker.env`; the root `.env` is local setup storage. The
-unit does not yet start an agent loop.
+For a configured local scheduler, run `threadwalker run -agents agents -db data/threadwalker.db`
+(with `-llms` if needed). This may call the selected LLM and trend sources; offline verification
+uses the commands above. `-once` executes at most one due wake. Startup rejects non-dry-run
+templates, and restart advances interrupted wakes without replaying their actions.
+
+The optional [`deploy/threadwalker.service`](../deploy/threadwalker.service) starts that same
+scheduler on an operator-chosen host. Its environment file is optional; selected enabled
+integrations still validate their required variables. No service is installed by these commands.
 
 ## Opt-in LLM protocol checks
 

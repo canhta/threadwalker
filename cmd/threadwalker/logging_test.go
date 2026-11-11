@@ -170,7 +170,8 @@ func TestCLILoggingExplicitFlagsOnSuccessAndFailure(t *testing.T) {
 
 	t.Run("failure debug JSON", func(t *testing.T) {
 		dbPath := filepath.Join(t.TempDir(), "threadwalker.db")
-		// Telegram values are missing, so template validation must fail.
+		// Explicitly enabled Telegram requires credentials and must fail.
+		agentsDir := enabledTelegramAgentDir(t)
 		env := map[string]string{"LLM_API_KEY": cmdLoggingFakeKey}
 		code, stdout, stderr := cmdLoggingRun(t, []string{
 			"check", "-agents", agentsDir, "-db", dbPath,

@@ -15,7 +15,17 @@ type Suite struct {
 	Cases       []Case `json:"cases"`
 	Digest      string `json:"-"`
 }
+type RuntimeCase struct {
+	Calls               []llm.ToolCall `json:"calls"`
+	Restart             bool           `json:"restart,omitempty"`
+	ExpectedNextMinutes int            `json:"expected_next_minutes"`
+	ExpectedActions     int            `json:"expected_actions"`
+	ExpectedNote        string         `json:"expected_note,omitempty"`
+	CheckUntrusted      bool           `json:"check_untrusted,omitempty"`
+}
+
 type Case struct {
+	Runtime     *RuntimeCase          `json:"runtime,omitempty"`
 	ID          string                `json:"id"`
 	Description string                `json:"description,omitempty"`
 	Messages    []llm.Message         `json:"messages"`

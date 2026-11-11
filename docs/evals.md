@@ -129,11 +129,24 @@ estimate, not a guarantee of provider billing; a server can report an overshoot,
 truthfully. Reservations remain charged when billing status is unknown, such as a transport error
 or missing usage. Never describe synthetic or estimated cost as an invoice.
 
+## Local runtime cases
+
+```sh
+go run ./cmd/threadwalker eval -suite internal/eval/testdata/runtime-v1.json -seed 1 -repeat 2 -out /tmp/runtime-eval.json
+```
+
+These offline cases run the production wake lifecycle, guarded dispatcher and temporary SQLite
+for both protocols: note carryover, dry-run action, default/minimum/maximum scheduling, step/stall
+stops, interrupted-no-replay and every external-result envelope. The optional `runtime` case
+contract in `internal/eval/types.go` declares synthetic calls and persistent-state expectations;
+it has no live mode. Reports retain the shared identities, normalized usage, safe reasons and
+separately labelled wall-clock timing. The logical soak command in [setup](setup.md) exports the
+same report alongside wake and event evidence.
+
 ## Pending coverage
 
-The current suites cover the client, protocols, configuration and accounting boundaries. They do
-not certify components that do not exist yet. Wake/no-replay/stall cases belong to
-[#5](https://github.com/canhta/threadwalker/issues/5), guard and do-not-contact boundaries to
+The current suites cover the client, protocols, configuration, accounting and local runtime boundaries.
+They do not certify components that do not exist yet. Full guard policy and do-not-contact boundaries belong to
 [#6](https://github.com/canhta/threadwalker/issues/6), Telegram/kill-switch cases to
 [#7](https://github.com/canhta/threadwalker/issues/7), browser/Threads cases to
 [#8](https://github.com/canhta/threadwalker/issues/8), and integrated live validation to

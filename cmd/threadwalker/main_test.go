@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -37,7 +38,7 @@ func TestRun_CheckPassesWithValidEnvAndLeaksNoSecrets(t *testing.T) {
 
 func TestRun_CheckFailsAndPrintsEachErrorWhenInvalid(t *testing.T) {
 	getenv := func(string) string { return "" }
-	agentsDir := filepath.Join("..", "..", "agents")
+	agentsDir := enabledTelegramAgentDir(t)
 	dbPath := filepath.Join(t.TempDir(), "threadwalker.db")
 
 	var stdout, stderr bytes.Buffer
@@ -76,4 +77,18 @@ func TestRun_NoArgsAndBadFlagsAndBadDBPathExitOne(t *testing.T) {
 	if code := run(context.Background(), []string{"check", "-agents", agentsDir, "-db", badDBPath}, func(string) string { return "val" }, &stdout, &stderr); code != 1 {
 		t.Fatalf("run(check with directory as db) = %d, want 1", code)
 	}
+}
+
+// Explicitly enabled fixture preserves check's complete credential diagnostics.
+func enabledTelegramAgentDir(t *testing.T) string {
+	t.Helper()
+	raw, err := os.ReadFile(filepath.Join("..", "..", "agents", "solo-builder.example.yaml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	dir := t.TempDir()
+	if err = os.WriteFile(filepath.Join(dir, "agent.yaml"), []byte(strings.Replace(string(raw), "enabled: false", "enabled: true", 1)), 0600); err != nil {
+		t.Fatal(err)
+	}
+	return dir
 }

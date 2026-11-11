@@ -43,6 +43,13 @@ func Run(ctx context.Context, suite *Suite, opts Options) (Report, error) {
 	if opts.Mode == "live" && (len(opts.Profiles) == 0 || len(opts.CaseIDs) == 0 || opts.MaxUSD <= 0 || opts.MaxSteps <= 0 || opts.MaxOutputTokens <= 0) {
 		return Report{}, errors.New("configuring live eval: explicit profiles, cases and positive spend/step/output caps required")
 	}
+	if opts.Mode == "live" {
+		for _, c := range suite.Cases {
+			if c.Runtime != nil {
+				return Report{}, errors.New("runtime eval requires offline mode")
+			}
+		}
+	}
 	profiles := append([]Profile(nil), opts.Profiles...)
 	if len(profiles) == 0 {
 		for _, protocol := range []string{"openai", "anthropic"} {
@@ -119,6 +126,9 @@ func Run(ctx context.Context, suite *Suite, opts Options) (Report, error) {
 }
 
 func runCase(ctx context.Context, c Case, p Profile, repeat int, opts Options, liveBudget *reservation) CaseResult {
+	if c.Runtime != nil {
+		return runRuntimeCase(ctx, c, p, repeat, opts)
+	}
 	started := time.Now()
 	r := CaseResult{CaseID: c.ID, ProfileID: p.ID, ProviderID: p.ProviderID, Model: p.Config.Model, Protocol: p.Config.Protocol, Repeat: repeat, ToolCalls: []string{}}
 	steps, output, usd := effectiveLimits(opts, c.Limits)

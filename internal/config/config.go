@@ -89,6 +89,7 @@ type ThreadsConfig struct {
 }
 
 type TelegramConfig struct {
+	Enabled        bool
 	BotTokenEnv    string
 	BotToken       Secret
 	OwnerChatIDEnv string
@@ -271,10 +272,24 @@ func LoadFileWithCatalog(path string, getenv func(string) string, catalog *Catal
 	tmpl.Limits.MaxStepsPerWake = requirePositiveInt("limits.max_steps_per_wake")
 	tmpl.Limits.MaxUSDPerDay = requireFloat("limits.max_usd_per_day", false)
 	tmpl.Limits.MinMinutesBetweenWakes = requirePositiveInt("limits.min_minutes_between_wakes")
+	if tmpl.Limits.MinMinutesBetweenWakes > 1440 {
+		addErr("limits.min_minutes_between_wakes", "must be at most 1440")
+	}
 
 	tmpl.Threads.ProfileDir = requireString("threads.profile_dir")
-	tmpl.Telegram.BotTokenEnv = requireString("telegram.bot_token_env")
-	tmpl.Telegram.OwnerChatIDEnv = requireString("telegram.owner_chat_id_env")
+	if doc.keys["telegram.enabled"] {
+		raw := doc.scalars["telegram.enabled"]
+		enabled, err := strconv.ParseBool(strings.TrimSpace(raw))
+		if err != nil {
+			addErr("telegram.enabled", "must be a boolean")
+		} else {
+			tmpl.Telegram.Enabled = enabled
+		}
+	}
+	if tmpl.Telegram.Enabled {
+		tmpl.Telegram.BotTokenEnv = requireString("telegram.bot_token_env")
+		tmpl.Telegram.OwnerChatIDEnv = requireString("telegram.owner_chat_id_env")
+	}
 
 	if rawDryRun, ok := doc.scalars["dry_run"]; !ok || strings.TrimSpace(rawDryRun) == "" {
 		addErr("dry_run", "required field is missing")
@@ -305,8 +320,10 @@ func LoadFileWithCatalog(path string, getenv func(string) string, catalog *Catal
 	if !hasProfile {
 		tmpl.LLM.APIKey = resolveSecret("llm.api_key_env", tmpl.LLM.APIKeyEnv)
 	}
-	tmpl.Telegram.BotToken = resolveSecret("telegram.bot_token_env", tmpl.Telegram.BotTokenEnv)
-	tmpl.Telegram.OwnerChatID = resolveSecret("telegram.owner_chat_id_env", tmpl.Telegram.OwnerChatIDEnv)
+	if tmpl.Telegram.Enabled {
+		tmpl.Telegram.BotToken = resolveSecret("telegram.bot_token_env", tmpl.Telegram.BotTokenEnv)
+		tmpl.Telegram.OwnerChatID = resolveSecret("telegram.owner_chat_id_env", tmpl.Telegram.OwnerChatIDEnv)
+	}
 
 	if len(errs) > 0 {
 		return Template{}, errors.Join(errs...)
