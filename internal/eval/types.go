@@ -25,6 +25,7 @@ type RuntimeCase struct {
 }
 
 type Case struct {
+	Guard       *GuardCase            `json:"guard,omitempty"`
 	Runtime     *RuntimeCase          `json:"runtime,omitempty"`
 	ID          string                `json:"id"`
 	Description string                `json:"description,omitempty"`

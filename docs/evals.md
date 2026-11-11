@@ -143,11 +143,38 @@ it has no live mode. Reports retain the shared identities, normalized usage, saf
 separately labelled wall-clock timing. The logical soak command in [setup](setup.md) exports the
 same report alongside wake and event evidence.
 
+## Guard policy cases
+
+```sh
+go run ./cmd/threadwalker eval -suite internal/eval/testdata/guard-v1.json \
+  -seed 1 -repeat 2 -out /tmp/guard-eval.json
+go test ./internal/guard ./internal/tools ./internal/eval -run 'Policy|Contact|Guard|Stop'
+```
+
+The `guard` component contract drives the production dispatcher, mandatory guard and temporary
+SQLite directly. Its `steps` declare nanosecond offsets, tool calls, owner status/contact changes
+and addressed stop observations with expected fixed refusal codes. It covers daily/contact caps,
+UTC/rolling-window expiry, spacing, 500/501 Unicode code points, forbidden case variants, URL and
+mention rules, canonical thread/day identity, permanent contacts, configured/default stop requests,
+paused/killed tools and mandatory construction. These cases make no provider, browser or Telegram
+request; profile/protocol labels are report dimensions and tokens/cost are zero. Daily-quota wake
+termination also has `TestDailyActionLimitStopsWakeBeforeFurtherTools`; atomic reservation and
+failed-effect conservation have `TestPolicyReservesQuotaBeforeEffect` and
+`TestConcurrentGuardsCannotSpendLastSlotTwice`.
+
+`TestCapturedGuardPolicyEvents` reproduces the metadata-only trace at
+[`guard-v1-events.jsonl`](../internal/eval/testdata/guard-v1-events.jsonl); only the nondeterministic
+logger wall timestamp is removed. Rule IDs live in `reason`, and audit rows keep the same ID in
+`blocked_by`. The trace contains no usernames, text or URLs. To intentionally regenerate after
+reviewing an event-contract change, run
+`THREADWALKER_UPDATE_GUARD_TRACE=1 go test ./internal/eval -run TestCapturedGuardPolicyEvents`.
+Shared report identities, safe outcomes and separately labelled wall timing remain unchanged.
+These are synthetic implementation checks, not real service qualification.
+
 ## Pending coverage
 
 The current suites cover the client, protocols, configuration, accounting and local runtime boundaries.
-They do not certify components that do not exist yet. Full guard policy and do-not-contact boundaries belong to
-[#6](https://github.com/canhta/threadwalker/issues/6), Telegram/kill-switch cases to
+They do not certify components that do not exist yet. Telegram/kill-switch cases belong to
 [#7](https://github.com/canhta/threadwalker/issues/7), browser/Threads cases to
 [#8](https://github.com/canhta/threadwalker/issues/8), and integrated live validation to
 [#9](https://github.com/canhta/threadwalker/issues/9). Playbook/gate cases belong to

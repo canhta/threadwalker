@@ -69,15 +69,16 @@ func (g *Guard) content(a Attempt) (*actionIntent, string) {
 			return nil, "invalid_tool_arguments"
 		}
 		intent.thread = thread
+		// An author mention may contain dots; check URL syntax separately
+		// from mention identity so mailto/HTTP links retain the URL rule ID.
+		if links.MatchString(mentions.ReplaceAllString(intent.Text, "")) {
+			return nil, "reply_url"
+		}
 		for _, mention := range mentions.FindAllString(intent.Text, -1) {
 			normalized, err := store.NormalizeUsername(mention)
 			if err != nil || normalized != username {
 				return nil, "reply_mention"
 			}
-		}
-		// An allowed author mention may contain dots; it is an identifier, not a link.
-		if links.MatchString(mentions.ReplaceAllString(intent.Text, "")) {
-			return nil, "reply_url"
 		}
 	}
 	l := g.opts.Template.Limits

@@ -120,7 +120,7 @@ func TestPermanentDoNotContactRefusesRepliesWithNoAction(t *testing.T) {
 
 	for _, username := range []string{"synthetic.contact", "paused.target"} {
 		beforeActions := h.actionRows()
-		_, err := h.dispatch("reply", fmt.Sprintf(`{"text":"synthetic reply to %s","target_username":%q,"target_url":"https://threads.test/@%s/post/1"}`, username, username, username))
+		_, err := h.dispatch("reply", fmt.Sprintf(`{"text":"synthetic reply to @%s","target_username":%q,"target_url":"https://threads.test/@%s/post/1"}`, username, username, username))
 		if err == nil || !errors.Is(err, guard.ErrBlocked) {
 			t.Fatalf("%s reply was not refused by the guard: %v", username, err)
 		}

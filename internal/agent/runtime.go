@@ -167,6 +167,8 @@ func (r *Runtime) Wake(ctx context.Context) (wake WakeResult, wakeErr error) {
 	switch {
 	case err == nil:
 		wake.EndReason = "completed"
+	case errors.Is(err, guard.ErrActionLimit):
+		wake.EndReason = "action_limit"
 	case errors.Is(err, guard.ErrAudit):
 		wake.EndReason = "audit_failure"
 	case errors.Is(err, tools.ErrStallStop):
@@ -182,7 +184,7 @@ func (r *Runtime) Wake(ctx context.Context) (wake WakeResult, wakeErr error) {
 	default:
 		wake.EndReason = "provider_error"
 	}
-	if err != nil && wake.EndReason != "stall_stop" && wake.EndReason != "step_limit" && wake.EndReason != "budget" {
+	if err != nil && wake.EndReason != "stall_stop" && wake.EndReason != "step_limit" && wake.EndReason != "budget" && wake.EndReason != "action_limit" {
 		return wake, fmt.Errorf("running wake: %w", err)
 	}
 	return wake, nil

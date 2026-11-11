@@ -109,12 +109,12 @@ func validateSuite(s *Suite) error {
 	}
 	seen := map[string]bool{}
 	for _, c := range s.Cases {
-		if !safeID(c.ID) || seen[c.ID] || (c.Runtime == nil && (len(c.Messages) == 0 || len(c.Responses) == 0)) {
+		if !safeID(c.ID) || seen[c.ID] || (c.Guard == nil && c.Runtime == nil && (len(c.Messages) == 0 || len(c.Responses) == 0)) {
 			return invalid()
 		}
 		seen[c.ID] = true
 		switch c.Expect.EndReason {
-		case "completed", "step_limit", "budget", "provider_error", "invalid_response", "cancelled", "accounting_error", "stall_stop":
+		case "completed", "step_limit", "budget", "provider_error", "invalid_response", "cancelled", "accounting_error", "stall_stop", "action_limit":
 		default:
 			return invalid()
 		}
@@ -123,6 +123,24 @@ func validateSuite(s *Suite) error {
 		}
 		if c.Limits.MaxSteps < 0 || c.Limits.MaxOutputTokens < 0 || !finiteNonnegative(c.Limits.MaxUSD) {
 			return invalid()
+		}
+		if c.Guard != nil {
+			g := c.Guard
+			if c.Runtime != nil || len(c.Messages) > 0 || len(c.Responses) > 0 || len(c.Tools) > 0 || len(c.ToolOutputs) > 0 || g.PostsPerDay < 0 || g.RepliesPerDay < 0 || g.RepliesPerUser7d < 0 || g.SpacingSeconds < 0 || g.ExpectedActions < 0 || len(g.Steps) > 100 || len(g.Steps) == 0 {
+				return invalid()
+			}
+			for _, step := range g.Steps {
+				if step.OffsetNS < 0 {
+					return invalid()
+				}
+				if step.Status != "" && step.Status != "running" && step.Status != "paused" && step.Status != "killed" {
+					return invalid()
+				}
+				if step.Call != nil && (step.Call.Type != "function" || !safeID(step.Call.Function.Name) || !jsonObject([]byte(step.Call.Function.Arguments))) {
+					return invalid()
+				}
+			}
+			continue
 		}
 		if c.Runtime != nil {
 			rt := c.Runtime

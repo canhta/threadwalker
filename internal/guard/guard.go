@@ -39,6 +39,18 @@ type Attempt struct {
 var ErrAudit = errors.New("tool audit failed")
 var ErrBlocked = errors.New("tool blocked")
 
+// ErrActionLimit stops this wake after a daily action quota refuses an intent.
+// The agent stays running; its next wake can use the next UTC day quota.
+var ErrActionLimit = errors.New("daily action limit")
+
+type actionLimitError struct{ rule string }
+
+func (e *actionLimitError) Error() string {
+	return "executing guarded tool: " + e.rule + ": daily action limit"
+}
+func (e *actionLimitError) Unwrap() error           { return errors.Join(ErrBlocked, ErrActionLimit) }
+func (e *actionLimitError) TerminalToolError() bool { return true }
+
 type auditError struct{ cause error }
 
 func (e *auditError) Error() string           { return "recording tool audit: failed" }
@@ -54,7 +66,7 @@ func New(opts Options) (*Guard, error) {
 	}
 	phrases := opts.Template.Guard.StopPhrases
 	if phrases == nil {
-		phrases = []string{"stop replying", "do not contact", "don’t contact", "don't contact", "leave me alone", "đừng trả lời", "đừng liên hệ", "ngừng trả lời", "dừng trả lời", "đừng làm phiền"}
+		phrases = []string{"stop", "stop replying", "do not contact", "don’t contact", "don't contact", "leave me alone", "đừng trả lời", "đừng liên hệ", "ngừng trả lời", "dừng trả lời", "đừng làm phiền"}
 	}
 	for _, phrase := range phrases {
 		if strings.TrimSpace(phrase) == "" {
@@ -136,6 +148,9 @@ func (g *Guard) Execute(ctx context.Context, a Attempt, effect func() (string, e
 	if reason != "" {
 		g.event(ctx, "guard.checked", "blocked", reason, a.Tool)
 		g.event(ctx, "tool.blocked", "blocked", reason, a.Tool)
+		if reason == "posts_per_day" || reason == "replies_per_day" {
+			return "", &actionLimitError{rule: reason}
+		}
 		return "", fmt.Errorf("executing guarded tool: %s: %w", reason, ErrBlocked)
 	}
 	g.event(ctx, "guard.checked", "allowed", "policy_allowed", a.Tool)

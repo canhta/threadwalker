@@ -185,7 +185,9 @@ the target URL. **(decision, #6 boundary clarification)**
 `internal/guard` commits attempted-call audit metadata before effects and atomically reserves an
 action intent and contact counters under SQLite `BEGIN IMMEDIATE`. All dry-run/real intents,
 including failed/unknown outcomes, count; the action builtin reports the reserved ID and never
-inserts a duplicate. Persistence errors fail closed. Restart never replays these intents.
+inserts a duplicate. Persistence errors fail closed. A daily action quota refusal stops the wake with
+`action_limit`; the agent remains eligible for a later wake and quotas reset at the next UTC day.
+Restart never replays these intents.
 The local runtime serializes wakes; the SQLite reservation also protects concurrent guards and
 independent database handles. Contact counters refresh from timestamped intents during guarded
 action checks; permanent do-not-contact flags survive refresh/restart. **(decision)**
@@ -197,6 +199,11 @@ configured phrase add a permanent contact entry, without saving inbound text. Op
 [`internal/guard/guard.go`](../internal/guard/guard.go); configured lists must be nonempty.
 The add-only `mark_do_not_contact` tool accepts a `username`, records a fixed reason code and
 passes the same running-state/audit boundary as every other builtin. **(decision)**
+
+Versioned synthetic guard cases and captured metadata-only event evidence live in
+[`internal/eval/testdata/guard-v1.json`](../internal/eval/testdata/guard-v1.json) and
+[`guard-v1-events.jsonl`](../internal/eval/testdata/guard-v1-events.jsonl), using the shared eval
+report/logging contracts. Reproduction commands are in [`docs/evals.md`](evals.md).
 
 The numeric limits are starting values in the template and have no experimental basis yet.
 
