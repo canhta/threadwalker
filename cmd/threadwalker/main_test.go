@@ -10,9 +10,9 @@ import (
 
 func TestRun_CheckPassesWithValidEnvAndLeaksNoSecrets(t *testing.T) {
 	secrets := map[string]string{
-		"TW_SOLO_LLM_KEY":   "super-secret-deepseek-key-999",
-		"TW_TELEGRAM_TOKEN": "super-secret-telegram-token-888",
-		"TW_OWNER_CHAT_ID":  "super-secret-owner-chat-777",
+		"LLM_API_KEY":            "super-secret-deepseek-key-999",
+		"TELEGRAM_BOT_TOKEN":     "super-secret-telegram-token-888",
+		"TELEGRAM_OWNER_CHAT_ID": "super-secret-owner-chat-777",
 	}
 	getenv := func(k string) string {
 		return secrets[k]

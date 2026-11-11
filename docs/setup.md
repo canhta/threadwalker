@@ -16,18 +16,13 @@ test -f .env || cp .env.example .env
 chmod 600 .env
 ```
 
-Fill the entries you need; leave the rest empty. Quote values containing spaces or shell characters.
+Quote values containing spaces or shell characters.
 
 | Variable | Value to supply |
 |---|---|
-| `OPENAI_API_KEY` | OpenAI API key |
-| `ANTHROPIC_API_KEY` | Anthropic API key, if needed by a later integration |
-| `TW_SOLO_LLM_KEY` | DeepSeek key, only if keeping the example provider |
-| `TW_VPS_SSH_TARGET` | SSH host or alias, such as `threadwalker-vps` |
-| `TW_VPS_THREADS_PROFILE_DIR` | Absolute path to the saved browser profile on the VPS |
-| `TW_SPIKE_REPLY_TARGET_URL` | Post URL you approve for the browser spike's one reply |
-| `TW_TELEGRAM_TOKEN` | Telegram bot token |
-| `TW_OWNER_CHAT_ID` | Your numeric Telegram chat ID |
+| `LLM_API_KEY` | Key for the OpenAI-compatible provider selected in your template |
+| `TELEGRAM_BOT_TOKEN` | Telegram bot token |
+| `TELEGRAM_OWNER_CHAT_ID` | Your numeric Telegram chat ID |
 
 Load your file into the current shell before running commands:
 
@@ -37,16 +32,15 @@ set -a
 set +a
 ```
 
-The binary reads environment variables; it does not load `.env` itself. The VPS/profile/reply
-variables above record setup details for the operator; they do not configure the binary.
+The binary reads environment variables; it does not load `.env` itself.
 
 ## Agent template
 
 Edit [`agents/solo-builder.example.yaml`](../agents/solo-builder.example.yaml). Keep `dry_run: true`.
-Set `llm.base_url`, `llm.model`, both token prices and `llm.api_key_env` for your chosen
-OpenAI-compatible provider. For the supplied OpenAI key, use `api_key_env: OPENAI_API_KEY`;
-the example currently points to DeepSeek and `TW_SOLO_LLM_KEY`. Set `threads.profile_dir` to the
-profile path on the machine where the agent will run.
+Set `llm.base_url`, `llm.model` and both token prices for your chosen OpenAI-compatible provider;
+the example currently points to DeepSeek. Put that provider's key in `LLM_API_KEY`.
+Set `threads.profile_dir` to the saved browser profile on the machine where the agent will run.
+The template's `*_env` fields can select different variable names when needed.
 
 Once the template's selected LLM key and both Telegram entries are available:
 
@@ -61,13 +55,14 @@ services. Telegram entries are currently required even in dry run.
 
 For the [browser spike (#2)](https://github.com/canhta/threadwalker/issues/2), provide SSH access
 to the VPS and a disposable Threads account with an AI-experiment disclosure in its bio.
-Complete login and 2FA yourself, and leave the logged-in browser profile on the VPS. Fill the
-profile path and approved reply URL above. Passwords and session cookies stay out of chat and Git.
+Complete login and 2FA yourself, and leave the logged-in browser profile on the VPS. Supply the
+SSH target, saved profile path and approved reply URL when starting the spike; these are setup
+details, not environment variables. Passwords and session cookies stay out of chat and Git.
 The spike measures all six browser operations over three days before browser-backed work proceeds.
 
 For [Telegram (#7)](https://github.com/canhta/threadwalker/issues/7), create a bot with
 `@BotFather`, save its token, and send the bot a message from your own account. Supply that
-conversation's numeric chat ID as `TW_OWNER_CHAT_ID`.
+conversation's numeric chat ID as `TELEGRAM_OWNER_CHAT_ID`.
 
 The [seven-day live run (#9)](https://github.com/canhta/threadwalker/issues/9) needs your approval
 before `dry_run` becomes `false`. The [second agent (#12)](https://github.com/canhta/threadwalker/issues/12)

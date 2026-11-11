@@ -3,4 +3,3 @@ data/
 *.db-*
 .env
 /threadwalker
-/.privates/

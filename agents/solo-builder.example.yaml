@@ -77,7 +77,7 @@ seed_playbook:
 llm:
   base_url: https://api.deepseek.com
   model: deepseek-chat            # confirm the model name in the provider's docs when implementing
-  api_key_env: TW_SOLO_LLM_KEY
+  api_key_env: LLM_API_KEY
   price_per_mtok_in_usd: 0        # fill in from the provider's current price list
   price_per_mtok_out_usd: 0
 limits:                           # starting values, no experimental basis
@@ -91,6 +91,6 @@ limits:                           # starting values, no experimental basis
 threads:
   profile_dir: data/profiles/solo-builder
 telegram:
-  bot_token_env: TW_TELEGRAM_TOKEN
-  owner_chat_id_env: TW_OWNER_CHAT_ID
+  bot_token_env: TELEGRAM_BOT_TOKEN
+  owner_chat_id_env: TELEGRAM_OWNER_CHAT_ID
 dry_run: true

@@ -12,9 +12,9 @@ import (
 
 func validEnv() func(string) string {
 	env := map[string]string{
-		"TW_SOLO_LLM_KEY":  "secret-llm-key-value",
-		"TW_TELEGRAM_TOKEN": "secret-tg-token-value",
-		"TW_OWNER_CHAT_ID": "secret-owner-chat-id",
+		"LLM_API_KEY":            "secret-llm-key-value",
+		"TELEGRAM_BOT_TOKEN":     "secret-tg-token-value",
+		"TELEGRAM_OWNER_CHAT_ID": "secret-owner-chat-id",
 	}
 	return func(k string) string {
 		return env[k]
@@ -82,7 +82,7 @@ func TestLoadFile_ValidExampleTemplate(t *testing.T) {
 	if tmpl.LLM.Model != "deepseek-chat" {
 		t.Errorf("LLM.Model = %q", tmpl.LLM.Model)
 	}
-	if tmpl.LLM.APIKeyEnv != "TW_SOLO_LLM_KEY" {
+	if tmpl.LLM.APIKeyEnv != "LLM_API_KEY" {
 		t.Errorf("LLM.APIKeyEnv = %q", tmpl.LLM.APIKeyEnv)
 	}
 	if tmpl.LLM.APIKey.Expose() != "secret-llm-key-value" {
@@ -290,9 +290,9 @@ func TestLoadFile_UnsetSecretVariables(t *testing.T) {
 		field  string
 		envVar string
 	}{
-		{field: "llm.api_key_env", envVar: "TW_SOLO_LLM_KEY"},
-		{field: "telegram.bot_token_env", envVar: "TW_TELEGRAM_TOKEN"},
-		{field: "telegram.owner_chat_id_env", envVar: "TW_OWNER_CHAT_ID"},
+		{field: "llm.api_key_env", envVar: "LLM_API_KEY"},
+		{field: "telegram.bot_token_env", envVar: "TELEGRAM_BOT_TOKEN"},
+		{field: "telegram.owner_chat_id_env", envVar: "TELEGRAM_OWNER_CHAT_ID"},
 	}
 
 	examplePath := filepath.Join("..", "..", "agents", "solo-builder.example.yaml")
