@@ -1,0 +1,93 @@
+{
+  "evidence_kind": "synthetic-local-cdp-only",
+  "actions": [
+    {
+      "id": 1,
+      "kind": "post",
+      "dry_run": false,
+      "confirmed": true
+    },
+    {
+      "id": 2,
+      "kind": "reply",
+      "dry_run": false,
+      "confirmed": true
+    }
+  ],
+  "tool_calls": [
+    {
+      "tool": "read_feed",
+      "attempt": {
+        "bytes": 2,
+        "valid_object": true
+      },
+      "result": {
+        "outcome": "success",
+        "bytes": 231
+      },
+      "blocked_by": ""
+    },
+    {
+      "tool": "search",
+      "attempt": {
+        "bytes": 21,
+        "valid_object": true
+      },
+      "result": {
+        "outcome": "success",
+        "bytes": 190
+      },
+      "blocked_by": ""
+    },
+    {
+      "tool": "read_post",
+      "attempt": {
+        "bytes": 37,
+        "valid_object": true
+      },
+      "result": {
+        "outcome": "success",
+        "bytes": 293
+      },
+      "blocked_by": ""
+    },
+    {
+      "tool": "read_own_metrics",
+      "attempt": {
+        "bytes": 2,
+        "valid_object": true
+      },
+      "result": {
+        "outcome": "success",
+        "bytes": 101
+      },
+      "blocked_by": ""
+    },
+    {
+      "tool": "post",
+      "attempt": {
+        "bytes": 34,
+        "valid_object": true
+      },
+      "result": {
+        "outcome": "success",
+        "bytes": 116
+      },
+      "blocked_by": ""
+    },
+    {
+      "tool": "reply",
+      "attempt": {
+        "bytes": 115,
+        "valid_object": true
+      },
+      "result": {
+        "outcome": "success",
+        "bytes": 117
+      },
+      "blocked_by": ""
+    }
+  ],
+  "local_submissions": 2,
+  "process_cleanup": true
+}

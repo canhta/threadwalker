@@ -1,0 +1,33 @@
+=== RUN   TestDriverLocalChromeReadAndLifecycle
+--- PASS: TestDriverLocalChromeReadAndLifecycle (0.66s)
+=== RUN   TestBrowserCapturedGuardedEvidence
+    browser_evidence_test.go:119: synthetic local CDP: six guarded operations, two confirmed actions, six payload-free audits, two local submissions, process cleanup verified
+--- PASS: TestBrowserCapturedGuardedEvidence (0.94s)
+=== RUN   TestBrowserGuardedSyntheticFixtureOperations
+--- PASS: TestBrowserGuardedSyntheticFixtureOperations (0.90s)
+=== RUN   TestBrowserGuardedDryRunUsesBrowserForReadsButNeverSubmits
+--- PASS: TestBrowserGuardedDryRunUsesBrowserForReadsButNeverSubmits (0.59s)
+=== RUN   TestBrowserGuardedUnknownSubmitIsTerminalAndNotReplayed
+--- PASS: TestBrowserGuardedUnknownSubmitIsTerminalAndNotReplayed (1.71s)
+=== RUN   TestBrowserGuardedAuthStatesPauseAndQueueNotice
+=== RUN   TestBrowserGuardedAuthStatesPauseAndQueueNotice/logged_out
+=== RUN   TestBrowserGuardedAuthStatesPauseAndQueueNotice/captcha
+--- PASS: TestBrowserGuardedAuthStatesPauseAndQueueNotice (1.03s)
+    --- PASS: TestBrowserGuardedAuthStatesPauseAndQueueNotice/logged_out (0.50s)
+    --- PASS: TestBrowserGuardedAuthStatesPauseAndQueueNotice/captcha (0.53s)
+=== RUN   TestBrowserBackendFixtureStatesFailClosed
+=== RUN   TestBrowserBackendFixtureStatesFailClosed/logged_out
+=== RUN   TestBrowserBackendFixtureStatesFailClosed/captcha
+=== RUN   TestBrowserBackendFixtureStatesFailClosed/unknown
+--- PASS: TestBrowserBackendFixtureStatesFailClosed (0.89s)
+    --- PASS: TestBrowserBackendFixtureStatesFailClosed/logged_out (0.30s)
+    --- PASS: TestBrowserBackendFixtureStatesFailClosed/captcha (0.29s)
+    --- PASS: TestBrowserBackendFixtureStatesFailClosed/unknown (0.30s)
+=== RUN   TestBrowserBackendUnknownSubmitIsNotRetried
+--- PASS: TestBrowserBackendUnknownSubmitIsNotRetried (1.46s)
+=== RUN   TestBrowserBackendRejectsForeignOriginWithoutNavigation
+--- PASS: TestBrowserBackendRejectsForeignOriginWithoutNavigation (0.28s)
+=== RUN   TestBrowserCloseReleasesLeaseAndKeepsProfile
+--- PASS: TestBrowserCloseReleasesLeaseAndKeepsProfile (0.53s)
+PASS
+ok  	github.com/canhta/threadwalker/internal/threads	9.997s

@@ -1,0 +1,5 @@
+Eval suite=v1 report=v1 mode=offline revision=b845416 seed=8 repeat=2: 28/28 passed
+Suite digest=34bf1d3f6374eaf3870f9cfce6ab21c73ca7f377be807ee91c4564b8b18b8dfe inputs=ecf694de453f29918c42ece8b72b0b24abc56eb11bb580a6daa0f8dda1f8dfd8 configuration=eb126ecbf7e4f906ae4d6cd230fa3324dcb4b203d6eab96c8fe505f42169cbb7
+Profile "synthetic-anthropic" provider="fixture-anthropic" model="synthetic-model" protocol=anthropic
+Profile "synthetic-openai" provider="fixture-openai" model="synthetic-model" protocol=openai
+Measured tokens in=440 out=220; estimated cost USD=0.000880000; wall-clock duration_ms=5908.198 (wall_clock; excluded from deterministic comparisons)

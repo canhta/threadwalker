@@ -221,6 +221,9 @@ operations, local HTTP submissions and process cleanup against canonical HTML fi
 Default evals require no Chrome binary. Synthetic snapshots and local Chrome acceptance do not
 qualify the current Threads DOM, account/session behavior, production memory or elapsed live use.
 Recorded commands, redacted events and reports live in [browser local verification](research/browser-local.md).
+`TestCapturedBrowserEvents` reproduces the deterministic event trace; after reviewing an
+intentional contract change, regenerate it with
+`THREADWALKER_UPDATE_BROWSER_TRACE=1 go test ./internal/eval -run TestCapturedBrowserEvents`.
 
 ## Pending coverage
 

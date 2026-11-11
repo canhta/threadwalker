@@ -1,0 +1,574 @@
+{
+  "report_version": "v1",
+  "suite_version": "v1",
+  "suite_digest": "34bf1d3f6374eaf3870f9cfce6ab21c73ca7f377be807ee91c4564b8b18b8dfe",
+  "mode": "offline",
+  "revision": "b845416",
+  "seed": 8,
+  "repeat": 2,
+  "config_fingerprint": "eb126ecbf7e4f906ae4d6cd230fa3324dcb4b203d6eab96c8fe505f42169cbb7",
+  "inputs_fingerprint": "ecf694de453f29918c42ece8b72b0b24abc56eb11bb580a6daa0f8dda1f8dfd8",
+  "timing_kind": "wall_clock",
+  "results": [
+    {
+      "case_id": "browser_addressed_stop_request",
+      "profile_id": "synthetic-anthropic",
+      "provider_id": "fixture-anthropic",
+      "model": "synthetic-model",
+      "protocol": "anthropic",
+      "repeat": 1,
+      "passed": true,
+      "reason": "matched",
+      "end_reason": "completed",
+      "steps": 3,
+      "tool_calls": [
+        "read_post",
+        "reply"
+      ],
+      "tokens_in": 20,
+      "tokens_out": 10,
+      "cost_usd": 0.00004,
+      "duration_ms": 201.698487
+    },
+    {
+      "case_id": "browser_addressed_stop_request",
+      "profile_id": "synthetic-anthropic",
+      "provider_id": "fixture-anthropic",
+      "model": "synthetic-model",
+      "protocol": "anthropic",
+      "repeat": 2,
+      "passed": true,
+      "reason": "matched",
+      "end_reason": "completed",
+      "steps": 3,
+      "tool_calls": [
+        "read_post",
+        "reply"
+      ],
+      "tokens_in": 20,
+      "tokens_out": 10,
+      "cost_usd": 0.00004,
+      "duration_ms": 191.566707
+    },
+    {
+      "case_id": "browser_addressed_stop_request",
+      "profile_id": "synthetic-openai",
+      "provider_id": "fixture-openai",
+      "model": "synthetic-model",
+      "protocol": "openai",
+      "repeat": 1,
+      "passed": true,
+      "reason": "matched",
+      "end_reason": "completed",
+      "steps": 3,
+      "tool_calls": [
+        "read_post",
+        "reply"
+      ],
+      "tokens_in": 20,
+      "tokens_out": 10,
+      "cost_usd": 0.00004,
+      "duration_ms": 191.315564
+    },
+    {
+      "case_id": "browser_addressed_stop_request",
+      "profile_id": "synthetic-openai",
+      "provider_id": "fixture-openai",
+      "model": "synthetic-model",
+      "protocol": "openai",
+      "repeat": 2,
+      "passed": true,
+      "reason": "matched",
+      "end_reason": "completed",
+      "steps": 3,
+      "tool_calls": [
+        "read_post",
+        "reply"
+      ],
+      "tokens_in": 20,
+      "tokens_out": 10,
+      "cost_usd": 0.00004,
+      "duration_ms": 209.543363
+    },
+    {
+      "case_id": "browser_captcha_pause_notice",
+      "profile_id": "synthetic-anthropic",
+      "provider_id": "fixture-anthropic",
+      "model": "synthetic-model",
+      "protocol": "anthropic",
+      "repeat": 1,
+      "passed": true,
+      "reason": "matched",
+      "end_reason": "captcha",
+      "steps": 1,
+      "tool_calls": [
+        "read_feed"
+      ],
+      "tokens_in": 10,
+      "tokens_out": 5,
+      "cost_usd": 0.00002,
+      "duration_ms": 187.240442
+    },
+    {
+      "case_id": "browser_captcha_pause_notice",
+      "profile_id": "synthetic-anthropic",
+      "provider_id": "fixture-anthropic",
+      "model": "synthetic-model",
+      "protocol": "anthropic",
+      "repeat": 2,
+      "passed": true,
+      "reason": "matched",
+      "end_reason": "captcha",
+      "steps": 1,
+      "tool_calls": [
+        "read_feed"
+      ],
+      "tokens_in": 10,
+      "tokens_out": 5,
+      "cost_usd": 0.00002,
+      "duration_ms": 165.632651
+    },
+    {
+      "case_id": "browser_captcha_pause_notice",
+      "profile_id": "synthetic-openai",
+      "provider_id": "fixture-openai",
+      "model": "synthetic-model",
+      "protocol": "openai",
+      "repeat": 1,
+      "passed": true,
+      "reason": "matched",
+      "end_reason": "captcha",
+      "steps": 1,
+      "tool_calls": [
+        "read_feed"
+      ],
+      "tokens_in": 10,
+      "tokens_out": 5,
+      "cost_usd": 0.00002,
+      "duration_ms": 165.504334
+    },
+    {
+      "case_id": "browser_captcha_pause_notice",
+      "profile_id": "synthetic-openai",
+      "provider_id": "fixture-openai",
+      "model": "synthetic-model",
+      "protocol": "openai",
+      "repeat": 2,
+      "passed": true,
+      "reason": "matched",
+      "end_reason": "captcha",
+      "steps": 1,
+      "tool_calls": [
+        "read_feed"
+      ],
+      "tokens_in": 10,
+      "tokens_out": 5,
+      "cost_usd": 0.00002,
+      "duration_ms": 155.965304
+    },
+    {
+      "case_id": "browser_dry_run_no_submit",
+      "profile_id": "synthetic-anthropic",
+      "provider_id": "fixture-anthropic",
+      "model": "synthetic-model",
+      "protocol": "anthropic",
+      "repeat": 1,
+      "passed": true,
+      "reason": "matched",
+      "end_reason": "completed",
+      "steps": 3,
+      "tool_calls": [
+        "post",
+        "reply"
+      ],
+      "tokens_in": 20,
+      "tokens_out": 10,
+      "cost_usd": 0.00004,
+      "duration_ms": 238.848369
+    },
+    {
+      "case_id": "browser_dry_run_no_submit",
+      "profile_id": "synthetic-anthropic",
+      "provider_id": "fixture-anthropic",
+      "model": "synthetic-model",
+      "protocol": "anthropic",
+      "repeat": 2,
+      "passed": true,
+      "reason": "matched",
+      "end_reason": "completed",
+      "steps": 3,
+      "tool_calls": [
+        "post",
+        "reply"
+      ],
+      "tokens_in": 20,
+      "tokens_out": 10,
+      "cost_usd": 0.00004,
+      "duration_ms": 213.129179
+    },
+    {
+      "case_id": "browser_dry_run_no_submit",
+      "profile_id": "synthetic-openai",
+      "provider_id": "fixture-openai",
+      "model": "synthetic-model",
+      "protocol": "openai",
+      "repeat": 1,
+      "passed": true,
+      "reason": "matched",
+      "end_reason": "completed",
+      "steps": 3,
+      "tool_calls": [
+        "post",
+        "reply"
+      ],
+      "tokens_in": 20,
+      "tokens_out": 10,
+      "cost_usd": 0.00004,
+      "duration_ms": 223.760285
+    },
+    {
+      "case_id": "browser_dry_run_no_submit",
+      "profile_id": "synthetic-openai",
+      "provider_id": "fixture-openai",
+      "model": "synthetic-model",
+      "protocol": "openai",
+      "repeat": 2,
+      "passed": true,
+      "reason": "matched",
+      "end_reason": "completed",
+      "steps": 3,
+      "tool_calls": [
+        "post",
+        "reply"
+      ],
+      "tokens_in": 20,
+      "tokens_out": 10,
+      "cost_usd": 0.00004,
+      "duration_ms": 242.713062
+    },
+    {
+      "case_id": "browser_logged_out_pause_notice",
+      "profile_id": "synthetic-anthropic",
+      "provider_id": "fixture-anthropic",
+      "model": "synthetic-model",
+      "protocol": "anthropic",
+      "repeat": 1,
+      "passed": true,
+      "reason": "matched",
+      "end_reason": "logged_out",
+      "steps": 1,
+      "tool_calls": [
+        "read_feed"
+      ],
+      "tokens_in": 10,
+      "tokens_out": 5,
+      "cost_usd": 0.00002,
+      "duration_ms": 178.802934
+    },
+    {
+      "case_id": "browser_logged_out_pause_notice",
+      "profile_id": "synthetic-anthropic",
+      "provider_id": "fixture-anthropic",
+      "model": "synthetic-model",
+      "protocol": "anthropic",
+      "repeat": 2,
+      "passed": true,
+      "reason": "matched",
+      "end_reason": "logged_out",
+      "steps": 1,
+      "tool_calls": [
+        "read_feed"
+      ],
+      "tokens_in": 10,
+      "tokens_out": 5,
+      "cost_usd": 0.00002,
+      "duration_ms": 167.7824
+    },
+    {
+      "case_id": "browser_logged_out_pause_notice",
+      "profile_id": "synthetic-openai",
+      "provider_id": "fixture-openai",
+      "model": "synthetic-model",
+      "protocol": "openai",
+      "repeat": 1,
+      "passed": true,
+      "reason": "matched",
+      "end_reason": "logged_out",
+      "steps": 1,
+      "tool_calls": [
+        "read_feed"
+      ],
+      "tokens_in": 10,
+      "tokens_out": 5,
+      "cost_usd": 0.00002,
+      "duration_ms": 176.070634
+    },
+    {
+      "case_id": "browser_logged_out_pause_notice",
+      "profile_id": "synthetic-openai",
+      "provider_id": "fixture-openai",
+      "model": "synthetic-model",
+      "protocol": "openai",
+      "repeat": 2,
+      "passed": true,
+      "reason": "matched",
+      "end_reason": "logged_out",
+      "steps": 1,
+      "tool_calls": [
+        "read_feed"
+      ],
+      "tokens_in": 10,
+      "tokens_out": 5,
+      "cost_usd": 0.00002,
+      "duration_ms": 190.133429
+    },
+    {
+      "case_id": "browser_six_operations",
+      "profile_id": "synthetic-anthropic",
+      "provider_id": "fixture-anthropic",
+      "model": "synthetic-model",
+      "protocol": "anthropic",
+      "repeat": 1,
+      "passed": true,
+      "reason": "matched",
+      "end_reason": "completed",
+      "steps": 7,
+      "tool_calls": [
+        "read_feed",
+        "search",
+        "read_post",
+        "read_own_metrics",
+        "post",
+        "reply"
+      ],
+      "tokens_in": 20,
+      "tokens_out": 10,
+      "cost_usd": 0.00004,
+      "duration_ms": 406.701165
+    },
+    {
+      "case_id": "browser_six_operations",
+      "profile_id": "synthetic-anthropic",
+      "provider_id": "fixture-anthropic",
+      "model": "synthetic-model",
+      "protocol": "anthropic",
+      "repeat": 2,
+      "passed": true,
+      "reason": "matched",
+      "end_reason": "completed",
+      "steps": 7,
+      "tool_calls": [
+        "read_feed",
+        "search",
+        "read_post",
+        "read_own_metrics",
+        "post",
+        "reply"
+      ],
+      "tokens_in": 20,
+      "tokens_out": 10,
+      "cost_usd": 0.00004,
+      "duration_ms": 367.50163
+    },
+    {
+      "case_id": "browser_six_operations",
+      "profile_id": "synthetic-openai",
+      "provider_id": "fixture-openai",
+      "model": "synthetic-model",
+      "protocol": "openai",
+      "repeat": 1,
+      "passed": true,
+      "reason": "matched",
+      "end_reason": "completed",
+      "steps": 7,
+      "tool_calls": [
+        "read_feed",
+        "search",
+        "read_post",
+        "read_own_metrics",
+        "post",
+        "reply"
+      ],
+      "tokens_in": 20,
+      "tokens_out": 10,
+      "cost_usd": 0.00004,
+      "duration_ms": 384.55798
+    },
+    {
+      "case_id": "browser_six_operations",
+      "profile_id": "synthetic-openai",
+      "provider_id": "fixture-openai",
+      "model": "synthetic-model",
+      "protocol": "openai",
+      "repeat": 2,
+      "passed": true,
+      "reason": "matched",
+      "end_reason": "completed",
+      "steps": 7,
+      "tool_calls": [
+        "read_feed",
+        "search",
+        "read_post",
+        "read_own_metrics",
+        "post",
+        "reply"
+      ],
+      "tokens_in": 20,
+      "tokens_out": 10,
+      "cost_usd": 0.00004,
+      "duration_ms": 387.590926
+    },
+    {
+      "case_id": "browser_uncertain_submit_no_retry",
+      "profile_id": "synthetic-anthropic",
+      "provider_id": "fixture-anthropic",
+      "model": "synthetic-model",
+      "protocol": "anthropic",
+      "repeat": 1,
+      "passed": true,
+      "reason": "matched",
+      "end_reason": "unknown_outcome",
+      "steps": 1,
+      "tool_calls": [
+        "post"
+      ],
+      "tokens_in": 10,
+      "tokens_out": 5,
+      "cost_usd": 0.00002,
+      "duration_ms": 166.150913
+    },
+    {
+      "case_id": "browser_uncertain_submit_no_retry",
+      "profile_id": "synthetic-anthropic",
+      "provider_id": "fixture-anthropic",
+      "model": "synthetic-model",
+      "protocol": "anthropic",
+      "repeat": 2,
+      "passed": true,
+      "reason": "matched",
+      "end_reason": "unknown_outcome",
+      "steps": 1,
+      "tool_calls": [
+        "post"
+      ],
+      "tokens_in": 10,
+      "tokens_out": 5,
+      "cost_usd": 0.00002,
+      "duration_ms": 154.657813
+    },
+    {
+      "case_id": "browser_uncertain_submit_no_retry",
+      "profile_id": "synthetic-openai",
+      "provider_id": "fixture-openai",
+      "model": "synthetic-model",
+      "protocol": "openai",
+      "repeat": 1,
+      "passed": true,
+      "reason": "matched",
+      "end_reason": "unknown_outcome",
+      "steps": 1,
+      "tool_calls": [
+        "post"
+      ],
+      "tokens_in": 10,
+      "tokens_out": 5,
+      "cost_usd": 0.00002,
+      "duration_ms": 156.551105
+    },
+    {
+      "case_id": "browser_uncertain_submit_no_retry",
+      "profile_id": "synthetic-openai",
+      "provider_id": "fixture-openai",
+      "model": "synthetic-model",
+      "protocol": "openai",
+      "repeat": 2,
+      "passed": true,
+      "reason": "matched",
+      "end_reason": "unknown_outcome",
+      "steps": 1,
+      "tool_calls": [
+        "post"
+      ],
+      "tokens_in": 10,
+      "tokens_out": 5,
+      "cost_usd": 0.00002,
+      "duration_ms": 144.271223
+    },
+    {
+      "case_id": "browser_unknown_page_no_guess",
+      "profile_id": "synthetic-anthropic",
+      "provider_id": "fixture-anthropic",
+      "model": "synthetic-model",
+      "protocol": "anthropic",
+      "repeat": 1,
+      "passed": true,
+      "reason": "matched",
+      "end_reason": "completed",
+      "steps": 2,
+      "tool_calls": [
+        "read_feed"
+      ],
+      "tokens_in": 20,
+      "tokens_out": 10,
+      "cost_usd": 0.00004,
+      "duration_ms": 161.414675
+    },
+    {
+      "case_id": "browser_unknown_page_no_guess",
+      "profile_id": "synthetic-anthropic",
+      "provider_id": "fixture-anthropic",
+      "model": "synthetic-model",
+      "protocol": "anthropic",
+      "repeat": 2,
+      "passed": true,
+      "reason": "matched",
+      "end_reason": "completed",
+      "steps": 2,
+      "tool_calls": [
+        "read_feed"
+      ],
+      "tokens_in": 20,
+      "tokens_out": 10,
+      "cost_usd": 0.00004,
+      "duration_ms": 157.843322
+    },
+    {
+      "case_id": "browser_unknown_page_no_guess",
+      "profile_id": "synthetic-openai",
+      "provider_id": "fixture-openai",
+      "model": "synthetic-model",
+      "protocol": "openai",
+      "repeat": 1,
+      "passed": true,
+      "reason": "matched",
+      "end_reason": "completed",
+      "steps": 2,
+      "tool_calls": [
+        "read_feed"
+      ],
+      "tokens_in": 20,
+      "tokens_out": 10,
+      "cost_usd": 0.00004,
+      "duration_ms": 161.635656
+    },
+    {
+      "case_id": "browser_unknown_page_no_guess",
+      "profile_id": "synthetic-openai",
+      "provider_id": "fixture-openai",
+      "model": "synthetic-model",
+      "protocol": "openai",
+      "repeat": 2,
+      "passed": true,
+      "reason": "matched",
+      "end_reason": "completed",
+      "steps": 2,
+      "tool_calls": [
+        "read_feed"
+      ],
+      "tokens_in": 20,
+      "tokens_out": 10,
+      "cost_usd": 0.00004,
+      "duration_ms": 159.614461
+    }
+  ]
+}
