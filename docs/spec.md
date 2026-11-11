@@ -53,6 +53,13 @@ the blind spots of the agent it supervised.
 4. Every tool call passes through the guards, is written to the audit log, then executes.
 5. The agent writes a note for next time and schedules its next wake.
 
+Two rules keep a wake from doing damage **(sourced: patterns in `docs/research/reference-repos.md`)**:
+
+- **Stall stop.** A wake ends when the agent issues the same tool call with the same arguments
+  three times; the end reason is recorded.
+- **No replay.** An interrupted wake is never re-run. A `post` or `reply` whose outcome is unknown
+  is recorded as sent and never retried, so a crash cannot double-post.
+
 Reflection is something the agent chooses to do when new metrics exist; there is no fixed nightly
 job. **(proposed)**
 
