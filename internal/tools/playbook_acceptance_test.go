@@ -40,11 +40,14 @@ func newPlaybookHarness(t *testing.T, mutate ...func(*tools.Options)) *playbookH
 	if _, err := st.DB().Exec(`INSERT INTO agents(id,status) VALUES('agent','running'); INSERT INTO wakes(id,agent_id,started_at) VALUES(1,'agent','2026-06-01T07:00:00Z')`); err != nil {
 		t.Fatalf("seeding agent and wake: %v", err)
 	}
+	now := playbookToolsAt
 	opts := tools.Options{
 		Store:    st,
 		Template: config.Template{ID: "agent", DryRun: true, Limits: config.LimitsConfig{PostsPerDay: 100, RepliesPerDay: 100, RepliesPerUser7d: 10, MinSecondsBetweenActions: 1, MinMinutesBetweenWakes: 15}},
 		WakeID:   1,
-		Now:      func() time.Time { return playbookToolsAt },
+		// Advance injected time so independent action attempts are not blocked
+		// by the per-action spacing rule before hypothesis validation.
+		Now: func() time.Time { now = now.Add(2 * time.Second); return now },
 	}
 	for _, change := range mutate {
 		change(&opts)
@@ -359,7 +362,18 @@ func TestPlaybookGuardRejectsForeignDecidedAndUnknownHypotheses(t *testing.T) {
 		t.Fatalf("counting blocked hypothesis calls: %v", err)
 	}
 	if blocked != 6 {
-		t.Fatalf("blocked hypothesis audits = %d, want 6", blocked)
+		rows, _ := h.store.DB().Query(`SELECT tool,blocked_by FROM tool_calls ORDER BY id`)
+		var reasons []string
+		if rows != nil {
+			defer rows.Close()
+			for rows.Next() {
+				var tool, reason string
+				if rows.Scan(&tool, &reason) == nil {
+					reasons = append(reasons, tool+":"+reason)
+				}
+			}
+		}
+		t.Fatalf("blocked hypothesis audits = %d, want 6; rows=%v", blocked, reasons)
 	}
 
 	// An empty or omitted tag list remains a valid untagged action.
@@ -368,6 +382,52 @@ func TestPlaybookGuardRejectsForeignDecidedAndUnknownHypotheses(t *testing.T) {
 	if count := h.actionCount(t); count != 3 {
 		t.Fatalf("untagged actions = %d, want 3", count)
 	}
+}
+
+func TestPlaybookGuardSnapshotsRevisionAtActionReservation(t *testing.T) {
+	h := newPlaybookHarness(t)
+	entry := h.add(t, "agent", "revision one text")
+
+	first := decodeActionIdentity(t, h.mustCall(t, "post", `{"text":"first tagged post","hypothesis_ids":[`+jsonInt(entry.ID)+`]}`))
+	if revision := h.actionHypothesisRevision(t, first, entry.ID); revision != 1 {
+		t.Fatalf("first action snapshot revision = %d, want 1", revision)
+	}
+
+	amended, err := h.store.ProposePlaybook(context.Background(), "agent", entry.ID, "revision two text", playbookToolsAt.Add(time.Hour))
+	if err != nil || amended.Revision != 2 {
+		t.Fatalf("amending hypothesis = %+v err=%v", amended, err)
+	}
+	second := decodeActionIdentity(t, h.mustCall(t, "post", `{"text":"second tagged post","hypothesis_ids":[`+jsonInt(entry.ID)+`]}`))
+	if revision := h.actionHypothesisRevision(t, second, entry.ID); revision != 2 {
+		t.Fatalf("second action snapshot revision = %d, want 2", revision)
+	}
+	// The amendment must not rewrite the historical reservation: late metrics
+	// for the old text can never be attributed to the new revision.
+	if revision := h.actionHypothesisRevision(t, first, entry.ID); revision != 1 {
+		t.Fatalf("historical action snapshot revision = %d, want 1", revision)
+	}
+}
+
+type playbookActionIdentity struct {
+	ActionID int64 `json:"action_id"`
+}
+
+func decodeActionIdentity(t *testing.T, out string) int64 {
+	t.Helper()
+	var identity playbookActionIdentity
+	if err := json.Unmarshal([]byte(out), &identity); err != nil || identity.ActionID <= 0 {
+		t.Fatalf("decoding action output %s: %+v err=%v", out, identity, err)
+	}
+	return identity.ActionID
+}
+
+func (h *playbookHarness) actionHypothesisRevision(t *testing.T, actionID, hypothesisID int64) int64 {
+	t.Helper()
+	var revision int64
+	if err := h.store.DB().QueryRow(`SELECT revision FROM action_hypotheses WHERE agent_id='agent' AND action_id=? AND hypothesis_id=?`, actionID, hypothesisID).Scan(&revision); err != nil {
+		t.Fatalf("reading action %d hypothesis %d snapshot: %v", actionID, hypothesisID, err)
+	}
+	return revision
 }
 
 func TestPlaybookToolsRefusePausedAndKilledAgents(t *testing.T) {

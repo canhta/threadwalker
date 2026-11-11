@@ -318,6 +318,26 @@ func TestPlaybookInitializeMarksPreexistingEntriesWithoutReseeding(t *testing.T)
 	}
 }
 
+func TestPlaybookInitializationMarkerSurvivesDeletedRows(t *testing.T) {
+	st := playbookAcceptanceStore(t)
+	playbookAcceptanceAgent(t, st, "deleted")
+	if !playbookAcceptanceInitialize(t, st, "deleted", []string{"one", "two"}, playbookAcceptanceAt) {
+		t.Fatal("first initialization reported false")
+	}
+	if _, err := st.DB().Exec(`DELETE FROM playbook WHERE agent_id='deleted'`); err != nil {
+		t.Fatal(err)
+	}
+	if created := playbookAcceptanceInitialize(t, st, "deleted", []string{"resurrected"}, playbookAcceptanceAt.Add(time.Hour)); created {
+		t.Fatal("initialization reseeded after rows were deleted")
+	}
+	if entries := playbookAcceptanceEntries(t, st, "deleted", 100); len(entries) != 0 {
+		t.Fatalf("deleted playbook was repopulated: %+v", entries)
+	}
+	if count := playbookAcceptanceInitializationCount(t, st, "deleted"); count != 1 {
+		t.Fatalf("marker count = %d, want 1", count)
+	}
+}
+
 func TestPlaybookEntriesScopeOrderingAndLimits(t *testing.T) {
 	ctx := context.Background()
 	st := playbookAcceptanceStore(t)

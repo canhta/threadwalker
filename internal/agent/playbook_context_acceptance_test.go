@@ -41,8 +41,10 @@ func playbookContextRuntime(t *testing.T, mutate ...func(*agent.Options)) (*stor
 	if err != nil {
 		t.Fatalf("building runtime: %v", err)
 	}
-	if err := r.Start(ctx); err != nil {
-		t.Fatalf("starting runtime: %v", err)
+	// Ensure the agent row without running startup seeding, so these tests
+	// control the exact playbook rows the context must deliver.
+	if err := st.EnsureAgent(ctx, tmpl.ID); err != nil {
+		t.Fatalf("ensuring context agent: %v", err)
 	}
 	return st, opts, r
 }
