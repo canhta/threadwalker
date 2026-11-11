@@ -23,7 +23,7 @@
     {{range .Agents}}
     <li>
       <a href="#agent-{{.ID}}">{{.ID}}</a>
-      <span class="status{{if eq .Status "running"}} status-running{{else if eq .Status "paused"}} status-paused{{else if eq .Status "killed"}} status-killed{{else}} status-unknown{{end}}">{{if eq .Status "running"}}Running{{else if eq .Status "paused"}}Paused{{else if eq .Status "killed"}}Killed{{else}}Unknown{{end}}</span>
+      <span class="status{{if eq .Status "running"}} status-running{{else if eq .Status "paused"}} status-paused{{else if eq .Status "killed"}} status-killed{{else if eq .Status "not_started"}} status-not_started{{else}} status-unknown{{end}}">{{if eq .Status "running"}}Running{{else if eq .Status "paused"}}Paused{{else if eq .Status "killed"}}Killed{{else if eq .Status "not_started"}}Not started{{else}}Unknown{{end}}</span>
     </li>
     {{end}}
   </ul>
@@ -37,7 +37,7 @@
   <header class="agent-head">
     <div class="agent-title">
       <h2 id="agent-heading-{{.ID}}">{{.ID}}</h2>
-      <p class="status{{if eq .Status "running"}} status-running{{else if eq .Status "paused"}} status-paused{{else if eq .Status "killed"}} status-killed{{else}} status-unknown{{end}}">{{if eq .Status "running"}}Running{{else if eq .Status "paused"}}Paused{{else if eq .Status "killed"}}Killed{{else}}Unknown{{end}}</p>
+      <p class="status{{if eq .Status "running"}} status-running{{else if eq .Status "paused"}} status-paused{{else if eq .Status "killed"}} status-killed{{else if eq .Status "not_started"}} status-not_started{{else}} status-unknown{{end}}">{{if eq .Status "running"}}Running{{else if eq .Status "paused"}}Paused{{else if eq .Status "killed"}}Killed{{else if eq .Status "not_started"}}Not started{{else}}Unknown{{end}}</p>
     </div>
     <dl class="agent-figures">
       <div>
@@ -80,7 +80,7 @@
         {{range .Wakes}}
         <tr>
           <td data-label="Started">{{if .StartedAt}}<time>{{.StartedAt}}</time>{{else}}Not recorded{{end}}</td>
-          <td data-label="Ended">{{if .EndedAt}}<time>{{.EndedAt}}</time>{{else}}In progress{{end}}</td>
+          <td data-label="Ended">{{if .EndedAt}}<time>{{.EndedAt}}</time>{{else if .EndReason}}Not recorded{{else}}In progress{{end}}</td>
           <td data-label="Kind">{{if eq .Kind "agent"}}Agent{{else if eq .Kind "metrics"}}Metrics{{else}}Other{{end}}</td>
           <td class="num" data-label="Steps">{{.Steps}}</td>
           <td class="num" data-label="Tokens in">{{.TokensIn}}</td>
@@ -133,6 +133,7 @@
         <caption class="visually-hidden">Playbook for {{.ID}}</caption>
         <thead>
           <tr>
+            <th scope="col" class="num">ID</th>
             <th scope="col">Status</th>
             <th scope="col" class="num">Sample</th>
             <th scope="col" class="num">Successes</th>
@@ -141,6 +142,7 @@
         <tbody>
           {{range .Playbook}}
           <tr>
+            <td class="num" data-label="ID">{{.ID}}</td>
             <td data-label="Status"><span class="hypothesis{{if eq .Status "testing"}} hypothesis-testing{{else if eq .Status "established"}} hypothesis-established{{else if eq .Status "rejected"}} hypothesis-rejected{{else}} hypothesis-unknown{{end}}">{{if eq .Status "testing"}}Testing{{else if eq .Status "established"}}Established{{else if eq .Status "rejected"}}Rejected{{else}}Unknown{{end}}</span></td>
             <td class="num" data-label="Sample">{{.N}}</td>
             <td class="num" data-label="Successes">{{.Successes}}</td>

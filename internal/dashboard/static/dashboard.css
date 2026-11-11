@@ -230,13 +230,17 @@ h2 {
   color: var(--red);
 }
 
+.status-not_started {
+  color: var(--muted);
+}
+
 .status-unknown {
   color: var(--muted);
 }
 
 .agent-figures {
   display: grid;
-  flex: 1 1 32rem;
+  flex: 1 1 100%;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   max-width: 100%;
   margin: 0;
@@ -425,20 +429,17 @@ h2 {
 
   .agent-figures {
     flex-basis: 100%;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .agent-figures > div {
-    padding: 0.4rem 0.75rem 0.45rem 0;
-  }
-
-  .agent-figures > div:nth-child(2n) {
-    padding-right: 0;
+    padding: 0.4rem 0 0.45rem;
     border-right: 0;
+    border-bottom: 1px solid var(--rule-soft);
   }
 
-  .agent-figures > div:nth-child(-n + 2) {
-    border-bottom: 1px solid var(--rule-soft);
+  .agent-figures > div:last-child {
+    border-bottom: 0;
   }
 
   .panel-split {
