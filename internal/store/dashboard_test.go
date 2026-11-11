@@ -2,6 +2,7 @@ package store_test
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
@@ -48,8 +49,7 @@ func TestDashboardOpenReadOnlyNeverCreatesOrMigratesAndCannotWrite(t *testing.T)
 	}
 	cancelled, cancel := context.WithCancel(ctx)
 	cancel()
-	if st, err := store.OpenReadOnly(cancelled, path); err == nil {
-		st.Close()
-		t.Fatal("ignored cancellation")
+	if _, err := store.OpenReadOnly(cancelled, path); !errors.Is(err, context.Canceled) {
+		t.Fatal("did not preserve cancellation")
 	}
 }

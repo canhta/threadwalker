@@ -24,6 +24,9 @@ func OpenReadOnly(ctx context.Context, path string) (*Store, error) {
 	}
 	if err = db.PingContext(ctx); err != nil {
 		db.Close()
+		if ctx.Err() != nil {
+			return nil, errors.Join(errors.New("opening dashboard database: cancelled"), ctx.Err())
+		}
 		return nil, errors.New("opening dashboard database: unavailable")
 	}
 	return &Store{db: db}, nil
