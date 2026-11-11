@@ -2,7 +2,6 @@ package dashboard
 
 import (
 	"encoding/json"
-	"fmt"
 	"io"
 	"net/url"
 	"strings"
@@ -45,7 +44,7 @@ func ownURL(raw, username string) string {
 	return u.String()
 }
 
-func toolSummary(name, raw string, blocked bool) (string, string) {
+func toolSummary(raw string, blocked bool) (string, string) {
 	if blocked {
 		return "blocked", ""
 	}
@@ -67,8 +66,5 @@ func toolSummary(name, raw string, blocked bool) (string, string) {
 		return "unknown", ""
 	}
 	outcome := oneOf(value.Outcome, "success", "error", "unknown_assumed_sent", "interrupted_read")
-	if (name == "schedule_next_wake" || name == "read_own_metrics") && value.Bytes != nil && *value.Bytes >= 0 && *value.Bytes <= 1<<30 && (outcome == "success" || outcome == "error") {
-		return outcome, fmt.Sprintf("Result: %d bytes", *value.Bytes)
-	}
 	return outcome, ""
 }

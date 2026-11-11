@@ -125,6 +125,9 @@ func TestHTTPResponsesNeverReflectPrivateStateOrRequests(t *testing.T) {
 			if tc.method == "HEAD" && rr.Body.Len() != 0 {
 				t.Fatal("HEAD returned body")
 			}
+			if strings.Contains(rr.Body.String(), "Result:") {
+				t.Fatal("implementation byte counts rendered")
+			}
 			if rr.Header().Get("Content-Security-Policy") == "" || rr.Header().Get("Cache-Control") != "no-store" {
 				t.Fatal("missing response protections")
 			}
@@ -188,8 +191,8 @@ func TestToolMetadataAllowlistAndBoundedHistory(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, tc := range []struct{ name, result, blocked, outcome, detail string }{
-		{"read_own_metrics", `{"outcome":"success","bytes":42}`, "", "success", "Result: 42 bytes"},
-		{"schedule_next_wake", `{"outcome":"error","bytes":0}`, "", "error", "Result: 0 bytes"},
+		{"read_own_metrics", `{"outcome":"success","bytes":42}`, "", "success", ""},
+		{"schedule_next_wake", `{"outcome":"error","bytes":0}`, "", "error", ""},
 		{"search", `{"outcome":"success","bytes":42}`, "", "success", ""},
 		{"private-tool", `{"outcome":"success","bytes":42}`, "", "success", ""},
 		{"read_own_metrics", `{"outcome":"sk-secret","bytes":42}`, "", "unknown", ""},

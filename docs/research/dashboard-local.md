@@ -81,7 +81,7 @@ fixture above. The final captured widths were **1280, 390 and 320 CSS pixels**.
 At each width, `scrollWidth == clientWidth`; the recorded visible-element and table
 overflow counts were zero. Phone tables reflow into labeled rows, and timestamp values
 remain readable. Both agents, safe action links, playbook IDs/status/counts and tool
-metadata were inspected. No published link was followed.
+names/outcomes were inspected. No published link was followed.
 
 The checked screenshots and per-width layout JSON are in
 [`internal/dashboard/testdata/ui`](../../internal/dashboard/testdata/ui/README.md).

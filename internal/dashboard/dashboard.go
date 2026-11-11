@@ -259,7 +259,7 @@ func readAgent(ctx context.Context, tx *sql.Tx, a Agent, day string) (AgentView,
 		}
 		tool.Name = oneOf(tool.Name, "read_feed", "search", "read_post", "post", "reply", "read_own_metrics", "fetch_trends", "note_write", "note_search", "playbook_read", "playbook_propose", "notify_owner", "ask_owner", "mark_do_not_contact", "schedule_next_wake")
 		tool.At = timestamp(tool.At)
-		tool.Outcome, tool.Detail = toolSummary(tool.Name, result, blocked)
+		tool.Outcome, tool.Detail = toolSummary(result, blocked)
 		v.Tools = append(v.Tools, tool)
 	}
 	err = rows.Err()

@@ -1,17 +1,17 @@
 {
   "url": "http://127.0.0.1:18081/",
   "synthetic": true,
-  "captured_at_utc": "2026-11-11T16:17:59.122Z",
+  "captured_at_utc": "2026-11-11T16:22:08.878Z",
   "viewport": {
     "width": 390,
-    "height": 3664,
+    "height": 3579,
     "dpr": 1,
     "mobile": true
   },
   "page": {
     "client_width": 390,
     "scroll_width": 390,
-    "scroll_height": 3664,
+    "scroll_height": 3579,
     "body_scroll_width": 390,
     "horizontal_overflow": 0
   },
@@ -111,5 +111,15 @@
       "overflow": 0
     }
   ],
-  "overflowing_visible": []
+  "overflowing_visible": [
+    "TR.",
+    "TR.",
+    "TR.",
+    "TR.",
+    "TR.",
+    "TR.",
+    "TR.",
+    "TR."
+  ],
+  "byte_detail_present": false
 }

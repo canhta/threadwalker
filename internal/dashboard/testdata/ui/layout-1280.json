@@ -1,7 +1,7 @@
 {
   "url": "http://127.0.0.1:18081/",
   "synthetic": true,
-  "captured_at_utc": "2026-11-11T16:17:46.052Z",
+  "captured_at_utc": "2026-11-11T16:22:07.552Z",
   "viewport": {
     "width": 1280,
     "height": 1431,
@@ -111,5 +111,6 @@
       "overflow": 0
     }
   ],
-  "overflowing_visible": []
+  "overflowing_visible": [],
+  "byte_detail_present": false
 }

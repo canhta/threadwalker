@@ -505,7 +505,7 @@ issue scope, owner-provided account/session and explicit live-run approval. **(d
 ## 14. Read-only activity page and repo layout
 
 `dashboard` serves selected configured agent IDs and today's budget/spend, wake history,
-confirmed own actions, hypothesis state/counters and allowlisted numeric tool summaries.
+confirmed own actions, hypothesis state/counters and recent tool names/outcomes.
 The HTTP service defaults to `127.0.0.1:8080`, accepts GET/HEAD only, and uses a read-only
 SQLite handle without migrations or agent initialization. Config declarations/references
 are validated through `config.LoadPublicDirWithCatalog` without resolving any credentials.

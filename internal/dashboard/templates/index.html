@@ -168,7 +168,6 @@
           <th scope="col">Tool</th>
           <th scope="col">At</th>
           <th scope="col">Outcome</th>
-          <th scope="col">Detail</th>
         </tr>
       </thead>
       <tbody>
@@ -179,7 +178,6 @@
           <td class="mono" data-label="Tool">{{.Name}}</td>
           <td data-label="At">{{if .At}}<time>{{.At}}</time>{{else}}Not recorded{{end}}</td>
           <td data-label="Outcome">{{if eq .Outcome "ok"}}OK{{else if .Outcome}}{{.Outcome}}{{else}}Not recorded{{end}}</td>
-          <td class="mono" data-label="Detail">{{if .Detail}}{{.Detail}}{{else}}<span class="muted">No detail</span>{{end}}</td>
         </tr>
         {{end}}
       </tbody>
