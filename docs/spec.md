@@ -51,6 +51,15 @@ and client-side function tools. Unknown content blocks fail closed after recordi
 extended thinking, multimodal input, streaming and server-side tools are outside this contract.
 **(decision)**
 
+Operational diagnostics use one injectable standard-library `log/slog` logger, JSON to stdout
+by default (compatible with systemd/journald), with selectable `debug/info/warn/error` level and
+`json/text` format. The CLI `check` exposes `-log-level` and `-log-format`; library callers inject
+`llm.Options.Logger`, with nil disabling client output. No hosted collector or raw-payload debug
+mode is used. The canonical event names and metadata allowlist are in
+[`internal/logging/logging.go`](../internal/logging/logging.go); emitters pass a typed record,
+never arbitrary errors or payload fields. The SQLite audit DB remains the action record.
+**(decision)**
+
 No fixed triage/compose/critic pipeline and no same-model critic. **(sourced)**: first-party guidance says
 to maximise a single agent first, and in Anthropic's Project Vend a same-model supervisor shared
 the blind spots of the agent it supervised.
@@ -73,6 +82,23 @@ Two rules keep a wake from doing damage **(sourced: patterns in `docs/research/r
 
 Reflection is something the agent chooses to do when new metrics exist; there is no fixed nightly
 job. **(proposed)**
+
+The existing client emits run start/finish/stop, request start/finish/retry, usage-accounting and
+client dispatcher-result events. Correlation uses available operator-configured agent/provider/
+profile/model/protocol IDs, wake ID, a local request sequence, attempt and a locally derived tool
+call ID (wake/step), never provider-supplied IDs. Durations use the injected client clock. Events
+carry operation, outcome/reason, HTTP status when known, steps, tokens and locally computed USD;
+unknown or malformed tool names are omitted. `check` emits validation start/configuration/result.
+These are client boundaries; they do not claim scheduler, guard, action audit or browser coverage.
+
+Future event ownership is an acceptance requirement in the implementing issues: #5 adds wake
+lifecycle (`wake.started/finished/stopped`) and tool lifecycle (`tool.started/finished`) plus
+scheduler/context/note/trend outcomes; #6 adds `guard.checked` and `tool.blocked`; #7 adds
+`telegram.operation.finished` and kill-switch outcomes; #8 adds `browser.operation.finished`
+and real Threads-tool outcomes; #9 validates those events in the integrated live run. Each adds
+captured-log and offline eval cases through the same logger/record contract before completion.
+No future component is considered instrumented until its issue implements and tests it.
+**(decision)**
 
 ## 5. Tools
 
@@ -105,6 +131,13 @@ job. **(proposed)**
 - Everything read from Threads is marked as untrusted data. Secrets never enter the LLM context.
 - Kill switch: Telegram `/pause`, `/resume`, `/kill`, `/dnc`; automatic stop on reaching a daily limit or
   when the browser is logged out or shown a captcha.
+
+Operational logging is allowlisted metadata only: no credentials, authorization headers,
+endpoint URLs, request/response bodies, system prompts, private notes, Threads text or strangers'
+usernames. Tool arguments/results and raw provider errors never enter logs; returned provider
+errors use static diagnostic reasons while preserving cancellation/error identity. Log-level
+selection never enables payload logging. Configured IDs and known tool-schema names are trusted
+operator metadata; third-party tool IDs/names are not. **(decision)**
 
 The numeric limits are starting values in the template and have no experimental basis yet.
 
@@ -140,6 +173,17 @@ How fast it opens is one of the experiment's results.
 - The agent always sees its remaining budget and decides how to spend it; the harness only blocks
   at the limit.
 - Feeding real revenue back into the budget is out of scope for v0.
+
+Usage-accounting events at the client/ledger boundary distinguish a committed local ledger
+write from a failed write, with known token counts and computed USD retained for diagnosis.
+Every HTTP attempt has a correlated result, including budget rejection, cancellation, malformed
+responses and accounting failures; retryable responses retain any valid reported usage before
+retrying. Budget and step stops use stable reason codes. This logging does not replace the
+transactional ledger, reserve future costs, or claim invoice/balance accuracy. An offline saved
+trace and its reproducing test live in
+[`internal/llm/testdata/retry-failure-trace.jsonl`](../internal/llm/testdata/retry-failure-trace.jsonl)
+and `TestSyntheticRetryFailureTrace`; operator filtering commands are in
+[`docs/setup.md`](setup.md). **(decision)**
 
 ## 9. Telegram
 
