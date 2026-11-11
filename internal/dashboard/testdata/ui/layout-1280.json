@@ -1,0 +1,115 @@
+{
+  "url": "http://127.0.0.1:18081/",
+  "synthetic": true,
+  "captured_at_utc": "2026-11-11T16:17:46.052Z",
+  "viewport": {
+    "width": 1280,
+    "height": 1431,
+    "dpr": 1,
+    "mobile": false
+  },
+  "page": {
+    "client_width": 1280,
+    "scroll_width": 1280,
+    "scroll_height": 1431,
+    "body_scroll_width": 1280,
+    "horizontal_overflow": 0
+  },
+  "statuses": [
+    "Running",
+    "Paused"
+  ],
+  "tables": [
+    {
+      "client_width": 1120,
+      "scroll_width": 1120,
+      "overflow": 0
+    },
+    {
+      "client_width": 540,
+      "scroll_width": 540,
+      "overflow": 0
+    },
+    {
+      "client_width": 540,
+      "scroll_width": 540,
+      "overflow": 0
+    },
+    {
+      "client_width": 1120,
+      "scroll_width": 1120,
+      "overflow": 0
+    },
+    {
+      "client_width": 1120,
+      "scroll_width": 1120,
+      "overflow": 0
+    },
+    {
+      "client_width": 540,
+      "scroll_width": 540,
+      "overflow": 0
+    },
+    {
+      "client_width": 540,
+      "scroll_width": 540,
+      "overflow": 0
+    },
+    {
+      "client_width": 1120,
+      "scroll_width": 1120,
+      "overflow": 0
+    }
+  ],
+  "figures": [
+    {
+      "text": "$0.50",
+      "client_width": 265,
+      "scroll_width": 265,
+      "overflow": 0
+    },
+    {
+      "text": "$0.24",
+      "client_width": 265,
+      "scroll_width": 265,
+      "overflow": 0
+    },
+    {
+      "text": "$0.26",
+      "client_width": 265,
+      "scroll_width": 265,
+      "overflow": 0
+    },
+    {
+      "text": "2026-11-11T18:00:00Z",
+      "client_width": 266,
+      "scroll_width": 266,
+      "overflow": 0
+    },
+    {
+      "text": "$0.50",
+      "client_width": 265,
+      "scroll_width": 265,
+      "overflow": 0
+    },
+    {
+      "text": "$0.34",
+      "client_width": 265,
+      "scroll_width": 265,
+      "overflow": 0
+    },
+    {
+      "text": "$0.16",
+      "client_width": 265,
+      "scroll_width": 265,
+      "overflow": 0
+    },
+    {
+      "text": "2026-11-11T18:00:00Z",
+      "client_width": 266,
+      "scroll_width": 266,
+      "overflow": 0
+    }
+  ],
+  "overflowing_visible": []
+}
