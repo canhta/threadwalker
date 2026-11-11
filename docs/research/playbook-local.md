@@ -79,3 +79,25 @@ eligibility. `TestFractionalDayAllocationConsumesLookWithoutRounding` exercises
 a real N=400 collector look with abundant controls but fractional daily
 requirements. `TestGateLookUsesActualObservationOrder` ensures the look timestamp
 tracks the newest counted observation even when publication order differs.
+
+The evidence files retain the original producer commits from the worker checkouts.
+Their source is preserved in the main history: v1 gate/helpers are at `a1d2e1a`,
+v1 simulation/fixture at `99e4de2`, and v2 simulation/fixture at `148d139` with
+matched gate `ecc53b1`. Per-look reporting was added at `8236e61` without changing
+the policy, RNG sequence or measured outcomes; the recorded summaries landed at
+`771deb8`. These main-history commits can be resolved from a fresh clone, while
+the producer hashes are provenance labels for the original measurements.
+
+To rerun the superseded v1 policy without changing a checkout or creating a branch:
+
+```sh
+playbook_repro_dir=$(mktemp -d)
+git archive a1d2e1a | tar -x -C "$playbook_repro_dir"
+mkdir -p "$playbook_repro_dir/internal/playbook/testdata"
+for playbook_path in internal/playbook/simulation.go internal/playbook/simulation_test.go internal/playbook/testdata/gate-v1.json; do
+  git show "99e4de2:$playbook_path" > "$playbook_repro_dir/$playbook_path"
+done
+(cd "$playbook_repro_dir" && go test ./internal/playbook -run TestPredeclaredSimulationSuite -count=1 -v)
+```
+
+The current main checkout and shared eval command reproduce the shipped v2 policy.
