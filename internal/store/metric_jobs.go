@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"regexp"
 	"time"
 )
 
@@ -31,6 +32,21 @@ const metricTimeLayout = "2006-01-02T15:04:05.000000000Z"
 func metricTime(at time.Time) string { return at.UTC().Format(metricTimeLayout) }
 func validMetricTime(at time.Time) bool {
 	return !at.IsZero() && at.UTC().Year() >= 1 && at.UTC().Year() <= 9999
+}
+
+// time.Parse accepts excess fractional precision and some invalid RFC3339
+// spellings. Reject them before parsing so target times are never rounded.
+var metricTimestampPattern = regexp.MustCompile(`^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]{1,9})?(Z|[+-]([01][0-9]|2[0-3]):[0-5][0-9])$`)
+
+func parseMetricTime(stamp string) (time.Time, error) {
+	if !metricTimestampPattern.MatchString(stamp) {
+		return time.Time{}, errors.New("invalid metric timestamp")
+	}
+	at, err := time.Parse(time.RFC3339Nano, stamp)
+	if err != nil || !validMetricTime(at) {
+		return time.Time{}, errors.New("invalid metric timestamp")
+	}
+	return at, nil
 }
 
 // metricWrite reserves the SQLite writer before reading, across connections and
@@ -85,7 +101,7 @@ func (s *Store) SeedMetricJobs(ctx context.Context, agentID string) (int, error)
 				rows.Close()
 				return fmt.Errorf("reading metric action: %w", err)
 			}
-			a.at, err = time.Parse(time.RFC3339Nano, stamp)
+			a.at, err = parseMetricTime(stamp)
 			if err != nil || !validMetricTime(a.at) || !validMetricTime(a.at.Add(24*time.Hour)) {
 				rows.Close()
 				return errors.New("seeding metrics: invalid published timestamp")
@@ -165,12 +181,12 @@ func (s *Store) ClaimMetricJobs(ctx context.Context, agentID string, now time.Ti
 					rows.Close()
 					return fmt.Errorf("reading leased metric: %w", err)
 				}
-				job.DueAt, err = time.Parse(time.RFC3339Nano, due)
+				job.DueAt, err = parseMetricTime(due)
 				if err != nil {
 					rows.Close()
 					return errors.New("claiming metrics: invalid target timestamp")
 				}
-				job.PostedAt, err = time.Parse(time.RFC3339Nano, posted)
+				job.PostedAt, err = parseMetricTime(posted)
 				if err != nil || !validMetricTime(job.PostedAt) || !job.DueAt.Equal(job.PostedAt.Add(time.Duration(job.WindowHours)*time.Hour)) {
 					rows.Close()
 					return errors.New("claiming metrics: invalid published timestamp")
@@ -201,7 +217,7 @@ func (s *Store) NextMetricDue(ctx context.Context, agentID string) (time.Time, b
 	if !stamp.Valid {
 		return time.Time{}, false, nil
 	}
-	at, err := time.Parse(time.RFC3339Nano, stamp.String)
+	at, err := parseMetricTime(stamp.String)
 	if err != nil || !validMetricTime(at) {
 		return time.Time{}, false, errors.New("reading next metric target: invalid timestamp")
 	}
@@ -237,7 +253,7 @@ func metricClaims(ctx context.Context, conn *sql.Conn, jobs []MetricJob, at time
 	if err != nil {
 		return false, fmt.Errorf("reading metric claim action: %w", err)
 	}
-	postedAt, err := time.Parse(time.RFC3339Nano, posted)
+	postedAt, err := parseMetricTime(posted)
 	if err != nil || !validMetricTime(postedAt) || dry != 0 || url == "" {
 		return false, ErrMetricClaim
 	}
