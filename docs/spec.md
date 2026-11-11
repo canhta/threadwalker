@@ -106,7 +106,7 @@ not elapsed live qualification. The canonical implementation and fixtures are in
 Normal `run` loads configured LLM settings, with custom endpoints supported by that configuration.
 The default Threads stub requires `dry_run`; an explicitly configured browser backend permits
 guarded submissions. `run -offline` always forces the in-process Threads stub and rejects
-non-dry-run templates. Playbook context remains empty until its implementing issue lands.
+non-dry-run templates. Playbook context contains at most 100 own entries, testing first, with code-owned status, revision and counts; editable text is redacted against configured secrets.
 Metrics context contains at most 20 recent own confirmed-action samples: local action ID,
 actual measurement time and counters only; absent samples remain absent.
 
@@ -259,8 +259,66 @@ Design **(proposed; no study has tested this combination)**:
   **(sourced)**: wholesale rewriting has collapsed an agent's context from 18,282 to 122 tokens.
 - The template and system prompt are immutable to the agent.
 
-Accepted consequence: the gate opens slowly, possibly weeks before the first entry is established.
-How fast it opens is one of the experiment's results.
+The bounded tools are `playbook_read` (optional limit 1..100, default 10) and
+`playbook_propose` (one nonblank text of at most 1000 Unicode code points, optional positive
+`hypothesis_id` to amend). Unknown fields, status/counter changes, deletion and list replacement
+are refused. There are at most five `testing` entries. Template seed entries initialize once
+per agent, with a durable marker; a restart never restores removed or edited seed text.
+Amending genuinely changed testing text increments its revision and resets its counters.
+Decided entries are immutable. Each revision gets a persistent, lifetime per-agent test ordinal;
+closing or amending entries never recycles the statistical error budget. **(decision, #10)**
+
+The guard snapshots each tagged own testing revision in the same transaction as its action
+intent. Unknown, foreign, decided, duplicate or more than five IDs are refused. Outcomes count
+only for own confirmed non-dry-run actions with a completed harness-owned 24-hour target linked
+to its actual stored metric sample. Measurement age must be in **[24h, 30h]**, inclusive; catch-up
+beyond that interval, zero views, missing metrics and earlier windows supply no evidence.
+An outcome is counted at most once for its original revision; an amendment cannot inherit
+late evidence from older text. Outcome markers, counters, consumed looks and terminal decisions
+commit atomically. Restart reconciles committed metrics without replaying actions. **(decision)**
+
+A score is `min(1, (likes + replies + reposts) / views)`. Success means strictly exceeding a
+code-owned frozen threshold. Before the first baseline-ready tagged action of a revision,
+code selects the latest 300 prior own **untagged, same-kind** eligible observations within
+30 days; every measurement precedes that action's reservation. The chronological oldest 100
+calibrate a median threshold; the disjoint newer 200 supply the frozen binary reference counts.
+This split avoids using calibration outcomes to estimate their own reference success rate.
+The threshold, reference counts, action kind and source action IDs freeze for the revision.
+Insufficient history leaves that action permanently ineligible; a later reservation can freeze
+when history becomes sufficient. An action of a different kind from that frozen baseline
+cannot add evidence. **(decision)**
+
+The gate uses one-sided exact Fisher comparisons at **N=50, 100, 200, 400, 800, 1600**, with
+per-direction threshold `0.04 / (test_index * (test_index + 1) * 6)` at each look. An entry is
+established only when its success fraction beats **both** the frozen reference and 200
+contemporaneous controls at that threshold; negative evidence likewise requires both comparisons.
+Otherwise it remains testing until its final look, then is rejected with an explicit
+inconclusive or unavailable-control reason. A rejected inconclusive entry is not evidence of
+harm. Every fixed look is consumed once, including unavailable controls; subsequently arriving
+controls cannot reopen it. The nominal establishment error spend sums to at most 4% over all
+looks and lifetime revisions under independent appropriate null samples. **(decision)**
+
+Contemporaneous controls use the **whole counted candidate cohort's UTC posting-day histogram**.
+For each represented day, code requires exactly `candidate_count_on_day * 200 / N` own untagged
+same-kind eligible controls posted that day, after the baseline froze and measured strictly
+before the current candidate observation. Non-integral allocations or insufficient support
+fail closed; counts are never rounded and days are never dropped. Controls are selected by
+measurement time then local action ID, earliest first within each day. Their full epoch is
+retained rather than substituting the latest 30 days for older candidate days. Persisted look
+rows contain selected IDs, counts, observation time, status and reason. **(decision)**
+
+The choice follows the sample-size, heavy-tail and confounding warnings in
+[`agent-architecture.md`, section 5](research/agent-architecture.md): normalize by views,
+binarize, require substantial evidence and keep counting outside the model. Calibration, fixed
+looks, lifetime error spending and matched controls are implementation choices, not a study's
+validated Threads learning algorithm. Original historical-only simulations falsely established
+all 200 runs under a shared account-wide rise; that failed policy was replaced before release.
+The revised simulations and reproduction commands are recorded in
+[`playbook-local.md`](research/playbook-local.md). These are synthetic measurements, not live
+engagement evidence. Daily matching does not remove within-day timing, adaptive labeling,
+nonrandomized allocation or other confounders; establishment remains an observational result.
+Accepted consequence: the gate may stay closed for weeks, or indefinitely when control support
+is missing. **(decision)**
 
 Metric remeasurement is harness-owned: each own confirmed publication seeds durable targets
 at `posted_at + 1h`, `+6h` and `+24h`. Dry-run and unconfirmed/unknown intents seed no targets.
@@ -431,7 +489,7 @@ no code path executes a tool without passing the guards.
 
 ## 15. Database schema
 
-Every table carries `agent_id`, even while only one agent runs. Canonical initial DDL lives in [`internal/store/migrations/001_initial_schema.sql`](../internal/store/migrations/001_initial_schema.sql); delivery/offset changes live in [`003_owner_delivery.sql`](../internal/store/migrations/003_owner_delivery.sql), metric checkpoints and wake kinds in [`004_metric_jobs.sql`](../internal/store/migrations/004_metric_jobs.sql).
+Every table carries `agent_id`, even while only one agent runs. Canonical initial DDL lives in [`internal/store/migrations/001_initial_schema.sql`](../internal/store/migrations/001_initial_schema.sql); delivery/offset changes live in [`003_owner_delivery.sql`](../internal/store/migrations/003_owner_delivery.sql), metric checkpoints and wake kinds in [`004_metric_jobs.sql`](../internal/store/migrations/004_metric_jobs.sql), bounded playbook revisions/seeding in [`005_playbook.sql`](../internal/store/migrations/005_playbook.sql), and revision snapshots/baselines/outcomes/looks in [`006_playbook_outcomes.sql`](../internal/store/migrations/006_playbook_outcomes.sql).
 
 | Table | Main columns | Purpose |
 |---|---|---|
@@ -442,7 +500,7 @@ Every table carries `agent_id`, even while only one agent runs. Canonical initia
 | `metrics` | `action_id`, `measured_at`, `views`, `likes`, `replies`, `reposts` | Repeated measurements |
 | `metric_jobs` | `agent_id`, `action_id`, `window_hours`, `due_at`, `not_before`, claim fence/lease, `completed_at`, `reason` | Durable fixed-window metric targets and recovery |
 | `notes` | `id`, `agent_id`, `text`, `created_at`, plus an FTS5 table | The agent's own notes |
-| `playbook` | `id`, `agent_id`, `text`, `status` (`testing`/`established`/`rejected`), `n`, `successes`, `created_at`, `decided_at` | Hypotheses; counters are written by code only |
+| `playbook` | `id`, `agent_id`, `text`, `status` (`testing`/`established`/`rejected`), `revision`, `n`, `successes`, `created_at`, `decided_at` | Hypotheses; counters are written by code only |
 | `contacts` | `agent_id`, `username`, `reply_count_7d`, `do_not_contact`, `reason` | Rate limiting only; no description of the person |
 | `ledger` | `agent_id`, `day`, `tokens_in`, `tokens_out`, `cost_usd` | Budget |
 | `owner_msgs` | `id`, `agent_id`, `direction`, `text`, `answered_id`, `at` | Telegram exchange |

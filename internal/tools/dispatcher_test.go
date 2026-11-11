@@ -58,7 +58,7 @@ func dispatch(t *testing.T, d *tools.Dispatcher, name, args string) string {
 func TestDefinitionsAndConstructor(t *testing.T) {
 	st, opts, d := setup(t)
 	defs := d.Definitions()
-	if len(defs) != 11 {
+	if len(defs) != 13 {
 		t.Fatalf("definitions %d", len(defs))
 	}
 	names := map[string]bool{}

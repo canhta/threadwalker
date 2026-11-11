@@ -12,6 +12,7 @@ import (
 	"unicode"
 	"unicode/utf8"
 
+	"github.com/canhta/threadwalker/internal/playbook"
 	"github.com/canhta/threadwalker/internal/store"
 )
 
@@ -126,7 +127,13 @@ func (g *Guard) reserve(ctx context.Context, a Attempt, intent *actionIntent, au
 		}
 	}
 	if reason == "" {
+		seen := map[int64]bool{}
 		for _, hypothesis := range intent.HypothesisIDs {
+			if hypothesis <= 0 || seen[hypothesis] || len(intent.HypothesisIDs) > 5 {
+				reason = "invalid_hypothesis"
+				break
+			}
+			seen[hypothesis] = true
 			var valid bool
 			err = conn.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM playbook WHERE id=? AND agent_id=? AND status='testing')`, hypothesis, g.opts.Template.ID).Scan(&valid)
 			if err != nil {
@@ -151,6 +158,9 @@ func (g *Guard) reserve(ctx context.Context, a Attempt, intent *actionIntent, au
 		}
 		id, err = result.LastInsertId()
 		if err != nil {
+			return 0, "", err
+		}
+		if err = playbook.Reserve(ctx, conn, g.opts.Template.ID, id, ids, now); err != nil {
 			return 0, "", err
 		}
 		if a.Tool == "reply" {

@@ -15,6 +15,7 @@ import (
 	"github.com/canhta/threadwalker/internal/guard"
 	"github.com/canhta/threadwalker/internal/llm"
 	"github.com/canhta/threadwalker/internal/logging"
+	"github.com/canhta/threadwalker/internal/playbook"
 	"github.com/canhta/threadwalker/internal/store"
 	"github.com/canhta/threadwalker/internal/threads"
 	"github.com/canhta/threadwalker/internal/tools"
@@ -109,6 +110,9 @@ func (p *Processor) NextDue(ctx context.Context) (time.Time, bool, error) {
 func (p *Processor) RunDue(ctx context.Context) (result Result, runErr error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
+	if err := playbook.Process(ctx, p.opts.Store, p.opts.Template.ID, p.opts.Now(), p.opts.Logger); err != nil {
+		return result, err
+	}
 	due, ok, err := p.NextDue(ctx)
 	if err != nil {
 		return result, err
@@ -285,6 +289,9 @@ func (p *Processor) RunDue(ctx context.Context) (result Result, runErr error) {
 				p.emit(ctx, logging.Record{Event: logging.MetricsTargetCompleted, WakeID: wakeID, ActionID: job.ActionID, WindowHours: job.WindowHours, TargetAt: job.DueAt, MeasuredAt: at, LatenessMS: max(0, at.Sub(job.DueAt).Milliseconds()), Outcome: "success", Reason: "target_completed", Jobs: 1})
 			}
 		}
+	}
+	if err := playbook.Process(ctx, p.opts.Store, p.opts.Template.ID, p.opts.Now(), p.opts.Logger); err != nil {
+		return result, err
 	}
 	return result, nil
 }

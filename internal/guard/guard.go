@@ -185,7 +185,7 @@ func (g *Guard) Execute(ctx context.Context, a Attempt, effect func() (string, e
 
 func safeTool(name string) string {
 	switch name {
-	case "note_write", "note_search", "schedule_next_wake", "fetch_trends", "read_feed", "search", "read_post", "post", "reply", "read_own_metrics", "mark_do_not_contact", "notify_owner", "ask_owner":
+	case "playbook_read", "playbook_propose", "note_write", "note_search", "schedule_next_wake", "fetch_trends", "read_feed", "search", "read_post", "post", "reply", "read_own_metrics", "mark_do_not_contact", "notify_owner", "ask_owner":
 		return name
 	default:
 		return "unknown"

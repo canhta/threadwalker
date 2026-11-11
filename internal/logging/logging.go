@@ -14,6 +14,8 @@ import (
 // Stable events emitted by the components implemented today. LLM tool events
 // describe only the client dispatcher boundary, not a guard or audit outcome.
 const (
+	PlaybookGateChecked       = "playbook.gate.checked"
+	PlaybookDecided           = "playbook.decided"
 	MetricsScheduled          = "metrics.scheduled"
 	MetricsMeasured           = "metrics.measured"
 	MetricsTargetCompleted    = "metrics.target.completed"
@@ -79,19 +81,21 @@ func New(w io.Writer, level, format string) (*slog.Logger, error) {
 // Event, Operation, Outcome, Reason and Tool must be static code/schema values.
 // Optional zero numeric values are included to make accounting explicit.
 type Record struct {
-	Event, AgentID, ProviderID, ProfileID, Model, Protocol string
-	WakeID                                                 int64
-	Request                                                int
-	ToolCallID                                             string
-	Operation, Outcome, Reason, Tool                       string
-	Attempt, HTTPStatus, Steps                             int
-	DurationMS                                             int64
-	TokensIn, TokensOut                                    int64
-	CostUSD                                                float64
-	ActionID                                               int64
-	WindowHours, Jobs, Samples                             int
-	TargetAt, MeasuredAt                                   time.Time
-	LatenessMS                                             int64
+	Event, AgentID, ProviderID, ProfileID, Model, Protocol              string
+	WakeID                                                              int64
+	Request                                                             int
+	ToolCallID                                                          string
+	Operation, Outcome, Reason, Tool                                    string
+	Attempt, HTTPStatus, Steps                                          int
+	DurationMS                                                          int64
+	TokensIn, TokensOut                                                 int64
+	CostUSD                                                             float64
+	ActionID                                                            int64
+	WindowHours, Jobs, Samples                                          int
+	TargetAt, MeasuredAt                                                time.Time
+	LatenessMS                                                          int64
+	HypothesisID, Revision, N, Successes                                int64
+	BaselineN, BaselineSuccesses, ControlN, ControlSuccesses, TestIndex int64
 }
 
 // Emit accepts a typed allowlist rather than arbitrary slog attributes. An
@@ -109,6 +113,9 @@ func Emit(ctx context.Context, logger *slog.Logger, level slog.Level, r Record) 
 	attrs = append(attrs, slog.Int64("wake_id", r.WakeID), slog.Int("request", r.Request), slog.Int("attempt", r.Attempt), slog.Int("http_status", r.HTTPStatus), slog.Int64("duration_ms", r.DurationMS), slog.Int("steps", r.Steps), slog.Int64("tokens_in", r.TokensIn), slog.Int64("tokens_out", r.TokensOut), slog.Float64("cost_usd", r.CostUSD))
 	if r.ActionID > 0 || r.Event == MetricsScheduled || r.Event == MetricsFinished {
 		attrs = append(attrs, slog.Int64("action_id", r.ActionID), slog.Int("window_hours", r.WindowHours), slog.Int("jobs", r.Jobs), slog.Int("samples", r.Samples), slog.Int64("lateness_ms", r.LatenessMS))
+	}
+	if r.HypothesisID > 0 {
+		attrs = append(attrs, slog.Int64("hypothesis_id", r.HypothesisID), slog.Int64("revision", r.Revision), slog.Int64("n", r.N), slog.Int64("successes", r.Successes), slog.Int64("baseline_n", r.BaselineN), slog.Int64("baseline_successes", r.BaselineSuccesses), slog.Int64("control_n", r.ControlN), slog.Int64("control_successes", r.ControlSuccesses), slog.Int64("test_index", r.TestIndex))
 	}
 	for _, field := range []struct {
 		key string

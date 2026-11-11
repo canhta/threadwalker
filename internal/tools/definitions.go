@@ -34,7 +34,7 @@ func (b builtin) Definition() llm.Tool {
 	properties := map[string]any{}
 	required := []string{}
 	// Stable ordering makes request bodies and configuration fingerprints stable.
-	for _, key := range []string{"text", "query", "limit", "action_id", "at", "url", "target_url", "target_username", "username", "hypothesis_ids"} {
+	for _, key := range []string{"text", "query", "limit", "action_id", "hypothesis_id", "at", "url", "target_url", "target_username", "username", "hypothesis_ids"} {
 		f, ok := b.fields[key]
 		if !ok {
 			continue
@@ -47,7 +47,7 @@ func (b builtin) Definition() llm.Tool {
 			property["minimum"] = 1
 			property["maximum"] = 100
 		}
-		if key == "action_id" {
+		if key == "action_id" || key == "hypothesis_id" {
 			property["minimum"] = 1
 		}
 		if key == "at" {
@@ -69,6 +69,7 @@ type arguments struct {
 	Text, Query, At, URL, TargetURL, TargetUsername, Username string
 	ReservedActionID                                          int64
 	ActionID                                                  int64
+	HypothesisID                                              int64
 	Limit                                                     int
 	HypothesisIDs                                             []int64
 }
@@ -116,6 +117,10 @@ func (b builtin) parse(raw string) (arguments, error) {
 		case "integer":
 			if key == "action_id" {
 				if json.Unmarshal(value, &a.ActionID) != nil || a.ActionID <= 0 {
+					return arguments{}, errArguments
+				}
+			} else if key == "hypothesis_id" {
+				if json.Unmarshal(value, &a.HypothesisID) != nil || a.HypothesisID <= 0 {
 					return arguments{}, errArguments
 				}
 			} else if json.Unmarshal(value, &a.Limit) != nil || a.Limit < 1 || a.Limit > 100 {

@@ -18,6 +18,16 @@ func (d *Dispatcher) builtins() []builtin {
 	// The embedded fixture is checked by TestExternalWrappersAndDryRunActions.
 	_ = json.Unmarshal(threadsFixtures, &fixtures)
 	tools := []builtin{
+		{name: "playbook_read", description: "Read your bounded playbook with code-owned status and outcome counts.", fields: map[string]field{"limit": {"integer", false}}, run: func(ctx context.Context, a arguments) (any, error) {
+			return d.opts.Store.PlaybookEntries(ctx, d.opts.Template.ID, a.Limit)
+		}},
+		{name: "playbook_propose", description: "Add one testing hypothesis or amend one testing entry. Text amendments reset evidence; status and counters are code-owned.", fields: map[string]field{"text": stringRequired, "hypothesis_id": {"integer", false}}, run: func(ctx context.Context, a arguments) (any, error) {
+			entry, err := d.opts.Store.ProposePlaybook(ctx, d.opts.Template.ID, a.HypothesisID, a.Text, d.opts.Now())
+			if err != nil {
+				return nil, errors.New("proposing playbook entry: refused")
+			}
+			return entry, nil
+		}},
 		{name: "mark_do_not_contact", description: "Permanently stop replying to a username. Entries cannot be removed.", fields: map[string]field{"username": stringRequired}, run: func(ctx context.Context, a arguments) (any, error) {
 			if err := d.opts.Store.MarkDoNotContact(ctx, d.opts.Template.ID, a.Username, "agent_request"); err != nil {
 				return nil, errors.New("marking do not contact: failed")

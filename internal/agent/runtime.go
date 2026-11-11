@@ -16,6 +16,7 @@ import (
 	"github.com/canhta/threadwalker/internal/llm"
 	"github.com/canhta/threadwalker/internal/logging"
 	"github.com/canhta/threadwalker/internal/metrics"
+	"github.com/canhta/threadwalker/internal/playbook"
 	"github.com/canhta/threadwalker/internal/store"
 	"github.com/canhta/threadwalker/internal/threads"
 	"github.com/canhta/threadwalker/internal/tools"
@@ -101,6 +102,14 @@ func (r *Runtime) Start(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	if before.Status == "running" {
+		if _, err = r.opts.Store.InitializePlaybook(ctx, r.opts.Template.ID, r.opts.Template.SeedPlaybook, now); err != nil {
+			return err
+		}
+	}
+	if err = playbook.Process(ctx, r.opts.Store, r.opts.Template.ID, now, r.opts.Logger); err != nil {
+		return err
+	}
 	ids, err := r.opts.Store.RecoverWakes(ctx, r.opts.Template.ID, now, r.fallback(now))
 	if err != nil {
 		return err
@@ -121,9 +130,12 @@ func (r *Runtime) Start(ctx context.Context) error {
 }
 
 // Context includes only the immutable persona/goal and this agent's own state.
-// Playbook remains empty until its implementing issue lands.
+// Editable playbook text is scoped to this agent and redacted before delivery.
 func (r *Runtime) Context(ctx context.Context) ([]llm.Message, error) { return r.buildContext(ctx, 0) }
 func (r *Runtime) buildContext(ctx context.Context, wakeID int64) ([]llm.Message, error) {
+	if err := playbook.Process(ctx, r.opts.Store, r.opts.Template.ID, r.opts.Now(), r.opts.Logger); err != nil {
+		return nil, err
+	}
 	state, err := r.opts.Store.AgentState(ctx, r.opts.Template.ID)
 	if err != nil {
 		return nil, err
@@ -148,6 +160,10 @@ func (r *Runtime) buildContext(ctx context.Context, wakeID int64) ([]llm.Message
 	if err != nil {
 		return nil, err
 	}
+	entries, err := r.opts.Store.PlaybookEntries(ctx, r.opts.Template.ID, 100)
+	if err != nil {
+		return nil, err
+	}
 	secrets := append([]config.Secret{}, r.opts.Secrets...)
 	secrets = append(secrets, r.opts.Template.LLM.APIKey, r.opts.Template.Telegram.BotToken, r.opts.Template.Telegram.OwnerChatID)
 	for i := range answers {
@@ -157,13 +173,20 @@ func (r *Runtime) buildContext(ctx context.Context, wakeID int64) ([]llm.Message
 			}
 		}
 	}
+	for i := range entries {
+		for _, secret := range secrets {
+			if raw := secret.Expose(); raw != "" {
+				entries[i].Text = strings.ReplaceAll(entries[i].Text, raw, "[REDACTED]")
+			}
+		}
+	}
 	data, _ := json.Marshal(struct {
-		SelfNote     string               `json:"self_note"`
-		OwnerAnswers []store.OwnerMessage `json:"owner_answers"`
-		Playbook     []string             `json:"playbook"`
-		Metrics      []store.MetricSample `json:"metrics"`
-		RemainingUSD float64              `json:"remaining_usd"`
-	}{state.SelfNote, answers, []string{}, metrics, remaining})
+		SelfNote     string                `json:"self_note"`
+		OwnerAnswers []store.OwnerMessage  `json:"owner_answers"`
+		Playbook     []store.PlaybookEntry `json:"playbook"`
+		Metrics      []store.MetricSample  `json:"metrics"`
+		RemainingUSD float64               `json:"remaining_usd"`
+	}{state.SelfNote, answers, entries, metrics, remaining})
 	r.event(ctx, logging.ContextBuilt, "success", "own_state_only", wakeID, 0)
 	mode := "dry-run"
 	if !r.opts.Template.DryRun {
