@@ -137,9 +137,17 @@ func TestCLILoggingDefaultsToJSONInfo(t *testing.T) {
 	if got := finished["reason"]; got != "validated" {
 		t.Errorf("check.finished reason = %v, want validated", got)
 	}
-	configured := cmdLoggingOne(t, records, "check.configured")
-	if got := configured["agent_id"]; got != "solo-builder" {
-		t.Errorf("check.configured agent_id = %v, want solo-builder", got)
+	configured := cmdLoggingEvents(records, "check.configured")
+	if len(configured) != 2 {
+		t.Fatalf("configuration events=%d, want both templates", len(configured))
+	}
+	seen := map[string]bool{}
+	for _, event := range configured {
+		id, _ := event["agent_id"].(string)
+		if seen[id] || (id != "solo-builder" && id != "teasing") {
+			t.Fatalf("invalid agent correlation %q", id)
+		}
+		seen[id] = true
 	}
 	cmdLoggingAssertSafe(t, stdout, stderr, records)
 }

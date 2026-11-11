@@ -129,6 +129,9 @@ func Run(ctx context.Context, suite *Suite, opts Options) (Report, error) {
 }
 
 func runCase(ctx context.Context, c Case, p Profile, repeat int, opts Options, liveBudget *reservation) CaseResult {
+	if c.IsolationScenario != "" {
+		return runIsolationCase(ctx, c, p, repeat, opts)
+	}
 	if c.DashboardScenario != "" {
 		return runDashboardCase(ctx, c, p, repeat, opts)
 	}

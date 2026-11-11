@@ -1,0 +1,11 @@
+{
+ "version":"v1",
+ "description":"Real guarded tools, state, serial scheduler and injected-time two-agent isolation; synthetic identities, no live credentials or network.",
+ "cases":[
+  {"id":"isolation_data_boundaries","isolation_scenario":"data","expect":{"end_reason":"completed","tools":null}},
+  {"id":"isolation_owner_budget_controls","isolation_scenario":"controls","expect":{"end_reason":"completed","tools":null}},
+  {"id":"isolation_own_account_refusal","isolation_scenario":"own_accounts","expect":{"end_reason":"completed","tools":null}},
+  {"id":"isolation_shared_link_reservation","isolation_scenario":"shared_links","expect":{"end_reason":"completed","tools":null}},
+  {"id":"isolation_48_logical_hours","isolation_scenario":"logical_soak","expect":{"end_reason":"completed","tools":null}}
+ ]
+}

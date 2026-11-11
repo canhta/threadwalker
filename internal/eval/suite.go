@@ -133,6 +133,12 @@ func validateSuite(s *Suite) error {
 		if c.Limits.MaxSteps < 0 || c.Limits.MaxOutputTokens < 0 || !finiteNonnegative(c.Limits.MaxUSD) {
 			return invalid()
 		}
+		if c.IsolationScenario != "" {
+			if !validIsolationScenario(c.IsolationScenario) || len(c.Messages) > 0 || len(c.Responses) > 0 || len(c.Tools) > 0 || len(c.ToolOutputs) > 0 {
+				return invalid()
+			}
+			continue
+		}
 		if c.DashboardScenario != "" {
 			if !validDashboardScenario(c.DashboardScenario) || len(c.Messages) > 0 || len(c.Responses) > 0 || len(c.Tools) > 0 || len(c.ToolOutputs) > 0 {
 				return invalid()

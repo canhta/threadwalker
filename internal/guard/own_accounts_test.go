@@ -37,3 +37,34 @@ func TestOwnAccountsBlockedThroughEveryDeclaredAddress(t *testing.T) {
 		})
 	}
 }
+
+func TestConfirmedOwnPublicationCannotBeDisguisedAsForeign(t *testing.T) {
+	for _, args := range []string{
+		`{"text":"Synthetic reply","target_username":"stranger","target_url":"http://www.THREADS.NET/opaque-publication/?tracking=1"}`,
+		`{"text":"See https://threads.net/opaque-publication"}`,
+	} {
+		t.Run(args, func(t *testing.T) {
+			st, opts := setup(t)
+			opts.Template.Limits.PostsPerDay = 5
+			opts.Template.Limits.RepliesPerDay = 5
+			opts.Template.Limits.RepliesPerUser7d = 2
+			opts.Template.Limits.MinSecondsBetweenActions = 1
+			if _, err := st.DB().Exec(`INSERT INTO actions(agent_id,kind,text,posted_at,thread_url) VALUES('other','post','synthetic confirmed publication','2026-11-10T00:00:00Z','https://threads.net/opaque-publication')`); err != nil {
+				t.Fatal(err)
+			}
+			g, err := guard.New(opts)
+			if err != nil {
+				t.Fatal(err)
+			}
+			tool := "post"
+			if strings.Contains(args, "target_url") {
+				tool = "reply"
+			}
+			called := false
+			_, err = g.Execute(context.Background(), guard.Attempt{Tool: tool, Arguments: args}, func() (string, error) { called = true; return "", nil })
+			if called || !errors.Is(err, guard.ErrBlocked) || !strings.Contains(err.Error(), "own_account") {
+				t.Fatalf("confirmed own URL escaped: %v", err)
+			}
+		})
+	}
+}

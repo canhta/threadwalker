@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"time"
 
+	"github.com/canhta/threadwalker/internal/agent"
 	"github.com/canhta/threadwalker/internal/config"
 	"github.com/canhta/threadwalker/internal/llm"
 	"github.com/canhta/threadwalker/internal/playbook"
@@ -93,23 +94,24 @@ type Report struct {
 	Results           []CaseResult `json:"results"`
 }
 type CaseResult struct {
-	Simulation    *playbook.SimulationReport `json:"simulation,omitempty"`
-	CaseID        string                     `json:"case_id"`
-	ProfileID     string                     `json:"profile_id"`
-	ProviderID    string                     `json:"provider_id"`
-	Model         string                     `json:"model"`
-	Protocol      string                     `json:"protocol"`
-	Repeat        int                        `json:"repeat"`
-	Passed        bool                       `json:"passed"`
-	Reason        string                     `json:"reason"`
-	EndReason     string                     `json:"end_reason"`
-	Steps         int                        `json:"steps"`
-	ToolCalls     []string                   `json:"tool_calls"`
-	TokensIn      int64                      `json:"tokens_in"`
-	TokensOut     int64                      `json:"tokens_out"`
-	CostUSD       float64                    `json:"cost_usd"`
-	DurationMS    float64                    `json:"duration_ms"`
-	LogicalHours  int                        `json:"logical_hours,omitempty"`
-	MetricSamples int                        `json:"metric_samples,omitempty"`
-	MetricTargets int                        `json:"metric_targets,omitempty"`
+	Agents        []agent.IsolationAgentEvidence `json:"agents,omitempty"`
+	Simulation    *playbook.SimulationReport     `json:"simulation,omitempty"`
+	CaseID        string                         `json:"case_id"`
+	ProfileID     string                         `json:"profile_id"`
+	ProviderID    string                         `json:"provider_id"`
+	Model         string                         `json:"model"`
+	Protocol      string                         `json:"protocol"`
+	Repeat        int                            `json:"repeat"`
+	Passed        bool                           `json:"passed"`
+	Reason        string                         `json:"reason"`
+	EndReason     string                         `json:"end_reason"`
+	Steps         int                            `json:"steps"`
+	ToolCalls     []string                       `json:"tool_calls"`
+	TokensIn      int64                          `json:"tokens_in"`
+	TokensOut     int64                          `json:"tokens_out"`
+	CostUSD       float64                        `json:"cost_usd"`
+	DurationMS    float64                        `json:"duration_ms"`
+	LogicalHours  int                            `json:"logical_hours,omitempty"`
+	MetricSamples int                            `json:"metric_samples,omitempty"`
+	MetricTargets int                            `json:"metric_targets,omitempty"`
 }

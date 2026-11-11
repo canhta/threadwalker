@@ -105,3 +105,31 @@ func TestConcurrentAgentsReserveSharedPromotionOnce(t *testing.T) {
 		t.Fatalf("reservations %v %v %v", counts, other, err)
 	}
 }
+
+func TestBareDomainPromotionSharesHTTPSReservation(t *testing.T) {
+	st, opts := setup(t)
+	opts.Template.Limits.PostsPerDay = 5
+	opts.Template.Limits.RepliesPerDay = 5
+	opts.Template.Limits.RepliesPerUser7d = 2
+	opts.Template.Limits.MinSecondsBetweenActions = 1
+	g, err := guard.New(opts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = g.Execute(context.Background(), guard.Attempt{Tool: "post", Arguments: `{"text":"https://example.org"}`}, func() (string, error) { return "ok", nil }); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = st.DB().Exec(`INSERT INTO agents(id,status) VALUES('other','running'); INSERT INTO wakes(id,agent_id,started_at) VALUES(2,'other','2026-11-11T00:00:00Z')`); err != nil {
+		t.Fatal(err)
+	}
+	opts.Template.ID = "other"
+	opts.WakeID = 2
+	g, err = guard.New(opts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = g.Execute(context.Background(), guard.Attempt{Tool: "post", Arguments: `{"text":"example.org"}`}, func() (string, error) { t.Fatal("duplicate bare link effect"); return "", nil })
+	if !errors.Is(err, guard.ErrBlocked) {
+		t.Fatal("bare domain promotion escaped")
+	}
+}

@@ -302,6 +302,26 @@ synthetic sensitive strings. They check privacy across routes/methods, absence o
 safe query failure. Both profile labels execute the same local component with zero model calls;
 these results are not a model comparison. Live mode refuses all component scenarios.
 
+## Two-agent isolation
+
+```sh
+go run ./cmd/threadwalker eval -suite internal/eval/testdata/isolation-v1.json -seed 12 -out /tmp/isolation-eval.json
+go test ./internal/eval -run 'TestCapturedIsolation|TestIsolationScenarios|TestAgentScopedReport' -count=1
+go test -race ./internal/config ./internal/guard ./internal/agent ./internal/eval ./cmd/threadwalker -run 'IsolationAcceptance|Promotion|OwnAccount|ConfirmedOwn|IsolationScenarios|CapturedIsolation|AgentScopedReport' -count=1
+```
+
+`isolation_scenario` cases exercise actual guarded data tools, notes/playbook/contact/ledger
+boundaries, independent owner/budget state, own-account and duplicate-link refusals, and a
+48-logical-hour two-agent run including metric maintenance and SQLite restart. `agents` in each
+shared report row contains separate actual per-agent counts and locally estimated usage/cost.
+Both synthetic profile labels execute local component scenarios; the soak uses its fixed
+synthetic OpenAI transport and is not a provider/model comparison. Timing is wall-clock report
+metadata, separate from logical hours; no provider charges occur. The redacted trace is
+`internal/eval/testdata/isolation-v1-events.jsonl`, reproduced by
+`TestCapturedIsolationEventsAreRedactedAndScoped`; deliberate changes may regenerate it with
+`THREADWALKER_UPDATE_ISOLATION_TRACE=1`. See [local evidence](research/isolation-local.md).
+Live mode refuses these component cases before reading provider credentials.
+
 ## Pending coverage
 
 The current suites cover client/protocol, configuration, accounting, local runtime, owner-service
@@ -310,6 +330,6 @@ revision-bound day-matched gate simulations.
 They do not certify components that do not exist yet. Real-bot qualification belongs to
 [#18](https://github.com/canhta/threadwalker/issues/18), live browser/Threads compatibility to
 [#2](https://github.com/canhta/threadwalker/issues/2), and integrated live validation to
-[#9](https://github.com/canhta/threadwalker/issues/9). Multiple-agent/template cases remain in
-[#12](https://github.com/canhta/threadwalker/issues/12) as that component lands; its coverage is
-pending, not passing.
+[#9](https://github.com/canhta/threadwalker/issues/9). Real-account two-agent 48-hour memory
+qualification remains in [#21](https://github.com/canhta/threadwalker/issues/21); synthetic
+isolation and local memory samples do not certify it.

@@ -33,6 +33,18 @@ operational events (JSON by default), and `eval.json` uses the existing eval rep
 The soak uses an isolated empty database; a supplied `-db` must also be empty. This takes seconds,
 not 48 elapsed hours, and does not qualify the real services tracked in #2/#18/#21.
 
+For two synthetic templates/profiles, independent owner controls and budgets, serial agent/metric
+wakes, one restart and local Go-process memory samples:
+
+```sh
+go run ./cmd/threadwalker run -offline -soak-hours 48 -soak-agents 2 -evidence /tmp/threadwalker-isolation
+```
+
+`isolation.json` records agent-scoped usage, states and memory observations; `events.jsonl` is the
+redacted trace and `eval.json` runs the focused isolation cases. The default one-agent soak stays
+available without `-soak-agents`. Samples use synthetic backends, not Chromium or real accounts;
+[local isolation evidence](research/isolation-local.md) states the limits and source revision.
+
 ## Read-only local dashboard
 
 ```sh

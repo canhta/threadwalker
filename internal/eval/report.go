@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/canhta/threadwalker/internal/agent"
 	"io"
 	"math"
 	"os"
@@ -122,6 +123,17 @@ func canonicalReport(r Report) (Report, error) {
 		if c.Simulation != nil && !validSimulationMetadata(*c.Simulation) {
 			return Report{}, invalid
 		}
+		if len(c.Agents) > 100 {
+			return Report{}, invalid
+		}
+		agents := map[string]bool{}
+		for _, a := range c.Agents {
+			if !safeID(a.AgentID) || agents[a.AgentID] || a.CompletedWakes < 0 || a.BudgetStops < 0 || a.ActionLimitStops < 0 || a.PausedSkips < 0 || a.KilledSkips < 0 || a.DryRunActions < 0 || a.TokensIn < 0 || a.TokensOut < 0 || !finiteNonnegative(a.CostUSD) {
+				return Report{}, invalid
+			}
+			agents[a.AgentID] = true
+		}
+		r.Results[i].Agents = append([]agent.IsolationAgentEvidence(nil), c.Agents...)
 		key := resultKey{c.CaseID, c.ProfileID, c.Repeat}
 		if seen[key] {
 			return Report{}, errors.New("duplicate eval report case")

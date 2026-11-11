@@ -30,10 +30,11 @@ func runRuntime(ctx context.Context, args []string, getenv func(string) string, 
 	once := fs.Bool("once", false, "execute at most one due wake")
 	offline := fs.Bool("offline", false, "use only a synthetic template and in-process fake services; no environment credentials")
 	hours := fs.Int("soak-hours", 0, "offline logical hours (48..720); includes one restart")
+	soakAgents := fs.Int("soak-agents", 1, "synthetic soak agent count (1 or 2); requires -soak-hours")
 	evidence := fs.String("evidence", "", "offline soak evidence directory")
 	level := fs.String("log-level", "info", "debug/info/warn/error")
 	format := fs.String("log-format", "json", "json/text")
-	if err := fs.Parse(args); err != nil || fs.NArg() != 0 || *hours < 0 || (*hours > 0 && (!*offline || *once || *hours < 48 || *hours > 720)) || (*evidence != "" && *hours == 0) {
+	if err := fs.Parse(args); err != nil || fs.NArg() != 0 || *hours < 0 || (*hours > 0 && (!*offline || *once || *hours < 48 || *hours > 720)) || (*evidence != "" && *hours == 0) || (*soakAgents != 1 && *soakAgents != 2) || (*soakAgents == 2 && *hours == 0) {
 		fmt.Fprintln(stderr, "invalid run arguments; soak requires -offline -soak-hours 48..720 and optional -evidence")
 		return 1
 	}
@@ -70,6 +71,9 @@ func runRuntime(ctx context.Context, args []string, getenv func(string) string, 
 		}
 	}
 	if *hours > 0 {
+		if *soakAgents == 2 {
+			return runIsolationSoakCLI(ctx, *dbPath, *hours, *evidence, logger, stdout, stderr)
+		}
 		return runSoak(ctx, *dbPath, *hours, *evidence, logger, stdout, stderr)
 	}
 	explicitConfig := false
@@ -202,6 +206,52 @@ func runRuntime(ctx context.Context, args []string, getenv func(string) string, 
 	serviceWG.Wait()
 	if err != nil && !errors.Is(err, context.Canceled) {
 		fmt.Fprintln(stderr, "runtime stopped; inspect safe event reasons")
+		return 1
+	}
+	return 0
+}
+
+func runIsolationSoakCLI(ctx context.Context, dbPath string, hours int, evidencePath string, logger *slog.Logger, stdout, stderr io.Writer) int {
+	result, err := agent.RunIsolationSoak(ctx, dbPath, hours, logger)
+	if err != nil {
+		fmt.Fprintln(stderr, "offline two-agent logical soak failed; use an isolated empty database")
+		return 1
+	}
+	result.SourceRevision = evalRevision()
+	suite, err := eval.LoadSuite("internal/eval/testdata/isolation-v1.json")
+	if err != nil {
+		fmt.Fprintln(stderr, "loading isolation eval fixtures failed; run from repository root")
+		return 1
+	}
+	// The exported soak already executes the long component. Companion evals
+	// independently exercise the focused data/control/guard boundaries.
+	report, err := eval.Run(ctx, suite, eval.Options{Seed: 12, Revision: evalRevision(), CaseIDs: []string{"isolation_data_boundaries", "isolation_owner_budget_controls", "isolation_own_account_refusal", "isolation_shared_link_reservation"}})
+	if err != nil {
+		fmt.Fprintln(stderr, "isolation eval failed")
+		return 1
+	}
+	for _, r := range report.Results {
+		if !r.Passed {
+			fmt.Fprintln(stderr, "isolation eval expectation failed")
+			return 1
+		}
+	}
+	if evidencePath != "" {
+		data, _ := json.MarshalIndent(result, "", "  ")
+		if err = os.WriteFile(filepath.Join(evidencePath, "isolation.json"), append(data, '\n'), 0600); err != nil {
+			fmt.Fprintln(stderr, "writing isolation evidence failed")
+			return 1
+		}
+		if err = eval.WriteReport(filepath.Join(evidencePath, "eval.json"), report); err != nil {
+			fmt.Fprintln(stderr, "writing isolation eval failed")
+			return 1
+		}
+	}
+	summary := result
+	summary.Wakes = nil
+	summary.Hours = nil
+	if err = json.NewEncoder(stdout).Encode(summary); err != nil {
+		fmt.Fprintln(stderr, "writing isolation summary failed")
 		return 1
 	}
 	return 0

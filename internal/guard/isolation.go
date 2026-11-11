@@ -14,11 +14,15 @@ import (
 // Deliberately local syntax: no redirect resolution or network access. Query
 // values are retained, fragments discarded, and equivalent host/default ports,
 // escaped paths, trailing slashes and query ordering share a promotion key.
-var promotionURLs = regexp.MustCompile(`(?i)(?:https?://|www\.|(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,}/)[^\s<>"']*`)
+var promotionURLs = regexp.MustCompile(`(?i)(?:https?://|www\.|(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,}\b)[^\s<>"']*`)
 
 func promotedLinks(text string) map[string]bool {
 	out := map[string]bool{}
-	for _, raw := range promotionURLs.FindAllString(text, -1) {
+	for _, span := range promotionURLs.FindAllStringIndex(text, -1) {
+		if span[0] > 0 && text[span[0]-1] == '@' {
+			continue
+		}
+		raw := text[span[0]:span[1]]
 		raw = strings.TrimRight(raw, ".,;!?)\u3002")
 		if !strings.Contains(raw, "://") {
 			raw = "https://" + raw
@@ -100,11 +104,16 @@ func (g *Guard) isolation(ctx context.Context, conn *sql.Conn, intent *actionInt
 		if err := rows.Scan(&agent, &text, &published); err != nil {
 			return "", err
 		}
-		if published != "" && intent.TargetURL != "" {
-			a, e1 := canonicalThread(published)
-			b, e2 := canonicalThread(intent.TargetURL)
-			if e1 == nil && e2 == nil && a == b {
-				return "own_account", nil
+		if published != "" {
+			for own := range publicationKeys(published) {
+				if publicationKeys(intent.TargetURL)[own] {
+					return "own_account", nil
+				}
+				for outbound := range links {
+					if publicationKeys(outbound)[own] {
+						return "own_account", nil
+					}
+				}
 			}
 		}
 		if agent == g.opts.Template.ID {
@@ -117,4 +126,17 @@ func (g *Guard) isolation(ctx context.Context, conn *sql.Conn, intent *actionInt
 		}
 	}
 	return "", rows.Err()
+}
+
+func publicationKeys(raw string) map[string]bool {
+	u, err := url.Parse(raw)
+	if err != nil || u.Hostname() == "" {
+		return nil
+	}
+	u.RawQuery = ""
+	u.ForceQuery = false
+	if host := strings.TrimPrefix(strings.ToLower(u.Hostname()), "www."); host == "threads.com" || host == "threads.net" {
+		u.Host = "threads.net"
+	}
+	return promotedLinks(u.String())
 }

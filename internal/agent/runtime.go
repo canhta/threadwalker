@@ -338,7 +338,19 @@ func (s Scheduler) Run(ctx context.Context, once bool) error {
 	// Install the complete set before starting any agent. Never discover identities
 	// incrementally while another agent may already execute effects.
 	for _, r := range s.Agents {
-		r.opts.OwnUsernames = append(append([]string(nil), r.opts.OwnUsernames...), users...)
+		seen := map[string]bool{}
+		complete := []string{}
+		for _, user := range append(append([]string(nil), r.opts.OwnUsernames...), users...) {
+			normalized, err := store.NormalizeUsername(user)
+			if err != nil {
+				return errors.New("scheduling agents: invalid own identity")
+			}
+			if !seen[normalized] {
+				complete = append(complete, normalized)
+				seen[normalized] = true
+			}
+		}
+		r.opts.OwnUsernames = complete
 	}
 	for _, r := range s.Agents {
 		if r == nil {

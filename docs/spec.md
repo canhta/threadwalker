@@ -109,7 +109,10 @@ executes its pending tool/action intent. Paused and killed agents stay stopped. 
 credentials, an in-process scripted LLM transport and synthetic trend/Threads fixtures. It reads
 no environment credentials and makes no network request. `-soak-hours` uses injected logical time
 and an actual local SQLite close/reopen to simulate a restart; its exported evidence is synthetic,
-not elapsed live qualification. The canonical implementation and fixtures are in
+not elapsed live qualification. `-soak-agents 2` selects two synthetic identities, independent
+pause/kill/quota/budget phases, serial metric maintenance and labelled local Go memory samples
+with fake backends; it does not measure Chromium RSS or close #21. Its canonical implementation
+is [`internal/agent/isolation_soak.go`](../internal/agent/isolation_soak.go). The canonical implementation and fixtures are in
 [`internal/agent`](../internal/agent) and [`internal/eval/testdata/runtime-v1.json`](../internal/eval/testdata/runtime-v1.json).
 Normal `run` loads configured LLM settings, with custom endpoints supported by that configuration.
 The default Threads stub requires `dry_run`; an explicitly configured browser backend permits
@@ -217,7 +220,7 @@ A post cannot promote a link already reserved by another agent. The reservation 
 checks all prior intents, including dry-run, failed and uncertain outcomes. Local URL keys
 fold host case, remove `www.` and default ports, treat HTTP/HTTPS alike, normalize escaped/dot
 paths and trailing slashes, discard fragments and sort query keys while retaining query values
-and path case. Bare domain/path and `www.` links use the same key; no redirects or network
+and path case. Bare domains, domain/path and `www.` links use the same key; no redirects or network
 lookups are guessed. Different query values or path case remain distinct. These conservative
 syntactic keys cannot detect redirect aliases or semantically identical tracking variants.
 Refusal reasons are fixed `own_account` and `shared_promotion_link`; URLs and usernames never

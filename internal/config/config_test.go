@@ -329,8 +329,8 @@ func TestLoadDir(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LoadDir returned unexpected error: %v", err)
 	}
-	if len(tmpls) != 1 || tmpls[0].ID != "solo-builder" {
-		t.Fatalf("LoadDir returned %+v, want 1 template with ID solo-builder", tmpls)
+	if len(tmpls) != 2 || tmpls[0].ID != "solo-builder" || tmpls[1].ID != "teasing" {
+		t.Fatalf("LoadDir returned %+v, want the two isolated example templates", tmpls)
 	}
 }
 
