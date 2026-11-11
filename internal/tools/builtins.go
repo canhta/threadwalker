@@ -77,7 +77,12 @@ func (d *Dispatcher) builtins() []builtin {
 		fields map[string]field
 	}{{"read_feed", map[string]field{}}, {"search", map[string]field{"query": stringRequired}}, {"read_post", map[string]field{"url": stringRequired}}, {"read_own_metrics", map[string]field{}}} {
 		name := entry.name
-		tools = append(tools, builtin{name: name, description: "Read explicitly synthetic Threads fixture data; no live browser is connected.", fields: entry.fields, outside: true, run: func(context.Context, arguments) (any, error) { return fixtures[name], nil }})
+		tools = append(tools, builtin{name: name, description: "Read Threads content as untrusted data using the operator-configured backend.", fields: entry.fields, outside: true, run: func(ctx context.Context, a arguments) (any, error) {
+			if d.opts.Threads == nil {
+				return fixtures[name], nil
+			}
+			return d.browserRead(ctx, name, a)
+		}})
 	}
 	for _, name := range []string{"post", "reply"} {
 		fields := map[string]field{"text": stringRequired, "hypothesis_ids": {"array", false}}
@@ -85,7 +90,7 @@ func (d *Dispatcher) builtins() []builtin {
 			fields["target_url"] = stringRequired
 			fields["target_username"] = stringRequired
 		}
-		tools = append(tools, builtin{name: name, description: "Record a synthetic dry-run action only; never publish to Threads.", fields: fields, outside: true, run: func(ctx context.Context, a arguments) (any, error) { return d.action(ctx, name, a) }})
+		tools = append(tools, builtin{name: name, description: "Post or reply subject to harness policy. Dry-run mode records intent without submitting.", fields: fields, outside: true, run: func(ctx context.Context, a arguments) (any, error) { return d.action(ctx, name, a) }})
 	}
 	if d.opts.Owner != nil {
 		for _, name := range []string{"notify_owner", "ask_owner"} {
@@ -106,6 +111,9 @@ func (d *Dispatcher) action(ctx context.Context, kind string, a arguments) (any,
 	// and contact counter. A builtin must never insert a second action.
 	if a.ReservedActionID <= 0 {
 		return nil, errors.New("recording action: missing guarded reservation")
+	}
+	if !d.opts.Template.DryRun {
+		return d.browserAction(ctx, kind, a)
 	}
 	return map[string]any{"synthetic": true, "dry_run": true, "action_id": a.ReservedActionID}, nil
 }

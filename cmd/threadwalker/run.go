@@ -101,9 +101,15 @@ func runRuntime(ctx context.Context, args []string, getenv func(string) string, 
 		}
 	}
 	seen := map[string]bool{}
-	for _, tmpl := range templates {
-		if seen[tmpl.ID] || !tmpl.DryRun {
-			fmt.Fprintln(stderr, "runtime requires distinct agent IDs and dry_run; live backend unavailable")
+	for i := range templates {
+		if *offline {
+			// Explicit templates cannot enable a browser in offline mode.
+			// Non-dry-run templates still fail closed below.
+			templates[i].Threads = config.ThreadsConfig{Backend: "stub"}
+		}
+		tmpl := templates[i]
+		if seen[tmpl.ID] || (!tmpl.DryRun && tmpl.Threads.Backend != "browser") {
+			fmt.Fprintln(stderr, "runtime requires distinct agent IDs and explicit browser configuration for non-dry-run")
 			return 1
 		}
 		seen[tmpl.ID] = true

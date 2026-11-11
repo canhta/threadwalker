@@ -145,7 +145,7 @@ func (g *Guard) reserve(ctx context.Context, a Attempt, intent *actionIntent, au
 		}
 		encoded, _ := json.Marshal(ids)
 		var result sql.Result
-		result, err = conn.ExecContext(ctx, `INSERT INTO actions(agent_id,kind,text,target_url,target_username,hypothesis_ids_json,dry_run,posted_at,thread_url) VALUES(?,?,?,?,?,?,?,?,?)`, g.opts.Template.ID, a.Tool, intent.Text, intent.TargetURL, intent.TargetUsername, string(encoded), g.opts.Template.DryRun, now.Format(time.RFC3339Nano), intent.thread)
+		result, err = conn.ExecContext(ctx, `INSERT INTO actions(agent_id,kind,text,target_url,target_username,hypothesis_ids_json,dry_run,posted_at,thread_url) VALUES(?,?,?,?,?,?,?,?,?)`, g.opts.Template.ID, a.Tool, intent.Text, intent.TargetURL, intent.TargetUsername, string(encoded), g.opts.Template.DryRun, now.Format(time.RFC3339Nano), "")
 		if err != nil {
 			return 0, "", err
 		}
@@ -213,7 +213,9 @@ func (g *Guard) quotas(ctx context.Context, conn *sql.Conn, kind string, intent 
 		if normalized == intent.TargetUsername && at.After(from) && !at.After(now) {
 			contact++
 		}
-		if thread == "" {
+		// The target identifies the replied-to thread; thread_url, when
+		// confirmed, identifies our new reply and must not weaken this quota.
+		if target != "" {
 			thread = target
 		}
 		canonical, e := canonicalThread(thread)

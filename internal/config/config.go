@@ -3,6 +3,7 @@ package config
 import (
 	"errors"
 	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
 	"sort"
@@ -90,7 +91,11 @@ type LimitsConfig struct {
 }
 
 type ThreadsConfig struct {
-	ProfileDir string
+	Backend        string // stub (default) or explicitly configured browser
+	BaseURL        string
+	ExecutablePath string
+	ProfileDir     string
+	NoSandbox      bool // Explicit operator choice for constrained local hosts.
 }
 
 type TelegramConfig struct {
@@ -291,6 +296,29 @@ func LoadFileWithCatalog(path string, getenv func(string) string, catalog *Catal
 	}
 
 	tmpl.Threads.ProfileDir = requireString("threads.profile_dir")
+	tmpl.Threads.Backend = "stub"
+	if doc.keys["threads.backend"] {
+		tmpl.Threads.Backend = requireString("threads.backend")
+	}
+	if tmpl.Threads.Backend != "stub" && tmpl.Threads.Backend != "browser" {
+		addErr("threads.backend", "must be stub or browser")
+	}
+	if tmpl.Threads.Backend == "browser" {
+		tmpl.Threads.BaseURL = requireString("threads.base_url")
+		tmpl.Threads.ExecutablePath = requireString("threads.executable_path")
+		u, err := url.Parse(tmpl.Threads.BaseURL)
+		if err != nil || u == nil || (u.Scheme != "http" && u.Scheme != "https") || u.Hostname() == "" || u.User != nil || u.Opaque != "" || (u.Path != "" && u.Path != "/") || u.RawQuery != "" || u.Fragment != "" || u.ForceQuery {
+			addErr("threads.base_url", "must be an HTTP(S) origin without credentials, path, query or fragment")
+		}
+	}
+	if doc.keys["threads.no_sandbox"] {
+		value, err := strconv.ParseBool(doc.scalars["threads.no_sandbox"])
+		if err != nil {
+			addErr("threads.no_sandbox", "must be a boolean")
+		} else {
+			tmpl.Threads.NoSandbox = value
+		}
+	}
 	if doc.keys["telegram.enabled"] {
 		raw := doc.scalars["telegram.enabled"]
 		enabled, err := strconv.ParseBool(strings.TrimSpace(raw))

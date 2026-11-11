@@ -17,7 +17,7 @@ go run ./cmd/threadwalker run -once -offline
 The command runs one real guarded wake with synthetic LLM/trend/Threads services and an isolated
 temporary SQLite database, removed on exit. Add `-db /tmp/threadwalker-smoke.db` to inspect its
 rows afterward. Explicit `-agents`/`-llms` loads custom templates/profiles using dummy keys,
-while forcing the in-process fake transport and synthetic trends. Telegram remains disabled
+while forcing the in-process fake transport, Threads stubs and synthetic trends. Telegram remains disabled
 and no real environment credentials are read. Every action has `dry_run=1`; this cannot
 publish to Threads.
 
@@ -238,7 +238,42 @@ measured acceptance criteria hold.
 For a configured local scheduler, run `threadwalker run -agents agents -db data/threadwalker.db`
 (with `-llms` if needed). This may call the selected LLM and trend sources; offline verification
 uses the commands above. `-once` executes at most one due wake. Startup rejects non-dry-run
-templates, and restart advances interrupted wakes without replaying their actions.
+templates without an explicit browser backend, and restart advances interrupted wakes without
+replaying their actions. Offline mode always uses stubs and requires dry run.
+
+## Synthetic browser backend
+
+The default `threads.backend` is `stub`. To exercise an operator-hosted synthetic-v1 fixture
+site, select `browser`, set `threads.base_url` to its HTTP(S) origin, set
+`threads.executable_path` to installed Chromium, and choose a separate `threads.profile_dir`
+for each agent. Keep `dry_run: true` for reads with logging-only writes. The harness opens one
+browser per wake and closes it on success, failure or cancellation, retaining profile data.
+Profile ownership markers prevent sharing one profile between different agent IDs.
+`threads.no_sandbox: true` is an explicit option for constrained local test hosts; normal
+configuration leaves sandboxing enabled. No browser is downloaded automatically.
+
+This backend recognizes the invented [saved DOM contract](research/testdata/browser/manifest.json),
+with page scripts disabled and requests restricted to the configured origin. It is not yet a
+live Threads implementation. Real-account selectors/session qualification remains #2/#18.
+Local fixture tests may select non-dry-run mode to prove local HTTP submissions; this does not
+authorize real posting or establish real-service compatibility. Logout/captcha pauses that agent
+and queues a safe notice locally even when Telegram delivery is disabled. An uncertain submission
+ends the wake with `unknown_outcome`, retains its action intent and never retries it.
+
+Run the actual local Chromium tests explicitly (all HTTP uses `httptest`; no account required):
+
+```sh
+CHROME_BIN=/path/to/chrome go test -tags browser_integration ./internal/threads -count=1 -v
+go run ./cmd/threadwalker eval -suite internal/eval/testdata/browser-v1.json -seed 8 -out /tmp/browser-eval.json
+```
+
+`browser.operation.finished` records lifecycle and operation timing/outcome using the shared
+metadata-only event contract. Guarded operation records include `wake_id`; driver lifecycle
+records use the configured `agent_id`. Filter without exposing raw DOM or session data:
+
+```sh
+jq -c 'select(.event == "browser.operation.finished") | {agent_id,wake_id,operation,outcome,reason,duration_ms}' events.jsonl
+```
 
 The optional [`deploy/threadwalker.service`](../deploy/threadwalker.service) starts that same
 scheduler on an operator-chosen host. Its environment file is optional; selected enabled

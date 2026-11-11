@@ -16,11 +16,13 @@ import (
 )
 
 type Options struct {
-	Store    *store.Store
-	Template config.Template
-	WakeID   int64
-	Now      func() time.Time
-	Logger   *slog.Logger
+	// AllowLive is an operator capability, never a model tool argument.
+	AllowLive bool
+	Store     *store.Store
+	Template  config.Template
+	WakeID    int64
+	Now       func() time.Time
+	Logger    *slog.Logger
 }
 type Guard struct {
 	opts        Options
@@ -58,8 +60,8 @@ func (e *auditError) Unwrap() error           { return errors.Join(ErrAudit, e.c
 func (e *auditError) TerminalToolError() bool { return true }
 
 func New(opts Options) (*Guard, error) {
-	if opts.Store == nil || opts.Template.ID == "" || opts.WakeID <= 0 || !opts.Template.DryRun {
-		return nil, errors.New("configuring guard: store, agent, wake and dry run required")
+	if opts.Store == nil || opts.Template.ID == "" || opts.WakeID <= 0 || (!opts.Template.DryRun && !opts.AllowLive) {
+		return nil, errors.New("configuring guard: store, agent, wake and action capability required")
 	}
 	if opts.Now == nil {
 		opts.Now = time.Now
@@ -82,8 +84,11 @@ func New(opts Options) (*Guard, error) {
 
 // Matches prevents accidentally auditing one scope while mutating another.
 func (g *Guard) Matches(st *store.Store, agentID string, wakeID int64) bool {
-	return g != nil && st != nil && agentID != "" && wakeID > 0 && g.opts.Template.DryRun && g.opts.Store == st && g.opts.Template.ID == agentID && g.opts.WakeID == wakeID
+	return g != nil && st != nil && agentID != "" && wakeID > 0 && (g.opts.Template.DryRun || g.opts.AllowLive) && g.opts.Store == st && g.opts.Template.ID == agentID && g.opts.WakeID == wakeID
 }
+
+// MatchesMode prevents a dispatcher from changing a reserved intent's dry-run mode.
+func (g *Guard) MatchesMode(dryRun bool) bool { return g != nil && g.opts.Template.DryRun == dryRun }
 func (g *Guard) event(ctx context.Context, event, outcome, reason, tool string) {
 	if tool == "unknown" {
 		tool = ""
@@ -166,7 +171,11 @@ func (g *Guard) Execute(ctx context.Context, a Attempt, effect func() (string, e
 		Outcome string `json:"outcome"`
 		Bytes   int    `json:"bytes"`
 	}{outcome, len(output)})
-	if _, err := g.opts.Store.DB().ExecContext(ctx, `UPDATE tool_calls SET result_json=? WHERE id=?`, string(result), id); err != nil {
+	// Completion accounting must survive parent cancellation after an effect.
+	// The pre-effect audit still uses the caller context and fails closed.
+	finalCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+	defer cancel()
+	if _, err := g.opts.Store.DB().ExecContext(finalCtx, `UPDATE tool_calls SET result_json=? WHERE id=?`, string(result), id); err != nil {
 		g.event(ctx, "audit.recorded", "error", "audit_update_failed", a.Tool)
 		return "", &auditError{err}
 	}

@@ -15,6 +15,7 @@ import (
 	"github.com/canhta/threadwalker/internal/llm"
 	"github.com/canhta/threadwalker/internal/logging"
 	"github.com/canhta/threadwalker/internal/store"
+	"github.com/canhta/threadwalker/internal/threads"
 )
 
 // Owner enqueues private owner messages; implementations must never wait for an answer.
@@ -23,6 +24,9 @@ type Owner interface {
 }
 
 type Options struct {
+	Threads     threads.Backend
+	AllowLive   bool // Trusted harness capability; never exposed in a tool schema.
+	Secrets     []config.Secret
 	Owner       Owner
 	Store       *store.Store
 	Template    config.Template
@@ -53,8 +57,8 @@ type Dispatcher struct {
 }
 
 func NewDispatcher(g *guard.Guard, opts Options) (*Dispatcher, error) {
-	if !g.Matches(opts.Store, opts.Template.ID, opts.WakeID) || !opts.Template.DryRun || opts.Template.Limits.MinMinutesBetweenWakes < 1 || opts.Template.Limits.MinMinutesBetweenWakes > 1440 {
-		return nil, errors.New("configuring tools: matching guard scope, dry run and valid wake interval required")
+	if !g.Matches(opts.Store, opts.Template.ID, opts.WakeID) || !g.MatchesMode(opts.Template.DryRun) || (!opts.Template.DryRun && (!opts.AllowLive || opts.Threads == nil)) || opts.Template.Limits.MinMinutesBetweenWakes < 1 || opts.Template.Limits.MinMinutesBetweenWakes > 1440 {
+		return nil, errors.New("configuring tools: matching guard scope, action capability and valid wake interval required")
 	}
 	if opts.Now == nil {
 		opts.Now = time.Now
@@ -63,7 +67,9 @@ func NewDispatcher(g *guard.Guard, opts Options) (*Dispatcher, error) {
 		opts.FetchTrends = func(ctx context.Context) ([]Trend, error) { return FetchTrends(ctx, TrendsOptions{}) }
 	}
 	d := &Dispatcher{guard: g, opts: opts, registry: map[string]builtin{}, attempts: map[[32]byte]int{}}
-	for _, secret := range []config.Secret{opts.Template.LLM.APIKey, opts.Template.Telegram.BotToken, opts.Template.Telegram.OwnerChatID} {
+	secrets := append([]config.Secret{}, opts.Secrets...)
+	secrets = append(secrets, opts.Template.LLM.APIKey, opts.Template.Telegram.BotToken, opts.Template.Telegram.OwnerChatID)
+	for _, secret := range secrets {
 		if raw := secret.Expose(); raw != "" {
 			d.secrets = append(d.secrets, raw)
 		}
@@ -137,6 +143,8 @@ func (d *Dispatcher) dispatch(ctx context.Context, call llm.ToolCall, rejected s
 	if d.stopped != nil {
 		if errors.Is(d.stopped, ErrStallStop) {
 			block = "stall_stop"
+		} else if errors.As(d.stopped, new(*browserStop)) {
+			block = "browser_stopped"
 		} else {
 			block = "audit_failure"
 		}
@@ -159,6 +167,16 @@ func (d *Dispatcher) dispatch(ctx context.Context, call llm.ToolCall, rejected s
 			}{true, tool.name, data}
 		}
 		result, err := json.Marshal(data)
+		if err != nil {
+			return "", errors.New("encoding tool result: failed")
+		}
+		// Decode before redaction so JSON escaping cannot hide a configured
+		// credential in outside content. Audit stores only outcome and byte count.
+		var safe any
+		if json.Unmarshal(result, &safe) != nil {
+			return "", errors.New("encoding tool result: failed")
+		}
+		result, err = json.Marshal(d.redact(safe))
 		if err != nil {
 			return "", errors.New("encoding tool result: failed")
 		}

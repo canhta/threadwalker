@@ -13,6 +13,7 @@ import (
 // Stable events emitted by the components implemented today. LLM tool events
 // describe only the client dispatcher boundary, not a guard or audit outcome.
 const (
+	BrowserOperationFinished  = "browser.operation.finished"
 	TelegramOperationFinished = "telegram.operation.finished"
 	WakeStarted               = "wake.started"
 	WakeFinished              = "wake.finished"

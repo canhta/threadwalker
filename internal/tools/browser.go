@@ -1,0 +1,175 @@
+package tools
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"log/slog"
+	"strings"
+	"time"
+
+	"github.com/canhta/threadwalker/internal/logging"
+	"github.com/canhta/threadwalker/internal/threads"
+)
+
+// BrowserOwner is optional; disabled owner delivery still retains a local notice.
+type BrowserOwner interface {
+	BrowserStopped(context.Context, string, string, string) error
+}
+
+type browserStop struct {
+	reason string
+	cause  error
+}
+
+func (e *browserStop) Error() string           { return "browser stopped: " + e.reason }
+func (e *browserStop) Unwrap() error           { return e.cause }
+func (e *browserStop) TerminalToolError() bool { return true }
+
+func (d *Dispatcher) browserRead(ctx context.Context, operation string, a arguments) (data any, err error) {
+	started := d.opts.Now()
+	defer func() { err = d.browserResult(ctx, operation, started, err) }()
+	var page threads.Page
+	switch operation {
+	case "read_feed":
+		page, err = d.opts.Threads.ReadFeed(ctx)
+	case "search":
+		page, err = d.opts.Threads.Search(ctx, a.Query)
+	case "read_post":
+		page, err = d.opts.Threads.ReadPost(ctx, a.URL)
+	case "read_own_metrics":
+		return d.opts.Threads.ReadOwnMetrics(ctx)
+	}
+	if err != nil {
+		return nil, err
+	}
+	if operation == "read_post" {
+		for _, post := range page.Posts {
+			if post.IsReply {
+				if _, err = d.guard.ObserveStopRequest(ctx, post.Username, post.Text, post.AddressedToAgent); err != nil {
+					return nil, err
+				}
+			}
+		}
+	}
+	return page, nil
+}
+
+func (d *Dispatcher) browserAction(ctx context.Context, operation string, a arguments) (data any, err error) {
+	started := d.opts.Now()
+	defer func() { err = d.browserResult(ctx, operation, started, err) }()
+	var confirmed string
+	if operation == "post" {
+		confirmed, err = d.opts.Threads.Post(ctx, a.Text)
+	} else {
+		confirmed, err = d.opts.Threads.Reply(ctx, a.TargetURL, a.Text)
+	}
+	if err != nil {
+		return nil, err
+	}
+	if confirmed == "" {
+		return nil, threads.ErrUnknownOutcome
+	}
+	for _, secret := range d.secrets {
+		if strings.Contains(confirmed, secret) {
+			return nil, threads.ErrUnknownOutcome
+		}
+	}
+	// The pre-effect intent remains even if storing the acknowledgement fails.
+	// Ending the wake is mandatory: another model turn could duplicate the effect.
+	finalCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+	defer cancel()
+	row, e := d.opts.Store.DB().ExecContext(finalCtx, `UPDATE actions SET thread_url=? WHERE id=? AND agent_id=? AND dry_run=0 AND thread_url=''`, confirmed, a.ReservedActionID, d.opts.Template.ID)
+	if e != nil {
+		return nil, threads.ErrUnknownOutcome
+	}
+	n, e := row.RowsAffected()
+	if e != nil || n != 1 {
+		return nil, threads.ErrUnknownOutcome
+	}
+	return map[string]any{"dry_run": false, "action_id": a.ReservedActionID, "thread_url": confirmed}, nil
+}
+
+func (d *Dispatcher) browserResult(ctx context.Context, operation string, started time.Time, err error) error {
+	reason, outcome := "completed", "success"
+	if err != nil {
+		outcome, reason = "error", "operation_failed"
+		switch {
+		case errors.Is(err, threads.ErrLoggedOut):
+			reason = "logged_out"
+		case errors.Is(err, threads.ErrCaptcha):
+			reason = "captcha"
+		case errors.Is(err, threads.ErrUnknownOutcome):
+			reason = "unknown_outcome"
+		case errors.Is(err, threads.ErrUnknownPage):
+			reason = "unknown_page"
+		case errors.Is(err, threads.ErrMalformedPage):
+			reason = "malformed_page"
+		case errors.Is(err, context.Canceled):
+			reason = "cancelled"
+		case errors.Is(err, context.DeadlineExceeded):
+			reason = "timeout"
+		}
+	}
+	logging.Emit(context.WithoutCancel(ctx), d.opts.Logger, slog.LevelInfo, logging.Record{Event: logging.BrowserOperationFinished, AgentID: d.opts.Template.ID, WakeID: d.opts.WakeID, Operation: operation, Tool: operation, Outcome: outcome, Reason: reason, DurationMS: d.opts.Now().Sub(started).Milliseconds()})
+	if reason == "logged_out" || reason == "captcha" {
+		finalCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+		defer cancel()
+		pauseErr := d.opts.Store.PauseOwnerAgent(finalCtx, d.opts.Template.ID)
+		event := fmt.Sprintf("wake-%d", d.opts.WakeID)
+		var noticeErr error
+		owner, ok := d.opts.Owner.(BrowserOwner)
+		if ok {
+			noticeErr = owner.BrowserStopped(finalCtx, d.opts.Template.ID, reason, event)
+		}
+		if !ok || noticeErr != nil {
+			text := "Browser logged out; agent paused."
+			if reason == "captcha" {
+				text = "Browser captcha detected; agent paused."
+			}
+			_, pendingErr := d.opts.Store.QueueOwner(finalCtx, d.opts.Template.ID, "notice", text, "notice:"+reason+":"+event, d.opts.Now())
+			noticeErr = errors.Join(noticeErr, pendingErr)
+		}
+		d.stopped = &browserStop{reason: reason, cause: errors.Join(err, pauseErr, noticeErr)}
+		return d.stopped
+	}
+	if reason == "unknown_outcome" || reason == "cancelled" || reason == "timeout" {
+		d.stopped = &browserStop{reason: reason, cause: err}
+		return d.stopped
+	}
+	if err != nil {
+		return &safeBrowserError{operation: operation, reason: reason, cause: err}
+	}
+	return nil
+}
+
+type safeBrowserError struct {
+	operation, reason string
+	cause             error
+}
+
+func (e *safeBrowserError) Error() string { return "browser " + e.operation + ": " + e.reason }
+func (e *safeBrowserError) Unwrap() error { return e.cause }
+
+func (d *Dispatcher) redact(data any) any {
+	switch v := data.(type) {
+	case string:
+		for _, secret := range d.secrets {
+			v = strings.ReplaceAll(v, secret, "[REDACTED]")
+		}
+		return v
+	case []any:
+		for i := range v {
+			v[i] = d.redact(v[i])
+		}
+		return v
+	case map[string]any:
+		out := make(map[string]any, len(v))
+		for key, value := range v {
+			out[d.redact(key).(string)] = d.redact(value)
+		}
+		return out
+	default:
+		return data
+	}
+}

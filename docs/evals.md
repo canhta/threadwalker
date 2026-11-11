@@ -198,12 +198,36 @@ configuration/input fingerprints and separately labelled wall-clock timing. They
 Saved redacted evidence and reproduction commands are in
 [Telegram local verification](research/telegram-local.md).
 
+## Browser component cases
+
+```sh
+go run ./cmd/threadwalker eval -suite internal/eval/testdata/browser-v1.json -seed 8 -repeat 2 -out /tmp/browser-eval.json
+go test ./internal/agent ./internal/tools ./internal/eval -run Browser
+CHROME_BIN=/path/to/chrome go test -tags browser_integration ./internal/threads -count=1 -v
+```
+
+The versioned `browser_scenario` cases execute the production JSON snapshot parser, guarded
+dispatcher, SQLite intent boundary and wake runtime with a scripted browser boundary. They
+cover six operations, dry-run suppression, literal untrusted content and secret redaction,
+logout/captcha pause plus durable notices, unknown pages, uncertain-submit termination and
+restart without replay, and addressed stop-request ingestion. Shared reports retain actual
+executed tools, wake usage, fingerprints and separately labelled wall-clock timing; live eval
+mode rejects these component cases. Their invented snapshots in
+[`browser-snapshots-v1.json`](../internal/eval/testdata/browser-snapshots-v1.json) follow the
+saved synthetic-v1 contract and include explicit redaction/stop variants.
+
+The tagged Chromium tests independently exercise the actual CDP extraction, six guarded
+operations, local HTTP submissions and process cleanup against canonical HTML fixtures.
+Default evals require no Chrome binary. Synthetic snapshots and local Chrome acceptance do not
+qualify the current Threads DOM, account/session behavior, production memory or elapsed live use.
+Recorded commands, redacted events and reports live in [browser local verification](research/browser-local.md).
+
 ## Pending coverage
 
 The current suites cover the client, protocols, configuration, accounting and local runtime boundaries.
 They do not certify components that do not exist yet. Real-bot qualification belongs to
-[#18](https://github.com/canhta/threadwalker/issues/18), browser/Threads cases to
-[#8](https://github.com/canhta/threadwalker/issues/8), and integrated live validation to
+[#18](https://github.com/canhta/threadwalker/issues/18), live browser/Threads compatibility to
+[#2](https://github.com/canhta/threadwalker/issues/2), and integrated live validation to
 [#9](https://github.com/canhta/threadwalker/issues/9). Playbook/gate cases belong to
 [#10](https://github.com/canhta/threadwalker/issues/10), and multiple-agent/template cases to
 [#12](https://github.com/canhta/threadwalker/issues/12) as those components land. Until then,

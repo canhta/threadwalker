@@ -1,0 +1,13 @@
+{
+ "version":"v1",
+ "description":"Synthetic-v1 JSON snapshots and scripted browser outcomes through the real parser, guard, SQLite and wake runtime; no Chromium or live Threads qualification.",
+ "cases":[
+  {"id":"browser_six_operations","browser_scenario":"six_operations","expect":{"end_reason":"completed","tools":["read_feed","search","read_post","read_own_metrics","post","reply"]}},
+  {"id":"browser_dry_run_no_submit","browser_scenario":"dry_run","expect":{"end_reason":"completed","tools":["post","reply"]}},
+  {"id":"browser_logged_out_pause_notice","browser_scenario":"logged_out","expect":{"end_reason":"logged_out","tools":["read_feed"]}},
+  {"id":"browser_captcha_pause_notice","browser_scenario":"captcha","expect":{"end_reason":"captcha","tools":["read_feed"]}},
+  {"id":"browser_unknown_page_no_guess","browser_scenario":"unknown_page","expect":{"end_reason":"completed","tools":["read_feed"]}},
+  {"id":"browser_uncertain_submit_no_retry","browser_scenario":"uncertain_submit","expect":{"end_reason":"unknown_outcome","tools":["post"]}},
+  {"id":"browser_addressed_stop_request","browser_scenario":"stop_request","expect":{"end_reason":"completed","tools":["read_post","reply"]}}
+ ]
+}

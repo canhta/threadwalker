@@ -104,8 +104,9 @@ and an actual local SQLite close/reopen to simulate a restart; its exported evid
 not elapsed live qualification. The canonical implementation and fixtures are in
 [`internal/agent`](../internal/agent) and [`internal/eval/testdata/runtime-v1.json`](../internal/eval/testdata/runtime-v1.json).
 Normal `run` loads configured LLM settings, with custom endpoints supported by that configuration.
-All runtime startup requires `dry_run`; the #5 Threads backend only writes dry-run actions and
-never publishes. Playbook and metrics context are empty until their implementing issues land.
+The default Threads stub requires `dry_run`; an explicitly configured browser backend permits
+guarded submissions. `run -offline` always forces the in-process Threads stub and rejects
+non-dry-run templates. Playbook and metrics context are empty until their implementing issues land.
 
 Two rules keep a wake from doing damage **(sourced: patterns in `docs/research/reference-repos.md`)**:
 
@@ -145,6 +146,25 @@ No future component is considered instrumented until its issue implements and te
 | Owner | `notify_owner`, `ask_owner` | Telegram; `ask_owner` never blocks the wake |
 | Contacts | `mark_do_not_contact` | The agent can add to the list, never remove |
 | Scheduling | `schedule_next_wake` | Clamped to the allowed range |
+
+The browser backend implements the measured `synthetic-v1` contract in
+[`docs/research/testdata/browser/manifest.json`](research/testdata/browser/manifest.json), using
+`chromedp v0.23.0`. It starts at most one browser per wake, closes it on every exit (including
+cancellation), and retains an agent-owned operator profile. Only configured-origin navigation
+and form submissions are allowed; page scripts are disabled for this synthetic contract.
+Unknown or malformed pages return operation-specific safe errors without guessed selectors.
+Current Threads DOM, login/session behavior and real-account operation remain unverified in
+#2/#18; these fixtures do not claim live compatibility. **(decision)**
+
+`dry_run` browser reads execute normally; writes retain a single guarded intent without
+submitting. A configured non-dry-run backend submits only after that intent commits and stores
+`thread_url` only after a recognized acknowledgement. Any uncertain submission ends the wake,
+retains the action/counters and disables further tool effects; restart never replays it.
+The replied-to thread quota uses `target_url`, independently of the confirmed new reply URL.
+Logout/captcha pauses only the selected running agent (killed stays killed), ends its wake,
+and queues a static owner notice; a disabled owner integration retains the notice locally.
+Addressed inbound replies enter `ObserveStopRequest` transiently, without storing their text.
+External tool strings are redacted against configured secrets before model delivery. **(decision)**
 
 ## 6. Guards (in code; the agent cannot disable them)
 
@@ -398,7 +418,9 @@ Each agent template in `agents/*.yaml` (see [`agents/solo-builder.example.yaml`]
   `min_seconds_between_actions`, `max_steps_per_wake`, `max_usd_per_day`,
   `min_minutes_between_wakes`.
 - `guard`: optional nonempty `stop_phrases` list; omission selects the code defaults.
-- `threads`: `profile_dir`.
+- `threads`: `profile_dir`, optional `backend` (`stub` by default, or `browser`). Browser mode
+  requires an explicit HTTP(S) origin `base_url` and installed Chromium `executable_path`.
+  Optional `no_sandbox` defaults to false and is an operator host choice, never a model field.
 - `telegram`: optional `enabled` (defaults to `false`); `bot_token_env` and `owner_chat_id_env` are required and resolved only when enabled. Optional `digest_hour` is 0..23 UTC and defaults to 18. The canonical example keeps this optional integration disabled for local operation without a bot.
 
 Secrets live only in environment variables named by `*_env`, never in a template, catalog, log
