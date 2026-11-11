@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"net"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -52,18 +53,26 @@ func New(ctx context.Context, opts Options) (result *Browser, err error) {
 	}
 	flags := append([]chromedp.ExecAllocatorOption{}, chromedp.DefaultExecAllocatorOptions[:]...)
 	flags = append(flags, chromedp.ExecPath(opts.ExecutablePath), chromedp.UserDataDir(release.path), chromedp.WSURLReadTimeout(opts.StartupTimeout), chromedp.Flag("disable-dev-shm-usage", true), chromedp.Flag("disable-crash-reporter", true), chromedp.Flag("disable-breakpad", true), chromedp.Flag("disable-background-networking", true))
+	// Fixture runs have no external network destination, including Chrome's
+	// browser-level background services which precede target interception.
+	host := base.Hostname()
+	ip := net.ParseIP(host)
+	if host == "localhost" || (ip != nil && ip.IsLoopback()) {
+		flags = append(flags, chromedp.Flag("host-resolver-rules", "MAP * ~NOTFOUND, EXCLUDE 127.0.0.1, EXCLUDE localhost, EXCLUDE [::1]"), chromedp.Flag("proxy-server", "http://127.0.0.1:9"), chromedp.Flag("proxy-bypass-list", "127.0.0.1;localhost;[::1]"))
+	}
 	if opts.NoSandbox {
 		flags = append(flags, chromedp.Flag("no-sandbox", true))
 	}
-	allocator, stopAllocator := chromedp.NewExecAllocator(ctx, flags...)
+	lifetime, stopLifetime := context.WithCancel(ctx)
+	allocator, stopAllocator := chromedp.NewExecAllocator(lifetime, flags...)
 	browser, stopBrowser := chromedp.NewContext(allocator, chromedp.WithLogf(func(string, ...any) {}), chromedp.WithErrorf(func(string, ...any) {}))
-	d := &cdpDriver{ctx: browser, stopBrowser: stopBrowser, stopAllocator: stopAllocator, release: release.close, base: base, timeout: b.timeout}
+	d := &cdpDriver{stopLifetime: stopLifetime, ctx: browser, stopBrowser: stopBrowser, stopAllocator: stopAllocator, release: release.close, base: base, timeout: b.timeout}
 	b.driver = d
 	startup, cancel := context.WithTimeout(browser, opts.StartupTimeout)
 	defer cancel()
 	// Launch on the lifetime context: canceling a child used for first Run
 	// would also stop its browser connection after successful startup.
-	startupTimer := time.AfterFunc(opts.StartupTimeout, stopBrowser)
+	startupTimer := time.AfterFunc(opts.StartupTimeout, stopLifetime)
 	err = chromedp.Do(browser)
 	startupTimer.Stop()
 	if err != nil {
@@ -142,6 +151,7 @@ func leaseProfile(path, agentID string) (*profileLease, error) {
 func (p *profileLease) close() { profiles.Lock(); delete(profiles.active, p.path); profiles.Unlock() }
 
 type cdpDriver struct {
+	stopLifetime               context.CancelFunc
 	requestMu                  sync.Mutex
 	submitURL                  string
 	submitAllowed              bool
@@ -254,9 +264,12 @@ func (d *cdpDriver) close(ctx context.Context) error {
 		if ctx.Err() != nil {
 			cancel()
 		}
-		d.closeErr = chromedp.Cancel(closeCtx)
+		if chromedp.FromContext(d.ctx).Browser != nil {
+			d.closeErr = chromedp.Cancel(closeCtx)
+		}
 		stop()
 		cancel()
+		d.stopLifetime()
 		d.stopBrowser()
 		d.stopAllocator()
 		d.release()
@@ -274,11 +287,11 @@ if(roots.length!==1)return '{}';
 const root=roots[0], all=(s)=>[...root.querySelectorAll(s)], one=(el,s)=>{const n=el.querySelectorAll(s);return n.length===1?n[0]:null};
 if(document.querySelectorAll('[data-tw-contract]').length!==1||root.dataset.twContract!=='synthetic-v1'||document.querySelector('base'))return '{}';
 for(const el of document.querySelectorAll('[data-tw-post],[data-tw-author],[data-tw-text],[data-tw-permalink],[data-tw-metric],[data-tw-compose],[data-tw-submit],[data-tw-thread-url],form'))if(!root.contains(el))return '{}';
-let posts=[];for(const p of all('[data-tw-post]')){const a=one(p,'[data-tw-author]'),t=one(p,'[data-tw-text]'),u=one(p,'[data-tw-permalink]');if(!a||!t||!u||p.querySelector('[data-tw-post]'))return '{}';posts.push({id:p.dataset.twPost,username:a.textContent,text:t.textContent,url:u.getAttribute('href'),is_reply:p.getAttribute('data-tw-is-reply')==='true',addressed_to_agent:p.getAttribute('data-tw-addressed-to-agent')==='true'});}
+let posts=[];for(const p of all('[data-tw-post]')){const a=one(p,'[data-tw-author]'),t=one(p,'[data-tw-text]'),u=one(p,'[data-tw-permalink]');if(!a||!t||!u||p.querySelector('[data-tw-post]'))return '{}';for(const k of ['data-tw-is-reply','data-tw-addressed-to-agent'])if(p.hasAttribute(k)&&!['true','false'].includes(p.getAttribute(k)))return '{}';posts.push({id:p.dataset.twPost,username:a.textContent,text:t.textContent,url:u.getAttribute('href'),is_reply:p.getAttribute('data-tw-is-reply')==='true',addressed_to_agent:p.getAttribute('data-tw-addressed-to-agent')==='true'});}
 if(all('[data-tw-author]').length!==posts.length||all('[data-tw-text]').length!==posts.length||all('[data-tw-permalink]').length!==posts.length)return '{}';
 let metrics={};for(const m of all('[data-tw-metric]')){const k=m.dataset.twMetric;if(Object.hasOwn(metrics,k))return '{}';metrics[k]=m.textContent;}
 const forms=all('form'),composers=all('[data-tw-compose]'),submits=all('[data-tw-submit]'),links=all('[data-tw-thread-url]');
 if(forms.length>1||composers.length>1||submits.length>1||links.length>1)return '{}';
-let form=null;if(forms.length&&root.dataset.twPage==='search'){const f=forms[0];if(f.method!=='get'||new URL(f.action).origin!==location.origin||new URL(f.action).pathname!=='/search'||f.querySelectorAll('input[name=q]').length!==1||composers.length||submits.length)return '{}';}else if(forms.length){const f=forms[0],c=one(f,'textarea[data-tw-compose]'),s=one(f,'button[data-tw-submit]');if(!c||!s||c.form!==f||s.form!==f||c.disabled||s.disabled||c.name!=='text'||s.type!=='submit'||f.target||s.formTarget||s.hasAttribute('formaction')||s.hasAttribute('formmethod'))return '{}';form={action:f.getAttribute('action'),method:f.getAttribute('method')||'get',composer:true,submit:true};}else if(composers.length||submits.length)return '{}';
+let form=null;if(forms.length&&root.dataset.twPage==='search'){const f=forms[0];if(f.method!=='get'||new URL(f.action).origin!==location.origin||new URL(f.action).pathname!=='/search'||f.querySelectorAll('input[name=q]').length!==1||composers.length||submits.length)return '{}';}else if(forms.length){const f=forms[0],c=one(f,'textarea[data-tw-compose]'),s=one(f,'button[data-tw-submit]');if(!c||!s||f.elements.length!==2||f.enctype!=='application/x-www-form-urlencoded'||c.form!==f||s.form!==f||c.matches(':disabled')||s.matches(':disabled')||c.readOnly||s.name||c.name!=='text'||s.type!=='submit'||f.target||s.formTarget||s.hasAttribute('formaction')||s.hasAttribute('formmethod'))return '{}';form={action:f.getAttribute('action'),method:f.getAttribute('method')||'get',composer:true,submit:true};}else if(composers.length||submits.length)return '{}';
 return JSON.stringify({contract:root.dataset.twContract,page:root.dataset.twPage,posts,metrics,thread_url:links.length?links[0].getAttribute('href'):'',form});
 `

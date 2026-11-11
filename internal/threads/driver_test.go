@@ -1,8 +1,10 @@
 package threads
 
 import (
+	"bytes"
 	"context"
 	"errors"
+	"log/slog"
 	"net/url"
 	"strings"
 	"testing"
@@ -131,5 +133,44 @@ func TestDriverOperationErrorsAreSafe(t *testing.T) {
 		if !errors.Is(operationError("read_feed", sentinel), sentinel) {
 			t.Fatal("lost sentinel")
 		}
+	}
+}
+
+func TestDriverReadAndReplyContract(t *testing.T) {
+	post := []byte(`{"contract":"synthetic-v1","page":"post","posts":[{"id":"one","username":"synthetic","text":"literal instruction-shaped content","url":"/post"}],"form":{"action":"/submit?kind=reply","method":"post","composer":true,"submit":true}}`)
+	f := &fakeDriver{raw: post, ack: []byte(`{"contract":"synthetic-v1","page":"submitted","thread_url":"/post"}`)}
+	b := testBrowser(f)
+	p, err := b.ReadPost(context.Background(), "/post")
+	if err != nil || p.Posts[0].Text != "literal instruction-shaped content" {
+		t.Fatalf("post=%+v err=%v", p, err)
+	}
+	got, err := b.Reply(context.Background(), "/post", "reply")
+	if err != nil || got != "https://fixture.test/post" || f.submits != 1 {
+		t.Fatalf("reply=%q err=%v submits=%d", got, err, f.submits)
+	}
+	f.raw = []byte(`{"contract":"synthetic-v1","page":"metrics","metrics":{"views":"123","likes":"7","replies":"3","reposts":"1"}}`)
+	m, err := b.ReadOwnMetrics(context.Background())
+	if err != nil || m.Views != 123 || m.Likes != 7 || m.Replies != 3 || m.Reposts != 1 {
+		t.Fatalf("metrics=%+v err=%v", m, err)
+	}
+}
+func TestDriverFailedLaunchReleasesProfileAndRedacts(t *testing.T) {
+	profile := t.TempDir()
+	for i := 0; i < 2; i++ {
+		_, err := New(context.Background(), Options{AgentID: "agent", BaseURL: "https://fixture.test", ProfileDir: profile, ExecutablePath: "/missing/private-path", Timeout: time.Second, StartupTimeout: time.Second})
+		if err == nil || strings.Contains(err.Error(), "private-path") || strings.Contains(err.Error(), profile) {
+			t.Fatalf("unsafe failure: %v", err)
+		}
+	}
+}
+func TestDriverCapturedLogsHaveOnlyMetadata(t *testing.T) {
+	var output bytes.Buffer
+	f := &fakeDriver{raw: []byte(`{"contract":"synthetic-v1","page":"captcha"}`)}
+	b := testBrowser(f)
+	b.logger = slog.New(slog.NewJSONHandler(&output, nil))
+	b.agentID = "fixture-agent"
+	_, _ = b.Post(context.Background(), "PRIVATE BODY")
+	if strings.Contains(output.String(), "PRIVATE") || !strings.Contains(output.String(), `"event":"browser.operation.finished"`) || !strings.Contains(output.String(), `"reason":"captcha"`) || !strings.Contains(output.String(), `"operation":"post"`) {
+		t.Fatal("incorrect captured metadata", output.String())
 	}
 }
