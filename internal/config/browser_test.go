@@ -24,6 +24,9 @@ func TestBrowserConfigurationExplicitAndFailClosed(t *testing.T) {
 		{"credentials", "  backend: browser\n  base_url: https://private:secret@fixture.invalid\n  executable_path: /synthetic/chrome\n", false},
 		{"invalid_origin", "  backend: browser\n  base_url: file:///tmp/fixture\n  executable_path: /synthetic/chrome\n", false},
 		{"missing_binary", "  backend: browser\n  base_url: https://fixture.invalid\n", false},
+		{"sandbox_choice", "  no_sandbox: true\n", true},
+		{"invalid_sandbox_choice", "  no_sandbox: maybe\n", false},
+		{"path_is_not_origin", "  backend: browser\n  base_url: https://fixture.invalid/path\n  executable_path: /synthetic/chrome\n", false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			path := filepath.Join(t.TempDir(), "agent.yaml")
@@ -37,6 +40,9 @@ func TestBrowserConfigurationExplicitAndFailClosed(t *testing.T) {
 			}
 			if err == nil && tc.name == "default" && tmpl.Threads.Backend != "stub" {
 				t.Fatal("default must be offline stub")
+			}
+			if err == nil && tc.name == "sandbox_choice" && !tmpl.Threads.NoSandbox {
+				t.Fatal("explicit sandbox choice lost")
 			}
 			if err == nil && tc.name == "browser" && (tmpl.Threads.Backend != "browser" || tmpl.Threads.BaseURL != "http://127.0.0.1:1234" || tmpl.Threads.ExecutablePath != "/synthetic/chrome") {
 				t.Fatalf("config lost: %+v", tmpl.Threads)
