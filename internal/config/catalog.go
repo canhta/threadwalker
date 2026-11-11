@@ -218,6 +218,10 @@ func validateCatalogURL(raw string) error {
 
 // Resolve resolves only the selected model profile's provider secret.
 func (c *Catalog) Resolve(profile string, getenv func(string) string) (LLMConfig, error) {
+	return c.resolve(profile, getenv, true)
+}
+
+func (c *Catalog) resolve(profile string, getenv func(string) string, secrets bool) (LLMConfig, error) {
 	if c == nil {
 		return LLMConfig{}, fmt.Errorf("catalog field models: unknown model profile %q", profile)
 	}
@@ -230,6 +234,9 @@ func (c *Catalog) Resolve(profile string, getenv func(string) string) (LLMConfig
 		return LLMConfig{}, fmt.Errorf("catalog field models.%s.provider: unknown provider", profile)
 	}
 	llm.Model, llm.PricePerMTokInUSD, llm.PricePerMTokOutUSD = model.model, model.in, model.out
+	if !secrets {
+		return llm, nil
+	}
 	var key string
 	if getenv != nil {
 		key = getenv(llm.APIKeyEnv)

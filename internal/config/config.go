@@ -91,6 +91,7 @@ type LimitsConfig struct {
 }
 
 type ThreadsConfig struct {
+	Username       string // Operator-declared own account identity, never inferred.
 	Backend        string // stub (default) or explicitly configured browser
 	BaseURL        string
 	ExecutablePath string
@@ -114,6 +115,10 @@ func LoadDir(dir string, getenv func(string) string) ([]Template, error) {
 
 // LoadDirWithCatalog loads templates with an optional catalog for named LLM profiles.
 func LoadDirWithCatalog(dir string, getenv func(string) string, catalog *Catalog) ([]Template, error) {
+	return loadDir(dir, getenv, catalog, true)
+}
+
+func loadDir(dir string, getenv func(string) string, catalog *Catalog, secrets bool) ([]Template, error) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		return nil, fmt.Errorf("reading templates directory %s: %w", dir, err)
@@ -135,7 +140,7 @@ func LoadDirWithCatalog(dir string, getenv func(string) string, catalog *Catalog
 	var tmpls []Template
 	var errs []error
 	for _, p := range paths {
-		tmpl, err := LoadFileWithCatalog(p, getenv, catalog)
+		tmpl, err := loadFile(p, getenv, catalog, secrets)
 		if err != nil {
 			errs = append(errs, err)
 			continue
@@ -144,6 +149,9 @@ func LoadDirWithCatalog(dir string, getenv func(string) string, catalog *Catalog
 	}
 	if len(errs) > 0 {
 		return nil, errors.Join(errs...)
+	}
+	if err := ValidateTemplates(tmpls); err != nil {
+		return nil, err
 	}
 	return tmpls, nil
 }
@@ -157,6 +165,10 @@ func LoadFile(path string, getenv func(string) string) (Template, error) {
 // LoadFileWithCatalog loads a template and resolves its selected LLM profile.
 // A nil catalog preserves inline configuration and rejects profile selection.
 func LoadFileWithCatalog(path string, getenv func(string) string, catalog *Catalog) (Template, error) {
+	return loadFile(path, getenv, catalog, true)
+}
+
+func loadFile(path string, getenv func(string) string, catalog *Catalog, secrets bool) (Template, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return Template{}, fmt.Errorf("reading template %s: %w", path, err)
@@ -262,7 +274,7 @@ func LoadFileWithCatalog(path string, getenv func(string) string, catalog *Catal
 		if catalog == nil {
 			addErr("llm.profile", "selecting a profile requires an LLM catalog")
 		} else if profile != "" && !ambiguous {
-			resolved, err := catalog.Resolve(profile, getenv)
+			resolved, err := catalog.resolve(profile, getenv, secrets)
 			if err != nil {
 				addErr("llm.profile", err.Error())
 			} else {
@@ -296,6 +308,15 @@ func LoadFileWithCatalog(path string, getenv func(string) string, catalog *Catal
 	}
 
 	tmpl.Threads.ProfileDir = requireString("threads.profile_dir")
+	tmpl.Threads.Username = strings.TrimSpace(doc.scalars["threads.username"])
+	if tmpl.Threads.Username != "" {
+		normalized, err := normalizeOwnUsername(tmpl.Threads.Username)
+		if err != nil {
+			addErr("threads.username", "must be a valid account username")
+		} else {
+			tmpl.Threads.Username = normalized
+		}
+	}
 	tmpl.Threads.Backend = "stub"
 	if doc.keys["threads.backend"] {
 		tmpl.Threads.Backend = requireString("threads.backend")
@@ -368,10 +389,10 @@ func LoadFileWithCatalog(path string, getenv func(string) string, catalog *Catal
 		return NewSecret(val)
 	}
 
-	if !hasProfile {
+	if !hasProfile && secrets {
 		tmpl.LLM.APIKey = resolveSecret("llm.api_key_env", tmpl.LLM.APIKeyEnv)
 	}
-	if tmpl.Telegram.Enabled {
+	if tmpl.Telegram.Enabled && secrets {
 		tmpl.Telegram.BotToken = resolveSecret("telegram.bot_token_env", tmpl.Telegram.BotTokenEnv)
 		tmpl.Telegram.OwnerChatID = resolveSecret("telegram.owner_chat_id_env", tmpl.Telegram.OwnerChatIDEnv)
 	}
