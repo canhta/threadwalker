@@ -7,6 +7,7 @@ import (
 
 	"github.com/canhta/threadwalker/internal/config"
 	"github.com/canhta/threadwalker/internal/llm"
+	"github.com/canhta/threadwalker/internal/playbook"
 )
 
 type Suite struct {
@@ -25,19 +26,20 @@ type RuntimeCase struct {
 }
 
 type Case struct {
-	MetricsScenario string                `json:"metrics_scenario,omitempty"`
-	BrowserScenario string                `json:"browser_scenario,omitempty"`
-	OwnerScenario   string                `json:"owner_scenario,omitempty"`
-	Guard           *GuardCase            `json:"guard,omitempty"`
-	Runtime         *RuntimeCase          `json:"runtime,omitempty"`
-	ID              string                `json:"id"`
-	Description     string                `json:"description,omitempty"`
-	Messages        []llm.Message         `json:"messages"`
-	Tools           []llm.Tool            `json:"tools,omitempty"`
-	Responses       map[string][]Response `json:"responses"`
-	ToolOutputs     map[string]string     `json:"tool_outputs,omitempty"`
-	Expect          Expectation           `json:"expect"`
-	Limits          Limits                `json:"limits,omitempty"`
+	PlaybookScenario string                `json:"playbook_scenario,omitempty"`
+	MetricsScenario  string                `json:"metrics_scenario,omitempty"`
+	BrowserScenario  string                `json:"browser_scenario,omitempty"`
+	OwnerScenario    string                `json:"owner_scenario,omitempty"`
+	Guard            *GuardCase            `json:"guard,omitempty"`
+	Runtime          *RuntimeCase          `json:"runtime,omitempty"`
+	ID               string                `json:"id"`
+	Description      string                `json:"description,omitempty"`
+	Messages         []llm.Message         `json:"messages"`
+	Tools            []llm.Tool            `json:"tools,omitempty"`
+	Responses        map[string][]Response `json:"responses"`
+	ToolOutputs      map[string]string     `json:"tool_outputs,omitempty"`
+	Expect           Expectation           `json:"expect"`
+	Limits           Limits                `json:"limits,omitempty"`
 }
 type Response struct {
 	Status  int             `json:"status,omitempty"`
@@ -89,22 +91,23 @@ type Report struct {
 	Results           []CaseResult `json:"results"`
 }
 type CaseResult struct {
-	CaseID        string   `json:"case_id"`
-	ProfileID     string   `json:"profile_id"`
-	ProviderID    string   `json:"provider_id"`
-	Model         string   `json:"model"`
-	Protocol      string   `json:"protocol"`
-	Repeat        int      `json:"repeat"`
-	Passed        bool     `json:"passed"`
-	Reason        string   `json:"reason"`
-	EndReason     string   `json:"end_reason"`
-	Steps         int      `json:"steps"`
-	ToolCalls     []string `json:"tool_calls"`
-	TokensIn      int64    `json:"tokens_in"`
-	TokensOut     int64    `json:"tokens_out"`
-	CostUSD       float64  `json:"cost_usd"`
-	DurationMS    float64  `json:"duration_ms"`
-	LogicalHours  int      `json:"logical_hours,omitempty"`
-	MetricSamples int      `json:"metric_samples,omitempty"`
-	MetricTargets int      `json:"metric_targets,omitempty"`
+	Simulation    *playbook.SimulationReport `json:"simulation,omitempty"`
+	CaseID        string                     `json:"case_id"`
+	ProfileID     string                     `json:"profile_id"`
+	ProviderID    string                     `json:"provider_id"`
+	Model         string                     `json:"model"`
+	Protocol      string                     `json:"protocol"`
+	Repeat        int                        `json:"repeat"`
+	Passed        bool                       `json:"passed"`
+	Reason        string                     `json:"reason"`
+	EndReason     string                     `json:"end_reason"`
+	Steps         int                        `json:"steps"`
+	ToolCalls     []string                   `json:"tool_calls"`
+	TokensIn      int64                      `json:"tokens_in"`
+	TokensOut     int64                      `json:"tokens_out"`
+	CostUSD       float64                    `json:"cost_usd"`
+	DurationMS    float64                    `json:"duration_ms"`
+	LogicalHours  int                        `json:"logical_hours,omitempty"`
+	MetricSamples int                        `json:"metric_samples,omitempty"`
+	MetricTargets int                        `json:"metric_targets,omitempty"`
 }

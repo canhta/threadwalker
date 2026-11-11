@@ -1,0 +1,246 @@
+{
+  "version": "v1",
+  "description": "Actual guarded playbook mutations, revision/metric outcomes, common drift regression and predeclared day-matched heavy-tail simulations; synthetic, no provider or live Threads calls.",
+  "cases": [
+    {
+      "id": "playbook_mutation",
+      "playbook_scenario": "mutation",
+      "expect": {
+        "end_reason": "completed",
+        "tools": null
+      }
+    },
+    {
+      "id": "playbook_outcomes",
+      "playbook_scenario": "outcomes",
+      "expect": {
+        "end_reason": "completed",
+        "tools": null
+      }
+    },
+    {
+      "id": "playbook_revision",
+      "playbook_scenario": "revision",
+      "expect": {
+        "end_reason": "completed",
+        "tools": null
+      }
+    },
+    {
+      "id": "playbook_drift",
+      "playbook_scenario": "drift",
+      "expect": {
+        "end_reason": "completed",
+        "tools": null
+      }
+    },
+    {
+      "id": "playbook_simulation_null_101",
+      "playbook_scenario": "simulation_null-101",
+      "expect": {
+        "end_reason": "completed",
+        "tools": []
+      }
+    },
+    {
+      "id": "playbook_simulation_null_211",
+      "playbook_scenario": "simulation_null-211",
+      "expect": {
+        "end_reason": "completed",
+        "tools": []
+      }
+    },
+    {
+      "id": "playbook_simulation_null_307",
+      "playbook_scenario": "simulation_null-307",
+      "expect": {
+        "end_reason": "completed",
+        "tools": []
+      }
+    },
+    {
+      "id": "playbook_simulation_effect_2x_101",
+      "playbook_scenario": "simulation_effect-2x-101",
+      "expect": {
+        "end_reason": "completed",
+        "tools": []
+      }
+    },
+    {
+      "id": "playbook_simulation_effect_2x_211",
+      "playbook_scenario": "simulation_effect-2x-211",
+      "expect": {
+        "end_reason": "completed",
+        "tools": []
+      }
+    },
+    {
+      "id": "playbook_simulation_effect_2x_307",
+      "playbook_scenario": "simulation_effect-2x-307",
+      "expect": {
+        "end_reason": "completed",
+        "tools": []
+      }
+    },
+    {
+      "id": "playbook_simulation_effect_4x",
+      "playbook_scenario": "simulation_effect-4x",
+      "expect": {
+        "end_reason": "completed",
+        "tools": []
+      }
+    },
+    {
+      "id": "playbook_simulation_effect_1.25x",
+      "playbook_scenario": "simulation_effect-1.25x",
+      "expect": {
+        "end_reason": "completed",
+        "tools": []
+      }
+    },
+    {
+      "id": "playbook_simulation_negative_0.5x",
+      "playbook_scenario": "simulation_negative-0.5x",
+      "expect": {
+        "end_reason": "completed",
+        "tools": []
+      }
+    },
+    {
+      "id": "playbook_simulation_sparse_2x",
+      "playbook_scenario": "simulation_sparse-2x",
+      "expect": {
+        "end_reason": "completed",
+        "tools": []
+      }
+    },
+    {
+      "id": "playbook_simulation_missing_baseline",
+      "playbook_scenario": "simulation_missing-baseline",
+      "expect": {
+        "end_reason": "completed",
+        "tools": []
+      }
+    },
+    {
+      "id": "playbook_simulation_no_evidence",
+      "playbook_scenario": "simulation_no-evidence",
+      "expect": {
+        "end_reason": "completed",
+        "tools": []
+      }
+    },
+    {
+      "id": "playbook_simulation_delayed_2x",
+      "playbook_scenario": "simulation_delayed-2x",
+      "expect": {
+        "end_reason": "completed",
+        "tools": []
+      }
+    },
+    {
+      "id": "playbook_simulation_missing_current_controls",
+      "playbook_scenario": "simulation_missing-current-controls",
+      "expect": {
+        "end_reason": "completed",
+        "tools": []
+      }
+    },
+    {
+      "id": "playbook_simulation_common_start_shift_101",
+      "playbook_scenario": "simulation_common-start-shift-101",
+      "expect": {
+        "end_reason": "completed",
+        "tools": []
+      }
+    },
+    {
+      "id": "playbook_simulation_common_start_shift_211",
+      "playbook_scenario": "simulation_common-start-shift-211",
+      "expect": {
+        "end_reason": "completed",
+        "tools": []
+      }
+    },
+    {
+      "id": "playbook_simulation_common_start_shift_307",
+      "playbook_scenario": "simulation_common-start-shift-307",
+      "expect": {
+        "end_reason": "completed",
+        "tools": []
+      }
+    },
+    {
+      "id": "playbook_simulation_common_mid_up_101",
+      "playbook_scenario": "simulation_common-mid-up-101",
+      "expect": {
+        "end_reason": "completed",
+        "tools": []
+      }
+    },
+    {
+      "id": "playbook_simulation_common_mid_up_211",
+      "playbook_scenario": "simulation_common-mid-up-211",
+      "expect": {
+        "end_reason": "completed",
+        "tools": []
+      }
+    },
+    {
+      "id": "playbook_simulation_common_mid_up_307",
+      "playbook_scenario": "simulation_common-mid-up-307",
+      "expect": {
+        "end_reason": "completed",
+        "tools": []
+      }
+    },
+    {
+      "id": "playbook_simulation_common_mid_down_101",
+      "playbook_scenario": "simulation_common-mid-down-101",
+      "expect": {
+        "end_reason": "completed",
+        "tools": []
+      }
+    },
+    {
+      "id": "playbook_simulation_common_mid_down_211",
+      "playbook_scenario": "simulation_common-mid-down-211",
+      "expect": {
+        "end_reason": "completed",
+        "tools": []
+      }
+    },
+    {
+      "id": "playbook_simulation_common_mid_down_307",
+      "playbook_scenario": "simulation_common-mid-down-307",
+      "expect": {
+        "end_reason": "completed",
+        "tools": []
+      }
+    },
+    {
+      "id": "playbook_simulation_common_reversal_101",
+      "playbook_scenario": "simulation_common-reversal-101",
+      "expect": {
+        "end_reason": "completed",
+        "tools": []
+      }
+    },
+    {
+      "id": "playbook_simulation_common_reversal_211",
+      "playbook_scenario": "simulation_common-reversal-211",
+      "expect": {
+        "end_reason": "completed",
+        "tools": []
+      }
+    },
+    {
+      "id": "playbook_simulation_common_reversal_307",
+      "playbook_scenario": "simulation_common-reversal-307",
+      "expect": {
+        "end_reason": "completed",
+        "tools": []
+      }
+    }
+  ]
+}

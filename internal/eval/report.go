@@ -119,6 +119,9 @@ func canonicalReport(r Report) (Report, error) {
 		if !reportText(c.CaseID) || !reportText(c.ProfileID) || !reportText(c.ProviderID) || !reportText(c.Model) || (c.Protocol != "openai" && c.Protocol != "anthropic") || !reportCode(c.Reason) || !reportCode(c.EndReason) || c.Repeat < 1 || c.Repeat > r.Repeat || c.Steps < 0 || c.TokensIn < 0 || c.TokensOut < 0 || c.LogicalHours < 0 || c.MetricSamples < 0 || c.MetricTargets < 0 || !finiteNonnegative(c.CostUSD) || !finiteNonnegative(c.DurationMS) {
 			return Report{}, invalid
 		}
+		if c.Simulation != nil && !validSimulationMetadata(*c.Simulation) {
+			return Report{}, invalid
+		}
 		key := resultKey{c.CaseID, c.ProfileID, c.Repeat}
 		if seen[key] {
 			return Report{}, errors.New("duplicate eval report case")

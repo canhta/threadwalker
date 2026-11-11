@@ -109,7 +109,7 @@ func validateSuite(s *Suite) error {
 	}
 	seen := map[string]bool{}
 	for _, c := range s.Cases {
-		if !safeID(c.ID) || seen[c.ID] || (c.Guard == nil && c.Runtime == nil && c.OwnerScenario == "" && c.BrowserScenario == "" && c.MetricsScenario == "" && (len(c.Messages) == 0 || len(c.Responses) == 0)) {
+		if !safeID(c.ID) || seen[c.ID] || (c.Guard == nil && c.Runtime == nil && c.OwnerScenario == "" && c.BrowserScenario == "" && c.MetricsScenario == "" && c.PlaybookScenario == "" && (len(c.Messages) == 0 || len(c.Responses) == 0)) {
 			return invalid()
 		}
 		seen[c.ID] = true
@@ -123,6 +123,12 @@ func validateSuite(s *Suite) error {
 		}
 		if c.Limits.MaxSteps < 0 || c.Limits.MaxOutputTokens < 0 || !finiteNonnegative(c.Limits.MaxUSD) {
 			return invalid()
+		}
+		if c.PlaybookScenario != "" {
+			if !validPlaybookScenario(c.PlaybookScenario) || c.MetricsScenario != "" || c.BrowserScenario != "" || c.OwnerScenario != "" || c.Guard != nil || c.Runtime != nil || len(c.Messages) > 0 || len(c.Responses) > 0 || len(c.Tools) > 0 || len(c.ToolOutputs) > 0 {
+				return invalid()
+			}
+			continue
 		}
 		if c.MetricsScenario != "" {
 			switch c.MetricsScenario {
@@ -262,6 +268,9 @@ func suiteDigest(s *Suite) string {
 	b, _ = json.Marshal(canonical)
 	if fixture := browserFixtureDigest(s.Cases); fixture != "" {
 		b = append(b, []byte("\x00browser-snapshots:"+fixture)...)
+	}
+	if fixture := playbookFixtureDigest(s.Cases); fixture != "" {
+		b = append(b, []byte("\x00playbook:"+fixture)...)
 	}
 	hash := sha256.Sum256(b)
 	return hex.EncodeToString(hash[:])

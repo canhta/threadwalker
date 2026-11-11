@@ -313,9 +313,26 @@ binarize, require substantial evidence and keep counting outside the model. Cali
 looks, lifetime error spending and matched controls are implementation choices, not a study's
 validated Threads learning algorithm. Original historical-only simulations falsely established
 all 200 runs under a shared account-wide rise; that failed policy was replaced before release.
-The revised simulations and reproduction commands are recorded in
-[`playbook-local.md`](research/playbook-local.md). These are synthetic measurements, not live
-engagement evidence. Daily matching does not remove within-day timing, adaptive labeling,
+Measured revised **v2** heavy-tail simulations use predeclared seeds **101/211/307**, five
+hypotheses per run, 30 synthetic actions/day split into 20 tagged actions and 10 untagged
+controls, and actual 24h measurement delay with 0..6h lateness. The stationary null established
+at least one hypothesis in **1/500, 1/500 and 0/500** runs over 430 days: combined
+**2/1500 = 0.1333%**, below 5%. A stated **2x engagement-rate multiplier** detected
+**7019/7500 hypotheses** over 180 days, leaving **481 undetected**; conditional median detection
+was **51 days** in each seed, with conditional 90th percentiles **102/101/101 days**. Add
+**11.25 synthetic days** for the declared 300-control cold start at 30 untagged actions/day.
+A 4x multiplier detected 1000/1000 hypotheses (median 27 days); a 1.25x multiplier detected only
+24/1000 by 430 days. With 25% stale/censored observations, 2x detected 528/1000 (median 68 days),
+showing the cost of exact day support. Common account-wide start-rise, mid-rise, mid-fall and
+reversal scenarios, with no hypothesis-specific effect, established in **5/600, 1/600, 4/600
+and 1/600** runs respectively. All these simulations made **zero paid calls, $0 provider spend**;
+synthetic action cost and unavailable looks are reported separately. In the 2x runs,
+7,500/7,500 N=50 looks and 2,184/7,500 N=100 looks lacked exact control support.
+At N=1600, all 7,496 attempted stationary-null looks were unavailable because daily
+allocations were fractional; the gate rejected them without inferring harm. These finite-run results
+are not a general proof against drift. Full source-identified results and reproduction commands
+are in [`playbook-local.md`](research/playbook-local.md). These are synthetic measurements, not
+live engagement evidence. Daily matching does not remove within-day timing, adaptive labeling,
 nonrandomized allocation or other confounders; establishment remains an observational result.
 Accepted consequence: the gate may stay closed for weeks, or indefinitely when control support
 is missing. **(decision)**

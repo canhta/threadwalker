@@ -255,14 +255,49 @@ or sample, no agent scheduling changes. One `metrics.measured` event corresponds
 functional behavior, not elapsed runtime or live Threads metrics support. See
 [recorded evidence](research/metrics-local.md).
 
+## Playbook mutation, outcomes and seeded gate simulations
+
+```sh
+go run ./cmd/threadwalker eval -suite internal/eval/testdata/playbook-v1.json -seed 10 -out /tmp/playbook-eval.json
+go test ./internal/playbook -run TestPredeclaredSimulationSuite -count=1 -v
+go test ./internal/eval -run 'TestCapturedPlaybookEvents|TestPlaybookSuite' -count=1
+go test -race ./internal/store ./internal/tools ./internal/agent ./internal/playbook -run 'Playbook|FrozenBaseline|Amendment|CommonShift|MetricOutcomes' -count=1
+```
+
+The shared suite exercises real guarded playbook tools, SQLite revision snapshots, actual
+metric polling and gate decisions. Cases cover bounded mutation, code-owned counters, amended
+revision exclusion and an account-wide common-shift regression. The independent acceptance
+suites cover strict schemas, the testing cap, immutable decided entries, selected-agent context,
+configured-secret redaction, restart initialization and concurrent storage handles.
+
+`playbook_scenario` simulation cases execute the production score/baseline/gate helpers with
+the predeclared seeds and parameters in `internal/playbook/testdata/gate-v2.json`. The shared
+report's `simulation` object retains the actual seed, horizon, synthetic action allocation,
+null run-level false-positive fraction, detected/undetected hypotheses, conditional detection
+days, censored outcomes, control availability and zero paid calls/USD. The CLI seed remains
+report metadata; each named simulation uses its versioned configuration seed. Suite/input
+fingerprints include these configurations and the collection-policy identity. Both profile
+labels are dimensions over the same offline component code, with no provider request; they
+are not model comparisons. Wall-clock report timing is separate from synthetic logical days.
+Live mode rejects these cases.
+
+The checked-in redacted trace is `internal/eval/testdata/playbook-v1-events.jsonl`, reproduced
+by `TestCapturedPlaybookEvents`. It records established and common-drift pending decisions
+with local hypothesis/revision/ordinal, candidate/reference/control counts and fixed reasons;
+no editable text, credentials, URLs or third-party data. After reviewing a deliberate contract
+change, regenerate with
+`THREADWALKER_UPDATE_PLAYBOOK_TRACE=1 go test ./internal/eval -run TestCapturedPlaybookEvents`.
+See [measured local results and limits](research/playbook-local.md); synthetic learning does
+not close live account/metrics/elapsed qualification issues.
+
 ## Pending coverage
 
 The current suites cover client/protocol, configuration, accounting, local runtime, owner-service
-synthetic browser boundaries and action-scoped metric polling.
+synthetic browser boundaries, action-scoped metric polling, bounded playbook mutation and
+revision-bound day-matched gate simulations.
 They do not certify components that do not exist yet. Real-bot qualification belongs to
 [#18](https://github.com/canhta/threadwalker/issues/18), live browser/Threads compatibility to
 [#2](https://github.com/canhta/threadwalker/issues/2), and integrated live validation to
-[#9](https://github.com/canhta/threadwalker/issues/9). Playbook/gate cases belong to
-[#10](https://github.com/canhta/threadwalker/issues/10), and multiple-agent/template cases to
-[#12](https://github.com/canhta/threadwalker/issues/12) as those components land. Until then,
-their coverage is pending, not passing.
+[#9](https://github.com/canhta/threadwalker/issues/9). Multiple-agent/template cases remain in
+[#12](https://github.com/canhta/threadwalker/issues/12) as that component lands; its coverage is
+pending, not passing.

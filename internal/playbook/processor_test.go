@@ -439,3 +439,204 @@ func TestCommonShiftsUseExactlyDayMatchedControlIDs(t *testing.T) {
 		})
 	}
 }
+
+func TestFractionalDayAllocationConsumesLookWithoutRounding(t *testing.T) {
+	ctx := context.Background()
+	st, e := store.Open(ctx, filepath.Join(t.TempDir(), "fractional.db"))
+	if e != nil {
+		t.Fatal(e)
+	}
+	defer st.Close()
+	base := time.Date(2026, 11, 11, 0, 0, 0, 0, time.UTC)
+	if e = st.EnsureAgent(ctx, "a"); e != nil {
+		t.Fatal(e)
+	}
+	syntheticControls(t, st, "a", base)
+	if _, e = st.InitializePlaybook(ctx, "a", []string{"idea"}, base); e != nil {
+		t.Fatal(e)
+	}
+	entries, _ := st.PlaybookEntries(ctx, "a", 100)
+	hyp := entries[0].ID
+	first := reserveAction(t, st, "a", hyp, base)
+	// Saved synthetic code-owned checkpoint immediately before the N=400 look.
+	tx, e := st.DB().Begin()
+	if e != nil {
+		t.Fatal(e)
+	}
+	defer tx.Rollback()
+	for i := 0; i < 399; i++ {
+		id := first
+		if i > 0 {
+			r, e := tx.Exec(`INSERT INTO actions(agent_id,kind,text,hypothesis_ids_json,dry_run,posted_at,thread_url) VALUES('a','post','checkpoint',?,0,?,'https://fixture.invalid/checkpoint')`, fmt.Sprintf("[%d]", hyp), base.Add(time.Duration(i)*time.Second).Format(time.RFC3339Nano))
+			if e != nil {
+				t.Fatal(e)
+			}
+			id, e = r.LastInsertId()
+			if e != nil {
+				t.Fatal(e)
+			}
+		}
+		if _, e = tx.Exec(`INSERT INTO playbook_outcomes(agent_id,action_id,hypothesis_id,revision,measured_at,success,reason,counted) VALUES('a',?,?,1,?,1,'counted',1)`, id, hyp, base.Add(25*time.Hour).Format(time.RFC3339Nano)); e != nil {
+			t.Fatal(e)
+		}
+	}
+	if _, e = tx.Exec(`UPDATE playbook SET n=399,successes=399 WHERE id=?`, hyp); e != nil {
+		t.Fatal(e)
+	}
+	if e = tx.Commit(); e != nil {
+		t.Fatal(e)
+	}
+	last := reserveAction(t, st, "a", hyp, base.Add(24*time.Hour))
+	syntheticCurrentControls(t, st, "a", base.Add(time.Hour), 250, 0)
+	syntheticCurrentControls(t, st, "a", base.Add(25*time.Hour), 250, 0)
+	due := base.Add(48 * time.Hour).Format("2006-01-02T15:04:05.000000000Z")
+	if _, e = st.DB().Exec(`INSERT INTO metric_jobs(agent_id,action_id,window_hours,due_at,not_before) VALUES('a',?,24,?,?)`, last, due, due); e != nil {
+		t.Fatal(e)
+	}
+	at := base.Add(50 * time.Hour)
+	jobs, e := st.ClaimMetricJobs(ctx, "a", at, 5*time.Minute, 1)
+	if e != nil || len(jobs) != 1 {
+		t.Fatalf("jobs=%v err=%v", jobs, e)
+	}
+	if _, e = st.CompleteMetricJobs(ctx, jobs, at, store.MetricValues{Views: 100, Likes: 90}); e != nil {
+		t.Fatal(e)
+	}
+	if e = playbook.Process(ctx, st, "a", at, nil); e != nil {
+		t.Fatal(e)
+	}
+	var n, controls int
+	var status, reason string
+	if e = st.DB().QueryRow(`SELECT n,current_n,status,reason FROM playbook_looks WHERE agent_id='a'`).Scan(&n, &controls, &status, &reason); e != nil || n != 400 || controls != 0 || status != "testing" || reason != "current_controls_unavailable" {
+		t.Fatalf("n=%d controls=%d %s %s err=%v", n, controls, status, reason, e)
+	}
+	if e = playbook.Process(ctx, st, "a", at.Add(time.Hour), nil); e != nil {
+		t.Fatal(e)
+	}
+	var looks int
+	if e = st.DB().QueryRow(`SELECT count(*) FROM playbook_looks WHERE n=400`).Scan(&looks); e != nil || looks != 1 {
+		t.Fatal("look reopened")
+	}
+}
+
+func TestBaselineFreezeExcludesInvalidOrFutureControls(t *testing.T) {
+	for _, mode := range []string{"foreign", "kind", "dry", "unknown", "tagged", "future", "stale", "wrong_window", "zero_views"} {
+		t.Run(mode, func(t *testing.T) {
+			ctx := context.Background()
+			st, e := store.Open(ctx, filepath.Join(t.TempDir(), "baseline.db"))
+			if e != nil {
+				t.Fatal(e)
+			}
+			defer st.Close()
+			base := time.Date(2026, 11, 11, 0, 0, 0, 0, time.UTC)
+			if e = st.EnsureAgent(ctx, "a"); e != nil {
+				t.Fatal(e)
+			}
+			syntheticControls(t, st, "a", base)
+			statement := ""
+			var args []any
+			switch mode {
+			case "foreign":
+				statement = `UPDATE actions SET agent_id='foreign' WHERE id=1`
+			case "kind":
+				statement = `UPDATE actions SET kind='reply',target_username='fixture_control',target_url='https://fixture.invalid/control' WHERE id=1`
+			case "dry":
+				statement = `UPDATE actions SET dry_run=1 WHERE id=1`
+			case "unknown":
+				statement = `UPDATE actions SET thread_url='' WHERE id=1`
+			case "tagged":
+				statement = `UPDATE actions SET hypothesis_ids_json='[999]' WHERE id=1`
+			case "future", "stale":
+				at := base
+				if mode == "stale" {
+					at = base.Add(-41 * time.Hour)
+				}
+				statement = `UPDATE metrics SET measured_at=? WHERE action_id=1`
+				args = []any{at.Format(time.RFC3339Nano)}
+			case "wrong_window":
+				statement = `DELETE FROM metric_jobs WHERE action_id=1 AND window_hours=24`
+			case "zero_views":
+				statement = `UPDATE metrics SET views=0 WHERE action_id=1`
+			}
+			if _, e = st.DB().Exec(statement, args...); e != nil {
+				t.Fatal(e)
+			}
+			if mode == "future" || mode == "stale" {
+				if _, e = st.DB().Exec(`UPDATE metric_jobs SET completed_at=? WHERE action_id=1`, args[0]); e != nil {
+					t.Fatal(e)
+				}
+			}
+			if _, e = st.InitializePlaybook(ctx, "a", []string{"idea"}, base); e != nil {
+				t.Fatal(e)
+			}
+			entries, _ := st.PlaybookEntries(ctx, "a", 100)
+			id := reserveAction(t, st, "a", entries[0].ID, base)
+			var baselines, eligible int
+			if e = st.DB().QueryRow(`SELECT count(*) FROM playbook_baselines`).Scan(&baselines); e != nil || baselines != 0 {
+				t.Fatalf("baselines=%d err=%v", baselines, e)
+			}
+			if e = st.DB().QueryRow(`SELECT eligible FROM action_hypotheses WHERE action_id=?`, id).Scan(&eligible); e != nil || eligible != 0 {
+				t.Fatalf("eligible=%d err=%v", eligible, e)
+			}
+		})
+	}
+}
+
+func TestGateLookUsesActualObservationOrder(t *testing.T) {
+	ctx := context.Background()
+	st, e := store.Open(ctx, filepath.Join(t.TempDir(), "order.db"))
+	if e != nil {
+		t.Fatal(e)
+	}
+	defer st.Close()
+	base := time.Date(2026, 11, 11, 0, 0, 0, 0, time.UTC)
+	if e = st.EnsureAgent(ctx, "a"); e != nil {
+		t.Fatal(e)
+	}
+	syntheticControls(t, st, "a", base)
+	if _, e = st.InitializePlaybook(ctx, "a", []string{"idea"}, base); e != nil {
+		t.Fatal(e)
+	}
+	entries, _ := st.PlaybookEntries(ctx, "a", 100)
+	hyp := entries[0].ID
+	var first int64
+	for i := 0; i < 50; i++ {
+		id := reserveAction(t, st, "a", hyp, base.Add(time.Duration(i)*time.Minute))
+		if i == 0 {
+			first = id
+		}
+	}
+	syntheticCurrentControls(t, st, "a", base.Add(10*time.Minute), 200, 10)
+	if _, e = st.SeedMetricJobs(ctx, "a"); e != nil {
+		t.Fatal(e)
+	}
+	at := base.Add(25 * time.Hour)
+	jobs, e := st.ClaimMetricJobs(ctx, "a", at, time.Hour, 1000)
+	if e != nil {
+		t.Fatal(e)
+	}
+	groups := map[int64][]store.MetricJob{}
+	for _, job := range jobs {
+		groups[job.ActionID] = append(groups[job.ActionID], job)
+	}
+	late := at.Add(30 * time.Minute)
+	for id, group := range groups {
+		measured := at
+		if id == first {
+			measured = late
+		}
+		if _, e = st.CompleteMetricJobs(ctx, group, measured, store.MetricValues{Views: 100, Likes: 90}); e != nil {
+			t.Fatal(e)
+		}
+	}
+	if e = playbook.Process(ctx, st, "a", late, nil); e != nil {
+		t.Fatal(e)
+	}
+	var stamp string
+	if e = st.DB().QueryRow(`SELECT measured_at FROM playbook_looks WHERE n=50`).Scan(&stamp); e != nil {
+		t.Fatal(e)
+	}
+	got, e := time.Parse(time.RFC3339Nano, stamp)
+	if e != nil || !got.Equal(late) {
+		t.Fatalf("look timestamp=%s wanted=%s err=%v", stamp, late, e)
+	}
+}
