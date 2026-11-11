@@ -271,6 +271,8 @@ func TestSchedulerWaitsAndSerializesConfiguredAgents(t *testing.T) {
 	for _, id := range []string{"first", "second"} {
 		tmpl := agent.OfflineTemplate()
 		tmpl.ID = id
+		tmpl.Threads.Username = "fixture_" + id
+		tmpl.Threads.ProfileDir = filepath.Join(t.TempDir(), id)
 		fixture := agent.NewOfflineFixture(func() time.Time { return now })
 		fixture.Calls = []llm.ToolCall{}
 		fixture.Observe = func(_ []llm.Message) {

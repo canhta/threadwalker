@@ -89,6 +89,14 @@ protocol, configuration, accounting and local runtime behavior. **(decision)**
 4. Every tool call passes through the guards, is written to the audit log, then executes.
 5. The agent writes a note for next time and schedules its next wake.
 
+The local runtime validates the complete template set before state initialization or any wake.
+Several templates require distinct IDs, normalized operator-declared `threads.username` identities
+and nonoverlapping canonical profile paths (including existing symlink ancestors). Single-agent
+legacy callers may omit the username; no identity is inferred from a persona or agent ID. The
+scheduler installs the complete immutable own-username set before starting either agent. All
+wakes and metric maintenance share its serial execution loop. Notes, playbook, contacts, budgets,
+limits and owner controls remain scoped by agent ID. **(decision, #12)**
+
 The local runtime serializes wakes across configured agents. `schedule_next_wake` clamps to
 `now + min_minutes_between_wakes` through `now + 24h`; the configured minimum is 1..1440 minutes.
 A wake reserves a fallback schedule of `now + 60min` (or the configured minimum if longer) before
@@ -199,6 +207,21 @@ qualification of live Threads per-post insights. **(decision, #19)**
 - Everything read from Threads is marked as untrusted data. Secrets never enter the LLM context.
 - Kill switch: Telegram `/pause`, `/resume`, `/kill`, `/dnc`; automatic stop on reaching a daily limit or
   when the browser is logged out or shown a captcha.
+
+The own-account guard refuses replies to any configured own username, explicit own Threads
+profile/post URL, or confirmed own publication URL even when the supplied author disagrees.
+Outgoing mentions and direct Threads profile/post links to own accounts are also refused.
+Threads hosts are `threads.net`, `threads.com` (with optional `www.`), plus the configured
+browser origin. This is a local identity rule; account/session binding still needs #21.
+A post cannot promote a link already reserved by another agent. The reservation transaction
+checks all prior intents, including dry-run, failed and uncertain outcomes. Local URL keys
+fold host case, remove `www.` and default ports, treat HTTP/HTTPS alike, normalize escaped/dot
+paths and trailing slashes, discard fragments and sort query keys while retaining query values
+and path case. Bare domain/path and `www.` links use the same key; no redirects or network
+lookups are guessed. Different query values or path case remain distinct. These conservative
+syntactic keys cannot detect redirect aliases or semantically identical tracking variants.
+Refusal reasons are fixed `own_account` and `shared_promotion_link`; URLs and usernames never
+enter operational logs. **(decision, #12)**
 
 Operational logging is allowlisted metadata only: no credentials, authorization headers,
 endpoint URLs, request/response bodies, system prompts, private notes, Threads text or strangers'
@@ -543,7 +566,7 @@ Each agent template in `agents/*.yaml` (see [`agents/solo-builder.example.yaml`]
   `min_seconds_between_actions`, `max_steps_per_wake`, `max_usd_per_day`,
   `min_minutes_between_wakes`.
 - `guard`: optional nonempty `stop_phrases` list; omission selects the code defaults.
-- `threads`: `profile_dir`, optional `backend` (`stub` by default, or `browser`). Browser mode
+- `threads`: `profile_dir`, `username` (operator-declared own account, required for several agents), optional `backend` (`stub` by default, or `browser`). Browser mode
   requires an explicit HTTP(S) origin `base_url` and installed Chromium `executable_path`.
   Optional `no_sandbox` defaults to false and is an operator host choice, never a model field.
 - `telegram`: optional `enabled` (defaults to `false`); `bot_token_env` and `owner_chat_id_env` are required and resolved only when enabled. Optional `digest_hour` is 0..23 UTC and defaults to 18. The canonical example keeps this optional integration disabled for local operation without a bot.

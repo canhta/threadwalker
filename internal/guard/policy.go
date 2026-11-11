@@ -60,12 +60,18 @@ func (g *Guard) content(a Attempt) (*actionIntent, string) {
 			return nil, "forbidden_phrase"
 		}
 	}
+	if g.ownInteraction(intent.Text) {
+		return nil, "own_account"
+	}
 	if a.Tool == "reply" {
 		username, err := store.NormalizeUsername(intent.TargetUsername)
 		if err != nil {
 			return nil, "invalid_tool_arguments"
 		}
 		intent.TargetUsername = username
+		if g.own[username] || g.ownURL(intent.TargetURL) {
+			return nil, "own_account"
+		}
 		thread, err := canonicalThread(intent.TargetURL)
 		if err != nil {
 			return nil, "invalid_tool_arguments"
@@ -119,6 +125,12 @@ func (g *Guard) reserve(ctx context.Context, a Attempt, intent *actionIntent, au
 		reason = "agent_not_running"
 	} else if !open {
 		reason = "wake_not_open"
+	}
+	if reason == "" {
+		reason, err = g.isolation(ctx, conn, intent)
+		if err != nil {
+			return 0, "", err
+		}
 	}
 	if reason == "" {
 		reason, err = g.quotas(ctx, conn, a.Tool, intent, now)

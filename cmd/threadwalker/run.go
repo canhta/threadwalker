@@ -105,7 +105,9 @@ func runRuntime(ctx context.Context, args []string, getenv func(string) string, 
 		if *offline {
 			// Explicit templates cannot enable a browser in offline mode.
 			// Non-dry-run templates still fail closed below.
-			templates[i].Threads = config.ThreadsConfig{Backend: "stub"}
+			templates[i].Threads.Backend = "stub"
+			templates[i].Threads.BaseURL = ""
+			templates[i].Threads.ExecutablePath = ""
 		}
 		tmpl := templates[i]
 		if seen[tmpl.ID] || (!tmpl.DryRun && tmpl.Threads.Backend != "browser") {
@@ -113,6 +115,16 @@ func runRuntime(ctx context.Context, args []string, getenv func(string) string, 
 			return 1
 		}
 		seen[tmpl.ID] = true
+	}
+	if err := config.ValidateTemplates(templates); err != nil {
+		fmt.Fprintln(stderr, "runtime requires isolated agent identities and profiles")
+		return 1
+	}
+	ownUsernames := []string{}
+	for _, tmpl := range templates {
+		if tmpl.Threads.Username != "" {
+			ownUsernames = append(ownUsernames, tmpl.Threads.Username)
+		}
 	}
 	dbCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	st, err := store.Open(dbCtx, *dbPath)
@@ -163,7 +175,7 @@ func runRuntime(ctx context.Context, args []string, getenv func(string) string, 
 			tmpl.LLM.APIKey = config.NewSecret("offline-dummy-key")
 			tmpl.Telegram = config.TelegramConfig{}
 		}
-		opts := agent.Options{Store: st, Template: tmpl, Logger: logger, Now: now, Wait: wait, Secrets: secrets}
+		opts := agent.Options{Store: st, Template: tmpl, OwnUsernames: ownUsernames, Logger: logger, Now: now, Wait: wait, Secrets: secrets}
 		if owner := bindings[tmpl.ID]; owner != nil {
 			opts.Owner = owner
 		}

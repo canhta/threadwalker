@@ -89,6 +89,7 @@ limits:                           # starting values, no experimental basis
   max_usd_per_day: 0.50
   min_minutes_between_wakes: 20
 threads:
+  username: synthetic_builder # Replace with the operator-owned account username.
   backend: stub # Browser mode additionally requires base_url and executable_path.
   profile_dir: data/profiles/solo-builder
 telegram:

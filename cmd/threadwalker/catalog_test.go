@@ -102,6 +102,8 @@ func catalogAgentFile(t *testing.T, dir, filename, id, llmBlock string) string {
 		t.Fatalf("canonical example does not start with %q", oldID)
 	}
 	out = strings.Replace(out, oldID, "id: "+id, 1)
+	out = strings.Replace(out, "username: synthetic_builder", "username: "+strings.ReplaceAll(id, "-", "_"), 1)
+	out = strings.Replace(out, "data/profiles/solo-builder", "data/profiles/"+id, 1)
 
 	path := filepath.Join(dir, filename)
 	if err := os.WriteFile(path, []byte(out), 0o600); err != nil {

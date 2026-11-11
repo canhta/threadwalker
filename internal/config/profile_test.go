@@ -161,13 +161,13 @@ func TestLoadDirWithCatalog_ResolvesProfilesAndInlineInFilenameOrder(t *testing.
 	catalog := loadResolutionCatalog(t)
 	dir := t.TempDir()
 	first := strings.Replace(profileTemplate(t, "  profile: speedy\n"), "id: solo-builder", "id: selected", 1)
-	first = strings.Replace(first, "threads:\n", "threads:\n  username: fixture_selected\n", 1)
+	first = strings.Replace(first, "username: synthetic_builder", "username: fixture_selected", 1)
 	first = strings.Replace(first, "data/profiles/solo-builder", "data/profiles/selected", 1)
 	second, err := os.ReadFile(filepath.Join("..", "..", "agents", "solo-builder.example.yaml"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	for name, data := range map[string]string{"a.yaml": first, "z.yaml": strings.Replace(string(second), "threads:\n", "threads:\n  username: fixture_solo\n", 1), "ignored.txt": "invalid YAML"} {
+	for name, data := range map[string]string{"a.yaml": first, "z.yaml": string(second), "ignored.txt": "invalid YAML"} {
 		if err := os.WriteFile(filepath.Join(dir, name), []byte(data), 0600); err != nil {
 			t.Fatal(err)
 		}

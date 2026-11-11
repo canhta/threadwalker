@@ -23,6 +23,7 @@ import (
 )
 
 type Options struct {
+	OwnUsernames []string
 	// ThreadsFactory is harness-only; a wake owns and always closes its backend.
 	ThreadsFactory func(context.Context, config.Template) (threads.Backend, error)
 	Owner          tools.Owner
@@ -53,6 +54,7 @@ func New(opts Options) (*Runtime, error) {
 	if opts.Store == nil || opts.Template.ID == "" {
 		return nil, errors.New("configuring runtime: store and agent required")
 	}
+	opts.OwnUsernames = append([]string(nil), opts.OwnUsernames...)
 	if opts.ThreadsFactory == nil && opts.Template.Threads.Backend == "browser" {
 		opts.ThreadsFactory = func(ctx context.Context, tmpl config.Template) (threads.Backend, error) {
 			browser, err := threads.New(ctx, threads.Options{AgentID: tmpl.ID, BaseURL: tmpl.Threads.BaseURL, ProfileDir: tmpl.Threads.ProfileDir, ExecutablePath: tmpl.Threads.ExecutablePath, Timeout: 15 * time.Second, StartupTimeout: 30 * time.Second, Logger: opts.Logger, Now: opts.Now, NoSandbox: tmpl.Threads.NoSandbox})
@@ -255,7 +257,7 @@ func (r *Runtime) Wake(ctx context.Context) (wake WakeResult, wakeErr error) {
 	if err != nil {
 		return wake, err
 	}
-	g, err := guard.New(guard.Options{Store: r.opts.Store, Template: r.opts.Template, WakeID: id, Now: r.opts.Now, Logger: r.opts.Logger, AllowLive: backend != nil})
+	g, err := guard.New(guard.Options{Store: r.opts.Store, Template: r.opts.Template, OwnUsernames: r.opts.OwnUsernames, WakeID: id, Now: r.opts.Now, Logger: r.opts.Logger, AllowLive: backend != nil})
 	if err != nil {
 		return wake, err
 	}
@@ -318,6 +320,25 @@ func (s Scheduler) Run(ctx context.Context, once bool) error {
 	}
 	if s.Wait == nil {
 		s.Wait = Wait
+	}
+	templates := make([]config.Template, 0, len(s.Agents))
+	users := []string{}
+	for _, r := range s.Agents {
+		if r == nil {
+			return errors.New("scheduling agents: nil agent")
+		}
+		templates = append(templates, r.opts.Template)
+		if r.opts.Template.Threads.Username != "" {
+			users = append(users, r.opts.Template.Threads.Username)
+		}
+	}
+	if err := config.ValidateTemplates(templates); err != nil {
+		return fmt.Errorf("scheduling agents: %w", err)
+	}
+	// Install the complete set before starting any agent. Never discover identities
+	// incrementally while another agent may already execute effects.
+	for _, r := range s.Agents {
+		r.opts.OwnUsernames = append(append([]string(nil), r.opts.OwnUsernames...), users...)
 	}
 	for _, r := range s.Agents {
 		if r == nil {

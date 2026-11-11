@@ -16,6 +16,8 @@ import (
 )
 
 type Options struct {
+	// OwnUsernames is a complete immutable operator identity set, never model data.
+	OwnUsernames []string
 	// AllowLive is an operator capability, never a model tool argument.
 	AllowLive bool
 	Store     *store.Store
@@ -27,6 +29,7 @@ type Options struct {
 type Guard struct {
 	opts        Options
 	stopPhrases []string
+	own         map[string]bool
 }
 
 // Attempt contains data used only for bounded audit metadata. Arguments are
@@ -79,7 +82,20 @@ func New(opts Options) (*Guard, error) {
 		}
 	}
 	opts.Template.Persona.ForbiddenPhrases = append([]string(nil), opts.Template.Persona.ForbiddenPhrases...)
-	return &Guard{opts: opts, stopPhrases: append([]string(nil), phrases...)}, nil
+	own := map[string]bool{}
+	users := append([]string(nil), opts.OwnUsernames...)
+	if opts.Template.Threads.Username != "" {
+		users = append(users, opts.Template.Threads.Username)
+	}
+	for _, raw := range users {
+		user, err := store.NormalizeUsername(raw)
+		if err != nil {
+			return nil, errors.New("configuring guard: invalid own account identity")
+		}
+		own[user] = true
+	}
+	opts.OwnUsernames = users
+	return &Guard{opts: opts, stopPhrases: append([]string(nil), phrases...), own: own}, nil
 }
 
 // Matches prevents accidentally auditing one scope while mutating another.
