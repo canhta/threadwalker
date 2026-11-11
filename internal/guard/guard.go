@@ -68,6 +68,9 @@ func New(opts Options) (*Guard, error) {
 	if phrases == nil {
 		phrases = []string{"stop", "stop replying", "do not contact", "don’t contact", "don't contact", "leave me alone", "đừng trả lời", "đừng liên hệ", "ngừng trả lời", "dừng trả lời", "đừng làm phiền"}
 	}
+	if len(phrases) == 0 {
+		return nil, errors.New("configuring guard: empty stop phrase list")
+	}
 	for _, phrase := range phrases {
 		if strings.TrimSpace(phrase) == "" {
 			return nil, errors.New("configuring guard: empty stop phrase")

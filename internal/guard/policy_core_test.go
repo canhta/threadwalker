@@ -86,6 +86,10 @@ func TestStopRequestsDefaultAndPersistenceFailure(t *testing.T) {
 	if matched || !errors.Is(err, guard.ErrAudit) || strings.Contains(err.Error(), "private") {
 		t.Fatalf("fail closed %v %v", matched, err)
 	}
+	opts.Template.Guard.StopPhrases = []string{}
+	if _, err = guard.New(opts); err == nil {
+		t.Fatal("empty configured list accepted")
+	}
 	opts.Template.Guard.StopPhrases = []string{" "}
 	if _, err = guard.New(opts); err == nil {
 		t.Fatal("empty phrase accepted")
