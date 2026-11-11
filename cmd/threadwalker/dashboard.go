@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"strconv"
 	"strings"
 	"time"
 
@@ -30,7 +31,8 @@ func runDashboard(ctx context.Context, args []string, stdout, stderr io.Writer) 
 	}
 	host, port, err := net.SplitHostPort(*listen)
 	ip := net.ParseIP(host)
-	if err != nil || ip == nil || !ip.IsLoopback() || port == "" || strings.Contains(host, "%") {
+	portNumber, portErr := strconv.Atoi(port)
+	if err != nil || ip == nil || !ip.IsLoopback() || portErr != nil || portNumber < 0 || portNumber > 65535 || strings.Contains(host, "%") {
 		fmt.Fprintln(stderr, "dashboard requires a numeric loopback listen address")
 		return 1
 	}

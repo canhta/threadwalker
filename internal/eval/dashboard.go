@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http/httptest"
 	"net/url"
 	"os"
@@ -23,7 +24,11 @@ func validDashboardScenario(s string) bool {
 
 // These cases run the actual public projection, HTTP handler and SQLite reader;
 // no model, external network, credential or user content is used as evidence.
-func runDashboardCase(ctx context.Context, c Case, p Profile, repeat int, opts Options) (r CaseResult) {
+func runDashboardCase(ctx context.Context, c Case, p Profile, repeat int, opts Options) CaseResult {
+	return runDashboardCaseCaptured(ctx, c, p, repeat, opts, nil)
+}
+
+func runDashboardCaseCaptured(ctx context.Context, c Case, p Profile, repeat int, opts Options, capture io.Writer) (r CaseResult) {
 	started := time.Now()
 	r = CaseResult{CaseID: c.ID, ProfileID: p.ID, ProviderID: p.ProviderID, Model: p.Config.Model, Protocol: p.Config.Protocol, Repeat: repeat, EndReason: "completed", Reason: "dashboard_setup_failed", ToolCalls: []string{}}
 	defer func() { r.DurationMS = float64(time.Since(started).Nanoseconds()) / 1e6 }()
@@ -74,6 +79,9 @@ func runDashboardCase(ctx context.Context, c Case, p Profile, repeat int, opts O
 	}
 	defer ro.Close()
 	var logs bytes.Buffer
+	if capture != nil {
+		defer func() { _, _ = capture.Write(logs.Bytes()) }()
+	}
 	logger, _ := logging.New(&logs, "debug", "json")
 	h, err := dashboard.New(dashboard.Options{DB: ro.DB(), Now: opts.Now, Logger: logger, Agents: []dashboard.Agent{{ID: "synthetic-dashboard", DailyBudgetUSD: 2}, {ID: "synthetic-second", DailyBudgetUSD: 3}}})
 	if err != nil {
