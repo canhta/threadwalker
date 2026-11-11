@@ -1,22 +1,20 @@
 # ThreadWalker
 
-Thí nghiệm mã nguồn mở: một agent AI chỉ được giao goal, một tài khoản Threads và một ngân sách
-thì tự vận hành, tự học và tự cải tiến được tới đâu khi không có người duyệt.
+An open-source experiment: given only a goal, one Threads account and a budget, how far can an AI
+agent run, learn and improve by itself with nobody approving its output?
 
-Trạng thái: chưa có code. Thiết kế đã chốt, công việc nằm trong
+Status: no code yet. The design is settled and the work is in
 [GitHub Issues](https://github.com/canhta/threadwalker/issues).
 
-## Đọc gì trước
-
-| File | Nội dung |
+| Read | For |
 |---|---|
-| [`docs/spec.md`](docs/spec.md) | Spec có hiệu lực: kiến trúc, tool, luật cứng, lược đồ DB, thứ tự làm |
-| [`GLOSSARY.md`](GLOSSARY.md) | Thuật ngữ dùng trong code và issue |
-| [`AGENTS.md`](AGENTS.md) | Quy ước cho coding agent làm việc trong repo |
-| [`docs/research/`](docs/research/) | Bằng chứng đằng sau các quyết định, kèm nguồn |
-| [`docs/handoff_spec.md`](docs/handoff_spec.md) | Bản nháp đầu, đã bị thay thế, chỉ để đối chiếu |
+| [`docs/spec.md`](docs/spec.md) | The spec: architecture, tools, guards, schema, order of work |
+| [`GLOSSARY.md`](GLOSSARY.md) | Terms used in code and issues |
+| [`AGENTS.md`](AGENTS.md) | Rules for coding agents working in this repo |
+| [`docs/research/`](docs/research/) | The evidence behind the decisions, with sources |
 
-## Lưu ý
+## Warning
 
-Agent điều khiển Threads qua trình duyệt tự động, việc này trái điều khoản dịch vụ của Threads và
-có thể làm mất tài khoản. Chỉ dùng tài khoản phụ, có ghi rõ trong bio là thí nghiệm AI.
+The agent drives Threads through browser automation. That is against the Threads terms of service
+and can get the account removed. Use only a disposable side account whose bio states that it is an
+AI experiment.

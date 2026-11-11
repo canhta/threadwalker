@@ -1,22 +1,20 @@
 # Glossary
 
-Dùng đúng các từ này trong code, issue và tài liệu. Tên trong code dùng cột "Tên code".
+Use these terms, with these spellings, in code, issues and docs.
 
-| Thuật ngữ | Tên code | Nghĩa |
-|---|---|---|
-| Khung | `harness` | Phần code Go cố định: lập lịch, tool, luật cứng, sổ ngân sách. Agent không sửa được. |
-| Agent | `agent` | Một vòng lặp LLM gắn với một template, một tài khoản Threads và một ngân sách. |
-| Template | `template` | File YAML khai báo goal, persona, giới hạn và LLM của một agent. Bất biến với agent. |
-| Lần thức | `wake` | Một phiên agent chạy từ lúc được đánh thức tới khi tự kết thúc hoặc chạm trần. |
-| Tool | `tool` | Hành động agent gọi được. Mọi tool đi qua luật cứng trước khi thực thi. |
-| Luật cứng | `guard` | Kiểm tra trong code mà agent không tắt được: trần, từ cấm, danh sách không đụng tới. |
-| Hành động | `action` | Một bài gốc hoặc một reply đã đăng (hoặc đã ghi log khi chạy khô). |
-| Playbook | `playbook` | Danh sách giả thuyết của agent về cái gì hiệu quả. |
-| Giả thuyết | `hypothesis` | Một mục playbook, trạng thái `testing`, `established` hoặc `rejected`. |
-| Cổng thống kê | `gate` | Code quyết định một giả thuyết đổi trạng thái, dựa trên bộ đếm do code giữ. |
-| Sổ ngân sách | `ledger` | Số token và chi phí theo agent theo ngày, tính cục bộ. |
-| Chạy khô | `dry_run` | `post` và `reply` chỉ ghi log, không đăng thật. |
-| Chủ dự án | `owner` | Người vận hành, liên lạc qua Telegram. |
-| Danh sách không đụng tới | `do_not_contact` | Username mà agent không được reply nữa. |
-
-Tránh dùng: "dreaming", "survival mode", "critic", "triage", "bandit" (thuộc spec cũ đã bỏ).
+| Term | Meaning |
+|---|---|
+| `harness` | The fixed Go code: scheduling, tools, guards, ledger. The agent cannot change it. |
+| `agent` | One LLM loop bound to one template, one Threads account and one budget. |
+| `template` | The YAML file declaring an agent's goal, persona, limits and LLM. Immutable to the agent. |
+| `wake` | One agent session, from being woken until it ends itself or hits a limit. |
+| `tool` | An operation the agent can call. Every tool call passes the guards before it executes. |
+| `guard` | A check in code the agent cannot disable: limits, forbidden phrases, do-not-contact. |
+| `action` | One post or reply that was published, or logged in a dry run. |
+| `playbook` | The agent's list of hypotheses about what works. |
+| `hypothesis` | One playbook entry: `testing`, `established` or `rejected`. |
+| `gate` | The code that changes a hypothesis's status from counters the code itself keeps. |
+| `ledger` | Tokens and cost per agent per day, computed locally. |
+| `dry_run` | Mode in which `post` and `reply` only log. |
+| `owner` | The human operator, reached over Telegram. |
+| `do_not_contact` | Usernames the agent may no longer reply to. |

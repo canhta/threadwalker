@@ -1,225 +1,225 @@
-# ThreadWalker — Spec v0 (thay cho handoff_spec.md)
+# ThreadWalker spec (v0)
 
-Ngày: 2026-11-11. Trạng thái: chủ dự án đã giao triển khai; công việc chia thành issue trên GitHub.
+This is the only spec. Work is split into GitHub issues; each issue cites the sections it implements.
 
-Nguồn: `docs/research/handoff_spec_verification.md` (kiểm chứng spec cũ) và
-`docs/research/agentic_architecture_research.md` (kiến trúc agent). Research về bốn repo
-tham khảo chưa xong, chưa được đưa vào đây. Mỗi mục ghi rõ là **[quyết định]** của chủ dự án,
-**[nguồn]** từ research, hay **[đề xuất]** của người viết và chưa được kiểm bằng thực nghiệm.
+Evidence lives in `docs/research/`. Statements here are tagged where it matters:
+**(decision)** made by the owner, **(sourced)** backed by the research, **(proposed)** a design
+choice not yet tested.
 
-## 1. Thí nghiệm này trả lời câu hỏi gì
+## 1. What the experiment asks
 
-Một agent chỉ được giao goal, một tài khoản Threads và một ngân sách thì tự vận hành, tự học và
-tự cải tiến được tới đâu khi không có người duyệt? Đây là thí nghiệm năng lực AI, không phải sản
-phẩm để bán. **[quyết định]**
+Given only a goal, one Threads account and a budget, how far can an agent run, learn and improve
+by itself with nobody approving its output? This is an experiment in AI capability, not a product.
+**(decision)**
 
-Thước đo, đọc theo tuần trên chính tài khoản đó: follower, lượt xem, số reply nhận được, chi phí
-token. **[đề xuất]**
+Weekly measures on the agent's own account: followers, views, replies received, token cost.
+**(proposed)**
 
-## 2. Đã chốt
+## 2. Settled
 
-| Điểm | Chốt | Loại |
+| Topic | Choice | Kind |
 |---|---|---|
-| Mức tự chủ | Tự động hoàn toàn, không người duyệt bài | quyết định |
-| Liên lạc với chủ | Telegram, chỉ khi cần | quyết định |
-| Template | Chỉ khai báo goal, persona, ràng buộc; chiến thuật do agent tự vạch | quyết định |
-| Tự sửa | Agent sửa playbook và ký ức trong DB, không sửa code | quyết định |
-| Tài khoản | Tài khoản phụ, mất cũng được | quyết định |
-| Truy cập Threads | Trình duyệt tự động, vì không có Business Verification | quyết định |
-| LLM | Cắm được qua cấu hình, không gắn một model | quyết định |
-| Ngôn ngữ | Rust hoặc Go; đề xuất Go | đề xuất |
-| Hosting | VPS của chủ dự án: Ubuntu 24.04, 2 vCPU, 3,6 GB RAM (còn trống khoảng 2,6 GB), 48 GB đĩa trống; chưa có Docker, Go hay Chromium | đã kiểm trên máy |
-| Nhiều agent | Có, nhưng sau khi một agent chạy ổn | đề xuất |
-| Nhãn AI trong bio | Có ghi. Điều kiện của người viết, chủ dự án **chưa xác nhận** | chờ xác nhận |
+| Autonomy | Fully automatic; nobody approves posts | decision |
+| Owner contact | Telegram, only when needed | decision |
+| Template | Declares goal, persona and limits; the agent plans its own tactics | decision |
+| Self-editing | The agent edits its playbook and notes in the DB, never code or its template | decision |
+| Account | A disposable side account whose bio states it is an AI experiment | decision (AI label: author's condition, owner has not objected) |
+| Threads access | Browser automation; the official API needs Business Verification the owner does not have | decision |
+| LLM | Pluggable by config; no model is hardcoded | decision |
+| Language | Go | proposed |
+| Host | Owner's VPS: Ubuntu 24.04, 2 vCPU, 3.6 GB RAM (about 2.6 GB free), 48 GB disk free; no Go, Docker or Chromium installed yet | measured |
+| Several agents | Yes, after one agent runs stably | proposed |
 
-## 3. Hình dạng tổng thể
+## 3. Shape
 
-Hai lớp, tách bạch:
+Two layers:
 
-- **Khung cứng (code Go):** lập lịch, tool, trần, sổ ngân sách, audit log, kill switch, cổng
-  thống kê. Agent không sửa được lớp này.
-- **Agent (LLM):** mỗi lần thức dậy nhận goal, playbook, số liệu và ngân sách còn lại, rồi tự
-  quyết làm gì bằng cách gọi tool.
+- **Harness (Go code):** scheduling, tools, guards, ledger, audit log, kill switch, gate. The agent
+  cannot change it.
+- **Agent (LLM):** on each wake it receives its goal, playbook, metrics and remaining budget, and
+  decides what to do by calling tools.
 
-Một agent, một vòng lặp tool-calling viết tay trên Chat Completions. Không có pipeline
-triage → compose → critic cố định, không có critic cùng model. **[nguồn]**: OpenAI khuyên dồn
-năng lực vào một agent trước; Project Vend cho thấy agent giám sát cùng model mắc cùng điểm mù.
+One agent, one hand-written tool-calling loop over the Chat Completions API. No fixed
+triage/compose/critic pipeline and no same-model critic. **(sourced)**: first-party guidance says
+to maximise a single agent first, and in Anthropic's Project Vend a same-model supervisor shared
+the blind spots of the agent it supervised.
 
-## 4. Vòng đời một lần thức
+## 4. One wake
 
-1. Khung đánh thức agent theo giờ agent tự đặt ở lần trước (có trần tần suất).
-2. Khung đưa vào ngữ cảnh: template (bất biến), playbook, số liệu mới do code tính, ngân sách
-   còn lại, ghi chú agent để lại cho chính nó.
-3. Agent gọi tool cho tới khi tự kết thúc, hoặc chạm trần bước / trần token của lần thức.
-4. Mọi lời gọi tool đi qua khung: kiểm trần và luật cứng, ghi audit log, rồi mới thực thi.
-5. Agent ghi kế hoạch cho lần sau và giờ thức tiếp theo.
+1. The harness wakes the agent at the time the agent chose last wake, within a frequency limit.
+2. The harness assembles context: template (immutable), playbook, fresh metrics computed by code,
+   remaining budget, and the note the agent left for itself.
+3. The agent calls tools until it ends the wake or hits the step or token limit.
+4. Every tool call passes through the guards, is written to the audit log, then executes.
+5. The agent writes a note for next time and schedules its next wake.
 
-Không còn "02:00 dreaming" cố định: phản tư là một việc agent tự chọn làm khi có số liệu mới.
-**[đề xuất]**
+Reflection is something the agent chooses to do when new metrics exist; there is no fixed nightly
+job. **(proposed)**
 
-## 5. Bộ tool
+## 5. Tools
 
-| Nhóm | Tool | Ghi chú |
+| Group | Tools | Notes |
 |---|---|---|
-| Threads (trình duyệt) | `read_feed`, `search`, `read_post`, `post`, `reply`, `read_own_metrics` | Một profile trình duyệt cho mỗi agent |
-| Nguồn ngoài | `fetch_trends` (HN, Product Hunt RSS, Google Trends VN RSS) | Research đã gọi thử, cả ba phản hồi |
-| Ký ức | `note_write`, `note_search` | Tìm bằng FTS của SQLite, không dùng vector **[nguồn]**: quy mô này không cần |
-| Playbook | `playbook_propose`, `playbook_read` | Xem mục 7 |
-| Chủ dự án | `notify_owner`, `ask_owner` | Telegram; `ask_owner` không chặn, agent làm việc khác trong lúc chờ |
-| Điều độ | `schedule_next_wake` | Trong khoảng khung cho phép |
+| Threads (browser) | `read_feed`, `search`, `read_post`, `post`, `reply`, `read_own_metrics` | One browser profile per agent |
+| Outside sources | `fetch_trends` (Hacker News API, Product Hunt RSS, Google Trends VN RSS) | All three responded when the research called them |
+| Notes | `note_write`, `note_search` | SQLite FTS5; vector search is not justified at this scale **(sourced)** |
+| Playbook | `playbook_read`, `playbook_propose` | See section 7 |
+| Owner | `notify_owner`, `ask_owner` | Telegram; `ask_owner` never blocks the wake |
+| Contacts | `mark_do_not_contact` | The agent can add to the list, never remove |
+| Scheduling | `schedule_next_wake` | Clamped to the allowed range |
 
-## 6. Luật cứng (trong code, agent không thấy cách tắt)
+## 6. Guards (in code; the agent cannot disable them)
 
-- Trần bài gốc và reply mỗi ngày; trần token mỗi lần thức và mỗi ngày.
-- Cà khịa: không nhắm đặc điểm cá nhân; tối đa N reply cho một username trong 7 ngày; ai chặn,
-  bảo ngừng hoặc tỏ ra khó chịu thì vào danh sách không đụng tới.
-- So chuỗi danh sách từ cấm trước khi đăng (không cần LLM).
-- Không lưu hồ sơ người lạ: chỉ giữ username và bộ đếm để giới hạn tần suất. **[nguồn]**:
-  Platform Terms §3.a.v và rủi ro cài ký ức trong nghiên cứu về ElizaOS.
-- Nội dung đọc từ Threads được đánh dấu là dữ liệu không tin cậy; khóa và mật khẩu không bao
-  giờ vào ngữ cảnh agent.
-- Kill switch: lệnh Telegram `/pause`, `/resume`, `/kill`; tự dừng khi chạm trần ngày hoặc khi
-  trình duyệt bị đăng xuất / gặp captcha.
+- Daily limits on posts and replies; token limits per wake and per day.
+- Teasing rules: the persona may mock a take, never a person's traits; at most N replies to one
+  username in 7 days.
+- Do-not-contact list, filled three ways: a string match on stop requests in replies addressed to
+  the agent, the agent calling `mark_do_not_contact` when someone is annoyed, and the owner's
+  `/dnc <username>` command. Entries are permanent for the agent.
+- Forbidden-phrase check by plain string match before posting.
+- No profiles of strangers: store only username and counters needed for rate limiting.
+  **(sourced)**: Meta Platform Terms 3.a.v, and stored third-party content is a known
+  memory-injection surface.
+- Everything read from Threads is marked as untrusted data. Secrets never enter the LLM context.
+- Kill switch: Telegram `/pause`, `/resume`, `/kill`, `/dnc`; automatic stop on reaching a daily limit or
+  when the browser is logged out or shown a captcha.
 
-Các con số trần là giá trị khởi đầu trong file cấu hình, chưa có cơ sở thực nghiệm.
+The numeric limits are starting values in the template and have no experimental basis yet.
 
-## 7. Tự học và tự cải tiến
+## 7. Learning
 
-Vấn đề: vài chục hành động mỗi ngày, phản hồi trễ và nhiễu. Research tính cần khoảng 49 ngày để
-tách chiến thuật 20% khỏi 30% khi chia 5 nhánh. Học từ từng bài là học từ nhiễu. **[nguồn, phần
-số là tính toán của research]**
+The constraint: tens of actions a day, with delayed, noisy feedback. The research estimates about
+49 days to separate a 20% strategy from a 30% one across five arms, so learning from single posts
+is learning from noise. **(sourced; the figure is the research's own calculation)**
 
-Thiết kế **[đề xuất, chưa nghiên cứu nào thử đúng tổ hợp này]**:
+Design **(proposed; no study has tested this combination)**:
 
-- Playbook là danh sách mục ngắn, mỗi mục là một giả thuyết agent viết ("reply dưới 25 chữ về
-  chi phí được trả lời nhiều hơn") kèm trạng thái `đang thử` hoặc `đã xác lập`.
-- Agent gắn nhãn giả thuyết cho mỗi hành động. **Code** đếm kết quả, agent không tự đếm.
-- Cổng thống kê trong code quyết định khi nào một mục lên `đã xác lập` hoặc bị loại: đủ số mẫu
-  tối thiểu và chênh lệch vượt ngưỡng so với nền.
-- Agent chỉ thêm hoặc sửa từng mục; không được viết lại toàn bộ playbook. **[nguồn]**: viết lại
-  toàn bộ từng làm ngữ cảnh sụp từ 18.282 xuống 122 token.
-- Template bất biến. Agent không sửa prompt hệ thống.
+- The playbook is a list of short hypotheses written by the agent, each `testing`, `established`
+  or `rejected`.
+- The agent tags each action with the hypotheses it is testing. **Code** counts outcomes; the
+  agent never counts its own results.
+- The gate, in code, moves a hypothesis to `established` or `rejected` once it has a minimum
+  sample and a difference from baseline above a threshold.
+- The agent may add or amend single entries. It may not rewrite the playbook wholesale.
+  **(sourced)**: wholesale rewriting has collapsed an agent's context from 18,282 to 122 tokens.
+- The template and system prompt are immutable to the agent.
 
-Hệ quả phải chấp nhận: cổng mở chậm, vài tuần mới có mục đầu tiên được xác lập. Tốc độ mở cổng
-là một kết quả của thí nghiệm.
+Accepted consequence: the gate opens slowly, possibly weeks before the first entry is established.
+How fast it opens is one of the experiment's results.
 
-## 8. Sinh tồn
+## 8. Budget
 
-- Sổ token cục bộ theo từng agent, tính tiền theo bảng giá khai trong cấu hình. **[nguồn]**: gói
-  thuê bao không có số dư để đọc, nên `GET /credits` của spec cũ không dùng làm nền được.
-- Agent luôn thấy ngân sách còn lại và tự quyết cách tiêu; khung chỉ chặn khi chạm trần.
-- Nối doanh thu thật vào ngân sách (tự nuôi sống đúng nghĩa) để sau, khi có số liệu click.
+- A local token ledger per agent, priced from the rates in the template. **(sourced)**: flat
+  subscriptions expose no balance to read.
+- The agent always sees its remaining budget and decides how to spend it; the harness only blocks
+  at the limit.
+- Feeding real revenue back into the budget is out of scope for v0.
 
 ## 9. Telegram
 
-- Agent chủ động nhắn khi: gặp việc ngoài quyền, bị đăng xuất hoặc captcha, sắp hết ngân sách.
-- Bản tin ngắn mỗi ngày: đã làm gì, số liệu, playbook đổi gì.
-- Chủ dự án ra lệnh `/pause`, `/resume`, `/kill`, và trả lời `ask_owner`.
+- The agent messages the owner when it meets something outside its permissions, is logged out or
+  hits a captcha, or is close to its budget limit.
+- A short daily digest: what it did, metrics, playbook changes.
+- The owner sends `/pause`, `/resume`, `/kill`, `/dnc <username>`, and answers `ask_owner` questions.
 
 ## 10. Stack
 
-| Phần | Chọn | Mức chắc chắn |
+| Part | Choice | Confidence |
 |---|---|---|
-| Ngôn ngữ | Go, một binary | Research đọc repo, chưa chạy thử |
-| DB | SQLite, driver thuần Go (`modernc.org/sqlite`) | Research đọc repo, chưa chạy thử |
-| LLM | Client OpenAI-compatible: `base_url`, `api_key`, `model` theo từng agent | DeepSeek dùng được; Antigravity không (điều khoản cấm); OpenCode Go rủi ro |
-| Trình duyệt | Chromium headless điều khiển qua CDP | **Chưa kiểm**: thư viện Go nào, RAM thực tế, Threads có chặn IP datacenter không |
-| Triển khai | systemd trên VPS, chưa cần Docker | đề xuất |
+| Language | Go, single binary | Research read the repos; nothing was run |
+| DB | SQLite via a pure-Go driver (`modernc.org/sqlite`) | Research read the repo; nothing was run |
+| LLM | OpenAI-compatible client: `base_url`, `api_key`, `model` per agent | DeepSeek works; Google Antigravity is ruled out by its terms; OpenCode Go is risky |
+| Browser | Headless Chromium over CDP | **Untested**: which Go library, real memory use, whether Threads challenges datacenter IPs |
+| Deploy | systemd unit on the VPS | proposed |
 
-## 11. Cắt khỏi spec cũ
+## 11. Non-goals for v0
 
-- Threads Graph API, App Review, `keyword_search`: không có Business Verification.
-- Pipeline ba tầng, critic LLM, 3 phương án mỗi lần viết.
-- `viral_autopsies`, `relationship_graph.vibe_summary`, `sqlite-vec`, Drizzle, Bun, Hono.
-- Thompson sampling theo tên chiến thuật cố định; "predicted score".
-- Survival Mode theo số dư OpenRouter; chia Tier 1 / Tier 2 theo tên model.
-- Jitter để giả người. Giữ giãn cách giữa các hành động, nhưng với mục đích giới hạn tần suất.
+- The official Threads API.
+- An LLM critic or multi-agent pipeline.
+- Vector search, an ORM, a web framework.
+- Delays designed to imitate a human. Spacing between actions exists only as a rate limit.
+- Later, not now: a public dashboard (must redact strangers' usernames), a second agent, a second
+  template.
 
-Giữ nhưng làm sau: dashboard công khai (phải che username người lạ), nhiều agent, template thứ
-hai.
+## 12. Order of work
 
-## 12. Thứ tự làm
+Steps are gated: a step starts only when the one before it has passed. Each step's exit condition
+is in its GitHub issue.
 
-Mỗi bước có điều kiện dừng; bước trước chưa qua thì không làm bước sau.
+1. Browser spike on the VPS. This step can end the project.
+2. Dry-run agent loop.
+3. Live run with low limits and Telegram.
+4. Playbook and gate.
+5. Public dashboard.
+6. Second agent, second template.
 
-1. **Spike trình duyệt trên VPS.** Đăng nhập tài khoản phụ, đọc feed, đăng một bài, reply một
-   bài, đọc số liệu bài mình. Qua khi chạy lặp lại được 3 ngày không bị đăng xuất. Đây là điểm
-   có thể giết cả dự án.
-2. **Vòng lặp agent chạy khô.** Đủ tool, nhưng `post` và `reply` chỉ ghi log. Qua khi agent tự
-   lập kế hoạch và tự đặt giờ thức trong 48 giờ mà không vượt trần.
-3. **Chạy thật với trần thấp** và Telegram. Qua sau 7 ngày không cần can thiệp tay.
-4. **Playbook và cổng thống kê.**
-5. **Dashboard công khai.**
-6. **Agent thứ hai, template thứ hai.**
+## 13. Unknowns
 
-## 13. Chưa biết
+- Whether Threads blocks or challenges logins from the VPS's datacenter IP.
+- How long a browser-automated account survives.
+- Whether a cheap model can sustain a long tool-calling loop without drifting.
+- Whether the gate opens at all in the first 4 to 6 weeks.
 
-- Threads có chặn hoặc thử thách đăng nhập từ IP datacenter của VPS không.
-- Tài khoản tự động qua trình duyệt sống được bao lâu.
-- Model rẻ (DeepSeek) có giữ được vòng lặp tool-calling dài mà không trôi không.
-- Cổng thống kê có mở được lần nào trong 4–6 tuần đầu không.
-- Chủ dự án có đồng ý ghi nhãn AI trong bio không.
-- Bốn repo tham khảo có mẫu nào đáng mượn không (research đang chạy).
-
-## 14. Bố cục repo
+## 14. Repo layout
 
 ```text
 threadwalker/
-├── cmd/threadwalker/main.go     # entrypoint: đọc cấu hình, mở DB, chạy scheduler
+├── cmd/threadwalker/main.go     # entrypoint: load config, open DB, run scheduler
 ├── internal/
-│   ├── config/                  # đọc và kiểm tra agents/*.yaml
-│   ├── store/                   # SQLite, migration, truy vấn
-│   ├── llm/                     # client OpenAI-compatible + sổ token
-│   ├── agent/                   # vòng lặp một lần thức, lắp ngữ cảnh
-│   ├── tools/                   # định nghĩa tool và bộ điều phối
-│   ├── guard/                   # luật cứng: trần, từ cấm, danh sách không đụng tới
-│   ├── threads/                 # backend trình duyệt cho các tool Threads
-│   ├── playbook/                # mục giả thuyết + cổng thống kê
-│   └── telegram/                # thông báo và lệnh của chủ dự án
-├── agents/                      # mỗi agent một file template
+│   ├── config/                  # load and validate agents/*.yaml
+│   ├── store/                   # SQLite, migrations, queries
+│   ├── llm/                     # OpenAI-compatible client and ledger
+│   ├── agent/                   # one wake: context assembly and tool loop
+│   ├── tools/                   # tool definitions and dispatcher
+│   ├── guard/                   # limits, forbidden phrases, do-not-contact
+│   ├── threads/                 # browser backend for the Threads tools
+│   ├── playbook/                # hypotheses and the gate
+│   └── telegram/                # owner notifications and commands
+├── agents/                      # one template per agent
 │   └── solo-builder.example.yaml
-├── deploy/threadwalker.service  # systemd unit
+├── deploy/threadwalker.service
 └── docs/
 ```
 
-Mọi tool đi qua một interface duy nhất trong `internal/tools`; `internal/guard` bọc bộ điều phối,
-nên không có đường nào gọi tool mà bỏ qua luật cứng.
+Every tool implements one interface in `internal/tools`. `internal/guard` wraps the dispatcher, so
+no code path executes a tool without passing the guards.
 
-## 15. Lược đồ DB
+## 15. Database schema
 
-Mọi bảng có `agent_id`, kể cả khi mới chạy một agent.
+Every table carries `agent_id`, even while only one agent runs.
 
-| Bảng | Cột chính | Dùng cho |
+| Table | Main columns | Purpose |
 |---|---|---|
-| `agents` | `id`, `status` (`running`/`paused`/`killed`), `next_wake_at`, `self_note` | Trạng thái và ghi chú agent để lại cho lần thức sau |
-| `wakes` | `id`, `agent_id`, `started_at`, `ended_at`, `steps`, `tokens_in`, `tokens_out`, `cost_usd`, `end_reason` | Mỗi lần thức |
-| `tool_calls` | `id`, `wake_id`, `tool`, `args_json`, `result_json`, `blocked_by` (luật nào chặn, nếu có), `at` | Audit log |
-| `actions` | `id`, `agent_id`, `kind` (`post`/`reply`), `text`, `target_url`, `target_username`, `hypothesis_ids_json`, `dry_run`, `posted_at`, `thread_url` | Bài đã đăng |
-| `metrics` | `action_id`, `measured_at`, `views`, `likes`, `replies`, `reposts` | Số liệu đo lại theo thời gian |
-| `notes` | `id`, `agent_id`, `text`, `created_at` (+ bảng FTS5) | Ký ức agent tự ghi |
-| `playbook` | `id`, `agent_id`, `text`, `status` (`testing`/`established`/`rejected`), `n`, `successes`, `created_at`, `decided_at` | Giả thuyết và bộ đếm do code cập nhật |
-| `contacts` | `agent_id`, `username`, `reply_count_7d`, `do_not_contact`, `reason` | Chỉ để giới hạn tần suất; không lưu mô tả về người |
-| `ledger` | `agent_id`, `day`, `tokens_in`, `tokens_out`, `cost_usd` | Ngân sách |
-| `owner_msgs` | `id`, `agent_id`, `direction`, `text`, `answered_id`, `at` | Trao đổi Telegram |
+| `agents` | `id`, `status` (`running`/`paused`/`killed`), `next_wake_at`, `self_note` | State and the note left for the next wake |
+| `wakes` | `id`, `agent_id`, `started_at`, `ended_at`, `steps`, `tokens_in`, `tokens_out`, `cost_usd`, `end_reason` | One row per wake |
+| `tool_calls` | `id`, `wake_id`, `tool`, `args_json`, `result_json`, `blocked_by`, `at` | Audit log; `blocked_by` names the guard that refused the call |
+| `actions` | `id`, `agent_id`, `kind` (`post`/`reply`), `text`, `target_url`, `target_username`, `hypothesis_ids_json`, `dry_run`, `posted_at`, `thread_url` | Published or dry-run posts |
+| `metrics` | `action_id`, `measured_at`, `views`, `likes`, `replies`, `reposts` | Repeated measurements |
+| `notes` | `id`, `agent_id`, `text`, `created_at`, plus an FTS5 table | The agent's own notes |
+| `playbook` | `id`, `agent_id`, `text`, `status` (`testing`/`established`/`rejected`), `n`, `successes`, `created_at`, `decided_at` | Hypotheses; counters are written by code only |
+| `contacts` | `agent_id`, `username`, `reply_count_7d`, `do_not_contact`, `reason` | Rate limiting only; no description of the person |
+| `ledger` | `agent_id`, `day`, `tokens_in`, `tokens_out`, `cost_usd` | Budget |
+| `owner_msgs` | `id`, `agent_id`, `direction`, `text`, `answered_id`, `at` | Telegram exchange |
 
-## 16. Template agent
+## 16. Agent template
 
 ```yaml
 id: solo-builder
 goal: >
-  Xây một tài khoản Threads có người theo dõi thật trong cộng đồng builder và AI ở Việt Nam.
+  Build a Threads account with a real following among builders and AI people in Vietnam.
 persona:
   name: Kaito
-  bio_must_include: "thí nghiệm AI tự vận hành"   # nhãn AI, xem mục 2
-  voice: ngắn, thực dụng, châm biếm nhẹ quan điểm, không công kích cá nhân
+  language: vi
+  bio_must_include: "thí nghiệm AI tự vận hành"   # the AI label from section 2
+  voice: short, practical, lightly sarcastic about takes, never about people
   forbidden_phrases: ["Tuy nhiên,", "Tóm lại,", "Trong kỷ nguyên", "Không thể phủ nhận"]
 llm:
   base_url: https://api.deepseek.com
-  model: deepseek-chat            # tên model lấy theo tài liệu nhà cung cấp lúc triển khai
+  model: deepseek-chat            # confirm the model name in the provider's docs when implementing
   api_key_env: TW_SOLO_LLM_KEY
-  price_per_mtok_in_usd: 0        # điền theo bảng giá hiện hành; sổ token dùng số này
+  price_per_mtok_in_usd: 0        # fill in from the provider's current price list
   price_per_mtok_out_usd: 0
-limits:                           # giá trị khởi đầu, chưa có cơ sở thực nghiệm
+limits:                           # starting values, no experimental basis
   posts_per_day: 3
   replies_per_day: 15
   replies_per_user_7d: 2
@@ -235,5 +235,4 @@ telegram:
 dry_run: true
 ```
 
-Khóa bí mật chỉ nằm trong biến môi trường, không nằm trong file template và không bao giờ được
-đưa vào ngữ cảnh LLM.
+Secrets live only in environment variables, never in a template, a log or the LLM context.
