@@ -172,3 +172,26 @@ func TestGuardRejectsMalformedPolicyInputsBeforeReservation(t *testing.T) {
 		})
 	}
 }
+
+func TestPolicyUnicodeCaseFolding(t *testing.T) {
+	_, opts := setup(t)
+	opts.Template.Limits.PostsPerDay = 3
+	opts.Template.Limits.RepliesPerDay = 3
+	opts.Template.Limits.RepliesPerUser7d = 2
+	opts.Template.Limits.MinSecondsBetweenActions = 1
+	opts.Template.Persona.ForbiddenPhrases = []string{"σigma"}
+	opts.Template.Guard.StopPhrases = []string{"stop"}
+	g, err := guard.New(opts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	called := false
+	_, err = g.Execute(context.Background(), guard.Attempt{Tool: "post", Arguments: `{"text":"ςIGMA synthetic phrase"}`}, func() (string, error) { called = true; return "", nil })
+	if called || !errors.Is(err, guard.ErrBlocked) {
+		t.Fatalf("case-folded forbidden phrase bypass %v %v", called, err)
+	}
+	matched, err := g.ObserveStopRequest(context.Background(), "fixture_author", "ſTOP now", true)
+	if err != nil || !matched {
+		t.Fatalf("case-folded stop match %v %v", matched, err)
+	}
+}

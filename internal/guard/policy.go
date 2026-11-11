@@ -9,6 +9,7 @@ import (
 	"regexp"
 	"strings"
 	"time"
+	"unicode"
 	"unicode/utf8"
 
 	"github.com/canhta/threadwalker/internal/store"
@@ -52,9 +53,9 @@ func (g *Guard) content(a Attempt) (*actionIntent, string) {
 	if utf8.RuneCountInString(intent.Text) > 500 {
 		return nil, "text_length"
 	}
-	folded := strings.ToLower(intent.Text)
+	folded := foldCase(intent.Text)
 	for _, phrase := range g.opts.Template.Persona.ForbiddenPhrases {
-		if phrase != "" && strings.Contains(folded, strings.ToLower(phrase)) {
+		if phrase != "" && strings.Contains(folded, foldCase(phrase)) {
 			return nil, "forbidden_phrase"
 		}
 	}
@@ -309,7 +310,7 @@ func (g *Guard) ObserveStopRequest(ctx context.Context, username, text string, a
 		return false, nil
 	}
 	for _, phrase := range g.stopPhrases {
-		if strings.Contains(strings.ToLower(text), strings.ToLower(phrase)) {
+		if strings.Contains(foldCase(text), foldCase(phrase)) {
 			if err := g.opts.Store.MarkDoNotContact(ctx, g.opts.Template.ID, username, "stop_request"); err != nil {
 				g.event(ctx, "guard.checked", "error", "stop_request_persist_failed", "")
 				return false, &auditError{err}
@@ -319,4 +320,18 @@ func (g *Guard) ObserveStopRequest(ctx context.Context, username, text string, a
 		}
 	}
 	return false, nil
+}
+
+// foldCase chooses one representative per Unicode simple-fold orbit. Lowercase
+// alone misses equivalent forms such as Greek final sigma and Latin long s.
+func foldCase(text string) string {
+	return strings.Map(func(r rune) rune {
+		canonical := r
+		for next := unicode.SimpleFold(r); next != r; next = unicode.SimpleFold(next) {
+			if next < canonical {
+				canonical = next
+			}
+		}
+		return canonical
+	}, text)
 }
