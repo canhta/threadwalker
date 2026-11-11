@@ -140,6 +140,22 @@ journalctl -u threadwalker -o cat --since '15 min ago' \
   | jq -c 'select(.agent_id == "solo-builder" and .wake_id == 42) | {event, request, attempt, http_status, tokens_in, tokens_out, cost_usd, outcome, reason}'
 ```
 
+Replay the saved synthetic failure trace offline. Its first request gets HTTP 503
+and records usage; retry 2 records usage before an invalid assistant choice ends
+the run. The two accounting records sum to 300 input tokens, 30 output tokens
+and USD 0.00036 at the configured synthetic flat rates:
+
+```sh
+go test ./internal/llm -run '^TestSyntheticRetryFailureTrace$' -count=1
+jq -c 'select(.agent_id == "synthetic-agent" and .wake_id == 42) | {event, request, attempt, http_status, tokens_in, tokens_out, cost_usd, outcome, reason}' internal/llm/testdata/retry-failure-trace.jsonl
+jq -s '[.[] | select(.event == "llm.usage.recorded" and .outcome == "success")] | {tokens_in: (map(.tokens_in) | add), tokens_out: (map(.tokens_out) | add), cost_usd: (map(.cost_usd) | add)}' internal/llm/testdata/retry-failure-trace.jsonl
+```
+
+Filter `.reason == "retry_exhausted"`, `"accounting_write_failed"`,
+`"budget_limit"` or `"step_limit"` to find the corresponding failures, then use
+`agent_id`, `wake_id`, `request` and `attempt` to inspect the preceding trace.
+Tool IDs are local `wake/step` values, rather than arbitrary provider IDs.
+
 The `wake_id 42` above and any durations or costs are synthetic example values,
 not production evidence. `llm.tool.finished` covers only the client dispatcher
 boundary. [`deploy/threadwalker.service`](../deploy/threadwalker.service) still
@@ -170,7 +186,6 @@ measured acceptance criteria hold.
 only `check`. It expects environment variables in
 `/etc/threadwalker/threadwalker.env`; the root `.env` is local setup storage. The
 unit does not yet start an agent loop.
-
 
 ## Opt-in LLM protocol checks
 
