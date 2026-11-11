@@ -104,7 +104,9 @@ func TestWakeStopReasonsAndScheduleDefaults(t *testing.T) {
 			}
 			tmpl := agent.OfflineTemplate()
 			tmpl.Limits.MaxStepsPerWake = tc.steps
-			r, err := agent.New(agent.Options{Store: st, Template: tmpl, Now: func() time.Time { return now }, HTTPClient: fixture.Client(), FetchTrends: fixture.Trends})
+			var logs bytes.Buffer
+			logger, _ := logging.New(&logs, "debug", "json")
+			r, err := agent.New(agent.Options{Store: st, Template: tmpl, Logger: logger, Now: func() time.Time { return now }, HTTPClient: fixture.Client(), FetchTrends: fixture.Trends})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -115,6 +117,17 @@ func TestWakeStopReasonsAndScheduleDefaults(t *testing.T) {
 			if err != nil || wake.EndReason != tc.reason {
 				t.Fatalf("%+v %v", wake, err)
 			}
+			event := "wake.finished"
+			if tc.reason != "completed" {
+				event = "wake.stopped"
+			}
+			if !strings.Contains(logs.String(), `"event":"`+event+`"`) || !strings.Contains(logs.String(), `"reason":"`+tc.reason+`"`) {
+				t.Fatal("wake stop reason missing from captured logs")
+			}
+			if tc.name == "stall_stop" && !strings.Contains(logs.String(), `"event":"note.searched"`) {
+				t.Fatal("note-search outcome missing")
+			}
+
 			state, err := st.AgentState(ctx, tmpl.ID)
 			if err != nil || !state.NextWake.Equal(now.Add(tc.after)) {
 				t.Fatalf("%+v %v", state, err)
