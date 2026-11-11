@@ -27,7 +27,7 @@ Weekly measures on the agent's own account: followers, views, replies received, 
 | Threads access | Browser automation; the official API needs Business Verification the owner does not have | decision |
 | LLM | Configurable named providers and model profiles; provider IDs, model IDs and key environment-variable names are chosen by the operator | decision |
 | Language | Go | proposed |
-| Host | Owner's VPS: Ubuntu 24.04, 2 vCPU, 3.6 GB RAM (about 2.6 GB free), 48 GB disk free; no Go, Docker or Chromium installed yet | measured |
+| Host | Local development and verification; a VPS is an optional deployment target | decision |
 | Several agents | Yes, after one agent runs stably | proposed |
 
 ## 3. Shape
@@ -216,7 +216,7 @@ and `TestSyntheticRetryFailureTrace`; operator filtering commands are in
 | DB | SQLite via a pure-Go driver (`modernc.org/sqlite`) | Research read the repo; nothing was run |
 | LLM | Optional provider/model catalog ([canonical example](../llms.example.yaml)); templates select a profile or declare inline LLM settings | Standard-library adapters implement `openai` Chat Completions and native `anthropic` Messages, including custom base URLs; two-tool live evidence is in [spike-llm.md](research/spike-llm.md) |
 | Browser | Headless Chromium over CDP | **Untested**: which Go library, real memory use, whether Threads challenges datacenter IPs |
-| Deploy | systemd unit on the VPS | proposed |
+| Deploy | Local process; optional systemd deployment on a chosen Linux host | decision |
 
 ## 11. Non-goals for v0
 
@@ -224,20 +224,30 @@ and `TestSyntheticRetryFailureTrace`; operator filtering commands are in
 - An LLM critic or multi-agent pipeline.
 - Vector search, an ORM, a web framework.
 - Delays designed to imitate a human. Spacing between actions exists only as a rate limit.
-- Later, not now: a public dashboard (must redact strangers' usernames), a second agent, a second
-  template.
+- A public dashboard and second template follow the local runtime and isolation tests; they do
+  not require completion of a live deployment experiment before implementation.
 
 ## 12. Order of work
 
-Steps are gated: a step starts only when the one before it has passed. Each step's exit condition
-is in its GitHub issue.
+Implementation is local-first. A VPS, real Threads login, Telegram account or elapsed live-run
+period is not a prerequisite for writing and testing the harness. Functional issues depend on
+the code interfaces they use and finish with offline tests, synthetic fixtures, injected-time
+soak tests, redacted logs and eval evidence. Local `dry_run` operation may leave Telegram disabled;
+its credentials are required only when that integration is enabled. **(decision, owner update)**
 
-1. Browser spike on the VPS. This step can end the project.
-2. Dry-run agent loop.
-3. Live run with low limits and Telegram.
-4. Playbook and gate.
-5. Public dashboard.
-6. Second agent, second template.
+The implementation sequence is the local wake/tool runtime, guards and fake-service integrations,
+browser transport validated on local pages, metric collection, playbook/gate simulations, dashboard
+and agent isolation. Independent modules are implemented in parallel behind agreed interfaces.
+The canonical dependency graph is in GitHub Issues; no code issue waits for a deployment report.
+
+Qualification is separate and remains evidence-based: real-account browser checks and the
+three-day observation, a 48-hour single-agent dry run, real-bot controls, six real Threads
+operations, the seven-day live experiment, and the two-agent 48-hour memory observation remain
+open until actually measured. These may run on a local machine or an operator-chosen deployment
+host; a VPS is optional. A datacenter-IP conclusion still requires measurement from that IP.
+Synthetic DOM fixtures do not establish that selectors work on the current Threads site, and
+simulated time does not count as elapsed soak/live time. Live posting still requires the named
+issue scope, owner-provided account/session and explicit live-run approval. **(decision)**
 
 ## 13. Unknowns
 
