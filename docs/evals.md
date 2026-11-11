@@ -290,6 +290,18 @@ change, regenerate with
 See [measured local results and limits](research/playbook-local.md); synthetic learning does
 not close live account/metrics/elapsed qualification issues.
 
+## Read-only dashboard
+
+```sh
+go run ./cmd/threadwalker eval -suite internal/eval/testdata/dashboard-v1.json -out /tmp/dashboard-eval.json
+go test ./internal/dashboard ./internal/store ./cmd/threadwalker -run 'Dashboard' -count=1
+```
+
+`dashboard_scenario` cases run the actual read-only SQLite projection and HTTP handler with
+synthetic sensitive strings. They check privacy across routes/methods, absence of writes and
+safe query failure. Both profile labels execute the same local component with zero model calls;
+these results are not a model comparison. Live mode refuses all component scenarios.
+
 ## Pending coverage
 
 The current suites cover client/protocol, configuration, accounting, local runtime, owner-service

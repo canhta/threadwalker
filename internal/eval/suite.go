@@ -109,10 +109,19 @@ func validateSuite(s *Suite) error {
 	}
 	seen := map[string]bool{}
 	for _, c := range s.Cases {
-		if !safeID(c.ID) || seen[c.ID] || (c.Guard == nil && c.Runtime == nil && c.OwnerScenario == "" && c.BrowserScenario == "" && c.MetricsScenario == "" && c.PlaybookScenario == "" && (len(c.Messages) == 0 || len(c.Responses) == 0)) {
+		if !safeID(c.ID) || seen[c.ID] || (c.Guard == nil && c.Runtime == nil && c.OwnerScenario == "" && c.BrowserScenario == "" && c.MetricsScenario == "" && c.PlaybookScenario == "" && c.DashboardScenario == "" && c.IsolationScenario == "" && (len(c.Messages) == 0 || len(c.Responses) == 0)) {
 			return invalid()
 		}
 		seen[c.ID] = true
+		scenarios := 0
+		for _, active := range []bool{c.Guard != nil, c.Runtime != nil, c.OwnerScenario != "", c.BrowserScenario != "", c.MetricsScenario != "", c.PlaybookScenario != "", c.DashboardScenario != "", c.IsolationScenario != ""} {
+			if active {
+				scenarios++
+			}
+		}
+		if scenarios > 1 {
+			return invalid()
+		}
 		switch c.Expect.EndReason {
 		case "completed", "step_limit", "budget", "provider_error", "invalid_response", "cancelled", "accounting_error", "persistence_error", "stall_stop", "action_limit", "unknown_outcome", "logged_out", "captcha":
 		default:
@@ -123,6 +132,12 @@ func validateSuite(s *Suite) error {
 		}
 		if c.Limits.MaxSteps < 0 || c.Limits.MaxOutputTokens < 0 || !finiteNonnegative(c.Limits.MaxUSD) {
 			return invalid()
+		}
+		if c.DashboardScenario != "" {
+			if !validDashboardScenario(c.DashboardScenario) || len(c.Messages) > 0 || len(c.Responses) > 0 || len(c.Tools) > 0 || len(c.ToolOutputs) > 0 {
+				return invalid()
+			}
+			continue
 		}
 		if c.PlaybookScenario != "" {
 			if !validPlaybookScenario(c.PlaybookScenario) || c.MetricsScenario != "" || c.BrowserScenario != "" || c.OwnerScenario != "" || c.Guard != nil || c.Runtime != nil || len(c.Messages) > 0 || len(c.Responses) > 0 || len(c.Tools) > 0 || len(c.ToolOutputs) > 0 {

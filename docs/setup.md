@@ -33,6 +33,17 @@ operational events (JSON by default), and `eval.json` uses the existing eval rep
 The soak uses an isolated empty database; a supplied `-db` must also be empty. This takes seconds,
 not 48 elapsed hours, and does not qualify the real services tracked in #2/#18/#21.
 
+## Read-only local dashboard
+
+```sh
+go run ./cmd/threadwalker dashboard -agents agents -db data/threadwalker.db
+```
+
+Open `http://127.0.0.1:8080/`; use `-listen` to select another loopback port. The database
+must already exist: this command opens it read-only, without migrations, credentials or
+agent initialization. It can run beside `run` and displays only configured agents through
+a bounded public projection. See [local dashboard evidence](research/dashboard-local.md).
+
 ## Private configuration
 
 Keep credentials in `.env` at the repo root, which Git ignores. Create it from

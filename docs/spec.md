@@ -502,7 +502,21 @@ issue scope, owner-provided account/session and explicit live-run approval. **(d
 - Whether a cheap model can sustain a long tool-calling loop without drifting.
 - Whether the gate opens at all in the first 4 to 6 weeks.
 
-## 14. Repo layout
+## 14. Read-only activity page and repo layout
+
+`dashboard` serves selected configured agent IDs and today's budget/spend, wake history,
+confirmed own actions, hypothesis state/counters and allowlisted numeric tool summaries.
+The HTTP service defaults to `127.0.0.1:8080`, accepts GET/HEAD only, and uses a read-only
+SQLite handle without migrations or agent initialization. Config declarations/references
+are validated through `config.LoadPublicDirWithCatalog` without resolving any credentials.
+Templates, secrets and raw DB models never reach rendering: the canonical public DTO is in
+[`internal/dashboard/dashboard.go`](../internal/dashboard/dashboard.go). It excludes notes,
+persona/system prompts, action/playbook text, raw tool arguments/results, foreign usernames
+and arbitrary errors. Published URLs appear only for confirmed own HTTP(S) publications
+whose own username binding can be proved; unknown or unbound links are omitted. No LLM or
+agent action runs on a page request. **(decision, #11)**
+
+
 
 ```text
 threadwalker/
