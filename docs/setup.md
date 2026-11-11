@@ -8,13 +8,12 @@ go vet ./... && go test ./...
 
 ## Private configuration
 
-Keep credentials in `.privates/.env`, which Git ignores. If it does not exist:
+Keep credentials in `.env` at the repo root, which Git ignores. Create it from
+the blank [example](../.env.example) if it does not exist:
 
 ```sh
-mkdir -p .privates
-chmod 700 .privates
-touch .privates/.env
-chmod 600 .privates/.env
+test -f .env || cp .env.example .env
+chmod 600 .env
 ```
 
 Fill the entries you need; leave the rest empty. Quote values containing spaces or shell characters.
@@ -23,6 +22,7 @@ Fill the entries you need; leave the rest empty. Quote values containing spaces 
 |---|---|
 | `OPENAI_API_KEY` | OpenAI API key |
 | `ANTHROPIC_API_KEY` | Anthropic API key, if needed by a later integration |
+| `TW_SOLO_LLM_KEY` | DeepSeek key, only if keeping the example provider |
 | `TW_VPS_SSH_TARGET` | SSH host or alias, such as `threadwalker-vps` |
 | `TW_VPS_THREADS_PROFILE_DIR` | Absolute path to the saved browser profile on the VPS |
 | `TW_SPIKE_REPLY_TARGET_URL` | Post URL you approve for the browser spike's one reply |
@@ -33,7 +33,7 @@ Load your file into the current shell before running commands:
 
 ```sh
 set -a
-. ./.privates/.env
+. ./.env
 set +a
 ```
 
@@ -75,5 +75,5 @@ needs another disposable account and saved login. Keep these issues open until t
 acceptance criteria hold.
 
 [`deploy/threadwalker.service`](../deploy/threadwalker.service) currently runs only `check`.
-It expects environment variables in `/etc/threadwalker/threadwalker.env`; `.privates/.env`
+It expects environment variables in `/etc/threadwalker/threadwalker.env`; the root `.env`
 is local setup storage. The unit does not yet start an agent loop.
