@@ -1,0 +1,5 @@
+=== RUN   TestMetricProcessorWithActualLocalCDPAndBoundSyntheticDOM
+    browser_integration_test.go:97: actual local CDP: exact action binding measured, mismatched action deferred, zero writes, metadata-only logs, profile released
+--- PASS: TestMetricProcessorWithActualLocalCDPAndBoundSyntheticDOM (0.65s)
+PASS
+ok  	github.com/canhta/threadwalker/internal/metrics	0.657s

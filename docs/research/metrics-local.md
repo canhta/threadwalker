@@ -13,7 +13,7 @@ overdue action coalesces its three targets into one current observation. At logi
 guarded read occurs before a simulated crash; the file database closes/reopens and the expired
 lease is reclaimed at hour 26. The additional read creates no duplicate sample/checkpoint:
 20 source reads and 20 guarded audit rows, one restart, unchanged agent notes/schedules and zero
-model usage. `simulation.json` retains the actual observation times; `events-excerpt.jsonl`
+model usage. `simulation.json` retains the actual observation times; `events.jsonl`
 retains the metadata-only sample/target and recovery events. A sample and a target are different
 counts: 19 `metrics.measured` events and 21 `metrics.target.completed` events.
 

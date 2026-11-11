@@ -1,0 +1,187 @@
+{
+  "version": "v1",
+  "synthetic": true,
+  "timing_kind": "logical_time",
+  "logical_hours": 72,
+  "restarts": 1,
+  "confirmed_actions": 7,
+  "expected_samples": 19,
+  "samples": 19,
+  "completed_targets": 21,
+  "source_reads": 20,
+  "audit_reads": 20,
+  "maintenance_wakes": 18,
+  "observations": [
+    {
+      "agent_id": "synthetic-metrics-a",
+      "action_id": 1,
+      "measured_at": "2026-01-01T00:00:00Z",
+      "views": 123,
+      "likes": 7,
+      "replies": 3,
+      "reposts": 1
+    },
+    {
+      "agent_id": "synthetic-metrics-a",
+      "action_id": 6,
+      "measured_at": "2026-01-01T01:00:00Z",
+      "views": 123,
+      "likes": 7,
+      "replies": 3,
+      "reposts": 1
+    },
+    {
+      "agent_id": "synthetic-metrics-b",
+      "action_id": 7,
+      "measured_at": "2026-01-01T01:00:00Z",
+      "views": 123,
+      "likes": 7,
+      "replies": 3,
+      "reposts": 1
+    },
+    {
+      "agent_id": "synthetic-metrics-a",
+      "action_id": 6,
+      "measured_at": "2026-01-01T06:00:00Z",
+      "views": 123,
+      "likes": 7,
+      "replies": 3,
+      "reposts": 1
+    },
+    {
+      "agent_id": "synthetic-metrics-b",
+      "action_id": 7,
+      "measured_at": "2026-01-01T06:00:00Z",
+      "views": 123,
+      "likes": 7,
+      "replies": 3,
+      "reposts": 1
+    },
+    {
+      "agent_id": "synthetic-metrics-a",
+      "action_id": 6,
+      "measured_at": "2026-01-02T02:00:00Z",
+      "views": 123,
+      "likes": 7,
+      "replies": 3,
+      "reposts": 1
+    },
+    {
+      "agent_id": "synthetic-metrics-a",
+      "action_id": 8,
+      "measured_at": "2026-01-02T02:00:00Z",
+      "views": 123,
+      "likes": 7,
+      "replies": 3,
+      "reposts": 1
+    },
+    {
+      "agent_id": "synthetic-metrics-b",
+      "action_id": 7,
+      "measured_at": "2026-01-02T02:00:00Z",
+      "views": 123,
+      "likes": 7,
+      "replies": 3,
+      "reposts": 1
+    },
+    {
+      "agent_id": "synthetic-metrics-b",
+      "action_id": 9,
+      "measured_at": "2026-01-02T02:00:00Z",
+      "views": 123,
+      "likes": 7,
+      "replies": 3,
+      "reposts": 1
+    },
+    {
+      "agent_id": "synthetic-metrics-a",
+      "action_id": 8,
+      "measured_at": "2026-01-02T06:00:00Z",
+      "views": 123,
+      "likes": 7,
+      "replies": 3,
+      "reposts": 1
+    },
+    {
+      "agent_id": "synthetic-metrics-b",
+      "action_id": 9,
+      "measured_at": "2026-01-02T06:00:00Z",
+      "views": 123,
+      "likes": 7,
+      "replies": 3,
+      "reposts": 1
+    },
+    {
+      "agent_id": "synthetic-metrics-a",
+      "action_id": 8,
+      "measured_at": "2026-01-03T00:00:00Z",
+      "views": 123,
+      "likes": 7,
+      "replies": 3,
+      "reposts": 1
+    },
+    {
+      "agent_id": "synthetic-metrics-b",
+      "action_id": 9,
+      "measured_at": "2026-01-03T00:00:00Z",
+      "views": 123,
+      "likes": 7,
+      "replies": 3,
+      "reposts": 1
+    },
+    {
+      "agent_id": "synthetic-metrics-a",
+      "action_id": 10,
+      "measured_at": "2026-01-03T01:00:00Z",
+      "views": 123,
+      "likes": 7,
+      "replies": 3,
+      "reposts": 1
+    },
+    {
+      "agent_id": "synthetic-metrics-b",
+      "action_id": 11,
+      "measured_at": "2026-01-03T01:00:00Z",
+      "views": 123,
+      "likes": 7,
+      "replies": 3,
+      "reposts": 1
+    },
+    {
+      "agent_id": "synthetic-metrics-a",
+      "action_id": 10,
+      "measured_at": "2026-01-03T06:00:00Z",
+      "views": 123,
+      "likes": 7,
+      "replies": 3,
+      "reposts": 1
+    },
+    {
+      "agent_id": "synthetic-metrics-b",
+      "action_id": 11,
+      "measured_at": "2026-01-03T06:00:00Z",
+      "views": 123,
+      "likes": 7,
+      "replies": 3,
+      "reposts": 1
+    },
+    {
+      "agent_id": "synthetic-metrics-a",
+      "action_id": 10,
+      "measured_at": "2026-01-04T00:00:00Z",
+      "views": 123,
+      "likes": 7,
+      "replies": 3,
+      "reposts": 1
+    },
+    {
+      "agent_id": "synthetic-metrics-b",
+      "action_id": 11,
+      "measured_at": "2026-01-04T00:00:00Z",
+      "views": 123,
+      "likes": 7,
+      "replies": 3,
+      "reposts": 1
+    }
+  ]
+}
