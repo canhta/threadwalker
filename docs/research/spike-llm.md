@@ -229,3 +229,30 @@ Additional offline adapter evidence:
   either protocol's model context; transport errors suppress credential text.
 - `TestTruncatedToolCallsNeverDispatch`: both protocols account for usage and
   refuse incomplete tool responses before any caller/guard dispatch.
+
+Independent protocol acceptance tests were integrated from helper commit
+`6ba44a605d836a9ec93f06ab19c61cd87b6c3c0c` (integration commit `6b4e09d`).
+The helper first observed failure on the pre-adapter baseline, then passed
+against the implemented adapters. The final integrated offline
+`go vet ./... && go test ./...` passed for all packages.
+
+- `TestProtocolSelectionAcrossEndpoints`: distinct arbitrary providers and
+  multiple model IDs, both wire protocols, configured custom base paths/headers,
+  legacy empty protocol and native API-root/already-versioned endpoints.
+- `TestProtocolOpenAISystemMessageStaysInMessages` and
+  `TestAnthropicRequestSchemaSystemAndHeaders`: separate native system prompt,
+  native tool schema/output limits and protocol-specific authentication.
+- `TestAnthropicTwoToolConversationUsesReturnedIDs`: saved synthetic fixture
+  `internal/llm/testdata/protocol/anthropic-two-tool-loop.json`, two correlated
+  tool calls/results, and final response.
+- `TestAnthropicToolErrorsBecomeNativeToolResults` and
+  `TestAnthropicMalformedResponses`: malformed arguments, unknown tools,
+  dispatcher rejection, invalid response shapes and missing/duplicate IDs.
+- `TestAnthropicUsageSumsIntoExistingLedger`: usage across native responses at
+  the configured flat prices.
+- `TestAnthropicRetryThenSuccessAndExhaustion`,
+  `TestAnthropicTimeoutAndCancellation` and
+  `TestAnthropicOutputStepAndBudgetLimits`: bounded retries, injected backoff,
+  context cancellation, request timeouts, output bounds and pre-request limits.
+- `TestAnthropicErrorsDoNotLeakSecrets`: provider errors and dispatcher errors
+  remain generic, without credential text in errors or subsequent messages.
