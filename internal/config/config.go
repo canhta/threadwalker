@@ -65,6 +65,7 @@ type PersonaConfig struct {
 }
 
 type LLMConfig struct {
+	Protocol           string
 	BaseURL            string
 	Model              string
 	APIKeyEnv          string
@@ -272,39 +273,54 @@ func LoadFile(path string, getenv func(string) string) (Template, error) {
 	return tmpl, nil
 }
 
+// yamlNode retains mapping boundaries, including arbitrary keys containing dots.
+// The flat scalar/list views remain available to the template loader.
+type yamlNode struct {
+	children map[string]*yamlNode
+	value    string
+	raw      string
+	kind     string
+}
+
 type yamlDoc struct {
+	keys    map[string]bool
 	scalars map[string]string
 	lists   map[string][]string
+	root    *yamlNode
 }
 
 func parseSimpleYAML(input string) (yamlDoc, error) {
 	doc := yamlDoc{
+		keys:    make(map[string]bool),
 		scalars: make(map[string]string),
 		lists:   make(map[string][]string),
+		root:    &yamlNode{kind: "mapping", children: make(map[string]*yamlNode)},
 	}
+	type frame struct {
+		node        *yamlNode
+		indent      int
+		childIndent int
+		path        string
+	}
+	stack := []frame{{node: doc.root, indent: -1, childIndent: 0}}
 	lines := strings.Split(strings.ReplaceAll(input, "\r\n", "\n"), "\n")
-
-	var section string
-	var listKey string
-	var listIndent int
+	var previousField string
+	var block *yamlNode
 	var blockKey string
-	var blockLines []string
 	var blockIndent int
-
+	var blockLines []string
 	flushBlock := func() {
-		if blockKey != "" {
-			doc.scalars[blockKey] = strings.TrimSpace(strings.Join(blockLines, " "))
-			blockKey = ""
+		if block != nil {
+			block.value = strings.TrimSpace(strings.Join(blockLines, " "))
+			doc.scalars[blockKey] = block.value
+			block = nil
 			blockLines = nil
-			blockIndent = 0
 		}
 	}
-
 	for lineNo, rawLine := range lines {
 		trimmed := strings.TrimSpace(rawLine)
 		indent := len(rawLine) - len(strings.TrimLeft(rawLine, " "))
-
-		if blockKey != "" {
+		if block != nil {
 			if trimmed == "" {
 				continue
 			}
@@ -314,67 +330,90 @@ func parseSimpleYAML(input string) (yamlDoc, error) {
 			}
 			flushBlock()
 		}
-
 		if trimmed == "" || strings.HasPrefix(trimmed, "#") {
 			continue
 		}
-
-		if strings.HasPrefix(trimmed, "- ") || trimmed == "-" {
-			if listKey == "" || indent <= listIndent {
+		if strings.ContainsAny(rawLine[:len(rawLine)-len(strings.TrimLeft(rawLine, " \t"))], "\t") {
+			return yamlDoc{}, fmt.Errorf("line %d: tabs are not valid indentation", lineNo+1)
+		}
+		for len(stack) > 1 && indent <= stack[len(stack)-1].indent {
+			stack = stack[:len(stack)-1]
+		}
+		parent := &stack[len(stack)-1]
+		isList := strings.HasPrefix(trimmed, "- ") || trimmed == "-"
+		if isList {
+			if parent.path == "" || indent <= parent.indent || len(parent.node.children) != 0 {
 				return yamlDoc{}, fmt.Errorf("line %d: unexpected list item", lineNo+1)
 			}
-			itemText := strings.TrimSpace(strings.TrimPrefix(trimmed, "-"))
-			itemText = unquoteScalar(stripInlineComment(itemText))
+			if parent.childIndent >= 0 && indent != parent.childIndent {
+				return yamlDoc{}, fmt.Errorf("line %d: inconsistent indentation for %s", lineNo+1, parent.path)
+			}
+			parent.childIndent = indent
+			parent.node.kind = "list"
+			itemText := unquoteScalar(stripInlineComment(strings.TrimSpace(strings.TrimPrefix(trimmed, "-"))))
 			if itemText != "" {
-				doc.lists[listKey] = append(doc.lists[listKey], itemText)
+				doc.lists[parent.path] = append(doc.lists[parent.path], itemText)
 			}
 			continue
 		}
-
-		listKey = ""
-		listIndent = 0
-
-		colon := strings.IndexByte(trimmed, ':')
+		colon := yamlKeyColon(trimmed)
 		if colon <= 0 {
 			return yamlDoc{}, fmt.Errorf("line %d: expected key: value", lineNo+1)
 		}
-		key := strings.TrimSpace(trimmed[:colon])
+		key := unquoteScalar(strings.TrimSpace(trimmed[:colon]))
+		fullKey := key
+		if parent.path != "" {
+			fullKey = parent.path + "." + key
+		}
+		if key == "" {
+			return yamlDoc{}, fmt.Errorf("line %d: empty mapping key", lineNo+1)
+		}
+		if parent.node.kind == "list" || (parent.childIndent >= 0 && indent != parent.childIndent) {
+			return yamlDoc{}, fmt.Errorf("line %d: unexpected indentation for %s after %s", lineNo+1, fullKey, previousField)
+		}
+		parent.childIndent = indent
+		previousField = fullKey
+		if _, exists := parent.node.children[key]; exists {
+			return yamlDoc{}, fmt.Errorf("line %d: duplicate field %s", lineNo+1, fullKey)
+		}
 		rest := strings.TrimSpace(stripInlineComment(trimmed[colon+1:]))
-
-		if indent == 0 {
-			section = ""
-			if rest == "" {
-				section = key
-				listKey = key
-				listIndent = indent
-				continue
-			}
-			if rest == ">" || rest == "|" {
-				blockKey = key
-				blockIndent = indent
-				continue
-			}
-			doc.scalars[key] = unquoteScalar(rest)
+		node := &yamlNode{kind: "scalar", value: unquoteScalar(rest), raw: rest}
+		parent.node.children[key] = node
+		doc.keys[fullKey] = true
+		if rest == "" {
+			node.kind = "mapping"
+			node.children = make(map[string]*yamlNode)
+			stack = append(stack, frame{node: node, indent: indent, childIndent: -1, path: fullKey})
+		} else if rest == ">" || rest == "|" {
+			block, blockKey, blockIndent = node, fullKey, indent
 		} else {
-			if section == "" {
-				return yamlDoc{}, fmt.Errorf("line %d: unexpected indentation for %q", lineNo+1, key)
-			}
-			fullKey := section + "." + key
-			if rest == "" {
-				listKey = fullKey
-				listIndent = indent
-				continue
-			}
-			if rest == ">" || rest == "|" {
-				blockKey = fullKey
-				blockIndent = indent
-				continue
-			}
-			doc.scalars[fullKey] = unquoteScalar(rest)
+			doc.scalars[fullKey] = node.value
 		}
 	}
 	flushBlock()
 	return doc, nil
+}
+
+// yamlKeyColon ignores colons inside quoted mapping keys.
+func yamlKeyColon(s string) int {
+	var quote byte
+	for i := 0; i < len(s); i++ {
+		ch := s[i]
+		if quote != 0 {
+			if ch == '\\' && quote == '"' {
+				i++
+				continue
+			}
+			if ch == quote {
+				quote = 0
+			}
+		} else if ch == '\'' || ch == '"' {
+			quote = ch
+		} else if ch == ':' {
+			return i
+		}
+	}
+	return -1
 }
 
 func stripInlineComment(s string) string {
