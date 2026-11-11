@@ -34,7 +34,7 @@ func (b builtin) Definition() llm.Tool {
 	properties := map[string]any{}
 	required := []string{}
 	// Stable ordering makes request bodies and configuration fingerprints stable.
-	for _, key := range []string{"text", "query", "limit", "at", "url", "target_url", "target_username", "hypothesis_ids"} {
+	for _, key := range []string{"text", "query", "limit", "at", "url", "target_url", "target_username", "username", "hypothesis_ids"} {
 		f, ok := b.fields[key]
 		if !ok {
 			continue
@@ -63,9 +63,10 @@ func (b builtin) Definition() llm.Tool {
 }
 
 type arguments struct {
-	Text, Query, At, URL, TargetURL, TargetUsername string
-	Limit                                           int
-	HypothesisIDs                                   []int64
+	Text, Query, At, URL, TargetURL, TargetUsername, Username string
+	ReservedActionID                                          int64
+	Limit                                                     int
+	HypothesisIDs                                             []int64
 }
 
 var errArguments = errors.New("invalid tool arguments")
@@ -105,6 +106,8 @@ func (b builtin) parse(raw string) (arguments, error) {
 				a.TargetURL = s
 			case "target_username":
 				a.TargetUsername = s
+			case "username":
+				a.Username = s
 			}
 		case "integer":
 			if json.Unmarshal(value, &a.Limit) != nil || a.Limit < 1 || a.Limit > 100 {

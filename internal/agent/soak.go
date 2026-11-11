@@ -63,6 +63,9 @@ func RunOfflineSoak(ctx context.Context, path string, hours int, logger *slog.Lo
 	start := now
 	end := start.Add(time.Duration(hours) * time.Hour)
 	tmpl := OfflineTemplate()
+	// Synthetic stress fixture: one post/hour exercises lifecycle and recovery.
+	// Its explicit 24/day quota leaves real example-template limits unchanged.
+	tmpl.Limits.PostsPerDay = 24
 	fixture := NewOfflineFixture(func() time.Time { return now })
 	create := func() (*Runtime, error) {
 		return New(Options{Store: st, Template: tmpl, Now: func() time.Time { return now }, HTTPClient: fixture.Client(), FetchTrends: fixture.Trends, Logger: logger})

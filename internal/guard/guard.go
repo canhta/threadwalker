@@ -1,6 +1,4 @@
-// Package guard owns the mandatory pre-effect running-state and audit boundary.
-// Full content, contact and quota policy is added separately; this boundary only
-// permits local dry-run tools.
+// Package guard owns the mandatory policy, audit and pre-effect intent boundary.
 package guard
 
 import (
@@ -9,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strings"
 	"time"
 
 	"github.com/canhta/threadwalker/internal/config"
@@ -23,11 +22,19 @@ type Options struct {
 	Now      func() time.Time
 	Logger   *slog.Logger
 }
-type Guard struct{ opts Options }
+type Guard struct {
+	opts        Options
+	stopPhrases []string
+}
 
 // Attempt contains data used only for bounded audit metadata. Arguments are
 // never persisted: even malformed calls may contain external text or secrets.
-type Attempt struct{ Tool, Arguments, BlockedBy string }
+type Attempt struct {
+	Tool, Arguments, BlockedBy string
+	// ReservedActionID receives the committed intent ID before effect executes.
+	// The dispatcher uses it to report the action without inserting a second row.
+	ReservedActionID *int64
+}
 
 var ErrAudit = errors.New("tool audit failed")
 var ErrBlocked = errors.New("tool blocked")
@@ -45,7 +52,17 @@ func New(opts Options) (*Guard, error) {
 	if opts.Now == nil {
 		opts.Now = time.Now
 	}
-	return &Guard{opts: opts}, nil
+	phrases := opts.Template.Guard.StopPhrases
+	if phrases == nil {
+		phrases = []string{"stop replying", "do not contact", "don’t contact", "don't contact", "leave me alone", "đừng trả lời", "đừng liên hệ", "ngừng trả lời", "dừng trả lời", "đừng làm phiền"}
+	}
+	for _, phrase := range phrases {
+		if strings.TrimSpace(phrase) == "" {
+			return nil, errors.New("configuring guard: empty stop phrase")
+		}
+	}
+	opts.Template.Persona.ForbiddenPhrases = append([]string(nil), opts.Template.Persona.ForbiddenPhrases...)
+	return &Guard{opts: opts, stopPhrases: append([]string(nil), phrases...)}, nil
 }
 
 // Matches prevents accidentally auditing one scope while mutating another.
@@ -84,18 +101,18 @@ func (g *Guard) Execute(ctx context.Context, a Attempt, effect func() (string, e
 			reason = "wake_not_open"
 		}
 	}
-	outcome := "allowed"
-	if reason != "" {
-		outcome = "blocked"
+	var intent *actionIntent
+	if reason == "" {
+		intent, reason = g.content(a)
 	}
-	g.event(ctx, "guard.checked", outcome, reason, a.Tool)
+	now := g.opts.Now().UTC()
 	var object map[string]json.RawMessage
 	valid := json.Unmarshal([]byte(a.Arguments), &object) == nil && object != nil
 	metadata, _ := json.Marshal(struct {
 		Bytes       int  `json:"bytes"`
 		ValidObject bool `json:"valid_object"`
 	}{len(a.Arguments), valid})
-	row, err := g.opts.Store.DB().ExecContext(ctx, `INSERT INTO tool_calls(agent_id,wake_id,tool,args_json,blocked_by,at) VALUES(?,?,?,?,?,?)`, g.opts.Template.ID, g.opts.WakeID, a.Tool, string(metadata), reason, g.opts.Now().UTC().Format(time.RFC3339Nano))
+	row, err := g.opts.Store.DB().ExecContext(ctx, `INSERT INTO tool_calls(agent_id,wake_id,tool,args_json,blocked_by,at) VALUES(?,?,?,?,?,?)`, g.opts.Template.ID, g.opts.WakeID, a.Tool, string(metadata), reason, now.Format(time.RFC3339Nano))
 	if err != nil {
 		g.event(ctx, "audit.recorded", "error", "audit_insert_failed", a.Tool)
 		return "", &auditError{err}
@@ -105,12 +122,25 @@ func (g *Guard) Execute(ctx context.Context, a Attempt, effect func() (string, e
 		return "", &auditError{err}
 	}
 	g.event(ctx, "audit.recorded", "success", "attempt_recorded", a.Tool)
-	if reason != "" {
-		g.event(ctx, "tool.blocked", "blocked", reason, a.Tool)
-		return "", fmt.Errorf("executing guarded tool: %w", ErrBlocked)
+	if reason == "" && intent != nil {
+		var reserved int64
+		reserved, reason, err = g.reserve(ctx, a, intent, id, now)
+		if err != nil {
+			g.event(ctx, "guard.checked", "error", "reservation_failed", a.Tool)
+			return "", &auditError{err}
+		}
+		if a.ReservedActionID != nil {
+			*a.ReservedActionID = reserved
+		}
 	}
+	if reason != "" {
+		g.event(ctx, "guard.checked", "blocked", reason, a.Tool)
+		g.event(ctx, "tool.blocked", "blocked", reason, a.Tool)
+		return "", fmt.Errorf("executing guarded tool: %s: %w", reason, ErrBlocked)
+	}
+	g.event(ctx, "guard.checked", "allowed", "policy_allowed", a.Tool)
 	output, effectErr := effect()
-	outcome = "success"
+	outcome := "success"
 	if effectErr != nil {
 		outcome = "error"
 	}
@@ -128,7 +158,7 @@ func (g *Guard) Execute(ctx context.Context, a Attempt, effect func() (string, e
 
 func safeTool(name string) string {
 	switch name {
-	case "note_write", "note_search", "schedule_next_wake", "fetch_trends", "read_feed", "search", "read_post", "post", "reply", "read_own_metrics":
+	case "note_write", "note_search", "schedule_next_wake", "fetch_trends", "read_feed", "search", "read_post", "post", "reply", "read_own_metrics", "mark_do_not_contact", "notify_owner", "ask_owner":
 		return name
 	default:
 		return "unknown"

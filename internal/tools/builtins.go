@@ -18,6 +18,12 @@ func (d *Dispatcher) builtins() []builtin {
 	// The embedded fixture is checked by TestExternalWrappersAndDryRunActions.
 	_ = json.Unmarshal(threadsFixtures, &fixtures)
 	tools := []builtin{
+		{name: "mark_do_not_contact", description: "Permanently stop replying to a username. Entries cannot be removed.", fields: map[string]field{"username": stringRequired}, run: func(ctx context.Context, a arguments) (any, error) {
+			if err := d.opts.Store.MarkDoNotContact(ctx, d.opts.Template.ID, a.Username, "agent_request"); err != nil {
+				return nil, errors.New("marking do not contact: failed")
+			}
+			return map[string]bool{"do_not_contact": true}, nil
+		}},
 		{name: "note_write", description: "Write your own note and replace the note for your next wake.", fields: map[string]field{"text": stringRequired}, run: func(ctx context.Context, a arguments) (any, error) {
 			id, err := d.opts.Store.WriteAgentNote(ctx, d.opts.Template.ID, a.Text, d.opts.Now())
 			d.event(ctx, "note.written", outcome(err), reason(err), "note_write", time.Time{})
@@ -84,32 +90,14 @@ func (d *Dispatcher) builtins() []builtin {
 	return tools
 }
 func (d *Dispatcher) action(ctx context.Context, kind string, a arguments) (any, error) {
-	for _, id := range a.HypothesisIDs {
-		var testing bool
-		if err := d.opts.Store.DB().QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM playbook WHERE id=? AND agent_id=? AND status='testing')`, id, d.opts.Template.ID).Scan(&testing); err != nil {
-			return nil, fmt.Errorf("checking action hypothesis: %w", err)
-		}
-		if !testing {
-			return nil, errors.New("recording action: hypothesis is not testing for this agent")
-		}
+	// The guard already validated hypotheses and atomically committed the intent
+	// and contact counter. A builtin must never insert a second action.
+	if a.ReservedActionID <= 0 {
+		return nil, errors.New("recording action: missing guarded reservation")
 	}
-	ids := a.HypothesisIDs
-	if ids == nil {
-		ids = []int64{}
-	}
-	encoded, _ := json.Marshal(ids)
-	// This is the action intent written before any possible external effect.
-	// The local #5 backend has no publishing implementation or transport.
-	result, err := d.opts.Store.DB().ExecContext(ctx, `INSERT INTO actions(agent_id,kind,text,target_url,target_username,hypothesis_ids_json,dry_run,posted_at) VALUES(?,?,?,?,?,?,1,?)`, d.opts.Template.ID, kind, a.Text, a.TargetURL, a.TargetUsername, string(encoded), d.opts.Now().UTC().Format(time.RFC3339Nano))
-	if err != nil {
-		return nil, fmt.Errorf("recording dry-run action: %w", err)
-	}
-	id, err := result.LastInsertId()
-	if err != nil {
-		return nil, fmt.Errorf("reading dry-run action id: %w", err)
-	}
-	return map[string]any{"synthetic": true, "dry_run": true, "action_id": id}, nil
+	return map[string]any{"synthetic": true, "dry_run": true, "action_id": a.ReservedActionID}, nil
 }
+
 func outcome(err error) string {
 	if err != nil {
 		return "error"

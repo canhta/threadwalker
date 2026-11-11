@@ -173,6 +173,31 @@ errors use static diagnostic reasons while preserving cancellation/error identit
 selection never enables payload logging. Configured IDs and known tool-schema names are trusted
 operator metadata; third-party tool IDs/names are not. **(decision)**
 
+Guard policy uses UTC calendar days for post/reply and per-thread quotas. Contacts use the exact
+rolling interval `(now - 7 days, now]`, with nanosecond precision and exact expiry at seven days.
+The 500-character ceiling counts Unicode code points. Forbidden phrases and stop phrases use
+case-insensitive substring matching. Usernames normalize by trimming whitespace, removing one
+leading `@` and folding case; only username identifiers and rate counters/permanent fixed-code
+contact flags persist. Reply URLs include schemes, `www` and bare domains; an allowed author's
+`@mention` may contain dots. Thread identity removes query, fragment and trailing slash from
+the target URL. **(decision, #6 boundary clarification)**
+
+`internal/guard` commits attempted-call audit metadata before effects and atomically reserves an
+action intent and contact counters under SQLite `BEGIN IMMEDIATE`. All dry-run/real intents,
+including failed/unknown outcomes, count; the action builtin reports the reserved ID and never
+inserts a duplicate. Persistence errors fail closed. Restart never replays these intents.
+The local runtime serializes wakes; the SQLite reservation also protects concurrent guards and
+independent database handles. Contact counters refresh from timestamped intents during guarded
+action checks; permanent do-not-contact flags survive refresh/restart. **(decision)**
+
+`Guard.ObserveStopRequest` is harness-only ingestion of a username, transient reply text and an
+explicit addressed-to-agent flag; it is never an LLM tool. Only addressed replies matching a
+configured phrase add a permanent contact entry, without saving inbound text. Optional
+`guard.stop_phrases` replaces the Vietnamese/English defaults in
+[`internal/guard/guard.go`](../internal/guard/guard.go); configured lists must be nonempty.
+The add-only `mark_do_not_contact` tool accepts a `username`, records a fixed reason code and
+passes the same running-state/audit boundary as every other builtin. **(decision)**
+
 The numeric limits are starting values in the template and have no experimental basis yet.
 
 ## 7. Learning
@@ -336,6 +361,7 @@ Each agent template in `agents/*.yaml` (see [`agents/solo-builder.example.yaml`]
 - `limits` (all positive): `posts_per_day`, `replies_per_day`, `replies_per_user_7d`,
   `min_seconds_between_actions`, `max_steps_per_wake`, `max_usd_per_day`,
   `min_minutes_between_wakes`.
+- `guard`: optional nonempty `stop_phrases` list; omission selects the code defaults.
 - `threads`: `profile_dir`.
 - `telegram`: optional `enabled` (defaults to `false`); `bot_token_env` and `owner_chat_id_env` are required and resolved only when enabled. The canonical example keeps this optional integration disabled for local operation without a bot.
 

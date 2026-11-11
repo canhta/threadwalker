@@ -31,7 +31,7 @@ func setup(t *testing.T) (*store.Store, tools.Options, *tools.Dispatcher) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	opts := tools.Options{Store: st, Template: config.Template{ID: "agent", DryRun: true, Limits: config.LimitsConfig{MinMinutesBetweenWakes: 15}}, WakeID: 1, Now: func() time.Time { return time.Date(2026, 11, 11, 0, 0, 0, 0, time.UTC) }, FetchTrends: func(context.Context) ([]tools.Trend, error) {
+	opts := tools.Options{Store: st, Template: config.Template{ID: "agent", DryRun: true, Limits: config.LimitsConfig{PostsPerDay: 100, RepliesPerDay: 100, RepliesPerUser7d: 10, MinSecondsBetweenActions: 1, MinMinutesBetweenWakes: 15}}, WakeID: 1, Now: func() time.Time { return time.Date(2026, 11, 11, 0, 0, 0, 0, time.UTC) }, FetchTrends: func(context.Context) ([]tools.Trend, error) {
 		return []tools.Trend{{Source: "synthetic", Title: "untrusted-external-text", URL: "https://example.invalid/synthetic"}}, nil
 	}}
 	g, err := guard.New(guard.Options{Store: st, Template: opts.Template, WakeID: 1, Now: opts.Now})
@@ -58,7 +58,7 @@ func dispatch(t *testing.T, d *tools.Dispatcher, name, args string) string {
 func TestDefinitionsAndConstructor(t *testing.T) {
 	st, opts, d := setup(t)
 	defs := d.Definitions()
-	if len(defs) != 10 {
+	if len(defs) != 11 {
 		t.Fatalf("definitions %d", len(defs))
 	}
 	names := map[string]bool{}
@@ -114,7 +114,11 @@ func TestNotesAndSchedule(t *testing.T) {
 	}
 }
 func TestExternalWrappersAndDryRunActions(t *testing.T) {
-	st, _, d := setup(t)
+	st, opts, _ := setup(t)
+	now := opts.Now()
+	opts.Now = func() time.Time { now = now.Add(time.Second); return now }
+	g, _ := guard.New(guard.Options{Store: st, Template: opts.Template, WakeID: 1, Now: opts.Now})
+	d, _ := tools.NewDispatcher(g, opts)
 	for _, tc := range []struct{ name, args string }{{"fetch_trends", "{}"}, {"read_feed", "{}"}, {"search", `{"query":"golang"}`}, {"read_post", `{"url":"https://example.invalid/thread"}`}, {"read_own_metrics", "{}"}, {"post", `{"text":"synthetic own post"}`}, {"reply", `{"text":"synthetic own reply","target_url":"https://example.invalid/thread","target_username":"synthetic_user"}`}} {
 		out := dispatch(t, d, tc.name, tc.args)
 		var envelope struct {
@@ -135,8 +139,8 @@ func TestExternalWrappersAndDryRunActions(t *testing.T) {
 		t.Fatal(count)
 	}
 	st.DB().QueryRow(`SELECT COUNT(*) FROM contacts`).Scan(&count)
-	if count != 0 {
-		t.Fatal("stranger profile persisted")
+	if count != 1 {
+		t.Fatal("reply rate counter missing")
 	}
 	var leaked int
 	st.DB().QueryRow(`SELECT COUNT(*) FROM tool_calls WHERE args_json LIKE '%synthetic_user%' OR result_json LIKE '%untrusted-external-text%' OR result_json LIKE '%example.invalid%'`).Scan(&leaked)
@@ -145,7 +149,11 @@ func TestExternalWrappersAndDryRunActions(t *testing.T) {
 	}
 }
 func TestStallCanonicalAttemptsAndLatch(t *testing.T) {
-	st, _, d := setup(t)
+	st, opts, _ := setup(t)
+	now := opts.Now()
+	opts.Now = func() time.Time { now = now.Add(time.Second); return now }
+	g, _ := guard.New(guard.Options{Store: st, Template: opts.Template, WakeID: 1, Now: opts.Now})
+	d, _ := tools.NewDispatcher(g, opts)
 	for _, args := range []string{`{"text":"same","hypothesis_ids":[]}`, `{ "hypothesis_ids": [], "text": "same" }`} {
 		dispatch(t, d, "post", args)
 	}
@@ -264,8 +272,8 @@ func TestToolsLogsContainMetadataOnly(t *testing.T) {
 	dispatch(t, d, "note_write", `{"text":"private-note-canary"}`)
 	dispatch(t, d, "fetch_trends", "{}")
 	d.Dispatch(context.Background(), call("unknown-secret-canary", "{}"))
-	dispatch(t, d, "reply", `{"text":"own-post-canary","target_url":"https://private-url-canary.invalid/x","target_username":"stranger-canary"}`)
-	for _, canary := range []string{"private-note-canary", "untrusted-external-text", "unknown-secret-canary", "own-post-canary", "private-url-canary", "stranger-canary"} {
+	dispatch(t, d, "reply", `{"text":"own-post-canary","target_url":"https://private-url-canary.invalid/x","target_username":"stranger_canary"}`)
+	for _, canary := range []string{"private-note-canary", "untrusted-external-text", "unknown-secret-canary", "own-post-canary", "private-url-canary", "stranger_canary"} {
 		if strings.Contains(buf.String(), canary) {
 			t.Fatalf("log leaked %s", canary)
 		}
@@ -318,7 +326,11 @@ func TestBuiltinFailuresAreAuditedWithoutResultsOrEffects(t *testing.T) {
 			}
 			var actions, count int
 			st.DB().QueryRow(`SELECT COUNT(*) FROM actions`).Scan(&actions)
-			st.DB().QueryRow(`SELECT COUNT(*) FROM tool_calls WHERE result_json='{"outcome":"error","bytes":0}'`).Scan(&count)
+			if mode == "action" || mode == "hypothesis" {
+				st.DB().QueryRow(`SELECT COUNT(*) FROM tool_calls WHERE result_json=''`).Scan(&count)
+			} else {
+				st.DB().QueryRow(`SELECT COUNT(*) FROM tool_calls WHERE result_json='{"outcome":"error","bytes":0}'`).Scan(&count)
+			}
 			if actions != 0 || count != 1 {
 				t.Fatalf("actions %d audits %d", actions, count)
 			}

@@ -90,7 +90,7 @@ func TestGuardAuditFailureAndRejectedAttempts(t *testing.T) {
 				st.DB().Exec(`DROP TABLE agents`)
 			}
 			called := false
-			_, err := g.Execute(context.Background(), guard.Attempt{Tool: "post", Arguments: "{}"}, func() (string, error) { called = true; return "ok", nil })
+			_, err := g.Execute(context.Background(), guard.Attempt{Tool: "read_feed", Arguments: "{}"}, func() (string, error) { called = true; return "ok", nil })
 			if !errors.Is(err, guard.ErrAudit) || called != (phase == "update") {
 				t.Fatalf("called %v err %v", called, err)
 			}

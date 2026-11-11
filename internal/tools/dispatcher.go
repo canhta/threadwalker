@@ -138,7 +138,9 @@ func (d *Dispatcher) dispatch(ctx context.Context, call llm.ToolCall, rejected s
 		block = "stall_stop"
 		d.stopped = ErrStallStop
 	}
-	output, err := d.guard.Execute(ctx, guard.Attempt{Tool: safeTool, Arguments: call.Function.Arguments, BlockedBy: block}, func() (string, error) {
+	var reservedID int64
+	output, err := d.guard.Execute(ctx, guard.Attempt{Tool: safeTool, Arguments: call.Function.Arguments, BlockedBy: block, ReservedActionID: &reservedID}, func() (string, error) {
+		args.ReservedActionID = reservedID
 		data, err := tool.execute(ctx, args)
 		if err != nil {
 			return "", err
@@ -180,7 +182,7 @@ func (d *Dispatcher) containsSecret(raw string, a arguments) bool {
 		if strings.Contains(raw, secret) {
 			return true
 		}
-		for _, value := range []string{a.Text, a.Query, a.At, a.URL, a.TargetURL, a.TargetUsername} {
+		for _, value := range []string{a.Text, a.Query, a.At, a.URL, a.TargetURL, a.TargetUsername, a.Username} {
 			if strings.Contains(value, secret) {
 				return true
 			}

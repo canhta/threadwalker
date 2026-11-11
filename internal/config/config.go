@@ -40,6 +40,7 @@ type Template struct {
 	ID           string
 	Goal         string
 	Persona      PersonaConfig
+	Guard        GuardConfig
 	SeedPlaybook []string
 	LLM          LLMConfig
 	Limits       LimitsConfig
@@ -47,6 +48,10 @@ type Template struct {
 	Telegram     TelegramConfig
 	DryRun       bool
 }
+
+// GuardConfig configures harness-only stop-request matching. Omitted phrases
+// select the built-in Vietnamese and English defaults.
+type GuardConfig struct{ StopPhrases []string }
 
 type PersonaConfig struct {
 	Name             string
@@ -214,6 +219,14 @@ func LoadFileWithCatalog(path string, getenv func(string) string, catalog *Catal
 
 	var tmpl Template
 	tmpl.ID = requireString("id")
+	if doc.keys["guard.stop_phrases"] {
+		tmpl.Guard.StopPhrases = requireStringList("guard.stop_phrases")
+		for _, phrase := range tmpl.Guard.StopPhrases {
+			if strings.TrimSpace(phrase) == "" {
+				addErr("guard.stop_phrases", "phrases must be nonempty")
+			}
+		}
+	}
 	tmpl.Goal = requireString("goal")
 	tmpl.Persona.Name = requireString("persona.name")
 	tmpl.Persona.Language = requireString("persona.language")
