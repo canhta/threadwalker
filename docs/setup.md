@@ -1,85 +1,61 @@
 # Setup
 
-Use the Go version declared in [`go.mod`](../go.mod). From the repo root:
+Use the Go version in [go.mod](../go.mod). Run commands from the repository root.
+
+## Run locally without credentials
 
 ```sh
 go vet ./... && go test ./...
-```
-
-## Local smoke and logical soak
-
-No account, bot, environment file or provider key is needed for the offline runtime:
-
-```sh
 go run ./cmd/threadwalker run -once -offline
 ```
 
-The command runs one real guarded wake with synthetic LLM/trend/Threads services and an isolated
-temporary SQLite database, removed on exit. Add `-db /tmp/threadwalker-smoke.db` to inspect its
-rows afterward. Explicit `-agents`/`-llms` loads custom templates/profiles using dummy keys,
-while forcing the in-process fake transport, Threads stubs and synthetic trends. Telegram remains disabled
-and no real environment credentials are read. Every action has `dry_run=1`; this cannot
-publish to Threads.
-
-From the repository root, export a deterministic 48-hour **logical-time** soak with one simulated
-restart and the shared runtime eval report to a fresh directory:
-
-```sh
-go run ./cmd/threadwalker run -offline -soak-hours 48 -evidence /tmp/threadwalker-soak
-```
-
-`wakes.json` contains redacted lifecycle/count evidence, `events.jsonl` contains metadata-only
-operational events (JSON by default), and `eval.json` uses the existing eval report contract.
-The soak uses an isolated empty database; a supplied `-db` must also be empty. This takes seconds,
-not 48 elapsed hours, and does not qualify the real services tracked in #2/#18/#21.
-
-For two synthetic templates/profiles, independent owner controls and budgets, serial agent/metric
-wakes, one restart and local Go-process memory samples:
+The smoke run uses a temporary SQLite DB and in-process synthetic services. It reads no keys
+and cannot publish. To export a two-agent **48-hour logical-time** soak with one restart:
 
 ```sh
 go run ./cmd/threadwalker run -offline -soak-hours 48 -soak-agents 2 -evidence /tmp/threadwalker-isolation
 ```
 
-`isolation.json` records agent-scoped usage, states and memory observations; `events.jsonl` is the
-redacted trace and `eval.json` runs the focused isolation cases. The default one-agent soak stays
-available without `-soak-agents`. Samples use synthetic backends, not Chromium or real accounts;
-[local isolation evidence](research/isolation-local.md) states the limits and source revision.
+Use a fresh evidence directory. It contains `isolation.json`, `events.jsonl` and `eval.json`.
+Omit `-soak-agents 2` for the one-agent soak. Logical time advances in seconds; it is not an
+elapsed-time or real-account qualification. See [isolation evidence](research/isolation-local.md).
 
-## Read-only local dashboard
+## Configure credentials and models
 
-```sh
-go run ./cmd/threadwalker dashboard -agents agents -db data/threadwalker.db
-```
-
-Open `http://127.0.0.1:8080/`; use `-listen` to select another loopback port. The database
-must already exist: this command opens it read-only, without migrations, credentials or
-agent initialization. It can run beside `run` and displays only configured agents through
-a bounded public projection. See [local dashboard evidence](research/dashboard-local.md).
-
-## Private configuration
-
-Keep credentials in `.env` at the repo root, which Git ignores. Create it from
-the blank [example](../.env.example) if it does not exist:
+Keep `.env` at the repository root; Git ignores it. Preserve an existing file:
 
 ```sh
 test -f .env || cp .env.example .env
 chmod 600 .env
 ```
 
-Quote values containing spaces or shell characters.
+Fill the variables your selected integrations use; quote values containing shell characters.
 
-| Variable | Value to supply |
+| Example variable | Used for |
 |---|---|
-| `LLM_API_KEY` | Key for the provider that names it in your LLM catalog |
-| `SECONDARY_LLM_API_KEY` | Key for the second provider, when a selected profile uses it |
-| `TELEGRAM_BOT_TOKEN` | Telegram bot token |
-| `TELEGRAM_OWNER_CHAT_ID` | Your numeric Telegram chat ID |
+| `LLM_API_KEY` | Selected provider |
+| `SECONDARY_LLM_API_KEY` | Another selected provider, if needed |
+| `TELEGRAM_BOT_TOKEN` | Optional Telegram integration |
+| `TELEGRAM_OWNER_CHAT_ID` | Owner's numeric chat ID |
 
-These names are examples, not fixed requirements: each provider's `api_key_env`
-chooses the variable it reads. A provider whose profiles are never selected may
-have an empty key.
+Provider IDs, model IDs and key variable names are configurable. Edit a copy of
+[llms.example.yaml](../llms.example.yaml): set each provider's `base_url`, `protocol` and
+`api_key_env`, then add model profiles with their model IDs and input/output prices per million
+tokens. Fill placeholder IDs and prices before real use. Supported wire protocols are `openai`
+(Chat Completions compatible endpoints) and `anthropic` (native Messages).
 
-Load your file into the current shell before running commands:
+Select a profile in the agent template by replacing the entire inline `llm` block:
+
+```yaml
+llm:
+  profile: fast
+```
+
+`fast` is an example profile ID; use any profile in your catalog. A template can instead keep
+its inline LLM settings. Do not mix inline fields with `profile`. Only selected providers need
+keys. Prices produce local estimates, not provider balances or invoices.
+
+The binary reads environment variables; it does not load `.env` itself:
 
 ```sh
 set -a
@@ -87,261 +63,85 @@ set -a
 set +a
 ```
 
-The binary reads environment variables; it does not load `.env` itself.
+## Choose agent templates
 
-## LLM providers and model profiles
+The `agents/` directory contains [builder](../agents/solo-builder.example.yaml) and
+[teasing](../agents/teasing.example.yaml) examples; both load by default. Copy only the templates
+you want into your own directory and select it with `-agents`.
 
-Providers and models live in the catalog, and the agent template selects one
-model profile from it. The canonical catalog example is
-[`llms.example.yaml`](../llms.example.yaml). Provider IDs and model profile IDs
-are arbitrary. Each provider declares a `protocol` (`openai` or `anthropic`),
-`base_url` and `api_key_env`. Each model profile references a provider, names the
-provider's model ID and sets input and output prices per million tokens.
+Set each agent's goal, persona, limits and LLM selection. Keep `dry_run: true`. For multiple
+agents, use distinct IDs, `threads.username` values and browser profile paths. Replace the
+synthetic usernames before real-account operation; usernames are not inferred from agent IDs.
 
-Edit the example, or a copy of it, and fill every placeholder model ID and price
-before real use. The `openai` protocol also covers compatible custom endpoints.
-`anthropic` selects native Messages: `base_url` may be the API root or end in
-`/v1`, and the adapter appends the Messages path once. The catalog's `primary`,
-`secondary`, `fast`, `reasoning` and `backup` names are examples; you can rename
-them and use any model ID supported by the selected endpoint. Changing
-`api_key_env` selects your own environment-variable name. Credentials stay in
-HTTP authentication headers, outside model messages. Neither protocol implies
-support for every vendor API.
-
-Both protocols use the same bounded tool loop, caller-supplied guarded dispatcher
-and usage ledger. Native Messages supports text and client-side function tools,
-with a 1024-token output limit unless the caller sets `MaxCompletionTokens`.
-OpenAI-specific `ReasoningEffort` is rejected for native Messages; extended
-thinking, streaming, images and provider-hosted tools are outside this contract.
-Reported native cache input is counted in total input; the catalog's two flat
-prices do not reproduce cache/tier pricing or provider invoices.
-
-A template selects a profile by replacing its entire inline `llm` block with
-`llm.profile`:
-
-```yaml
-llm:
-  profile: fast
-```
-
-`fast` is a profile ID from the catalog; choose any profile defined there. Do not
-combine `profile` with inline `base_url`, `model`, `api_key_env` or price fields.
-Templates with the existing inline `llm` block keep working when no profile is
-selected.
-
-Check a catalog together with the templates:
+Validate your directory and optional catalog without making external calls:
 
 ```sh
-go run ./cmd/threadwalker check -agents agents -db data/threadwalker.db -llms llms.example.yaml
+go run ./cmd/threadwalker check -agents /path/to/templates -llms /path/to/llms.yaml -db data/threadwalker.db
 ```
 
-Without `-llms`, `check` validates legacy inline templates only. With it, `check`
-validates the catalog structure and every template reference, and resolves keys
-only for selected profiles. Errors name the offending field without printing key
-values.
-
-## Agent template
-
-The `agents/` directory includes the [builder](../agents/solo-builder.example.yaml) and
-[teasing](../agents/teasing.example.yaml) examples; both are loaded by default. Copy only the
-templates you want into your own directory and pass it with `-agents`. For multiple agents,
-set each `threads.username` to its own account and use distinct IDs and browser profile paths.
-Replace the synthetic example usernames before real-account operation.
-Keep `dry_run: true`. Select a model profile as shown above, or set the inline
-`llm` fields. Put the selected provider's key in the environment variable named
-by its `api_key_env`. Set `threads.profile_dir` to the saved browser profile on
-the machine where the agent will run. The template's `*_env` fields can select
-different Telegram variable names when needed.
-
-Set `telegram.enabled: false` (or omit the Telegram block) for local operation without a bot.
-The canonical example sets `enabled: false`; only `enabled: true` requires both Telegram
-entries. Once the selected LLM key and any enabled Telegram entries are available, run `check`.
-Add `-llms llms.example.yaml` when the template selects a profile; omit it for a
-legacy inline template:
+Omit `-llms` for inline LLM settings. Once configured, `run` uses the same paths:
 
 ```sh
-go run ./cmd/threadwalker check -agents agents -db data/threadwalker.db
+go run ./cmd/threadwalker run -agents /path/to/templates -llms /path/to/llms.yaml -db data/threadwalker.db
 ```
 
-`check` validates templates and SQLite migrations without calling external
-services. At its default `info` level it emits JSON lifecycle records to stdout.
-Telegram is disabled by default; disabled integrations do not read their credentials.
+This command may call the selected LLM and trend sources. `-once` limits it to one due wake.
+`-offline` forces fake transports and disables Telegram; explicit templates still require dry run.
+Startup never replays interrupted actions. The optional [systemd unit](../deploy/threadwalker.service)
+runs the same scheduler on a chosen host; a VPS is optional.
 
-When enabled, `run` starts one background long poller for each configured bot, sharing it among
-agents with that bot and owner. The same bot cannot select different owner chats. Runtime credentials
-must supply a nonzero numeric chat ID; values remain outside templates and logs. `run -offline`
-forces Telegram disabled before constructing services, including with explicit template files.
-Use `telegram.digest_hour: 18` for the default UTC digest hour (accepted range 0..23).
+## Browser and Telegram
 
-The owner's private chat accepts `/pause`, `/resume`, `/kill`, `/dnc <username>` and `/status`.
-When a bot controls several agents, include the agent ID: `/pause <agent_id>`, `/resume <agent_id>`,
-`/kill <agent_id>`, `/dnc <agent_id> <username>`, `/status <agent_id>`. Unknown/ambiguous requests
-are ignored. A killed agent stays killed after `/resume`. Reply directly to a delivered question
-to answer it; unmatched replies and other chats are ignored. `ask_owner` returns a queued ID
-without waiting for delivery or a reply; only that agent receives the answer in a subsequent wake.
+The default Threads backend is `stub`, which requires dry run. Browser configuration lives under
+`threads`: `backend: browser`, `base_url`, `executable_path` and an agent-specific `profile_dir`.
+Chromium must already be installed; `no_sandbox` defaults to false.
 
-The outbox makes one delivery attempt per message. Failed or interrupted sends are kept for
-diagnosis and are never automatically resent, including after restart. Filter owner outcome logs:
+**The current browser supports the saved synthetic DOM contract, not the current Threads site.**
+Real selectors, login/session behavior and action-bound insights remain to be qualified in
+[#2](https://github.com/canhta/threadwalker/issues/2) and
+[#18](https://github.com/canhta/threadwalker/issues/18). Local browser reproduction commands are
+in [browser evidence](research/browser-local.md).
+
+Telegram stays disabled unless `telegram.enabled: true`. When enabled, set `bot_token_env` and
+`owner_chat_id_env` to the variable names containing the bot token and owner's numeric chat ID.
+The owner must message the bot first. Optional `digest_hour` defaults to 18 UTC.
+
+With several agents, owner commands include the agent ID: `/status <agent_id>`,
+`/pause <agent_id>`, `/resume <agent_id>`, `/kill <agent_id>` and `/dnc <agent_id> <username>`.
+Kill is terminal. Reply directly to a delivered question to answer it. Delivery and recovery
+behavior are documented in [Telegram verification](research/telegram-local.md).
+
+## Dashboard, logs and evals
 
 ```sh
-jq -c 'select(.event == "telegram.operation.finished") | {agent_id, tool_call_id, operation, outcome, reason}' events.jsonl
+go run ./cmd/threadwalker dashboard -agents /path/to/templates -db data/threadwalker.db
 ```
 
-The fake Bot API integration and captured evidence are in
-[Telegram local verification](research/telegram-local.md); no real-bot transcript is claimed.
+Open `http://127.0.0.1:8080/`; `-listen` selects another loopback port. The DB must exist.
+The dashboard needs no provider or Telegram credentials, opens SQLite read-only and shows
+selected public metadata. Add `-llms` when templates use catalog profiles.
 
-
-## Operational logs
-
-Choose the log level and format with flags. The canonical event names and
-metadata allowlist are in [`internal/logging/logging.go`](../internal/logging/logging.go);
-the contract is in [`docs/spec.md`](spec.md).
+Operational logs are JSON to stdout by default. Use `-log-level debug` or `-log-format text`
+on `check`, `run` or `dashboard`. Even debug output excludes prompts, credentials, private
+content and raw tool payloads. Filter a saved trace by agent and wake:
 
 ```sh
-go run ./cmd/threadwalker check -agents agents -db data/threadwalker.db -log-format json -log-level debug
+jq -c 'select(.agent_id == "solo-builder" and .wake_id == 42)' events.jsonl
 ```
 
-Default is `-log-format json -log-level info`. Use `-log-format text` for local
-reading. Even at `debug`, records carry allowlisted metadata only: no credentials,
-headers, endpoint URLs, prompts, notes, Threads text, stranger usernames, tool
-arguments/results or raw provider bodies.
+[Eval commands](evals.md) cover offline suites, report comparison, failure inspection and bounded
+opt-in provider checks. [Metric evidence](research/metrics-local.md) and
+[playbook evidence](research/playbook-local.md) explain collection windows, gate simulations and
+known limitations. No real metrics are inferred from dry-run actions.
 
-`journalctl` receives the same JSON lines. Filter retries by wake and HTTP status:
+## Remaining real-account qualification
 
-```sh
-journalctl -u threadwalker -o cat --since '15 min ago' \
-  | jq -c 'select(.event == "llm.request.retry") | {time, agent_id, wake_id, request, attempt, http_status, reason}'
-```
+Supply logged-in disposable Threads profiles with the AI-experiment disclosure and their actual
+usernames on a chosen host. Complete login/2FA yourself. The remaining measured work is:
 
-Correlate one wake's requests with its outcome and locally computed usage:
+- [#2](https://github.com/canhta/threadwalker/issues/2): real browser compatibility and observation.
+- [#18](https://github.com/canhta/threadwalker/issues/18): real bot controls and single-agent soak.
+- [#21](https://github.com/canhta/threadwalker/issues/21): two-account 48-hour run and memory measurement.
+- [#9](https://github.com/canhta/threadwalker/issues/9): seven-day live experiment, with explicit approval before publishing.
 
-```sh
-journalctl -u threadwalker -o cat --since '15 min ago' \
-  | jq -c 'select(.agent_id == "solo-builder" and .wake_id == 42) | {event, request, attempt, http_status, tokens_in, tokens_out, cost_usd, outcome, reason}'
-```
-
-Replay the saved synthetic failure trace offline. Its first request gets HTTP 503
-and records usage; retry 2 records usage before an invalid assistant choice ends
-the run. The two accounting records sum to 300 input tokens, 30 output tokens
-and USD 0.00036 at the configured synthetic flat rates:
-
-```sh
-go test ./internal/llm -run '^TestSyntheticRetryFailureTrace$' -count=1
-jq -c 'select(.agent_id == "synthetic-agent" and .wake_id == 42) | {event, request, attempt, http_status, tokens_in, tokens_out, cost_usd, outcome, reason}' internal/llm/testdata/retry-failure-trace.jsonl
-jq -s '[.[] | select(.event == "llm.usage.recorded" and .outcome == "success")] | {tokens_in: (map(.tokens_in) | add), tokens_out: (map(.tokens_out) | add), cost_usd: (map(.cost_usd) | add)}' internal/llm/testdata/retry-failure-trace.jsonl
-```
-
-Filter `.reason == "retry_exhausted"`, `"accounting_write_failed"`,
-`"budget_limit"` or `"step_limit"` to find the corresponding failures, then use
-`agent_id`, `wake_id`, `request` and `attempt` to inspect the preceding trace.
-Tool IDs are local `wake/step` values, rather than arbitrary provider IDs.
-
-The `wake_id 42` above and any durations or costs are synthetic example values,
-not production evidence. `llm.tool.finished` covers only the client dispatcher
-boundary. The runtime additionally emits wake, scheduler, context, guarded tool, audit,
-note and trend outcomes. The optional systemd unit runs the dry-run scheduler; it does not
-qualify real browser or Telegram operation.
-
-## Accounts and live checks
-
-For the [browser spike (#2)](https://github.com/canhta/threadwalker/issues/2),
-provide a disposable Threads account with an AI-experiment disclosure in its bio.
-Complete login and 2FA yourself on the chosen host, and leave the saved browser profile there.
-A VPS is optional; an IP-specific conclusion requires measurement from that IP.
-The saved profile path and approved reply URL are setup inputs. Passwords and
-session cookies stay out of chat and Git.
-
-For [real-bot qualification (#18)](https://github.com/canhta/threadwalker/issues/18), create a bot
-with `@BotFather`, save its token, and send the bot a message from your own
-account. Supply that conversation's numeric chat ID as
-`TELEGRAM_OWNER_CHAT_ID`.
-
-The [seven-day live run (#9)](https://github.com/canhta/threadwalker/issues/9)
-needs your approval before `dry_run` becomes `false`. The
-[two-agent qualification (#21)](https://github.com/canhta/threadwalker/issues/21) needs
-another disposable account and saved login. Keep these issues open until their
-measured acceptance criteria hold.
-
-For a configured local scheduler, run `threadwalker run -agents agents -db data/threadwalker.db`
-(with `-llms` if needed). This may call the selected LLM and trend sources; offline verification
-uses the commands above. `-once` executes at most one due wake. Startup rejects non-dry-run
-templates without an explicit browser backend, and restart advances interrupted wakes without
-replaying their actions. Offline mode always uses stubs and requires dry run.
-
-## Synthetic browser backend
-
-The default `threads.backend` is `stub`. To exercise an operator-hosted synthetic-v1 fixture
-site, select `browser`, set `threads.base_url` to its HTTP(S) origin, set
-`threads.executable_path` to installed Chromium, and choose a separate `threads.profile_dir`
-for each agent. Keep `dry_run: true` for reads with logging-only writes. The harness opens one
-browser per wake and closes it on success, failure or cancellation, retaining profile data.
-Profile ownership markers prevent sharing one profile between different agent IDs.
-`threads.no_sandbox: true` is an explicit option for constrained local test hosts; normal
-configuration leaves sandboxing enabled. No browser is downloaded automatically.
-
-This backend recognizes the invented [saved DOM contract](research/testdata/browser/manifest.json),
-with page scripts disabled and requests restricted to the configured origin. It is not yet a
-live Threads implementation. Real-account selectors/session qualification remains #2/#18.
-Local fixture tests may select non-dry-run mode to prove local HTTP submissions; this does not
-authorize real posting or establish real-service compatibility. Logout/captcha pauses that agent
-and queues a safe notice locally even when Telegram delivery is disabled. An uncertain submission
-ends the wake with `unknown_outcome`, retains its action intent and never retries it.
-
-Run the actual local Chromium tests explicitly (all HTTP uses `httptest`; no account required):
-
-```sh
-CHROME_BIN=/path/to/chrome go test -tags browser_integration ./internal/threads -count=1 -v
-go run ./cmd/threadwalker eval -suite internal/eval/testdata/browser-v1.json -seed 8 -out /tmp/browser-eval.json
-```
-
-`browser.operation.finished` records lifecycle and operation timing/outcome using the shared
-metadata-only event contract. Guarded operation records include `wake_id`; driver lifecycle
-records use the configured `agent_id`. Filter without exposing raw DOM or session data:
-
-```sh
-jq -c 'select(.event == "browser.operation.finished") | {agent_id,wake_id,operation,outcome,reason,duration_ms}' events.jsonl
-```
-
-The optional [`deploy/threadwalker.service`](../deploy/threadwalker.service) starts that same
-scheduler on an operator-chosen host. Its environment file is optional; selected enabled
-integrations still validate their required variables. No service is installed by these commands.
-
-## Metric polling
-
-Configured `run` schedules confirmed own-action metric reads at 1, 6 and 24 hours even when
-the agent chooses a later wake. Dry-run/unconfirmed actions do not produce measurement jobs.
-The source must provide counters bound to the exact published action URL; unavailable metrics
-remain missing and retry later. Current browser support is the synthetic DOM contract only,
-with live Threads insights still unqualified.
-
-Reproduce the offline multi-day simulation without any credentials:
-
-```sh
-go run ./cmd/threadwalker metrics -offline -soak-hours 72 -evidence /tmp/metrics-evidence-new
-```
-
-The directory must be new. Targets, actual observation times, restart behavior and safe event
-filtering are explained in [metric evals](evals.md#metric-polling-and-logical-time-simulation).
-
-## Opt-in LLM protocol checks
-
-Default tests run offline. The paid two-tool check requires the `llm_live` build
-tag and `THREADWALKER_LIVE_LLM=1`. Configure `THREADWALKER_LIVE_PROTOCOL`
-(`openai` or `anthropic`), `THREADWALKER_LIVE_BASE_URL`,
-`THREADWALKER_LIVE_MODEL`, `THREADWALKER_LIVE_KEY_ENV` (the name of an existing
-key environment variable), and positive `THREADWALKER_LIVE_PRICE_IN` /
-`THREADWALKER_LIVE_PRICE_OUT` rates per million tokens. Optionally set
-`THREADWALKER_LIVE_REASONING_EFFORT` for the OpenAI protocol. The test has no
-provider/model defaults and invokes only fake local tools.
-
-```sh
-go test -tags llm_live ./internal/llm -run '^TestLiveTwoToolLoop$' -count=1 -v
-```
-
-Run only with authorization and verified current model rates. The check caps
-outputs at 256 tokens per response, three steps, three HTTP attempts per step,
-a 25-second request timeout, a 90-second wake timeout and a USD 0.01 local daily
-ledger budget. A response can cross that ledger threshold; the small fixed
-prompt and output cap bound this spike, rather than promising a provider billing
-cap. See [the measured evidence](research/spike-llm.md) for exact models, usage,
-computed costs and limitations.
+Local fixture and logical-time results do not close these qualifications.
