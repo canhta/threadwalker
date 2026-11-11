@@ -94,6 +94,7 @@ type ThreadsConfig struct {
 }
 
 type TelegramConfig struct {
+	DigestHour     int // UTC; defaults to 18 on loaded templates.
 	Enabled        bool
 	BotTokenEnv    string
 	BotToken       Secret
@@ -297,6 +298,15 @@ func LoadFileWithCatalog(path string, getenv func(string) string, catalog *Catal
 			addErr("telegram.enabled", "must be a boolean")
 		} else {
 			tmpl.Telegram.Enabled = enabled
+		}
+	}
+	tmpl.Telegram.DigestHour = 18
+	if doc.keys["telegram.digest_hour"] {
+		hour, err := strconv.Atoi(doc.scalars["telegram.digest_hour"])
+		if err != nil || hour < 0 || hour > 23 {
+			addErr("telegram.digest_hour", "must be an integer within 0..23 UTC")
+		} else {
+			tmpl.Telegram.DigestHour = hour
 		}
 	}
 	if tmpl.Telegram.Enabled {

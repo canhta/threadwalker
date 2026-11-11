@@ -17,7 +17,13 @@ import (
 	"github.com/canhta/threadwalker/internal/store"
 )
 
+// Owner enqueues private owner messages; implementations must never wait for an answer.
+type Owner interface {
+	QueueOwner(context.Context, string, string, bool) (int64, error)
+}
+
 type Options struct {
+	Owner       Owner
 	Store       *store.Store
 	Template    config.Template
 	WakeID      int64

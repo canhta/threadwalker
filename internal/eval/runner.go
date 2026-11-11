@@ -48,7 +48,7 @@ func Run(ctx context.Context, suite *Suite, opts Options) (Report, error) {
 			if c.Guard != nil {
 				return Report{}, errors.New("guard eval requires offline mode")
 			}
-			if c.Runtime != nil {
+			if c.Runtime != nil || c.OwnerScenario != "" {
 				return Report{}, errors.New("runtime eval requires offline mode")
 			}
 		}
@@ -129,6 +129,9 @@ func Run(ctx context.Context, suite *Suite, opts Options) (Report, error) {
 }
 
 func runCase(ctx context.Context, c Case, p Profile, repeat int, opts Options, liveBudget *reservation) CaseResult {
+	if c.OwnerScenario != "" {
+		return runOwnerCase(ctx, c, p, repeat, opts)
+	}
 	if c.Guard != nil {
 		return runGuardCase(ctx, c, p, repeat, opts, nil)
 	}

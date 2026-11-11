@@ -10,6 +10,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"sync"
 	"time"
 
 	"github.com/canhta/threadwalker/internal/agent"
@@ -17,6 +18,7 @@ import (
 	"github.com/canhta/threadwalker/internal/eval"
 	"github.com/canhta/threadwalker/internal/logging"
 	"github.com/canhta/threadwalker/internal/store"
+	"github.com/canhta/threadwalker/internal/telegram"
 )
 
 func runRuntime(ctx context.Context, args []string, getenv func(string) string, stdout, stderr io.Writer) int {
@@ -129,6 +131,25 @@ func runRuntime(ctx context.Context, args []string, getenv func(string) string, 
 			return nil
 		}
 	}
+	// Offline mode disables owner integration before client construction.
+	if *offline {
+		for i := range templates {
+			templates[i].Telegram = config.TelegramConfig{}
+		}
+	}
+	services, bindings, err := telegram.Services(st, templates, now, logger)
+	if err != nil {
+		fmt.Fprintln(stderr, "configuring owner service failed")
+		return 1
+	}
+	secrets := []config.Secret{}
+	for _, tmpl := range templates {
+		secrets = append(secrets, tmpl.LLM.APIKey, tmpl.Telegram.BotToken, tmpl.Telegram.OwnerChatID)
+		if err = st.EnsureAgent(ctx, tmpl.ID); err != nil {
+			fmt.Fprintln(stderr, "initializing runtime agent failed")
+			return 1
+		}
+	}
 	runtimes := []*agent.Runtime{}
 	for _, tmpl := range templates {
 		if *offline {
@@ -136,7 +157,10 @@ func runRuntime(ctx context.Context, args []string, getenv func(string) string, 
 			tmpl.LLM.APIKey = config.NewSecret("offline-dummy-key")
 			tmpl.Telegram = config.TelegramConfig{}
 		}
-		opts := agent.Options{Store: st, Template: tmpl, Logger: logger, Now: now, Wait: wait}
+		opts := agent.Options{Store: st, Template: tmpl, Logger: logger, Now: now, Wait: wait, Secrets: secrets}
+		if owner := bindings[tmpl.ID]; owner != nil {
+			opts.Owner = owner
+		}
 		if *offline {
 			fixture := agent.NewOfflineFixture(now)
 			opts.HTTPClient = fixture.Client()
@@ -149,7 +173,15 @@ func runRuntime(ctx context.Context, args []string, getenv func(string) string, 
 		}
 		runtimes = append(runtimes, runtime)
 	}
-	err = (agent.Scheduler{Agents: runtimes, Now: now, Wait: wait}).Run(ctx, *once)
+	serviceCtx, stopServices := context.WithCancel(ctx)
+	var serviceWG sync.WaitGroup
+	for _, svc := range services {
+		serviceWG.Add(1)
+		go func(svc *telegram.Service) { defer serviceWG.Done(); _ = svc.Run(serviceCtx) }(svc)
+	}
+	err = (agent.Scheduler{Agents: runtimes, Now: now, Wait: wait}).Run(serviceCtx, *once)
+	stopServices()
+	serviceWG.Wait()
 	if err != nil && !errors.Is(err, context.Canceled) {
 		fmt.Fprintln(stderr, "runtime stopped; inspect safe event reasons")
 		return 1

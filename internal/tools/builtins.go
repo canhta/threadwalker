@@ -87,6 +87,18 @@ func (d *Dispatcher) builtins() []builtin {
 		}
 		tools = append(tools, builtin{name: name, description: "Record a synthetic dry-run action only; never publish to Threads.", fields: fields, outside: true, run: func(ctx context.Context, a arguments) (any, error) { return d.action(ctx, name, a) }})
 	}
+	if d.opts.Owner != nil {
+		for _, name := range []string{"notify_owner", "ask_owner"} {
+			question := name == "ask_owner"
+			tools = append(tools, builtin{name: name, description: "Queue a private message to the owner; returns immediately without waiting for delivery or an answer.", fields: map[string]field{"text": stringRequired}, run: func(ctx context.Context, a arguments) (any, error) {
+				id, err := d.opts.Owner.QueueOwner(ctx, d.opts.Template.ID, a.Text, question)
+				if err != nil {
+					return nil, errors.New("queueing owner message: failed")
+				}
+				return map[string]int64{"queued_id": id}, nil
+			}})
+		}
+	}
 	return tools
 }
 func (d *Dispatcher) action(ctx context.Context, kind string, a arguments) (any, error) {
