@@ -73,7 +73,11 @@ func playbookAcceptanceAdd(t *testing.T, st *store.Store, agentID, text string, 
 
 func playbookAcceptanceSetState(t *testing.T, st *store.Store, id int64, status string, n, successes int64) {
 	t.Helper()
-	if _, err := st.DB().Exec(`UPDATE playbook SET status=?,n=?,successes=? WHERE id=?`, status, n, successes, id); err != nil {
+	var decided any
+	if status != "testing" {
+		decided = playbookAcceptanceAt.Add(30 * time.Hour).Format(time.RFC3339Nano)
+	}
+	if _, err := st.DB().Exec(`UPDATE playbook SET status=?,n=?,successes=?,decided_at=? WHERE id=?`, status, n, successes, decided, id); err != nil {
 		t.Fatalf("setting playbook entry %d state: %v", id, err)
 	}
 }
@@ -161,7 +165,13 @@ func TestPlaybookInitializeSeedsOncePerAgentAndPersistsMarker(t *testing.T) {
 		t.Fatal("third initialization reported a fresh seed")
 	}
 	entries = playbookAcceptanceEntries(t, st, "acceptance", 100)
-	if len(entries) != 2 || entries[0].ID != firstIDs[0] || entries[0].Status != "established" || entries[0].N != 12 || entries[0].Successes != 9 {
+	var decidedEntry *store.PlaybookEntry
+	for i := range entries {
+		if entries[i].ID == firstIDs[0] {
+			decidedEntry = &entries[i]
+		}
+	}
+	if len(entries) != 2 || decidedEntry == nil || decidedEntry.Status != "established" || decidedEntry.N != 12 || decidedEntry.Successes != 9 {
 		t.Fatalf("decided entry changed after initialization: %+v", entries)
 	}
 
@@ -213,11 +223,8 @@ func TestPlaybookInitializeAcceptsEmptyListAndBounds(t *testing.T) {
 	if !playbookAcceptanceInitialize(t, st, "cap", unique, playbookAcceptanceAt) {
 		t.Fatal("five-entry initialization reported false")
 	}
-	if created := playbookAcceptanceInitialize(t, st, "cap2", []string{"one", "two", "three", "four", "five", "six"}, playbookAcceptanceAt); created {
-		t.Fatal("six-entry initialization reported a fresh seed")
-	}
-	if _, err := st.InitializePlaybook(context.Background(), "cap2", []string{"one", "two", "three", "four", "five", "six"}, playbookAcceptanceAt); !errors.Is(err, store.ErrPlaybookCap) {
-		t.Fatalf("six-entry initialization error = %v, want ErrPlaybookCap", err)
+	if created, err := st.InitializePlaybook(context.Background(), "cap2", []string{"one", "two", "three", "four", "five", "six"}, playbookAcceptanceAt); !errors.Is(err, store.ErrPlaybookCap) || created {
+		t.Fatalf("six-entry initialization created=%v err=%v, want ErrPlaybookCap", created, err)
 	}
 	if count := playbookAcceptanceCount(t, st, "cap2"); count != 0 {
 		t.Fatalf("rejected initialization inserted %d entries", count)
@@ -387,13 +394,25 @@ func TestPlaybookEntriesFailSafelyOnMalformedRows(t *testing.T) {
 		t.Fatalf("malformed row returned partial entries=%+v", entries)
 	}
 
-	// A negative revision or counter is not a valid persisted state.
-	playbookAcceptanceAgent(t, st, "broken-revision")
-	if _, err := st.DB().Exec(`INSERT INTO playbook(agent_id,text,status,revision,n,successes,created_at) VALUES('broken-revision','bad revision','testing',-1,0,0,?)`, playbookAcceptanceAt.Format(time.RFC3339Nano)); err != nil {
-		t.Fatalf("inserting negative revision: %v", err)
-	}
-	if _, err := st.PlaybookEntries(ctx, "broken-revision", 10); err == nil {
-		t.Fatal("negative revision was accepted")
+	// Impossible counter states are not valid persisted state either.
+	for name, counters := range map[string]string{
+		"negative_n":          "-1,0",
+		"successes_over_n":    "3,4",
+		"terminal_no_decided": "0,0",
+	} {
+		channel := "broken-" + name
+		playbookAcceptanceAgent(t, st, channel)
+		status, revision := "testing", "1"
+		if name == "terminal_no_decided" {
+			status = "established"
+		}
+		query := `INSERT INTO playbook(agent_id,text,status,revision,n,successes,created_at) VALUES(?,?,'` + status + `',` + revision + `,` + counters + `,?)`
+		if _, err := st.DB().Exec(query, channel, name, playbookAcceptanceAt.Format(time.RFC3339Nano)); err != nil {
+			t.Fatalf("inserting %s row: %v", name, err)
+		}
+		if entries, err := st.PlaybookEntries(ctx, channel, 10); err == nil {
+			t.Fatalf("%s row was accepted: %+v", name, entries)
+		}
 	}
 }
 
@@ -654,8 +673,10 @@ func TestPlaybookConcurrentHandlesSeedOnceAndRespectCap(t *testing.T) {
 		}
 	}
 	entries := playbookAcceptanceEntries(t, first, "shared", 100)
-	if successes != store.MaxTestingHypotheses || len(entries) != store.MaxTestingHypotheses {
-		t.Fatalf("concurrent successes=%d entries=%d, want %d", successes, len(entries), store.MaxTestingHypotheses)
+	// The two seeded testing entries already consume two cap slots.
+	wantAdds := store.MaxTestingHypotheses - 2
+	if successes != wantAdds || len(entries) != store.MaxTestingHypotheses {
+		t.Fatalf("concurrent successes=%d entries=%d, want %d/%d", successes, len(entries), wantAdds, store.MaxTestingHypotheses)
 	}
 }
 

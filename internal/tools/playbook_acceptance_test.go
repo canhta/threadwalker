@@ -211,7 +211,7 @@ func TestPlaybookReadReturnsOnlyOwnBoundedEntries(t *testing.T) {
 	// testing cap does not interfere with the limit assertions.
 	for i := 0; i < 10; i++ {
 		entry := h.add(t, "agent", "bounded hypothesis "+string(rune('a'+i)))
-		if _, err := h.store.DB().Exec(`UPDATE playbook SET status='established',n=9,successes=6 WHERE id=?`, entry.ID); err != nil {
+		if _, err := h.store.DB().Exec(`UPDATE playbook SET status='established',n=9,successes=6,decided_at=? WHERE id=?`, playbookToolsAt.Format(time.RFC3339Nano), entry.ID); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -297,7 +297,7 @@ func TestPlaybookProposeToolAddsAndAmendsOnlyOwnTestingEntry(t *testing.T) {
 	}
 	foreign := h.add(t, "foreign", "foreign text")
 	decided := h.add(t, "agent", "decided text")
-	if _, err := h.store.DB().Exec(`UPDATE playbook SET status='rejected' WHERE id=?`, decided.ID); err != nil {
+	if _, err := h.store.DB().Exec(`UPDATE playbook SET status='rejected',decided_at=? WHERE id=?`, playbookToolsAt.Format(time.RFC3339Nano), decided.ID); err != nil {
 		t.Fatal(err)
 	}
 	for _, id := range []int64{foreign.ID, decided.ID, 999999} {
@@ -320,7 +320,7 @@ func TestPlaybookGuardRejectsForeignDecidedAndUnknownHypotheses(t *testing.T) {
 	}
 	foreign := h.add(t, "foreign", "foreign testing")
 	decided := h.add(t, "agent", "own decided")
-	if _, err := h.store.DB().Exec(`UPDATE playbook SET status='established',n=20,successes=15 WHERE id=?`, decided.ID); err != nil {
+	if _, err := h.store.DB().Exec(`UPDATE playbook SET status='established',n=20,successes=15,decided_at=? WHERE id=?`, playbookToolsAt.Format(time.RFC3339Nano), decided.ID); err != nil {
 		t.Fatal(err)
 	}
 
