@@ -32,7 +32,7 @@ func TestOwnerOutboxCorrelationSurvivesRestart(t *testing.T) {
 	if err != nil || len(pending) != 1 {
 		t.Fatalf("pending %v %v", pending, err)
 	}
-	if ok, err := st.ClaimOwner(ctx, id); err != nil || !ok {
+	if ok, err := st.ClaimOwner(ctx, id, "fake"); err != nil || !ok {
 		t.Fatal(err)
 	}
 	if err = st.FinishOwner(ctx, id, 41, true); err != nil {
@@ -44,11 +44,11 @@ func TestOwnerOutboxCorrelationSurvivesRestart(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer st.Close()
-	ok, err := st.AnswerOwner(ctx, []string{"one"}, 41, "reply:9", "Build tooling.", now)
+	ok, err := st.AnswerOwner(ctx, []string{"one"}, "fake", 41, "reply:9", "Build tooling.", now)
 	if err != nil || !ok {
 		t.Fatalf("answer %v %v", ok, err)
 	}
-	ok, err = st.AnswerOwner(ctx, []string{"one"}, 41, "reply:9", "Build tooling.", now)
+	ok, err = st.AnswerOwner(ctx, []string{"one"}, "fake", 41, "reply:9", "Build tooling.", now)
 	if err != nil || ok {
 		t.Fatalf("duplicate %v %v", ok, err)
 	}
@@ -104,7 +104,7 @@ func TestOwnerUnknownAnswersAndUncertainDeliveryAreNeverReplayed(t *testing.T) {
 	st.EnsureAgent(ctx, "one")
 	now := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 	for _, question := range []int64{0, 999} {
-		ok, err := st.AnswerOwner(ctx, []string{"one"}, question, "key", "unmatched", now)
+		ok, err := st.AnswerOwner(ctx, []string{"one"}, "fake", question, "key", "unmatched", now)
 		if err != nil || ok {
 			t.Fatalf("unknown %v %v", ok, err)
 		}
@@ -114,7 +114,7 @@ func TestOwnerUnknownAnswersAndUncertainDeliveryAreNeverReplayed(t *testing.T) {
 		t.Fatal(err)
 	}
 	for i := 0; i < 2; i++ {
-		ok, err := st.ClaimOwner(ctx, id)
+		ok, err := st.ClaimOwner(ctx, id, "fake")
 		if err != nil || ok != (i == 0) {
 			t.Fatalf("claim %v %v", ok, err)
 		}

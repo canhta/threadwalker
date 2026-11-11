@@ -346,3 +346,39 @@ func TestRuntimeFailsClosedAndRecordsBudgetStops(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestSchedulerOwnerPauseBetweenSelectionAndWake(t *testing.T) {
+	ctx := context.Background()
+	st, err := store.Open(ctx, filepath.Join(t.TempDir(), "pause.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	tmpl := agent.OfflineTemplate()
+	if err = st.EnsureAgent(ctx, tmpl.ID); err != nil {
+		t.Fatal(err)
+	}
+	now := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	calls := 0
+	clock := func() time.Time {
+		calls++
+		if calls == 3 {
+			if err := st.PauseOwnerAgent(ctx, tmpl.ID); err != nil {
+				t.Fatal(err)
+			}
+		}
+		return now
+	}
+	fixture := agent.NewOfflineFixture(clock)
+	r, err := agent.New(agent.Options{Store: st, Template: tmpl, Now: clock, HTTPClient: fixture.Client()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = (agent.Scheduler{Agents: []*agent.Runtime{r}, Now: clock}).Run(ctx, true); err != nil {
+		t.Fatalf("concurrent owner pause stopped scheduler: %v", err)
+	}
+	var count int
+	if err = st.DB().QueryRow(`SELECT COUNT(*) FROM wakes`).Scan(&count); err != nil || count != 0 {
+		t.Fatalf("paused wake started %d %v", count, err)
+	}
+}

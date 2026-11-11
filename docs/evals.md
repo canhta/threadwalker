@@ -183,11 +183,26 @@ build metadata. `checks.txt` captures successful full-package test and race outp
 `smoke.jsonl` is the metadata-only offline CLI smoke. No actual account, bot, paid provider,
 VPS or elapsed live-run qualification is claimed.
 
+## Owner service cases
+
+```sh
+go run ./cmd/threadwalker eval -suite internal/eval/testdata/owner-v1.json -seed 7 -repeat 2 -out /tmp/owner-eval.json
+```
+
+These versioned offline component scenarios use the real Bot API client against `httptest`,
+persisted owner commands, guarded `ask_owner`/`notify_owner`, wake context and an injected clock.
+They cover owner-only controls, pause/resume/killed state, permanent do-not-contact, asynchronous
+questions answered in the following wake, per-event notices, daily digest and failed delivery
+without replay. The shared v1 report includes actual executed tool names, persisted wake usage,
+configuration/input fingerprints and separately labelled wall-clock timing. They cannot run live.
+Saved redacted evidence and reproduction commands are in
+[Telegram local verification](research/telegram-local.md).
+
 ## Pending coverage
 
 The current suites cover the client, protocols, configuration, accounting and local runtime boundaries.
-They do not certify components that do not exist yet. Telegram/kill-switch cases belong to
-[#7](https://github.com/canhta/threadwalker/issues/7), browser/Threads cases to
+They do not certify components that do not exist yet. Real-bot qualification belongs to
+[#18](https://github.com/canhta/threadwalker/issues/18), browser/Threads cases to
 [#8](https://github.com/canhta/threadwalker/issues/8), and integrated live validation to
 [#9](https://github.com/canhta/threadwalker/issues/9). Playbook/gate cases belong to
 [#10](https://github.com/canhta/threadwalker/issues/10), and multiple-agent/template cases to

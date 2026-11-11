@@ -77,8 +77,8 @@ func (s *Store) PendingOwner(ctx context.Context, ids []string) ([]OwnerMessage,
 
 // Claim before HTTP: sending rows are never retried after crashes or uncertain
 // network outcomes. Telegram has no sendMessage idempotency key.
-func (s *Store) ClaimOwner(ctx context.Context, id int64) (bool, error) {
-	r, err := s.db.ExecContext(ctx, `UPDATE owner_msgs SET delivery='sending' WHERE id=? AND delivery='queued'`, id)
+func (s *Store) ClaimOwner(ctx context.Context, id int64, botKey string) (bool, error) {
+	r, err := s.db.ExecContext(ctx, `UPDATE owner_msgs SET delivery='sending',bot_key=? WHERE id=? AND delivery='queued'`, botKey, id)
 	if err != nil {
 		return false, fmt.Errorf("claiming owner delivery: %w", err)
 	}
@@ -99,16 +99,16 @@ func (s *Store) FinishOwner(ctx context.Context, id, messageID int64, sent bool)
 
 // AnswerOwner accepts exactly one answer to a delivered question in this bot's
 // configured agent group. It never stores unknown replies or transport profiles.
-func (s *Store) AnswerOwner(ctx context.Context, ids []string, messageID int64, key, text string, at time.Time) (bool, error) {
+func (s *Store) AnswerOwner(ctx context.Context, ids []string, botKey string, messageID int64, key, text string, at time.Time) (bool, error) {
 	if len(ids) == 0 || text == "" || len(text) > 12000 {
 		return false, nil
 	}
 	marks := strings.TrimSuffix(strings.Repeat("?,", len(ids)), ",")
-	args := []any{messageID}
+	args := []any{messageID, botKey}
 	for _, id := range ids {
 		args = append(args, id)
 	}
-	rows, err := s.db.QueryContext(ctx, `SELECT id,agent_id FROM owner_msgs WHERE message_id=? AND direction='out' AND kind='question' AND delivery='sent' AND agent_id IN (`+marks+`)`, args...)
+	rows, err := s.db.QueryContext(ctx, `SELECT id,agent_id FROM owner_msgs WHERE message_id=? AND bot_key=? AND direction='out' AND kind='question' AND delivery='sent' AND agent_id IN (`+marks+`)`, args...)
 	if err != nil {
 		return false, fmt.Errorf("finding owner question: %w", err)
 	}
@@ -158,7 +158,7 @@ func (s *Store) OwnerAnswers(ctx context.Context, id string, limit int) ([]Owner
 }
 func (s *Store) OwnerOffset(ctx context.Context, agentID, key string) (int64, error) {
 	var n int64
-	err := s.db.QueryRowContext(ctx, `SELECT next_update FROM owner_poll WHERE agent_id=? AND bot_key=?`, agentID, key).Scan(&n)
+	err := s.db.QueryRowContext(ctx, `SELECT COALESCE(MAX(next_update),0) FROM owner_poll WHERE bot_key=?`, key).Scan(&n)
 	if errors.Is(err, sql.ErrNoRows) {
 		return 0, nil
 	}
@@ -214,10 +214,10 @@ func (s *Store) OwnerControl(ctx context.Context, id, command, key, text string,
 }
 
 type OwnerSummary struct {
-	Status                                                            string
-	NextWake                                                          time.Time
-	Posts, Replies, Views, Likes, Responses, Reposts, PlaybookChanges int
-	CostUSD                                                           float64
+	Status                                                                           string
+	NextWake                                                                         time.Time
+	Posts, Replies, Views, Likes, Responses, Reposts, PlaybookChanges, MetricSamples int
+	CostUSD                                                                          float64
 }
 
 // PauseOwnerAgent is an automatic harness control, independent of the model
@@ -248,7 +248,7 @@ func (s *Store) OwnerSummary(ctx context.Context, id string, from, to time.Time)
 	if err != nil {
 		return out, fmt.Errorf("counting owner summary actions: %w", err)
 	}
-	err = s.db.QueryRowContext(ctx, `SELECT COALESCE(SUM(m.views),0),COALESCE(SUM(m.likes),0),COALESCE(SUM(m.replies),0),COALESCE(SUM(m.reposts),0) FROM metrics m JOIN actions a ON a.id=m.action_id AND a.agent_id=m.agent_id WHERE m.agent_id=? AND julianday(m.measured_at)>=julianday(?) AND julianday(m.measured_at)<julianday(?) AND m.measured_at=(SELECT MAX(m2.measured_at) FROM metrics m2 WHERE m2.agent_id=m.agent_id AND m2.action_id=m.action_id AND julianday(m2.measured_at)<julianday(?))`, id, formatStoreTimestamp(from), formatStoreTimestamp(to), formatStoreTimestamp(to)).Scan(&out.Views, &out.Likes, &out.Responses, &out.Reposts)
+	err = s.db.QueryRowContext(ctx, `SELECT COUNT(*),COALESCE(SUM(m.views),0),COALESCE(SUM(m.likes),0),COALESCE(SUM(m.replies),0),COALESCE(SUM(m.reposts),0) FROM metrics m JOIN actions a ON a.id=m.action_id AND a.agent_id=m.agent_id WHERE m.agent_id=? AND julianday(m.measured_at)>=julianday(?) AND julianday(m.measured_at)<julianday(?) AND m.measured_at=(SELECT MAX(m2.measured_at) FROM metrics m2 WHERE m2.agent_id=m.agent_id AND m2.action_id=m.action_id AND julianday(m2.measured_at)<julianday(?))`, id, formatStoreTimestamp(from), formatStoreTimestamp(to), formatStoreTimestamp(to)).Scan(&out.MetricSamples, &out.Views, &out.Likes, &out.Responses, &out.Reposts)
 	if err != nil {
 		return out, fmt.Errorf("counting owner summary metrics: %w", err)
 	}
@@ -257,4 +257,13 @@ func (s *Store) OwnerSummary(ctx context.Context, id string, from, to time.Time)
 		return out, fmt.Errorf("counting owner playbook changes: %w", err)
 	}
 	return out, nil
+}
+
+func (s *Store) OwnerEventID(ctx context.Context, id, key string) (int64, error) {
+	var n int64
+	err := s.db.QueryRowContext(ctx, `SELECT id FROM owner_msgs WHERE agent_id=? AND event_key=?`, id, key).Scan(&n)
+	if err != nil {
+		return 0, fmt.Errorf("reading owner event identity: %w", err)
+	}
+	return n, nil
 }

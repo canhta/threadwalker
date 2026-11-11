@@ -123,7 +123,7 @@ profile/model/protocol IDs, wake ID, a local request sequence, attempt and a loc
 call ID (wake/step), never provider-supplied IDs. Durations use the injected client clock. Events
 carry operation, outcome/reason, HTTP status when known, steps, tokens and locally computed USD;
 unknown or malformed tool names are omitted. `check` emits validation start/configuration/result.
-The runtime adds wake, scheduler and context events; guarded tool events cover the local running-state and audit boundary. Browser and full rule-policy coverage remain in their implementing issues.
+The runtime adds wake, scheduler and context events; guarded tool events cover the running-state and audit boundary. Telegram emits owner operation outcomes; browser instrumentation remains in its implementing issue.
 
 Event ownership is an acceptance requirement in the implementing issues: #5 implements wake
 lifecycle (`wake.started/finished/stopped`) and tool lifecycle (`tool.started/finished`) plus
@@ -256,7 +256,36 @@ and `TestSyntheticRetryFailureTrace`; operator filtering commands are in
 - The agent messages the owner when it meets something outside its permissions, is logged out or
   hits a captcha, or is close to its budget limit.
 - A short daily digest: what it did, metrics, playbook changes.
-- The owner sends `/pause`, `/resume`, `/kill`, `/dnc <username>`, and answers `ask_owner` questions.
+- The owner sends `/pause`, `/resume`, `/kill`, `/dnc <username>`, `/status`, and replies to
+  delivered `ask_owner` questions. A shared bot uses `/pause <agent_id>`, `/resume <agent_id>`,
+  `/kill <agent_id>`, `/dnc <agent_id> <username>`, and `/status <agent_id>`; ambiguous or unknown
+  agents fail safely. `/kill` is terminal: `/resume` cannot revive a killed agent.
+
+Enabled integrations run one long poller per bot and reject conflicting owner chats for that bot.
+Only the configured owner chat can issue commands or answer questions. Poll offsets, command
+receipts, question delivery IDs and reply correlation persist across restarts. `ask_owner` and
+`notify_owner` are private guarded tools that enqueue locally and return immediately. Only the
+selected agent's latest ten answers enter its next wake context, with configured secrets redacted;
+raw bot updates and chat identifiers never enter that context. Disabled integrations expose neither
+owner tool and create no Bot API client. **(decision)**
+
+Daily notices use UTC day identities for action limits and 80%/100% budget thresholds; killed
+notices use the terminal state identity. The browser's `BrowserStopped` seam accepts only
+`logged_out`/`captcha` plus an internal event ID, pauses that agent, and deduplicates its notice.
+Browser detection itself belongs to #8. The daily digest runs at `telegram.digest_hour` (0..23 UTC,
+loaded default 18), once per agent/day after that hour, and contains today's post/reply counts,
+spend, latest daily metric samples per action, and playbook entries created or decided that day.
+No missing metric is represented as measured engagement. **(decision)**
+
+The outbox claims a message before HTTP and never automatically retries failed, in-flight or
+uncertain delivery after restart. This favors avoiding duplicate messages over guaranteed delivery;
+operators diagnose static failure reasons in `telegram.operation.finished`. Local message row IDs
+and local operation counters provide correlation; credentials, chat IDs, message bodies, usernames
+and raw HTTP errors are excluded. Owner polling and wake storage share a serialized SQLite
+connection pool; no connection is held during Bot API HTTP. Canonical delivery DDL is
+[`003_owner_delivery.sql`](../internal/store/migrations/003_owner_delivery.sql), implementation is
+[`internal/telegram`](../internal/telegram), and synthetic evidence/reproduction is in
+[`telegram-local.md`](research/telegram-local.md). Real-bot qualification remains #18. **(decision)**
 
 ## 10. Stack
 
@@ -333,7 +362,7 @@ no code path executes a tool without passing the guards.
 
 ## 15. Database schema
 
-Every table carries `agent_id`, even while only one agent runs. Canonical DDL lives in [`internal/store/migrations/001_initial_schema.sql`](../internal/store/migrations/001_initial_schema.sql).
+Every table carries `agent_id`, even while only one agent runs. Canonical initial DDL lives in [`internal/store/migrations/001_initial_schema.sql`](../internal/store/migrations/001_initial_schema.sql); delivery/offset changes live in [`003_owner_delivery.sql`](../internal/store/migrations/003_owner_delivery.sql).
 
 | Table | Main columns | Purpose |
 |---|---|---|
@@ -370,7 +399,7 @@ Each agent template in `agents/*.yaml` (see [`agents/solo-builder.example.yaml`]
   `min_minutes_between_wakes`.
 - `guard`: optional nonempty `stop_phrases` list; omission selects the code defaults.
 - `threads`: `profile_dir`.
-- `telegram`: optional `enabled` (defaults to `false`); `bot_token_env` and `owner_chat_id_env` are required and resolved only when enabled. The canonical example keeps this optional integration disabled for local operation without a bot.
+- `telegram`: optional `enabled` (defaults to `false`); `bot_token_env` and `owner_chat_id_env` are required and resolved only when enabled. Optional `digest_hour` is 0..23 UTC and defaults to 18. The canonical example keeps this optional integration disabled for local operation without a bot.
 
 Secrets live only in environment variables named by `*_env`, never in a template, catalog, log
 or the LLM context. Catalog loading validates references and configuration without reading keys;

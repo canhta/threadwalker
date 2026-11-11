@@ -4,6 +4,8 @@ package telegram
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -11,7 +13,9 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
+	"unicode/utf8"
 
 	"github.com/canhta/threadwalker/internal/config"
 	"github.com/canhta/threadwalker/internal/logging"
@@ -34,11 +38,13 @@ type ServiceOptions struct {
 	Logger      *slog.Logger
 }
 type Service struct {
-	opts      ServiceOptions
-	mu        sync.Mutex
-	templates map[string]config.Template
-	ids       []string
-	secrets   []string
+	opts        ServiceOptions
+	mu          sync.Mutex
+	templates   map[string]config.Template
+	ids         []string
+	secrets     []string
+	sequence    atomic.Int64
+	deliveryKey string
 }
 
 func NewService(opts ServiceOptions) (*Service, error) {
@@ -51,7 +57,14 @@ func NewService(opts ServiceOptions) (*Service, error) {
 	if opts.Wait == nil {
 		opts.Wait = wait
 	}
-	s := &Service{opts: opts, templates: map[string]config.Template{}}
+	// The asynchronous owner poller shares SQLite with wakes. Serialize access
+	// through this Store's connection pool to avoid read-to-write lock upgrades
+	// and keep :memory: databases on their initialized connection. HTTP polling
+	// and delivery never hold a DB connection. Guard transactions still protect
+	// action reservations across independent stores and processes.
+	opts.Store.DB().SetMaxOpenConns(1)
+	scope := sha256.Sum256([]byte(opts.BotKey + "\x00" + strconv.FormatInt(opts.OwnerChatID, 10)))
+	s := &Service{opts: opts, templates: map[string]config.Template{}, deliveryKey: hex.EncodeToString(scope[:])}
 	for _, t := range opts.Templates {
 		if t.ID == "" || s.templates[t.ID].ID != "" || t.Telegram.DigestHour < 0 || t.Telegram.DigestHour > 23 {
 			return nil, errors.New("configuring Telegram service: invalid agent or digest hour")
@@ -74,7 +87,11 @@ func (s *Service) redact(text string) string {
 	return text
 }
 func (s *Service) event(ctx context.Context, id, op, outcome, reason string, correlation int64) {
-	logging.Emit(ctx, s.opts.Logger, slog.LevelInfo, logging.Record{Event: logging.TelegramOperationFinished, AgentID: id, Operation: op, Outcome: outcome, Reason: reason, ToolCallID: fmt.Sprintf("owner/%d", correlation)})
+	localID := fmt.Sprintf("owner-message/%d", correlation)
+	if correlation == 0 {
+		localID = fmt.Sprintf("owner-operation/%d", s.sequence.Add(1))
+	}
+	logging.Emit(ctx, s.opts.Logger, slog.LevelInfo, logging.Record{Event: logging.TelegramOperationFinished, AgentID: id, Operation: op, Outcome: outcome, Reason: reason, ToolCallID: localID})
 }
 
 // QueueOwner returns after SQLite persistence, without waiting for polling,
@@ -82,6 +99,9 @@ func (s *Service) event(ctx context.Context, id, op, outcome, reason string, cor
 func (s *Service) QueueOwner(ctx context.Context, id, text string, question bool) (int64, error) {
 	if _, ok := s.templates[id]; !ok {
 		return 0, errors.New("queueing owner message: unconfigured agent")
+	}
+	if utf8.RuneCountInString(text) > 3500 {
+		return 0, errors.New("queueing owner message: text too long")
 	}
 	kind := "notification"
 	if question {
@@ -108,7 +128,7 @@ func (s *Service) Poll(ctx context.Context, waitSeconds int) error {
 	updates, err := s.opts.Bot.GetUpdates(ctx, offset, waitSeconds)
 	if err != nil {
 		s.event(ctx, "", "poll", "error", "poll_failed", 0)
-		return errors.New("polling owner updates: request failed")
+		return safeBotError("polling owner updates: request failed", err)
 	}
 	sort.SliceStable(updates, func(i, j int) bool { return updates[i].UpdateID < updates[j].UpdateID })
 	for _, u := range updates {
@@ -140,7 +160,7 @@ func (s *Service) handle(ctx context.Context, u Update) error {
 		if m.ReplyToMessage == nil {
 			return nil
 		}
-		ok, err := s.opts.Store.AnswerOwner(ctx, s.ids, m.ReplyToMessage.MessageID, key, s.redact(m.Text), s.opts.Now())
+		ok, err := s.opts.Store.AnswerOwner(ctx, s.ids, s.deliveryKey, m.ReplyToMessage.MessageID, key, s.redact(m.Text), s.opts.Now())
 		outcome, reason := "ignored", "unknown_question"
 		if ok {
 			outcome, reason = "success", "answer_saved"
@@ -148,7 +168,17 @@ func (s *Service) handle(ctx context.Context, u Update) error {
 		if err != nil {
 			outcome, reason = "error", "answer_failed"
 		}
-		s.event(ctx, "", "answer", outcome, reason, 0)
+		agentID := ""
+		var correlation int64
+		if ok {
+			for _, id := range s.ids {
+				if n, e := s.opts.Store.OwnerEventID(ctx, id, key); e == nil {
+					agentID, correlation = id, n
+					break
+				}
+			}
+		}
+		s.event(ctx, agentID, "answer", outcome, reason, correlation)
 		return err
 	}
 	fields := strings.Fields(m.Text)
@@ -161,11 +191,15 @@ func (s *Service) handle(ctx context.Context, u Update) error {
 		s.event(ctx, "", "command", "ignored", "unknown_command", 0)
 		return nil
 	}
+	want := 0
+	if command == "dnc" {
+		want = 1
+	}
 	args := fields[1:]
 	id := ""
 	if len(s.ids) == 1 {
 		id = s.ids[0]
-		if len(args) > 0 && args[0] == id {
+		if len(args) == want+1 && args[0] == id {
 			args = args[1:]
 		}
 	} else if len(args) > 0 {
@@ -177,10 +211,6 @@ func (s *Service) handle(ctx context.Context, u Update) error {
 	if id == "" {
 		s.event(ctx, "", "command", "ignored", "ambiguous_agent", 0)
 		return nil
-	}
-	want := 0
-	if command == "dnc" {
-		want = 1
 	}
 	if len(args) != want {
 		s.event(ctx, id, "command", "ignored", "invalid_command", 0)
@@ -195,13 +225,11 @@ func (s *Service) handle(ctx context.Context, u Update) error {
 		text = summaryText(id, summary, false)
 	}
 	if command == "dnc" {
-		contacts, ok := any(s.opts.Store).(interface {
-			MarkDoNotContact(context.Context, string, string, string) error
-		})
-		if !ok {
-			return errors.New("processing owner contact control: store unavailable")
+		if _, err := store.NormalizeUsername(args[0]); err != nil {
+			s.event(ctx, id, "dnc", "ignored", "invalid_command", 0)
+			return nil
 		}
-		if err := contacts.MarkDoNotContact(ctx, id, args[0], "owner_request"); err != nil {
+		if err := s.opts.Store.MarkDoNotContact(ctx, id, args[0], "owner_request"); err != nil {
 			s.event(ctx, id, "dnc", "error", "contact_failed", 0)
 			return errors.New("processing owner contact control: invalid or unavailable contact")
 		}
@@ -210,7 +238,11 @@ func (s *Service) handle(ctx context.Context, u Update) error {
 		s.event(ctx, id, command, "error", "control_failed", 0)
 		return err
 	}
-	s.event(ctx, id, command, "success", "control_persisted", 0)
+	correlation, err := s.opts.Store.OwnerEventID(ctx, id, key)
+	if err != nil {
+		return err
+	}
+	s.event(ctx, id, command, "success", "control_persisted", correlation)
 	if command == "kill" {
 		return s.Notice(ctx, id, "killed", "terminal")
 	}
@@ -226,7 +258,7 @@ func (s *Service) Flush(ctx context.Context) error {
 		return err
 	}
 	for _, m := range messages {
-		ok, err := s.opts.Store.ClaimOwner(ctx, m.ID)
+		ok, err := s.opts.Store.ClaimOwner(ctx, m.ID, s.deliveryKey)
 		if err != nil {
 			return err
 		}
@@ -246,7 +278,7 @@ func (s *Service) Flush(ctx context.Context) error {
 			return err
 		}
 		if sendErr != nil {
-			return errors.New("delivering owner message: request failed")
+			return safeBotError("delivering owner message: request failed", sendErr)
 		}
 	}
 	return nil
@@ -262,7 +294,7 @@ func (s *Service) Notice(ctx context.Context, id, kind, event string) error {
 	var text string
 	switch kind {
 	case "daily_limit":
-		text = "Daily action limit reached; agent paused."
+		text = "Daily action limit reached."
 	case "budget_80":
 		text = "Daily budget reached 80%."
 	case "budget_100":
@@ -291,7 +323,7 @@ func (s *Service) Notice(ctx context.Context, id, kind, event string) error {
 // BrowserStopped is the browser adapter's safe event seam. The caller supplies
 // only a code and local event ID; no DOM, page text, session or URL is accepted.
 func (s *Service) BrowserStopped(ctx context.Context, id, kind, event string) error {
-	if kind != "logged_out" && kind != "captcha" {
+	if (kind != "logged_out" && kind != "captcha") || event == "" || len(event) > 200 {
 		return errors.New("stopping owner browser: unsupported event")
 	}
 	if _, ok := s.templates[id]; !ok {
@@ -316,7 +348,11 @@ func summaryText(id string, m store.OwnerSummary, digest bool) string {
 	if !m.NextWake.IsZero() {
 		next = m.NextWake.UTC().Format(time.RFC3339)
 	}
-	return fmt.Sprintf("%s %s: %s; next wake %s; posts %d; replies %d; spend $%.4f; metrics views %d, likes %d, replies %d, reposts %d; playbook changes %d.", label, id, m.Status, next, m.Posts, m.Replies, m.CostUSD, m.Views, m.Likes, m.Responses, m.Reposts, m.PlaybookChanges)
+	metrics := "metrics unavailable"
+	if m.MetricSamples > 0 {
+		metrics = fmt.Sprintf("metrics views %d, likes %d, replies %d, reposts %d", m.Views, m.Likes, m.Responses, m.Reposts)
+	}
+	return fmt.Sprintf("%s %s: %s; next wake %s; posts %d; replies %d; spend $%.4f; %s; playbook changes %d.", label, id, m.Status, next, m.Posts, m.Replies, m.CostUSD, metrics, m.PlaybookChanges)
 }
 
 // Tick observes persisted state, thresholds and UTC digest schedule. A pending
@@ -347,9 +383,6 @@ func (s *Service) Tick(ctx context.Context) error {
 			}
 		}
 		if (tmpl.Limits.PostsPerDay > 0 && summary.Posts >= tmpl.Limits.PostsPerDay) || (tmpl.Limits.RepliesPerDay > 0 && summary.Replies >= tmpl.Limits.RepliesPerDay) {
-			if err = s.opts.Store.PauseOwnerAgent(ctx, id); err != nil {
-				return err
-			}
 			if err = s.Notice(ctx, id, "daily_limit", day); err != nil {
 				return err
 			}
@@ -397,4 +430,15 @@ func wait(ctx context.Context, d time.Duration) error {
 	case <-timer.C:
 		return nil
 	}
+}
+
+func safeBotError(message string, cause error) error {
+	err := errors.New(message)
+	if errors.Is(cause, context.Canceled) {
+		return errors.Join(err, context.Canceled)
+	}
+	if errors.Is(cause, context.DeadlineExceeded) {
+		return errors.Join(err, context.DeadlineExceeded)
+	}
+	return err
 }

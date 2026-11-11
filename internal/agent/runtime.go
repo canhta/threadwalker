@@ -30,6 +30,10 @@ type Options struct {
 	Logger      *slog.Logger
 	FetchTrends func(context.Context) ([]tools.Trend, error)
 }
+
+// ErrNotRunning allows the scheduler to absorb an owner control racing selection.
+var ErrNotRunning = errors.New("starting wake: agent is not running")
+
 type Runtime struct{ opts Options }
 type WakeResult struct {
 	ID        int64
@@ -138,13 +142,16 @@ func (r *Runtime) Wake(ctx context.Context) (wake WakeResult, wakeErr error) {
 		return wake, err
 	}
 	if state.Status != "running" {
-		return wake, errors.New("starting wake: agent is not running")
+		return wake, ErrNotRunning
 	}
 	if !state.NextWake.IsZero() && state.NextWake.After(now) {
 		return wake, errors.New("starting wake: not due")
 	}
 	id, err := r.opts.Store.BeginWake(ctx, r.opts.Template.ID, now, r.fallback(now))
 	if err != nil {
+		if latest, e := r.opts.Store.AgentState(ctx, r.opts.Template.ID); e == nil && latest.Status != "running" {
+			return wake, ErrNotRunning
+		}
 		return wake, err
 	}
 	wake.ID = id
@@ -276,6 +283,9 @@ func (s Scheduler) Run(ctx context.Context, once bool) error {
 			continue
 		}
 		if _, err := selected.Wake(ctx); err != nil {
+			if errors.Is(err, ErrNotRunning) {
+				continue
+			}
 			return err
 		}
 		if once {

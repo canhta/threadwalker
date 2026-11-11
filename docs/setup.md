@@ -140,6 +140,30 @@ go run ./cmd/threadwalker check -agents agents -db data/threadwalker.db
 services. At its default `info` level it emits JSON lifecycle records to stdout.
 Telegram is disabled by default; disabled integrations do not read their credentials.
 
+When enabled, `run` starts one background long poller for each configured bot, sharing it among
+agents with that bot and owner. The same bot cannot select different owner chats. Runtime credentials
+must supply a nonzero numeric chat ID; values remain outside templates and logs. `run -offline`
+forces Telegram disabled before constructing services, including with explicit template files.
+Use `telegram.digest_hour: 18` for the default UTC digest hour (accepted range 0..23).
+
+The owner's private chat accepts `/pause`, `/resume`, `/kill`, `/dnc <username>` and `/status`.
+When a bot controls several agents, include the agent ID: `/pause <agent_id>`, `/resume <agent_id>`,
+`/kill <agent_id>`, `/dnc <agent_id> <username>`, `/status <agent_id>`. Unknown/ambiguous requests
+are ignored. A killed agent stays killed after `/resume`. Reply directly to a delivered question
+to answer it; unmatched replies and other chats are ignored. `ask_owner` returns a queued ID
+without waiting for delivery or a reply; only that agent receives the answer in a subsequent wake.
+
+The outbox makes one delivery attempt per message. Failed or interrupted sends are kept for
+diagnosis and are never automatically resent, including after restart. Filter owner outcome logs:
+
+```sh
+jq -c 'select(.event == "telegram.operation.finished") | {agent_id, tool_call_id, operation, outcome, reason}' events.jsonl
+```
+
+The fake Bot API integration and captured evidence are in
+[Telegram local verification](research/telegram-local.md); no real-bot transcript is claimed.
+
+
 ## Operational logs
 
 Choose the log level and format with flags. The canonical event names and

@@ -57,3 +57,34 @@ func TestTelegramOptionalAndExplicitlyEnabled(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestTelegramDigestHourUTC(t *testing.T) {
+	raw, err := os.ReadFile("../../agents/solo-builder.example.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	base := removeYAMLKeyBlock(string(raw), "telegram:")
+	for _, tc := range []struct {
+		hour    string
+		want    int
+		invalid bool
+	}{{"", 18, false}, {"0", 0, false}, {"23", 23, false}, {"24", 0, true}, {"-1", 0, true}, {"noon", 0, true}, {"null", 0, true}} {
+		t.Run(tc.hour, func(t *testing.T) {
+			text := base + "\ntelegram:\n  enabled: false\n"
+			if tc.hour != "" {
+				text += "  digest_hour: " + tc.hour + "\n"
+			}
+			path := filepath.Join(t.TempDir(), "agent.yaml")
+			if err = os.WriteFile(path, []byte(text), 0600); err != nil {
+				t.Fatal(err)
+			}
+			tmpl, err := config.LoadFile(path, func(string) string { return "synthetic-key" })
+			if (err != nil) != tc.invalid {
+				t.Fatalf("hour %q error %v", tc.hour, err)
+			}
+			if err == nil && tmpl.Telegram.DigestHour != tc.want {
+				t.Fatalf("hour %d want %d", tmpl.Telegram.DigestHour, tc.want)
+			}
+		})
+	}
+}

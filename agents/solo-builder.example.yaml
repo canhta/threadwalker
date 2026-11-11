@@ -91,6 +91,7 @@ limits:                           # starting values, no experimental basis
 threads:
   profile_dir: data/profiles/solo-builder
 telegram:
+  digest_hour: 18 # UTC, once per agent/day
   enabled: false # Local default; set true to require the owner integration credentials.
   bot_token_env: TELEGRAM_BOT_TOKEN
   owner_chat_id_env: TELEGRAM_OWNER_CHAT_ID

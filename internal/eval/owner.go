@@ -94,6 +94,9 @@ func runOwnerCase(ctx context.Context, c Case, p Profile, repeat int, opts Optio
 	tmpl.LLM.BaseURL = "https://fixture.invalid"
 	tmpl.LLM.APIKey = config.NewSecret("synthetic-owner-private-key")
 	tmpl.Telegram = config.TelegramConfig{DigestHour: 18}
+	steps, _, usd := effectiveLimits(opts, c.Limits)
+	tmpl.Limits.MaxStepsPerWake = steps
+	tmpl.Limits.MaxUSDPerDay = usd
 	if err = st.EnsureAgent(ctx, tmpl.ID); err != nil {
 		return r
 	}
@@ -111,6 +114,7 @@ func runOwnerCase(ctx context.Context, c Case, p Profile, repeat int, opts Optio
 		return r
 	}
 	fixture := agent.NewOfflineFixture(clock)
+	fixture.Calls = []llm.ToolCall{}
 	runtime, err := agent.New(agent.Options{Store: st, Template: tmpl, Now: clock, HTTPClient: fixture.Client(), FetchTrends: fixture.Trends, Logger: logger, Owner: svc})
 	if err != nil {
 		return r
@@ -168,23 +172,6 @@ func runOwnerCase(ctx context.Context, c Case, p Profile, repeat int, opts Optio
 		}
 		if len(api.sent()) != 0 {
 			return fail("ask_waited_for_delivery")
-		}
-		rows, err := st.DB().QueryContext(ctx, `SELECT tool FROM tool_calls WHERE wake_id=? ORDER BY id`, wake.ID)
-		if err != nil {
-			return r
-		}
-		for rows.Next() {
-			var name string
-			if rows.Scan(&name) != nil {
-				rows.Close()
-				return r
-			}
-			r.ToolCalls = append(r.ToolCalls, name)
-		}
-		err = rows.Err()
-		rows.Close()
-		if err != nil {
-			return r
 		}
 		if svc.Flush(ctx) != nil || len(api.sent()) != 2 {
 			return fail("question_delivery_failed")
@@ -271,6 +258,26 @@ func runOwnerCase(ctx context.Context, c Case, p Profile, repeat int, opts Optio
 	}
 	if !strings.Contains(logs.String(), logging.TelegramOperationFinished) {
 		return fail("owner_logs_missing")
+	}
+	rows, err := st.DB().QueryContext(ctx, `SELECT tool FROM tool_calls WHERE agent_id=? ORDER BY id`, tmpl.ID)
+	if err != nil {
+		return fail("owner_audit_read_failed")
+	}
+	for rows.Next() {
+		var name string
+		if rows.Scan(&name) != nil {
+			rows.Close()
+			return fail("owner_audit_read_failed")
+		}
+		r.ToolCalls = append(r.ToolCalls, name)
+	}
+	err = rows.Err()
+	rows.Close()
+	if err != nil {
+		return fail("owner_audit_read_failed")
+	}
+	if st.DB().QueryRowContext(ctx, `SELECT COALESCE(SUM(steps),0),COALESCE(SUM(tokens_in),0),COALESCE(SUM(tokens_out),0),COALESCE(SUM(cost_usd),0) FROM wakes WHERE agent_id=?`, tmpl.ID).Scan(&r.Steps, &r.TokensIn, &r.TokensOut, &r.CostUSD) != nil {
+		return fail("owner_usage_read_failed")
 	}
 	r.EndReason = "completed"
 	r.Passed, r.Reason = matches(c.Expect, r, "")
