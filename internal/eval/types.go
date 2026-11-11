@@ -26,20 +26,22 @@ type RuntimeCase struct {
 }
 
 type Case struct {
-	PlaybookScenario string                `json:"playbook_scenario,omitempty"`
-	MetricsScenario  string                `json:"metrics_scenario,omitempty"`
-	BrowserScenario  string                `json:"browser_scenario,omitempty"`
-	OwnerScenario    string                `json:"owner_scenario,omitempty"`
-	Guard            *GuardCase            `json:"guard,omitempty"`
-	Runtime          *RuntimeCase          `json:"runtime,omitempty"`
-	ID               string                `json:"id"`
-	Description      string                `json:"description,omitempty"`
-	Messages         []llm.Message         `json:"messages"`
-	Tools            []llm.Tool            `json:"tools,omitempty"`
-	Responses        map[string][]Response `json:"responses"`
-	ToolOutputs      map[string]string     `json:"tool_outputs,omitempty"`
-	Expect           Expectation           `json:"expect"`
-	Limits           Limits                `json:"limits,omitempty"`
+	DashboardScenario string                `json:"dashboard_scenario,omitempty"`
+	IsolationScenario string                `json:"isolation_scenario,omitempty"`
+	PlaybookScenario  string                `json:"playbook_scenario,omitempty"`
+	MetricsScenario   string                `json:"metrics_scenario,omitempty"`
+	BrowserScenario   string                `json:"browser_scenario,omitempty"`
+	OwnerScenario     string                `json:"owner_scenario,omitempty"`
+	Guard             *GuardCase            `json:"guard,omitempty"`
+	Runtime           *RuntimeCase          `json:"runtime,omitempty"`
+	ID                string                `json:"id"`
+	Description       string                `json:"description,omitempty"`
+	Messages          []llm.Message         `json:"messages"`
+	Tools             []llm.Tool            `json:"tools,omitempty"`
+	Responses         map[string][]Response `json:"responses"`
+	ToolOutputs       map[string]string     `json:"tool_outputs,omitempty"`
+	Expect            Expectation           `json:"expect"`
+	Limits            Limits                `json:"limits,omitempty"`
 }
 type Response struct {
 	Status  int             `json:"status,omitempty"`
