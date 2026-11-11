@@ -1,0 +1,1540 @@
+{
+  "version": "playbook-heavy-tail-v2",
+  "source_commit": "a209c1f1e64a3644754b1ab0ead2971c6eefd7aa",
+  "command": "go test ./internal/playbook -run TestPredeclaredSimulationSuite -v",
+  "assumptions": {
+    "baseline_controls_per_day": 30,
+    "baseline_actions_per_run": 300,
+    "baseline_warmup_days": 11.25,
+    "main_actions_per_day": 30,
+    "tagged_actions_per_day": 20,
+    "untagged_controls_per_day": 10,
+    "hypotheses_per_run": 5,
+    "outcome_delay_hours": "24 + uniform(0,6); censored outcomes at32h excluded",
+    "matching": "exact per-UTC-publication-day proportions;200 controls or consumed unavailable look",
+    "views": "Pareto shape1.3, minimum1000, cap1e9",
+    "engagement_rates": "lognormal median.01 log-SD1.25, capped1; integer likes, zero replies/reposts",
+    "effect": "engagement-rate multiplier; not a causal effect estimate",
+    "detection_delays": "days after first tagged action, conditional on detection; misses include rejected and pending",
+    "cost": "synthetic action counts, zero actual/estimated paid calls orUSD",
+    "sparse": "candidate epoch5actions/day:4tagged,1control; historical baseline still30controls/day",
+    "control_rate": "aggregate selected control successes across matched looks; reused controls counted in each look",
+    "limitations": [
+      "nonrandomized strategy labels",
+      "independent synthetic observations",
+      "UTCday matching does not control intraday confounding or serial dependence"
+    ]
+  },
+  "records": [
+    {
+      "name": "null-101",
+      "seed": 101,
+      "runs": 500,
+      "horizon_days": 430,
+      "rate": 0.002,
+      "established_runs": 1,
+      "established": 2,
+      "rejected": 2498,
+      "pending": 0,
+      "undetected": 2498,
+      "median_days": 51,
+      "p90_days": 101,
+      "baseline_p": 0.50298,
+      "test_p": 0.502096,
+      "actions": 6162837,
+      "measured": 3997400,
+      "censored": 0,
+      "awaiting": 0,
+      "warmup_days": 11.25,
+      "paid_calls": 0,
+      "paid_usd": 0.0,
+      "matched_control_p": 0.503711,
+      "measured_control_outcomes": 2005368,
+      "unavailable_control_looks": 5703,
+      "look_counts": [
+        {
+          "n": 50,
+          "attempted": 2500,
+          "unavailable": 2500
+        },
+        {
+          "n": 100,
+          "attempted": 2500,
+          "unavailable": 702
+        },
+        {
+          "n": 200,
+          "attempted": 2500,
+          "unavailable": 2
+        },
+        {
+          "n": 400,
+          "attempted": 2499,
+          "unavailable": 1
+        },
+        {
+          "n": 800,
+          "attempted": 2498,
+          "unavailable": 0
+        },
+        {
+          "n": 1600,
+          "attempted": 2498,
+          "unavailable": 2498
+        }
+      ]
+    },
+    {
+      "name": "null-211",
+      "seed": 211,
+      "runs": 500,
+      "horizon_days": 430,
+      "rate": 0.002,
+      "established_runs": 1,
+      "established": 1,
+      "rejected": 2499,
+      "pending": 0,
+      "undetected": 2499,
+      "median_days": 26,
+      "p90_days": 26,
+      "baseline_p": 0.50432,
+      "test_p": 0.500839,
+      "actions": 6162532,
+      "measured": 3997100,
+      "censored": 0,
+      "awaiting": 0,
+      "warmup_days": 11.25,
+      "paid_calls": 0,
+      "paid_usd": 0.0,
+      "matched_control_p": 0.500735,
+      "measured_control_outcomes": 2005364,
+      "unavailable_control_looks": 5649,
+      "look_counts": [
+        {
+          "n": 50,
+          "attempted": 2500,
+          "unavailable": 2500
+        },
+        {
+          "n": 100,
+          "attempted": 2500,
+          "unavailable": 647
+        },
+        {
+          "n": 200,
+          "attempted": 2499,
+          "unavailable": 1
+        },
+        {
+          "n": 400,
+          "attempted": 2498,
+          "unavailable": 2
+        },
+        {
+          "n": 800,
+          "attempted": 2498,
+          "unavailable": 1
+        },
+        {
+          "n": 1600,
+          "attempted": 2498,
+          "unavailable": 2498
+        }
+      ]
+    },
+    {
+      "name": "null-307",
+      "seed": 307,
+      "runs": 500,
+      "horizon_days": 430,
+      "rate": 0.0,
+      "established_runs": 0,
+      "established": 0,
+      "rejected": 2500,
+      "pending": 0,
+      "undetected": 2500,
+      "median_days": 0,
+      "p90_days": 0,
+      "baseline_p": 0.50651,
+      "test_p": 0.505305,
+      "actions": 6165426,
+      "measured": 4000000,
+      "censored": 0,
+      "awaiting": 0,
+      "warmup_days": 11.25,
+      "paid_calls": 0,
+      "paid_usd": 0.0,
+      "matched_control_p": 0.504159,
+      "measured_control_outcomes": 2005359,
+      "unavailable_control_looks": 5706,
+      "look_counts": [
+        {
+          "n": 50,
+          "attempted": 2500,
+          "unavailable": 2500
+        },
+        {
+          "n": 100,
+          "attempted": 2500,
+          "unavailable": 699
+        },
+        {
+          "n": 200,
+          "attempted": 2500,
+          "unavailable": 3
+        },
+        {
+          "n": 400,
+          "attempted": 2500,
+          "unavailable": 0
+        },
+        {
+          "n": 800,
+          "attempted": 2500,
+          "unavailable": 4
+        },
+        {
+          "n": 1600,
+          "attempted": 2500,
+          "unavailable": 2500
+        }
+      ]
+    },
+    {
+      "name": "effect-2x-101",
+      "seed": 101,
+      "runs": 500,
+      "horizon_days": 180,
+      "rate": 1.0,
+      "established_runs": 500,
+      "established": 2367,
+      "rejected": 0,
+      "pending": 133,
+      "undetected": 133,
+      "median_days": 51,
+      "p90_days": 102,
+      "baseline_p": 0.50119,
+      "test_p": 0.712585,
+      "actions": 1234284,
+      "measured": 597972,
+      "censored": 0,
+      "awaiting": 1553,
+      "warmup_days": 11.25,
+      "paid_calls": 0,
+      "paid_usd": 0.0,
+      "matched_control_p": 0.504108,
+      "measured_control_outcomes": 475232,
+      "unavailable_control_looks": 3263,
+      "look_counts": [
+        {
+          "n": 50,
+          "attempted": 2500,
+          "unavailable": 2500
+        },
+        {
+          "n": 100,
+          "attempted": 2500,
+          "unavailable": 760
+        },
+        {
+          "n": 200,
+          "attempted": 1792,
+          "unavailable": 3
+        },
+        {
+          "n": 400,
+          "attempted": 634,
+          "unavailable": 0
+        },
+        {
+          "n": 800,
+          "attempted": 0,
+          "unavailable": 0
+        },
+        {
+          "n": 1600,
+          "attempted": 0,
+          "unavailable": 0
+        }
+      ]
+    },
+    {
+      "name": "effect-2x-211",
+      "seed": 211,
+      "runs": 500,
+      "horizon_days": 180,
+      "rate": 0.996,
+      "established_runs": 498,
+      "established": 2312,
+      "rejected": 0,
+      "pending": 188,
+      "undetected": 188,
+      "median_days": 51,
+      "p90_days": 101,
+      "baseline_p": 0.50411,
+      "test_p": 0.713071,
+      "actions": 1255778,
+      "measured": 602020,
+      "censored": 0,
+      "awaiting": 2134,
+      "warmup_days": 11.25,
+      "paid_calls": 0,
+      "paid_usd": 0.0,
+      "matched_control_p": 0.50676,
+      "measured_control_outcomes": 492305,
+      "unavailable_control_looks": 3195,
+      "look_counts": [
+        {
+          "n": 50,
+          "attempted": 2500,
+          "unavailable": 2500
+        },
+        {
+          "n": 100,
+          "attempted": 2500,
+          "unavailable": 693
+        },
+        {
+          "n": 200,
+          "attempted": 1751,
+          "unavailable": 1
+        },
+        {
+          "n": 400,
+          "attempted": 588,
+          "unavailable": 1
+        },
+        {
+          "n": 800,
+          "attempted": 0,
+          "unavailable": 0
+        },
+        {
+          "n": 1600,
+          "attempted": 0,
+          "unavailable": 0
+        }
+      ]
+    },
+    {
+      "name": "effect-2x-307",
+      "seed": 307,
+      "runs": 500,
+      "horizon_days": 180,
+      "rate": 0.998,
+      "established_runs": 499,
+      "established": 2340,
+      "rejected": 0,
+      "pending": 160,
+      "undetected": 160,
+      "median_days": 51,
+      "p90_days": 101,
+      "baseline_p": 0.49962,
+      "test_p": 0.710089,
+      "actions": 1245786,
+      "measured": 594382,
+      "censored": 0,
+      "awaiting": 1912,
+      "warmup_days": 11.25,
+      "paid_calls": 0,
+      "paid_usd": 0.0,
+      "matched_control_p": 0.502456,
+      "measured_control_outcomes": 490048,
+      "unavailable_control_looks": 3234,
+      "look_counts": [
+        {
+          "n": 50,
+          "attempted": 2500,
+          "unavailable": 2500
+        },
+        {
+          "n": 100,
+          "attempted": 2500,
+          "unavailable": 731
+        },
+        {
+          "n": 200,
+          "attempted": 1753,
+          "unavailable": 3
+        },
+        {
+          "n": 400,
+          "attempted": 593,
+          "unavailable": 0
+        },
+        {
+          "n": 800,
+          "attempted": 0,
+          "unavailable": 0
+        },
+        {
+          "n": 1600,
+          "attempted": 0,
+          "unavailable": 0
+        }
+      ]
+    },
+    {
+      "name": "effect-4x",
+      "seed": 101,
+      "runs": 200,
+      "horizon_days": 180,
+      "rate": 1.0,
+      "established_runs": 200,
+      "established": 1000,
+      "rejected": 0,
+      "pending": 0,
+      "undetected": 0,
+      "median_days": 27,
+      "p90_days": 51,
+      "baseline_p": 0.5023,
+      "test_p": 0.864609,
+      "actions": 281743,
+      "measured": 127800,
+      "censored": 0,
+      "awaiting": 0,
+      "warmup_days": 11.25,
+      "paid_calls": 0,
+      "paid_usd": 0.0,
+      "matched_control_p": 0.499435,
+      "measured_control_outcomes": 89909,
+      "unavailable_control_looks": 1278,
+      "look_counts": [
+        {
+          "n": 50,
+          "attempted": 1000,
+          "unavailable": 1000
+        },
+        {
+          "n": 100,
+          "attempted": 1000,
+          "unavailable": 278
+        },
+        {
+          "n": 200,
+          "attempted": 278,
+          "unavailable": 0
+        },
+        {
+          "n": 400,
+          "attempted": 0,
+          "unavailable": 0
+        },
+        {
+          "n": 800,
+          "attempted": 0,
+          "unavailable": 0
+        },
+        {
+          "n": 1600,
+          "attempted": 0,
+          "unavailable": 0
+        }
+      ]
+    },
+    {
+      "name": "effect-1.25x",
+      "seed": 101,
+      "runs": 200,
+      "horizon_days": 430,
+      "rate": 0.095,
+      "established_runs": 19,
+      "established": 24,
+      "rejected": 976,
+      "pending": 0,
+      "undetected": 976,
+      "median_days": 52,
+      "p90_days": 101,
+      "baseline_p": 0.496825,
+      "test_p": 0.570478,
+      "actions": 2434768,
+      "measured": 1568600,
+      "censored": 0,
+      "awaiting": 0,
+      "warmup_days": 11.25,
+      "paid_calls": 0,
+      "paid_usd": 0.0,
+      "matched_control_p": 0.502643,
+      "measured_control_outcomes": 802137,
+      "unavailable_control_looks": 2251,
+      "look_counts": [
+        {
+          "n": 50,
+          "attempted": 1000,
+          "unavailable": 1000
+        },
+        {
+          "n": 100,
+          "attempted": 1000,
+          "unavailable": 272
+        },
+        {
+          "n": 200,
+          "attempted": 996,
+          "unavailable": 1
+        },
+        {
+          "n": 400,
+          "attempted": 987,
+          "unavailable": 0
+        },
+        {
+          "n": 800,
+          "attempted": 977,
+          "unavailable": 2
+        },
+        {
+          "n": 1600,
+          "attempted": 976,
+          "unavailable": 976
+        }
+      ]
+    },
+    {
+      "name": "negative-0.5x",
+      "seed": 101,
+      "runs": 200,
+      "horizon_days": 180,
+      "rate": 0.0,
+      "established_runs": 0,
+      "established": 0,
+      "rejected": 936,
+      "pending": 64,
+      "undetected": 1000,
+      "median_days": 0,
+      "p90_days": 0,
+      "baseline_p": 0.500125,
+      "test_p": 0.292624,
+      "actions": 498583,
+      "measured": 240090,
+      "censored": 0,
+      "awaiting": 751,
+      "warmup_days": 11.25,
+      "paid_calls": 0,
+      "paid_usd": 0.0,
+      "matched_control_p": 0.500702,
+      "measured_control_outcomes": 193968,
+      "unavailable_control_looks": 1294,
+      "look_counts": [
+        {
+          "n": 50,
+          "attempted": 1000,
+          "unavailable": 1000
+        },
+        {
+          "n": 100,
+          "attempted": 1000,
+          "unavailable": 292
+        },
+        {
+          "n": 200,
+          "attempted": 723,
+          "unavailable": 0
+        },
+        {
+          "n": 400,
+          "attempted": 238,
+          "unavailable": 2
+        },
+        {
+          "n": 800,
+          "attempted": 0,
+          "unavailable": 0
+        },
+        {
+          "n": 1600,
+          "attempted": 0,
+          "unavailable": 0
+        }
+      ]
+    },
+    {
+      "name": "sparse-2x",
+      "seed": 101,
+      "runs": 200,
+      "horizon_days": 28,
+      "rate": 0.0,
+      "established_runs": 0,
+      "established": 0,
+      "rejected": 0,
+      "pending": 1000,
+      "undetected": 1000,
+      "median_days": 0,
+      "p90_days": 0,
+      "baseline_p": 0.500125,
+      "test_p": 0.705463,
+      "actions": 88000,
+      "measured": 21600,
+      "censored": 0,
+      "awaiting": 1032,
+      "warmup_days": 11.25,
+      "paid_calls": 0,
+      "paid_usd": 0.0,
+      "matched_control_p": 0.0,
+      "measured_control_outcomes": 5368,
+      "unavailable_control_looks": 0,
+      "look_counts": [
+        {
+          "n": 50,
+          "attempted": 0,
+          "unavailable": 0
+        },
+        {
+          "n": 100,
+          "attempted": 0,
+          "unavailable": 0
+        },
+        {
+          "n": 200,
+          "attempted": 0,
+          "unavailable": 0
+        },
+        {
+          "n": 400,
+          "attempted": 0,
+          "unavailable": 0
+        },
+        {
+          "n": 800,
+          "attempted": 0,
+          "unavailable": 0
+        },
+        {
+          "n": 1600,
+          "attempted": 0,
+          "unavailable": 0
+        }
+      ]
+    },
+    {
+      "name": "missing-baseline",
+      "seed": 101,
+      "runs": 100,
+      "horizon_days": 60,
+      "rate": 0.0,
+      "established_runs": 0,
+      "established": 0,
+      "rejected": 0,
+      "pending": 500,
+      "undetected": 500,
+      "median_days": 0,
+      "p90_days": 0,
+      "baseline_p": 0.0,
+      "test_p": 0.0,
+      "actions": 180000,
+      "measured": 0,
+      "censored": 0,
+      "awaiting": 1140,
+      "warmup_days": 0.0,
+      "paid_calls": 0,
+      "paid_usd": 0.0,
+      "matched_control_p": 0.0,
+      "measured_control_outcomes": 58860,
+      "unavailable_control_looks": 0,
+      "look_counts": [
+        {
+          "n": 50,
+          "attempted": 0,
+          "unavailable": 0
+        },
+        {
+          "n": 100,
+          "attempted": 0,
+          "unavailable": 0
+        },
+        {
+          "n": 200,
+          "attempted": 0,
+          "unavailable": 0
+        },
+        {
+          "n": 400,
+          "attempted": 0,
+          "unavailable": 0
+        },
+        {
+          "n": 800,
+          "attempted": 0,
+          "unavailable": 0
+        },
+        {
+          "n": 1600,
+          "attempted": 0,
+          "unavailable": 0
+        }
+      ]
+    },
+    {
+      "name": "no-evidence",
+      "seed": 101,
+      "runs": 100,
+      "horizon_days": 60,
+      "rate": 0.0,
+      "established_runs": 0,
+      "established": 0,
+      "rejected": 0,
+      "pending": 500,
+      "undetected": 500,
+      "median_days": 0,
+      "p90_days": 0,
+      "baseline_p": 0.50675,
+      "test_p": 0.0,
+      "actions": 210000,
+      "measured": 0,
+      "censored": 176100,
+      "awaiting": 3900,
+      "warmup_days": 11.25,
+      "paid_calls": 0,
+      "paid_usd": 0.0,
+      "matched_control_p": 0.0,
+      "measured_control_outcomes": 0,
+      "unavailable_control_looks": 0,
+      "look_counts": [
+        {
+          "n": 50,
+          "attempted": 0,
+          "unavailable": 0
+        },
+        {
+          "n": 100,
+          "attempted": 0,
+          "unavailable": 0
+        },
+        {
+          "n": 200,
+          "attempted": 0,
+          "unavailable": 0
+        },
+        {
+          "n": 400,
+          "attempted": 0,
+          "unavailable": 0
+        },
+        {
+          "n": 800,
+          "attempted": 0,
+          "unavailable": 0
+        },
+        {
+          "n": 1600,
+          "attempted": 0,
+          "unavailable": 0
+        }
+      ]
+    },
+    {
+      "name": "delayed-2x",
+      "seed": 101,
+      "runs": 200,
+      "horizon_days": 180,
+      "rate": 0.935,
+      "established_runs": 187,
+      "established": 528,
+      "rejected": 0,
+      "pending": 472,
+      "undetected": 472,
+      "median_days": 68,
+      "p90_days": 71,
+      "baseline_p": 0.505175,
+      "test_p": 0.716268,
+      "actions": 884232,
+      "measured": 358712,
+      "censored": 204858,
+      "awaiting": 4288,
+      "warmup_days": 11.25,
+      "paid_calls": 0,
+      "paid_usd": 0.0,
+      "matched_control_p": 0.505839,
+      "measured_control_outcomes": 254208,
+      "unavailable_control_looks": 2745,
+      "look_counts": [
+        {
+          "n": 50,
+          "attempted": 1000,
+          "unavailable": 1000
+        },
+        {
+          "n": 100,
+          "attempted": 1000,
+          "unavailable": 1000
+        },
+        {
+          "n": 200,
+          "attempted": 1000,
+          "unavailable": 273
+        },
+        {
+          "n": 400,
+          "attempted": 472,
+          "unavailable": 472
+        },
+        {
+          "n": 800,
+          "attempted": 0,
+          "unavailable": 0
+        },
+        {
+          "n": 1600,
+          "attempted": 0,
+          "unavailable": 0
+        }
+      ]
+    },
+    {
+      "name": "missing-current-controls",
+      "seed": 101,
+      "runs": 200,
+      "horizon_days": 430,
+      "rate": 0.0,
+      "established_runs": 0,
+      "established": 0,
+      "rejected": 1000,
+      "pending": 0,
+      "undetected": 1000,
+      "median_days": 0,
+      "p90_days": 0,
+      "baseline_p": 0.505025,
+      "test_p": 0.712481,
+      "actions": 1666322,
+      "measured": 1600000,
+      "censored": 0,
+      "awaiting": 0,
+      "warmup_days": 11.25,
+      "paid_calls": 0,
+      "paid_usd": 0.0,
+      "matched_control_p": 0.0,
+      "measured_control_outcomes": 0,
+      "unavailable_control_looks": 6000,
+      "look_counts": [
+        {
+          "n": 50,
+          "attempted": 1000,
+          "unavailable": 1000
+        },
+        {
+          "n": 100,
+          "attempted": 1000,
+          "unavailable": 1000
+        },
+        {
+          "n": 200,
+          "attempted": 1000,
+          "unavailable": 1000
+        },
+        {
+          "n": 400,
+          "attempted": 1000,
+          "unavailable": 1000
+        },
+        {
+          "n": 800,
+          "attempted": 1000,
+          "unavailable": 1000
+        },
+        {
+          "n": 1600,
+          "attempted": 1000,
+          "unavailable": 1000
+        }
+      ]
+    },
+    {
+      "name": "common-start-shift-101",
+      "seed": 101,
+      "runs": 200,
+      "horizon_days": 430,
+      "rate": 0.005,
+      "established_runs": 1,
+      "established": 1,
+      "rejected": 999,
+      "pending": 0,
+      "undetected": 999,
+      "median_days": 27,
+      "p90_days": 27,
+      "baseline_p": 0.507675,
+      "test_p": 0.713602,
+      "actions": 2464683,
+      "measured": 1598500,
+      "censored": 0,
+      "awaiting": 0,
+      "warmup_days": 11.25,
+      "paid_calls": 0,
+      "paid_usd": 0.0,
+      "matched_control_p": 0.712621,
+      "measured_control_outcomes": 802154,
+      "unavailable_control_looks": 2286,
+      "look_counts": [
+        {
+          "n": 50,
+          "attempted": 1000,
+          "unavailable": 1000
+        },
+        {
+          "n": 100,
+          "attempted": 1000,
+          "unavailable": 285
+        },
+        {
+          "n": 200,
+          "attempted": 999,
+          "unavailable": 2
+        },
+        {
+          "n": 400,
+          "attempted": 999,
+          "unavailable": 0
+        },
+        {
+          "n": 800,
+          "attempted": 999,
+          "unavailable": 0
+        },
+        {
+          "n": 1600,
+          "attempted": 999,
+          "unavailable": 999
+        }
+      ]
+    },
+    {
+      "name": "common-start-shift-211",
+      "seed": 211,
+      "runs": 200,
+      "horizon_days": 430,
+      "rate": 0.02,
+      "established_runs": 4,
+      "established": 4,
+      "rejected": 996,
+      "pending": 0,
+      "undetected": 996,
+      "median_days": 27,
+      "p90_days": 201,
+      "baseline_p": 0.5037,
+      "test_p": 0.710663,
+      "actions": 2460955,
+      "measured": 1594800,
+      "censored": 0,
+      "awaiting": 0,
+      "warmup_days": 11.25,
+      "paid_calls": 0,
+      "paid_usd": 0.0,
+      "matched_control_p": 0.70927,
+      "measured_control_outcomes": 802134,
+      "unavailable_control_looks": 2277,
+      "look_counts": [
+        {
+          "n": 50,
+          "attempted": 1000,
+          "unavailable": 1000
+        },
+        {
+          "n": 100,
+          "attempted": 1000,
+          "unavailable": 280
+        },
+        {
+          "n": 200,
+          "attempted": 998,
+          "unavailable": 0
+        },
+        {
+          "n": 400,
+          "attempted": 997,
+          "unavailable": 1
+        },
+        {
+          "n": 800,
+          "attempted": 997,
+          "unavailable": 0
+        },
+        {
+          "n": 1600,
+          "attempted": 996,
+          "unavailable": 996
+        }
+      ]
+    },
+    {
+      "name": "common-start-shift-307",
+      "seed": 307,
+      "runs": 200,
+      "horizon_days": 430,
+      "rate": 0.0,
+      "established_runs": 0,
+      "established": 0,
+      "rejected": 1000,
+      "pending": 0,
+      "undetected": 1000,
+      "median_days": 0,
+      "p90_days": 0,
+      "baseline_p": 0.506125,
+      "test_p": 0.712114,
+      "actions": 2466170,
+      "measured": 1600000,
+      "censored": 0,
+      "awaiting": 0,
+      "warmup_days": 11.25,
+      "paid_calls": 0,
+      "paid_usd": 0.0,
+      "matched_control_p": 0.709683,
+      "measured_control_outcomes": 802147,
+      "unavailable_control_looks": 2290,
+      "look_counts": [
+        {
+          "n": 50,
+          "attempted": 1000,
+          "unavailable": 1000
+        },
+        {
+          "n": 100,
+          "attempted": 1000,
+          "unavailable": 285
+        },
+        {
+          "n": 200,
+          "attempted": 1000,
+          "unavailable": 3
+        },
+        {
+          "n": 400,
+          "attempted": 1000,
+          "unavailable": 0
+        },
+        {
+          "n": 800,
+          "attempted": 1000,
+          "unavailable": 2
+        },
+        {
+          "n": 1600,
+          "attempted": 1000,
+          "unavailable": 1000
+        }
+      ]
+    },
+    {
+      "name": "common-mid-up-101",
+      "seed": 101,
+      "runs": 200,
+      "horizon_days": 430,
+      "rate": 0.0,
+      "established_runs": 0,
+      "established": 0,
+      "rejected": 1000,
+      "pending": 0,
+      "undetected": 1000,
+      "median_days": 0,
+      "p90_days": 0,
+      "baseline_p": 0.506125,
+      "test_p": 0.697804,
+      "actions": 2466179,
+      "measured": 1600000,
+      "censored": 0,
+      "awaiting": 0,
+      "warmup_days": 11.25,
+      "paid_calls": 0,
+      "paid_usd": 0.0,
+      "matched_control_p": 0.612193,
+      "measured_control_outcomes": 802151,
+      "unavailable_control_looks": 2284,
+      "look_counts": [
+        {
+          "n": 50,
+          "attempted": 1000,
+          "unavailable": 1000
+        },
+        {
+          "n": 100,
+          "attempted": 1000,
+          "unavailable": 282
+        },
+        {
+          "n": 200,
+          "attempted": 1000,
+          "unavailable": 2
+        },
+        {
+          "n": 400,
+          "attempted": 1000,
+          "unavailable": 0
+        },
+        {
+          "n": 800,
+          "attempted": 1000,
+          "unavailable": 0
+        },
+        {
+          "n": 1600,
+          "attempted": 1000,
+          "unavailable": 1000
+        }
+      ]
+    },
+    {
+      "name": "common-mid-up-211",
+      "seed": 211,
+      "runs": 200,
+      "horizon_days": 430,
+      "rate": 0.005,
+      "established_runs": 1,
+      "established": 1,
+      "rejected": 999,
+      "pending": 0,
+      "undetected": 999,
+      "median_days": 26,
+      "p90_days": 26,
+      "baseline_p": 0.50955,
+      "test_p": 0.695991,
+      "actions": 2464667,
+      "measured": 1598500,
+      "censored": 0,
+      "awaiting": 0,
+      "warmup_days": 11.25,
+      "paid_calls": 0,
+      "paid_usd": 0.0,
+      "matched_control_p": 0.610052,
+      "measured_control_outcomes": 802140,
+      "unavailable_control_looks": 2256,
+      "look_counts": [
+        {
+          "n": 50,
+          "attempted": 1000,
+          "unavailable": 1000
+        },
+        {
+          "n": 100,
+          "attempted": 1000,
+          "unavailable": 256
+        },
+        {
+          "n": 200,
+          "attempted": 999,
+          "unavailable": 0
+        },
+        {
+          "n": 400,
+          "attempted": 999,
+          "unavailable": 1
+        },
+        {
+          "n": 800,
+          "attempted": 999,
+          "unavailable": 0
+        },
+        {
+          "n": 1600,
+          "attempted": 999,
+          "unavailable": 999
+        }
+      ]
+    },
+    {
+      "name": "common-mid-up-307",
+      "seed": 307,
+      "runs": 200,
+      "horizon_days": 430,
+      "rate": 0.0,
+      "established_runs": 0,
+      "established": 0,
+      "rejected": 1000,
+      "pending": 0,
+      "undetected": 1000,
+      "median_days": 0,
+      "p90_days": 0,
+      "baseline_p": 0.5063,
+      "test_p": 0.696371,
+      "actions": 2466170,
+      "measured": 1600000,
+      "censored": 0,
+      "awaiting": 0,
+      "warmup_days": 11.25,
+      "paid_calls": 0,
+      "paid_usd": 0.0,
+      "matched_control_p": 0.611168,
+      "measured_control_outcomes": 802147,
+      "unavailable_control_looks": 2290,
+      "look_counts": [
+        {
+          "n": 50,
+          "attempted": 1000,
+          "unavailable": 1000
+        },
+        {
+          "n": 100,
+          "attempted": 1000,
+          "unavailable": 285
+        },
+        {
+          "n": 200,
+          "attempted": 1000,
+          "unavailable": 3
+        },
+        {
+          "n": 400,
+          "attempted": 1000,
+          "unavailable": 0
+        },
+        {
+          "n": 800,
+          "attempted": 1000,
+          "unavailable": 2
+        },
+        {
+          "n": 1600,
+          "attempted": 1000,
+          "unavailable": 1000
+        }
+      ]
+    },
+    {
+      "name": "common-mid-down-101",
+      "seed": 101,
+      "runs": 200,
+      "horizon_days": 430,
+      "rate": 0.01,
+      "established_runs": 2,
+      "established": 2,
+      "rejected": 998,
+      "pending": 0,
+      "undetected": 998,
+      "median_days": 51,
+      "p90_days": 101,
+      "baseline_p": 0.50395,
+      "test_p": 0.519005,
+      "actions": 2463581,
+      "measured": 1597400,
+      "censored": 0,
+      "awaiting": 0,
+      "warmup_days": 11.25,
+      "paid_calls": 0,
+      "paid_usd": 0.0,
+      "matched_control_p": 0.604995,
+      "measured_control_outcomes": 802146,
+      "unavailable_control_looks": 2284,
+      "look_counts": [
+        {
+          "n": 50,
+          "attempted": 1000,
+          "unavailable": 1000
+        },
+        {
+          "n": 100,
+          "attempted": 1000,
+          "unavailable": 286
+        },
+        {
+          "n": 200,
+          "attempted": 1000,
+          "unavailable": 0
+        },
+        {
+          "n": 400,
+          "attempted": 999,
+          "unavailable": 0
+        },
+        {
+          "n": 800,
+          "attempted": 998,
+          "unavailable": 0
+        },
+        {
+          "n": 1600,
+          "attempted": 998,
+          "unavailable": 998
+        }
+      ]
+    },
+    {
+      "name": "common-mid-down-211",
+      "seed": 211,
+      "runs": 200,
+      "horizon_days": 430,
+      "rate": 0.01,
+      "established_runs": 2,
+      "established": 2,
+      "rejected": 998,
+      "pending": 0,
+      "undetected": 998,
+      "median_days": 51,
+      "p90_days": 201,
+      "baseline_p": 0.4979,
+      "test_p": 0.51285,
+      "actions": 2463968,
+      "measured": 1597800,
+      "censored": 0,
+      "awaiting": 0,
+      "warmup_days": 11.25,
+      "paid_calls": 0,
+      "paid_usd": 0.0,
+      "matched_control_p": 0.595798,
+      "measured_control_outcomes": 802138,
+      "unavailable_control_looks": 2263,
+      "look_counts": [
+        {
+          "n": 50,
+          "attempted": 1000,
+          "unavailable": 1000
+        },
+        {
+          "n": 100,
+          "attempted": 1000,
+          "unavailable": 263
+        },
+        {
+          "n": 200,
+          "attempted": 1000,
+          "unavailable": 0
+        },
+        {
+          "n": 400,
+          "attempted": 999,
+          "unavailable": 1
+        },
+        {
+          "n": 800,
+          "attempted": 999,
+          "unavailable": 1
+        },
+        {
+          "n": 1600,
+          "attempted": 998,
+          "unavailable": 998
+        }
+      ]
+    },
+    {
+      "name": "common-mid-down-307",
+      "seed": 307,
+      "runs": 200,
+      "horizon_days": 430,
+      "rate": 0.0,
+      "established_runs": 0,
+      "established": 0,
+      "rejected": 1000,
+      "pending": 0,
+      "undetected": 1000,
+      "median_days": 0,
+      "p90_days": 0,
+      "baseline_p": 0.5063,
+      "test_p": 0.518832,
+      "actions": 2466170,
+      "measured": 1600000,
+      "censored": 0,
+      "awaiting": 0,
+      "warmup_days": 11.25,
+      "paid_calls": 0,
+      "paid_usd": 0.0,
+      "matched_control_p": 0.599879,
+      "measured_control_outcomes": 802147,
+      "unavailable_control_looks": 2290,
+      "look_counts": [
+        {
+          "n": 50,
+          "attempted": 1000,
+          "unavailable": 1000
+        },
+        {
+          "n": 100,
+          "attempted": 1000,
+          "unavailable": 285
+        },
+        {
+          "n": 200,
+          "attempted": 1000,
+          "unavailable": 3
+        },
+        {
+          "n": 400,
+          "attempted": 1000,
+          "unavailable": 0
+        },
+        {
+          "n": 800,
+          "attempted": 1000,
+          "unavailable": 2
+        },
+        {
+          "n": 1600,
+          "attempted": 1000,
+          "unavailable": 1000
+        }
+      ]
+    },
+    {
+      "name": "common-reversal-101",
+      "seed": 101,
+      "runs": 200,
+      "horizon_days": 430,
+      "rate": 0.0,
+      "established_runs": 0,
+      "established": 0,
+      "rejected": 1000,
+      "pending": 0,
+      "undetected": 1000,
+      "median_days": 0,
+      "p90_days": 0,
+      "baseline_p": 0.506125,
+      "test_p": 0.520149,
+      "actions": 2466179,
+      "measured": 1600000,
+      "censored": 0,
+      "awaiting": 0,
+      "warmup_days": 11.25,
+      "paid_calls": 0,
+      "paid_usd": 0.0,
+      "matched_control_p": 0.551557,
+      "measured_control_outcomes": 802151,
+      "unavailable_control_looks": 2284,
+      "look_counts": [
+        {
+          "n": 50,
+          "attempted": 1000,
+          "unavailable": 1000
+        },
+        {
+          "n": 100,
+          "attempted": 1000,
+          "unavailable": 282
+        },
+        {
+          "n": 200,
+          "attempted": 1000,
+          "unavailable": 2
+        },
+        {
+          "n": 400,
+          "attempted": 1000,
+          "unavailable": 0
+        },
+        {
+          "n": 800,
+          "attempted": 1000,
+          "unavailable": 0
+        },
+        {
+          "n": 1600,
+          "attempted": 1000,
+          "unavailable": 1000
+        }
+      ]
+    },
+    {
+      "name": "common-reversal-211",
+      "seed": 211,
+      "runs": 200,
+      "horizon_days": 430,
+      "rate": 0.005,
+      "established_runs": 1,
+      "established": 1,
+      "rejected": 999,
+      "pending": 0,
+      "undetected": 999,
+      "median_days": 26,
+      "p90_days": 26,
+      "baseline_p": 0.50955,
+      "test_p": 0.51823,
+      "actions": 2464667,
+      "measured": 1598500,
+      "censored": 0,
+      "awaiting": 0,
+      "warmup_days": 11.25,
+      "paid_calls": 0,
+      "paid_usd": 0.0,
+      "matched_control_p": 0.549648,
+      "measured_control_outcomes": 802140,
+      "unavailable_control_looks": 2256,
+      "look_counts": [
+        {
+          "n": 50,
+          "attempted": 1000,
+          "unavailable": 1000
+        },
+        {
+          "n": 100,
+          "attempted": 1000,
+          "unavailable": 256
+        },
+        {
+          "n": 200,
+          "attempted": 999,
+          "unavailable": 0
+        },
+        {
+          "n": 400,
+          "attempted": 999,
+          "unavailable": 1
+        },
+        {
+          "n": 800,
+          "attempted": 999,
+          "unavailable": 0
+        },
+        {
+          "n": 1600,
+          "attempted": 999,
+          "unavailable": 999
+        }
+      ]
+    },
+    {
+      "name": "common-reversal-307",
+      "seed": 307,
+      "runs": 200,
+      "horizon_days": 430,
+      "rate": 0.0,
+      "established_runs": 0,
+      "established": 0,
+      "rejected": 1000,
+      "pending": 0,
+      "undetected": 1000,
+      "median_days": 0,
+      "p90_days": 0,
+      "baseline_p": 0.5063,
+      "test_p": 0.518929,
+      "actions": 2466170,
+      "measured": 1600000,
+      "censored": 0,
+      "awaiting": 0,
+      "warmup_days": 11.25,
+      "paid_calls": 0,
+      "paid_usd": 0.0,
+      "matched_control_p": 0.548879,
+      "measured_control_outcomes": 802147,
+      "unavailable_control_looks": 2290,
+      "look_counts": [
+        {
+          "n": 50,
+          "attempted": 1000,
+          "unavailable": 1000
+        },
+        {
+          "n": 100,
+          "attempted": 1000,
+          "unavailable": 285
+        },
+        {
+          "n": 200,
+          "attempted": 1000,
+          "unavailable": 3
+        },
+        {
+          "n": 400,
+          "attempted": 1000,
+          "unavailable": 0
+        },
+        {
+          "n": 800,
+          "attempted": 1000,
+          "unavailable": 2
+        },
+        {
+          "n": 1600,
+          "attempted": 1000,
+          "unavailable": 1000
+        }
+      ]
+    }
+  ],
+  "reporting_source_commit": "4bee51e7436d32505047ebe858802ad02ab94d83",
+  "go_version": "go version go1.27.3 linux/amd64"
+}

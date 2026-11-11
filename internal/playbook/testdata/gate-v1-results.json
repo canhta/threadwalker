@@ -1,0 +1,71 @@
+{
+  "version": "playbook-heavy-tail-v1",
+  "source_commit": "f1a51950c3cc36b2061529de16b09834337d7f64",
+  "command": "go test ./internal/playbook -run TestPredeclaredSimulationSuite -v",
+  "policy": "Historical reference only; superseded after common-drift false promotions were measured. Reproduce using the immutable source commit, not the v2 engine.",
+  "stationary_null": {
+    "seeds": [
+      17,
+      29,
+      43
+    ],
+    "runs_per_seed": 500,
+    "horizon_days": 365,
+    "hypotheses_per_run": 5,
+    "established_runs_by_seed": [
+      1,
+      8,
+      9
+    ],
+    "combined_established_runs": 18,
+    "combined_runs": 1500,
+    "combined_fraction": 0.012
+  },
+  "true_2x": {
+    "seeds": [
+      17,
+      29,
+      43
+    ],
+    "runs_per_seed": 500,
+    "horizon_days": 180,
+    "hypotheses_per_run": 5,
+    "established_hypotheses_by_seed": [
+      2463,
+      2456,
+      2462
+    ],
+    "undetected_hypotheses_by_seed": [
+      37,
+      44,
+      38
+    ],
+    "median_detection_days_by_seed": [
+      18,
+      18,
+      18
+    ],
+    "p90_detection_days_by_seed": [
+      68,
+      68,
+      68
+    ],
+    "baseline_warmup_days": 11.25,
+    "tagged_actions_per_day": 30,
+    "contemporaneous_controls_per_day": 0
+  },
+  "common_drift_no_relative_effect": {
+    "seed": 17,
+    "runs": 200,
+    "horizon_days": 180,
+    "hypotheses_per_run": 5,
+    "historical_rate_multiplier": 0.5,
+    "current_rate_multiplier": 1,
+    "established_runs": 200,
+    "established_run_fraction": 1,
+    "established_hypotheses": 985,
+    "pending_hypotheses": 15
+  },
+  "paid_calls": 0,
+  "paid_usd": 0
+}
