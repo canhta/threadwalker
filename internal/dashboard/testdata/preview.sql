@@ -1,0 +1,21 @@
+-- Synthetic local dashboard display fixture; no real account or engagement evidence.
+INSERT INTO "actions" VALUES(1,'synthetic-builder','post','private synthetic text','','','[]',0,'2026-11-11T15:01:00Z','https://www.threads.net/@synthetic_0/post/SYNTHETIC0');
+INSERT INTO "actions" VALUES(2,'synthetic-builder','post','private synthetic text','','','[]',0,'2026-11-11T15:01:00Z','https://www.threads.net/@synthetic_0/post/SYNTHETIC1');
+INSERT INTO "actions" VALUES(3,'synthetic-second','post','private synthetic text','','','[]',0,'2026-11-11T15:01:00Z','https://www.threads.net/@synthetic_1/post/SYNTHETIC0');
+INSERT INTO "actions" VALUES(4,'synthetic-second','post','private synthetic text','','','[]',0,'2026-11-11T15:01:00Z','https://www.threads.net/@synthetic_1/post/SYNTHETIC1');
+INSERT INTO "agents" VALUES('synthetic-builder','running','2026-11-11T18:00:00Z','private synthetic note');
+INSERT INTO "agents" VALUES('synthetic-second','paused','2026-11-11T18:00:00Z','private synthetic note');
+INSERT INTO "ledger" VALUES('synthetic-builder','2026-11-11',0,0,0.24);
+INSERT INTO "ledger" VALUES('synthetic-second','2026-11-11',0,0,3.39999999999999968e-01);
+INSERT INTO "playbook" VALUES(1,'synthetic-builder','private synthetic hypothesis','testing',50,4,'2026-11-11T15:00:00Z',NULL,1);
+INSERT INTO "playbook" VALUES(2,'synthetic-builder','private synthetic hypothesis','rejected',50,4,'2026-11-11T15:00:00Z',NULL,1);
+INSERT INTO "playbook" VALUES(3,'synthetic-second','private synthetic hypothesis','testing',50,4,'2026-11-11T15:00:00Z',NULL,1);
+INSERT INTO "playbook" VALUES(4,'synthetic-second','private synthetic hypothesis','rejected',50,4,'2026-11-11T15:00:00Z',NULL,1);
+INSERT INTO "tool_calls" VALUES(1,'synthetic-builder',1,'read_own_metrics','{}','{"outcome":"success","bytes":108}','','2026-11-11T15:01:00Z');
+INSERT INTO "tool_calls" VALUES(2,'synthetic-builder',1,'read_own_metrics','{}','{"outcome":"success","bytes":108}','','2026-11-11T15:01:00Z');
+INSERT INTO "tool_calls" VALUES(3,'synthetic-second',1,'read_own_metrics','{}','{"outcome":"success","bytes":108}','','2026-11-11T15:01:00Z');
+INSERT INTO "tool_calls" VALUES(4,'synthetic-second',1,'read_own_metrics','{}','{"outcome":"success","bytes":108}','','2026-11-11T15:01:00Z');
+INSERT INTO "wakes" VALUES(1,'synthetic-builder','2026-11-11T15:00:00Z','2026-11-11T15:01:00Z',4,320,96,0.12,'completed','agent');
+INSERT INTO "wakes" VALUES(2,'synthetic-builder','2026-11-11T15:00:00Z','2026-11-11T15:01:00Z',4,320,96,0.12,'completed','agent');
+INSERT INTO "wakes" VALUES(3,'synthetic-second','2026-11-11T15:00:00Z','2026-11-11T15:01:00Z',4,320,96,0.12,'completed','agent');
+INSERT INTO "wakes" VALUES(4,'synthetic-second','2026-11-11T15:00:00Z','2026-11-11T15:01:00Z',4,320,96,0.12,'completed','agent');
