@@ -1,0 +1,204 @@
+{{define "page"}}<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ThreadWalker activity</title>
+<link rel="stylesheet" href="/dashboard.css">
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to activity</a>
+
+<header class="masthead">
+  <div class="masthead-row">
+    <h1>ThreadWalker activity</h1>
+    <p class="masthead-updated">{{if .GeneratedAt}}Updated <time>{{.GeneratedAt}}</time>{{else}}Update time not recorded{{end}}</p>
+  </div>
+  <p class="masthead-day"><span class="label">Day</span> {{if .Day}}<time>{{.Day}}</time>{{else}}Not recorded{{end}}</p>
+</header>
+
+{{if .Agents}}
+<nav class="agent-nav" aria-label="Agents">
+  <ul>
+    {{range .Agents}}
+    <li>
+      <a href="#agent-{{.ID}}">{{.ID}}</a>
+      <span class="status{{if eq .Status "running"}} status-running{{else if eq .Status "paused"}} status-paused{{else if eq .Status "killed"}} status-killed{{else}} status-unknown{{end}}">{{if eq .Status "running"}}Running{{else if eq .Status "paused"}}Paused{{else if eq .Status "killed"}}Killed{{else}}Unknown{{end}}</span>
+    </li>
+    {{end}}
+  </ul>
+</nav>
+{{end}}
+
+<main id="main">
+{{if .Agents}}
+{{range .Agents}}
+<section class="agent" id="agent-{{.ID}}" aria-labelledby="agent-heading-{{.ID}}">
+  <header class="agent-head">
+    <div class="agent-title">
+      <h2 id="agent-heading-{{.ID}}">{{.ID}}</h2>
+      <p class="status{{if eq .Status "running"}} status-running{{else if eq .Status "paused"}} status-paused{{else if eq .Status "killed"}} status-killed{{else}} status-unknown{{end}}">{{if eq .Status "running"}}Running{{else if eq .Status "paused"}}Paused{{else if eq .Status "killed"}}Killed{{else}}Unknown{{end}}</p>
+    </div>
+    <dl class="agent-figures">
+      <div>
+        <dt>Daily budget</dt>
+        <dd>{{printf "$%.2f" .DailyBudgetUSD}}</dd>
+      </div>
+      <div>
+        <dt>Spent today</dt>
+        <dd>{{printf "$%.2f" .SpentUSD}}</dd>
+      </div>
+      <div>
+        <dt>Remaining</dt>
+        <dd>{{printf "$%.2f" .RemainingUSD}}</dd>
+      </div>
+      <div>
+        <dt>Next wake</dt>
+        <dd>{{if .NextWake}}<time>{{.NextWake}}</time>{{else}}Not scheduled{{end}}</dd>
+      </div>
+    </dl>
+  </header>
+
+  <section class="panel" aria-labelledby="agent-wakes-{{.ID}}">
+    <h3 id="agent-wakes-{{.ID}}">Recent wakes</h3>
+    {{if .Wakes}}
+    <table>
+      <caption class="visually-hidden">Recent wakes for {{.ID}}</caption>
+      <thead>
+        <tr>
+          <th scope="col">Started</th>
+          <th scope="col">Ended</th>
+          <th scope="col">Kind</th>
+          <th scope="col" class="num">Steps</th>
+          <th scope="col" class="num">Tokens in</th>
+          <th scope="col" class="num">Tokens out</th>
+          <th scope="col" class="num">Cost</th>
+          <th scope="col">Ended because</th>
+        </tr>
+      </thead>
+      <tbody>
+        {{range .Wakes}}
+        <tr>
+          <td data-label="Started">{{if .StartedAt}}<time>{{.StartedAt}}</time>{{else}}Not recorded{{end}}</td>
+          <td data-label="Ended">{{if .EndedAt}}<time>{{.EndedAt}}</time>{{else}}In progress{{end}}</td>
+          <td data-label="Kind">{{if eq .Kind "agent"}}Agent{{else if eq .Kind "metrics"}}Metrics{{else}}Other{{end}}</td>
+          <td class="num" data-label="Steps">{{.Steps}}</td>
+          <td class="num" data-label="Tokens in">{{.TokensIn}}</td>
+          <td class="num" data-label="Tokens out">{{.TokensOut}}</td>
+          <td class="num" data-label="Cost">{{printf "$%.4f" .CostUSD}}</td>
+          <td data-label="Ended because">{{if .EndReason}}{{.EndReason}}{{else if .EndedAt}}Not recorded{{else}}In progress{{end}}</td>
+        </tr>
+        {{end}}
+      </tbody>
+    </table>
+    {{else}}
+    <p class="empty">No wakes recorded yet.</p>
+    {{end}}
+  </section>
+
+  <div class="panel-split">
+    <section class="panel" aria-labelledby="agent-actions-{{.ID}}">
+      <h3 id="agent-actions-{{.ID}}">Published actions</h3>
+      {{if .Actions}}
+      <table>
+        <caption class="visually-hidden">Published actions for {{.ID}}</caption>
+        <thead>
+          <tr>
+            <th scope="col" class="num">ID</th>
+            <th scope="col">Kind</th>
+            <th scope="col">Published</th>
+            <th scope="col">Link</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{range .Actions}}
+          <tr>
+            <td class="num" data-label="ID">{{.ID}}</td>
+            <td data-label="Kind">{{if eq .Kind "post"}}Post{{else if eq .Kind "reply"}}Reply{{else}}Action{{end}}</td>
+            <td data-label="Published">{{if .PublishedAt}}<time>{{.PublishedAt}}</time>{{else}}Not recorded{{end}}</td>
+            <td data-label="Link">{{if .URL}}<a href="{{.URL}}" rel="noreferrer noopener">Action #{{.ID}}</a>{{else}}<span class="muted">No public link</span>{{end}}</td>
+          </tr>
+          {{end}}
+        </tbody>
+      </table>
+      {{else}}
+      <p class="empty">No published actions yet.</p>
+      {{end}}
+    </section>
+
+    <section class="panel" aria-labelledby="agent-playbook-{{.ID}}">
+      <h3 id="agent-playbook-{{.ID}}">Playbook</h3>
+      {{if .Playbook}}
+      <table>
+        <caption class="visually-hidden">Playbook for {{.ID}}</caption>
+        <thead>
+          <tr>
+            <th scope="col">Status</th>
+            <th scope="col" class="num">Sample</th>
+            <th scope="col" class="num">Successes</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{range .Playbook}}
+          <tr>
+            <td data-label="Status"><span class="hypothesis{{if eq .Status "testing"}} hypothesis-testing{{else if eq .Status "established"}} hypothesis-established{{else if eq .Status "rejected"}} hypothesis-rejected{{else}} hypothesis-unknown{{end}}">{{if eq .Status "testing"}}Testing{{else if eq .Status "established"}}Established{{else if eq .Status "rejected"}}Rejected{{else}}Unknown{{end}}</span></td>
+            <td class="num" data-label="Sample">{{.N}}</td>
+            <td class="num" data-label="Successes">{{.Successes}}</td>
+          </tr>
+          {{end}}
+        </tbody>
+      </table>
+      {{else}}
+      <p class="empty">No hypotheses yet.</p>
+      {{end}}
+    </section>
+  </div>
+
+  <section class="panel" aria-labelledby="agent-tools-{{.ID}}">
+    <h3 id="agent-tools-{{.ID}}">Recent tools</h3>
+    {{if .Tools}}
+    <table>
+      <caption class="visually-hidden">Recent tool calls for {{.ID}}</caption>
+      <thead>
+        <tr>
+          <th scope="col" class="num">ID</th>
+          <th scope="col" class="num">Wake</th>
+          <th scope="col">Tool</th>
+          <th scope="col">At</th>
+          <th scope="col">Outcome</th>
+          <th scope="col">Detail</th>
+        </tr>
+      </thead>
+      <tbody>
+        {{range .Tools}}
+        <tr>
+          <td class="num" data-label="ID">{{.ID}}</td>
+          <td class="num" data-label="Wake">{{.WakeID}}</td>
+          <td class="mono" data-label="Tool">{{.Name}}</td>
+          <td data-label="At">{{if .At}}<time>{{.At}}</time>{{else}}Not recorded{{end}}</td>
+          <td data-label="Outcome">{{if eq .Outcome "ok"}}OK{{else if .Outcome}}{{.Outcome}}{{else}}Not recorded{{end}}</td>
+          <td class="mono" data-label="Detail">{{if .Detail}}{{.Detail}}{{else}}<span class="muted">No detail</span>{{end}}</td>
+        </tr>
+        {{end}}
+      </tbody>
+    </table>
+    {{else}}
+    <p class="empty">No tool calls recorded yet.</p>
+    {{end}}
+  </section>
+</section>
+{{end}}
+{{else}}
+<section class="empty-page" aria-labelledby="empty-heading">
+  <h2 id="empty-heading">No agent activity to show</h2>
+  <p>This read-only page lists the agents selected in the local configuration.</p>
+</section>
+{{end}}
+</main>
+
+<footer class="site-footer">
+  <p>Read-only view of local ThreadWalker state.</p>
+</footer>
+</body>
+</html>
+{{end}}
