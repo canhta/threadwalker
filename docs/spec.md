@@ -76,7 +76,11 @@ job. **(proposed)**
 - Do-not-contact list, filled three ways: a string match on stop requests in replies addressed to
   the agent, the agent calling `mark_do_not_contact` when someone is annoyed, and the owner's
   `/dnc <username>` command. Entries are permanent for the agent.
+- The tools in section 5 are the agent's whole action surface: it cannot like, follow, message,
+  delete, or edit the profile.
 - Forbidden-phrase check by plain string match before posting.
+- A reply contains no URL and mentions no username other than the author it answers.
+- At most one reply per thread per day.
 - No profiles of strangers: store only username and counters needed for rate limiting.
   **(sourced)**: Meta Platform Terms 3.a.v, and stored third-party content is a known
   memory-injection surface.

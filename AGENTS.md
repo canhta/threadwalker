@@ -3,18 +3,54 @@
 `docs/spec.md` is the single source of truth. Read it and `GLOSSARY.md` before starting an issue.
 Read `docs/research/` when an issue cites it or when you doubt a claim in the spec.
 
-## Working rules
+## Taking an issue
 
-- One issue per branch and pull request, scoped to that issue's "Done when" list.
+1. Pick an open issue with zero open blockers:
+   `gh api repos/canhta/threadwalker/issues/<n> --jq .issue_dependencies_summary.blocked_by` prints 0.
+2. Claim it: `gh issue edit <n> --add-assignee @me`. Skip issues that already have an assignee.
+3. Branch from `main` as `issue-<n>-<slug>`.
+4. Build the "Done when" list, one item at a time, test first.
+5. Open a PR titled like the issue, with `Closes #<n>` and, under each "Done when" item, the
+   evidence that it holds (test name, command output, or file path).
+
+The issue is done when every "Done when" box is ticked with evidence and
+`go vet ./... && go test ./...` passes.
+
+## Scope
+
+- A PR changes what its issue's Scope lists. Anything else you notice becomes a new issue.
 - If the issue and the spec disagree, or the spec is silent, ask in the issue before writing code.
-- Go, single binary, standard library first. Add a dependency only when the issue names it.
-- Every branch, loop and parser ships with a test. Gate before a PR: `go vet ./... && go test ./...`.
+- A changed decision is an edit to `docs/spec.md` in the same PR. The repo holds one statement of
+  each decision, and one file per topic: extend the existing file.
 - Where the spec says "untested" or lists an unknown, measure it and record the result in
   `docs/research/`.
-- A changed decision is an edit to `docs/spec.md` in the same PR. The repo holds one statement of
-  each decision.
+- `AGENTS.md`, the guards and the invariants below change only in a PR the owner asked for.
+
+## Code
+
+- Go, single binary, standard library first. Add a dependency only when the issue names it.
+- Every network call takes a `context.Context` with a timeout.
+- Errors are returned and wrapped with what was being attempted; only `main` exits the process.
+- Time and randomness come from an injected clock and source, so tests are deterministic.
+- SQL uses parameters. Schema changes are new migration files.
+- Logging is `log/slog`; log ids, counts and reasons.
+- Every branch, loop and parser has a test. Tests use `httptest` servers and saved fixtures, and
+  run offline.
+
+## Live systems
+
+- Work in dry run. Real posts and replies happen only in an issue whose Scope says so.
+- Use the VPS, the Threads account, Telegram or a paid API only when the issue's Scope names it.
 - Issues labelled `needs-owner` wait for the owner to supply an account, key or login. Ask in the
   issue and stop there.
+
+## When to stop and report
+
+Comment on the issue with what you tried and what you found, then stop, when:
+
+- the same approach has failed twice;
+- a "Done when" item cannot be met as written;
+- finishing would break an invariant or exceed the issue's Scope.
 
 ## Invariants
 
