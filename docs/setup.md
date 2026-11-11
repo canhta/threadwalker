@@ -142,7 +142,11 @@ values.
 
 ## Agent template
 
-Edit [`agents/solo-builder.example.yaml`](../agents/solo-builder.example.yaml).
+The `agents/` directory includes the [builder](../agents/solo-builder.example.yaml) and
+[teasing](../agents/teasing.example.yaml) examples; both are loaded by default. Copy only the
+templates you want into your own directory and pass it with `-agents`. For multiple agents,
+set each `threads.username` to its own account and use distinct IDs and browser profile paths.
+Replace the synthetic example usernames before real-account operation.
 Keep `dry_run: true`. Select a model profile as shown above, or set the inline
 `llm` fields. Put the selected provider's key in the environment variable named
 by its `api_key_env`. Set `threads.profile_dir` to the saved browser profile on
@@ -247,14 +251,14 @@ A VPS is optional; an IP-specific conclusion requires measurement from that IP.
 The saved profile path and approved reply URL are setup inputs. Passwords and
 session cookies stay out of chat and Git.
 
-For [Telegram (#7)](https://github.com/canhta/threadwalker/issues/7), create a bot
+For [real-bot qualification (#18)](https://github.com/canhta/threadwalker/issues/18), create a bot
 with `@BotFather`, save its token, and send the bot a message from your own
 account. Supply that conversation's numeric chat ID as
 `TELEGRAM_OWNER_CHAT_ID`.
 
 The [seven-day live run (#9)](https://github.com/canhta/threadwalker/issues/9)
 needs your approval before `dry_run` becomes `false`. The
-[second agent (#12)](https://github.com/canhta/threadwalker/issues/12) needs
+[two-agent qualification (#21)](https://github.com/canhta/threadwalker/issues/21) needs
 another disposable account and saved login. Keep these issues open until their
 measured acceptance criteria hold.
 
