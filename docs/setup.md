@@ -16,7 +16,10 @@ go run ./cmd/threadwalker run -once -offline
 
 The command runs one real guarded wake with synthetic LLM/trend/Threads services and an isolated
 temporary SQLite database, removed on exit. Add `-db /tmp/threadwalker-smoke.db` to inspect its
-rows afterward. Every action has `dry_run=1`; this cannot publish to Threads.
+rows afterward. Explicit `-agents`/`-llms` loads custom templates/profiles using dummy keys,
+while forcing the in-process fake transport and synthetic trends. Telegram remains disabled
+and no real environment credentials are read. Every action has `dry_run=1`; this cannot
+publish to Threads.
 
 From the repository root, export a deterministic 48-hour **logical-time** soak with one simulated
 restart and the shared runtime eval report to a fresh directory:

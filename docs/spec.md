@@ -53,7 +53,7 @@ extended thinking, multimodal input, streaming and server-side tools are outside
 
 Operational diagnostics use one injectable standard-library `log/slog` logger, JSON to stdout
 by default (compatible with systemd/journald), with selectable `debug/info/warn/error` level and
-`json/text` format. The CLI `check` exposes `-log-level` and `-log-format`; library callers inject
+`json/text` format. The CLI `check` and `run` expose `-log-level` and `-log-format`; library callers inject
 `llm.Options.Logger`, with nil disabling client output. No hosted collector or raw-payload debug
 mode is used. The canonical event names and metadata allowlist are in
 [`internal/logging/logging.go`](../internal/logging/logging.go); emitters pass a typed record,

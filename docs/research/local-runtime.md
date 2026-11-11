@@ -57,6 +57,7 @@ No elapsed live-run duration is claimed.
 - `TestRuntimeSuiteUsesGuardedToolsAndPersistentWakes`: the versioned runtime eval suite through both real adapters and guarded tools.
 - `TestOfflineSoak48LogicalHoursWithRestart`: repeated wakes and restart against actual temporary SQLite.
 - `TestSavedLogicalSoakEvidenceAndEventRedaction`: evidence labels, counts, unique closed wakes and metadata field allowlist.
+- `TestRuntimeCLIOnceOfflineWakePersistsCompletedAudit` and the independent `TestRuntimeCLI*` acceptance tests: persisted smoke, credential-free custom profiles, lifecycle/logging, cancellation, bad inputs and live-backend refusal.
 - `TestTelegramOptionalAndExplicitlyEnabled`: default-off credential resolution; enabled fixtures retain required-secret validation.
 
 This measures local harness behavior only. Real browser/account qualification is
