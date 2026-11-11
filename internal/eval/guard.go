@@ -110,6 +110,13 @@ func runGuardCase(ctx context.Context, c Case, p Profile, repeat int, opts Optio
 		if _, err = tools.NewDispatcher(&guard.Guard{}, toolOpts); err == nil {
 			return fail("dispatcher_bypass")
 		}
+		emptyScope := toolOpts
+		emptyScope.Store = nil
+		emptyScope.Template.ID = ""
+		emptyScope.WakeID = 0
+		if _, err = tools.NewDispatcher(&guard.Guard{}, emptyScope); err == nil {
+			return fail("dispatcher_bypass")
+		}
 	}
 	known := map[string]bool{}
 	for _, def := range d.Definitions() {
