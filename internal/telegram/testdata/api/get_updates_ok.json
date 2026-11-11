@@ -1,0 +1,70 @@
+{
+  "ok": true,
+  "result": [
+    {
+      "update_id": 1001,
+      "message": {
+        "message_id": 5,
+        "date": 1700000000,
+        "chat": {
+          "id": 9001,
+          "type": "private",
+          "username": "synthetic_owner",
+          "first_name": "Synthetic"
+        },
+        "from": {
+          "id": 9001,
+          "is_bot": false,
+          "first_name": "Synthetic",
+          "username": "synthetic_owner"
+        },
+        "text": "/status agent-a",
+        "reply_to_message": {
+          "message_id": 4,
+          "date": 1699999999,
+          "chat": {
+            "id": 9001,
+            "type": "private",
+            "username": "synthetic_owner"
+          },
+          "from": {
+            "id": 9001,
+            "first_name": "Synthetic",
+            "username": "synthetic_owner"
+          },
+          "text": "What is your status?"
+        }
+      }
+    },
+    {
+      "update_id": 1002,
+      "edited_message": {
+        "message_id": 6,
+        "date": 1700000001,
+        "edit_date": 1700000002,
+        "chat": {
+          "id": 9001,
+          "type": "private",
+          "username": "synthetic_owner"
+        },
+        "from": {
+          "id": 9001,
+          "username": "synthetic_owner"
+        },
+        "text": "synthetic edited text"
+      }
+    },
+    {
+      "update_id": 1003,
+      "callback_query": {
+        "id": "synthetic-callback",
+        "from": {
+          "id": 9001,
+          "username": "synthetic_owner"
+        },
+        "chat_instance": "synthetic-instance",
+        "data": "synthetic-data"
+      }
+    }
+  ]
+}

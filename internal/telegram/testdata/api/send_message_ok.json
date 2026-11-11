@@ -1,0 +1,19 @@
+{
+  "ok": true,
+  "result": {
+    "message_id": 42,
+    "date": 1700000003,
+    "chat": {
+      "id": 9001,
+      "type": "private",
+      "username": "synthetic_owner"
+    },
+    "from": {
+      "id": 1,
+      "is_bot": true,
+      "first_name": "Synthetic Bot",
+      "username": "synthetic_bot"
+    },
+    "text": "synthetic echo"
+  }
+}
