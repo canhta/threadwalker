@@ -20,6 +20,12 @@ const (
 // including amendments. It must never be recycled when an entry is decided.
 type GateInput struct {
 	N, Successes, BaselineN, BaselineSuccesses, TestIndex int64
+	// ControlN is either zero (unavailable) or 200 code-selected controls.
+	// For EACH candidate UTC posting day d, select d_count*200/N controls
+	// from that same day, without rounding; require integral counts and enough
+	// eligible own untagged same-kind observations. Select by time/ID, never
+	// outcome. The full candidate epoch is covered, not a recent rolling tail.
+	ControlN, ControlSuccesses int64
 }
 
 // GateDecision contains only static status and reason codes, never editable text.
@@ -28,7 +34,7 @@ type GateDecision struct{ Status, Reason string }
 // EvaluateGate is pure: persistence, eligibility and revision binding belong to
 // the caller. A terminal decision must be persisted and never evaluated again.
 func EvaluateGate(in GateInput) (GateDecision, error) {
-	if in.TestIndex < 1 || in.N < 0 || in.N > MaxGateSamples || in.Successes < 0 || in.Successes > in.N || in.BaselineN < 0 || in.BaselineSuccesses < 0 || in.BaselineSuccesses > in.BaselineN || (in.BaselineN != 0 && in.BaselineN != BaselineReferenceSize) || (in.BaselineN == 0 && in.N != 0) {
+	if in.TestIndex < 1 || in.N < 0 || in.N > MaxGateSamples || in.Successes < 0 || in.Successes > in.N || in.BaselineN < 0 || in.BaselineSuccesses < 0 || in.BaselineSuccesses > in.BaselineN || (in.BaselineN != 0 && in.BaselineN != BaselineReferenceSize) || (in.BaselineN == 0 && in.N != 0) || (in.ControlN != 0 && in.ControlN != BaselineReferenceSize) || in.ControlSuccesses < 0 || in.ControlSuccesses > in.ControlN {
 		return GateDecision{}, errors.New("evaluating playbook gate: invalid evidence")
 	}
 	if in.BaselineN == 0 {
@@ -47,6 +53,15 @@ func EvaluateGate(in GateInput) (GateDecision, error) {
 	if !look {
 		return GateDecision{Status: "testing", Reason: "awaiting_look"}, nil
 	}
+	// A look is consumed exactly once even when matching is unavailable. The
+	// caller persists its cohort IDs/counts with the decision; changing controls
+	// and rerunning the same N would defeat the multiple-look error budget.
+	if in.ControlN == 0 {
+		if in.N == MaxGateSamples {
+			return GateDecision{Status: "rejected", Reason: "horizon_controls_unavailable"}, nil
+		}
+		return GateDecision{Status: "testing", Reason: "current_controls_unavailable"}, nil
+	}
 	// Sum_i 1/(i(i+1))=1; six looks spend at most 4% across all
 	// lifetime hypotheses/revisions, regardless of overlap between hypotheses.
 	// Conditional on the frozen threshold, Fisher requires independent,
@@ -55,6 +70,12 @@ func EvaluateGate(in GateInput) (GateDecision, error) {
 	i := float64(in.TestIndex)
 	alpha := math.Exp(math.Log(0.04) - math.Log(i) - math.Log(i+1) - math.Log(6))
 	positive, negative := fisherTails(in)
+	controlInput := in
+	controlInput.BaselineN = in.ControlN
+	controlInput.BaselineSuccesses = in.ControlSuccesses
+	controlPositive, controlNegative := fisherTails(controlInput)
+	positive = max(positive, controlPositive)
+	negative = max(negative, controlNegative)
 	// Leave a small numerical margin on the conservative side.
 	if positive <= alpha*(1-1e-10) {
 		return GateDecision{Status: "established", Reason: "positive_evidence"}, nil

@@ -36,7 +36,7 @@ func TestGateMakesScheduledDecisions(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			got, err := playbook.EvaluateGate(playbook.GateInput{N: tc.n, Successes: tc.k, BaselineN: 200, BaselineSuccesses: tc.base, TestIndex: tc.index})
+			got, err := playbook.EvaluateGate(playbook.GateInput{N: tc.n, Successes: tc.k, BaselineN: 200, BaselineSuccesses: tc.base, ControlN: 200, ControlSuccesses: tc.base, TestIndex: tc.index})
 			if err != nil || got.Status != tc.status || got.Reason != tc.reason {
 				t.Fatalf("decision=%+v err=%v; want %s/%s", got, err, tc.status, tc.reason)
 			}
@@ -152,9 +152,35 @@ func TestFisherExactBoundaryAndLifetimeOrdinal(t *testing.T) {
 		k, index int64
 		status   string
 	}{{36, 1, "testing"}, {37, 1, "established"}, {37, 2, "testing"}, {38, 2, "established"}, {14, 1, "testing"}, {13, 1, "rejected"}} {
-		got, err := playbook.EvaluateGate(playbook.GateInput{N: 50, Successes: tc.k, BaselineN: 200, BaselineSuccesses: 100, TestIndex: tc.index})
+		got, err := playbook.EvaluateGate(playbook.GateInput{N: 50, Successes: tc.k, BaselineN: 200, BaselineSuccesses: 100, ControlN: 200, ControlSuccesses: 100, TestIndex: tc.index})
 		if err != nil || got.Status != tc.status {
 			t.Fatalf("k%d index%d: %+v,%v want %s", tc.k, tc.index, got, err, tc.status)
+		}
+	}
+}
+
+func TestGateRequiresBothHistoricalAndDayMatchedControls(t *testing.T) {
+	for _, tc := range []struct {
+		name                     string
+		n, k, controlN, controlK int64
+		status, reason           string
+	}{
+		{"no controls", 50, 50, 0, 0, "testing", "current_controls_unavailable"},
+		{"historical improvement is common shift", 100, 80, 200, 160, "testing", "insufficient_evidence"},
+		{"historical harm is common shift", 100, 20, 200, 40, "testing", "insufficient_evidence"},
+		{"relative improvement", 100, 95, 200, 100, "established", "positive_evidence"},
+		{"unmatched horizon", 1600, 1600, 0, 0, "rejected", "horizon_controls_unavailable"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := playbook.EvaluateGate(playbook.GateInput{N: tc.n, Successes: tc.k, BaselineN: 200, BaselineSuccesses: 100, ControlN: tc.controlN, ControlSuccesses: tc.controlK, TestIndex: 1})
+			if err != nil || got.Status != tc.status || got.Reason != tc.reason {
+				t.Fatalf("decision=%+v,%v; want %s/%s", got, err, tc.status, tc.reason)
+			}
+		})
+	}
+	for _, in := range []playbook.GateInput{{TestIndex: 1, ControlN: -1}, {TestIndex: 1, ControlN: 1}, {TestIndex: 1, ControlN: 201}, {TestIndex: 1, ControlN: 200, ControlSuccesses: -1}, {TestIndex: 1, ControlN: 200, ControlSuccesses: 201}} {
+		if got, err := playbook.EvaluateGate(in); err == nil || got.Status != "" {
+			t.Fatalf("accepted malformed controls %+v", in)
 		}
 	}
 }
