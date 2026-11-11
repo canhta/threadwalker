@@ -289,7 +289,7 @@ func TestPlaybookProposeToolAddsAndAmendsOnlyOwnTestingEntry(t *testing.T) {
 			t.Fatalf("forbidden proposal %s accepted: %s", args, out)
 		}
 	}
-	after := decodePlaybookList(t, h.mustCall(t, "playbook_read", `{"limit":100}`))
+	after := decodePlaybookList(t, h.mustCall(t, "playbook_read", `{"limit":99}`))
 	if len(after) != len(before) || after[0] != before[0] || after[0] != amended {
 		t.Fatalf("rejected proposals changed entries: before=%+v after=%+v", before, after)
 	}
@@ -309,7 +309,7 @@ func TestPlaybookProposeToolAddsAndAmendsOnlyOwnTestingEntry(t *testing.T) {
 			t.Fatalf("proposal to immutable id %d accepted: %s", id, out)
 		}
 	}
-	stored := decodePlaybookList(t, h.mustCall(t, "playbook_read", `{"limit":100}`))
+	stored := decodePlaybookList(t, h.mustCall(t, "playbook_read", `{"limit":98}`))
 	if len(stored) != len(before)+1 {
 		t.Fatalf("immutable proposals changed entries: %+v", stored)
 	}
@@ -409,16 +409,20 @@ func TestPlaybookGuardSnapshotsRevisionAtActionReservation(t *testing.T) {
 }
 
 type playbookActionIdentity struct {
-	ActionID int64 `json:"action_id"`
+	Untrusted bool   `json:"untrusted"`
+	Source    string `json:"source"`
+	Data      struct {
+		ActionID int64 `json:"action_id"`
+	} `json:"data"`
 }
 
 func decodeActionIdentity(t *testing.T, out string) int64 {
 	t.Helper()
 	var identity playbookActionIdentity
-	if err := json.Unmarshal([]byte(out), &identity); err != nil || identity.ActionID <= 0 {
+	if err := json.Unmarshal([]byte(out), &identity); err != nil || !identity.Untrusted || identity.Source != "post" || identity.Data.ActionID <= 0 {
 		t.Fatalf("decoding action output %s: %+v err=%v", out, identity, err)
 	}
-	return identity.ActionID
+	return identity.Data.ActionID
 }
 
 func (h *playbookHarness) actionHypothesisRevision(t *testing.T, actionID, hypothesisID int64) int64 {
