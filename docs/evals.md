@@ -224,7 +224,8 @@ Recorded commands, redacted events and reports live in [browser local verificati
 
 ## Pending coverage
 
-The current suites cover the client, protocols, configuration, accounting and local runtime boundaries.
+The current suites cover client/protocol, configuration, accounting, local runtime, owner-service
+and synthetic browser boundaries.
 They do not certify components that do not exist yet. Real-bot qualification belongs to
 [#18](https://github.com/canhta/threadwalker/issues/18), live browser/Threads compatibility to
 [#2](https://github.com/canhta/threadwalker/issues/2), and integrated live validation to

@@ -124,7 +124,9 @@ profile/model/protocol IDs, wake ID, a local request sequence, attempt and a loc
 call ID (wake/step), never provider-supplied IDs. Durations use the injected client clock. Events
 carry operation, outcome/reason, HTTP status when known, steps, tokens and locally computed USD;
 unknown or malformed tool names are omitted. `check` emits validation start/configuration/result.
-The runtime adds wake, scheduler and context events; guarded tool events cover the running-state and audit boundary. Telegram emits owner operation outcomes; browser instrumentation remains in its implementing issue.
+The runtime adds wake, scheduler and context events; guarded tool events cover the running-state
+and audit boundary. Telegram emits owner operation outcomes; browser events cover launch/close
+and each configured-backend operation with safe outcome and pause reasons.
 
 Event ownership is an acceptance requirement in the implementing issues: #5 implements wake
 lifecycle (`wake.started/finished/stopped`) and tool lifecycle (`tool.started/finished`) plus
