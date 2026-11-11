@@ -80,13 +80,13 @@
         {{range .Wakes}}
         <tr>
           <td data-label="Started">{{if .StartedAt}}<time>{{.StartedAt}}</time>{{else}}Not recorded{{end}}</td>
-          <td data-label="Ended">{{if .EndedAt}}<time>{{.EndedAt}}</time>{{else if .EndReason}}Not recorded{{else}}In progress{{end}}</td>
+          <td data-label="Ended">{{if .EndedAt}}<time>{{.EndedAt}}</time>{{else if eq .EndReason "in_progress"}}In progress{{else}}Not recorded{{end}}</td>
           <td data-label="Kind">{{if eq .Kind "agent"}}Agent{{else if eq .Kind "metrics"}}Metrics{{else}}Other{{end}}</td>
           <td class="num" data-label="Steps">{{.Steps}}</td>
           <td class="num" data-label="Tokens in">{{.TokensIn}}</td>
           <td class="num" data-label="Tokens out">{{.TokensOut}}</td>
           <td class="num" data-label="Cost">{{printf "$%.4f" .CostUSD}}</td>
-          <td data-label="Ended because">{{if .EndReason}}{{.EndReason}}{{else if .EndedAt}}Not recorded{{else}}In progress{{end}}</td>
+          <td data-label="Ended because">{{if eq .EndReason "in_progress"}}In progress{{else if .EndReason}}{{.EndReason}}{{else}}Not recorded{{end}}</td>
         </tr>
         {{end}}
       </tbody>
