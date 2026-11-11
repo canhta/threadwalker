@@ -92,7 +92,7 @@ protocol, configuration, accounting and local runtime behavior. **(decision)**
 The local runtime serializes wakes across configured agents. `schedule_next_wake` clamps to
 `now + min_minutes_between_wakes` through `now + 24h`; the configured minimum is 1..1440 minutes.
 A wake reserves a fallback schedule of `now + 60min` (or the configured minimum if longer) before
-any tool runs. Startup closes open wakes as `interrupted`, retires unfinished tool audit outcomes
+any tool runs. Startup closes open agent wakes as `interrupted`, retires unfinished tool audit outcomes
 as unknown/assumed sent with retry disabled, and advances the affected agent's schedule to at
 least that fallback interval after restart. It never reloads the interrupted conversation or
 executes its pending tool/action intent. Paused and killed agents stay stopped. **(decision)**
@@ -106,7 +106,9 @@ not elapsed live qualification. The canonical implementation and fixtures are in
 Normal `run` loads configured LLM settings, with custom endpoints supported by that configuration.
 The default Threads stub requires `dry_run`; an explicitly configured browser backend permits
 guarded submissions. `run -offline` always forces the in-process Threads stub and rejects
-non-dry-run templates. Playbook and metrics context are empty until their implementing issues land.
+non-dry-run templates. Playbook context remains empty until its implementing issue lands.
+Metrics context contains at most 20 recent own confirmed-action samples: local action ID,
+actual measurement time and counters only; absent samples remain absent.
 
 Two rules keep a wake from doing damage **(sourced: patterns in `docs/research/reference-repos.md`)**:
 
@@ -167,6 +169,16 @@ Logout/captcha pauses only the selected running agent (killed stays killed), end
 and queues a static owner notice; a disabled owner integration retains the notice locally.
 Addressed inbound replies enter `ObserveStopRequest` transiently, without storing their text.
 External tool strings are redacted against configured secrets before model delivery. **(decision)**
+
+`read_own_metrics` retains its no-argument account-counter read and accepts an optional positive
+integer `action_id` for a specific own confirmed non-dry-run post/reply. The guarded handler
+resolves the stored published `thread_url`, requires the optional `threads.ActionMetricsReader`
+capability and returns that local action ID with bounded nonnegative counters. It never
+attributes aggregate account metrics to an action. Unsupported, absent, invalid or incorrectly
+bound data is unavailable, not a zero measurement. The browser's synthetic-v1 `action_metrics`
+page requires all four counters and an exact same-origin thread URL including its query;
+ordinary account `metrics` pages cannot satisfy it. This is a local fixture contract, not
+qualification of live Threads per-post insights. **(decision, #19)**
 
 ## 6. Guards (in code; the agent cannot disable them)
 
@@ -249,6 +261,41 @@ Design **(proposed; no study has tested this combination)**:
 
 Accepted consequence: the gate opens slowly, possibly weeks before the first entry is established.
 How fast it opens is one of the experiment's results.
+
+Metric remeasurement is harness-owned: each own confirmed publication seeds durable targets
+at `posted_at + 1h`, `+6h` and `+24h`. Dry-run and unconfirmed/unknown intents seed no targets.
+The scheduler selects metric work independently of the agent's chosen wake, serializes it with
+agent sessions, and rechecks owner state. A standalone `wakes.kind='metrics'` audit scope uses
+the actual guarded `read_own_metrics` route, with no model calls, token spend, note changes,
+write tools or changes to `next_wake_at`. Paused/killed agents perform no reads. **(decision)**
+
+Targets are approximate observation times, not historical samples: late/restarted work coalesces
+all currently ready windows of one action into one current read and one sample at the actual
+observation time. Each completed target references that sample time; lateness is explicit.
+Completed targets are never re-read. The processor defaults to 10 action groups per batch,
+a five-minute lease and a five-minute retry delay. Atomic writer claims exclude active leases;
+expiry increments a fencing version. Only the complete fresh claim set for that agent/action
+can atomically insert the sample and complete its targets; stale/expired/foreign claims cannot
+commit or release another claim. Failed transactions retain neither partial samples nor partial
+checkpoints. Restart closes interrupted maintenance scopes without advancing the agent schedule
+or replaying any agent action; a new fenced read after lease expiry is safe. **(decision)**
+
+Unavailable reads defer with fixed reason codes and no sample. Authentication stops pause the
+selected agent and retain the existing owner notice behavior. Cancellation, audit and persistence
+failures surface as errors with bounded cleanup; remaining claims are deferred when possible,
+or recover after expiry if cleanup cannot persist. Source operations are context-bounded and
+each maintenance backend closes on every exit. The job DDL is
+[`004_metric_jobs.sql`](../internal/store/migrations/004_metric_jobs.sql); code is
+[`internal/metrics`](../internal/metrics). **(decision)**
+
+Allowlisted `metrics.scheduled`, `metrics.measured`, `metrics.target.completed`, `metrics.deferred`
+and `metrics.finished` events contain local IDs, counts, target/actual times, lateness and safe
+reasons. One measured event identifies one stored sample; target events identify each satisfied
+window, including coalesced windows. URLs, third-party text/usernames and raw errors never enter
+these events. Versioned actual-code component cases and an injected-time multi-day simulation
+are reproduced in [`docs/evals.md`](evals.md); measured local evidence and its limits are in
+[`metrics-local.md`](research/metrics-local.md). Live metrics/account/elapsed qualification stays
+separate in #2/#18/#21/#9. **(decision)**
 
 ## 8. Budget
 
@@ -384,15 +431,16 @@ no code path executes a tool without passing the guards.
 
 ## 15. Database schema
 
-Every table carries `agent_id`, even while only one agent runs. Canonical initial DDL lives in [`internal/store/migrations/001_initial_schema.sql`](../internal/store/migrations/001_initial_schema.sql); delivery/offset changes live in [`003_owner_delivery.sql`](../internal/store/migrations/003_owner_delivery.sql).
+Every table carries `agent_id`, even while only one agent runs. Canonical initial DDL lives in [`internal/store/migrations/001_initial_schema.sql`](../internal/store/migrations/001_initial_schema.sql); delivery/offset changes live in [`003_owner_delivery.sql`](../internal/store/migrations/003_owner_delivery.sql), metric checkpoints and wake kinds in [`004_metric_jobs.sql`](../internal/store/migrations/004_metric_jobs.sql).
 
 | Table | Main columns | Purpose |
 |---|---|---|
 | `agents` | `id`, `status` (`running`/`paused`/`killed`), `next_wake_at`, `self_note` | State and the note left for the next wake |
-| `wakes` | `id`, `agent_id`, `started_at`, `ended_at`, `steps`, `tokens_in`, `tokens_out`, `cost_usd`, `end_reason` | One row per wake |
+| `wakes` | `id`, `agent_id`, `kind` (`agent`/`metrics`), `started_at`, `ended_at`, `steps`, `tokens_in`, `tokens_out`, `cost_usd`, `end_reason` | One row per agent session or metric audit scope |
 | `tool_calls` | `id`, `wake_id`, `tool`, `args_json`, `result_json`, `blocked_by`, `at` | Audit log; `blocked_by` names the guard that refused the call |
 | `actions` | `id`, `agent_id`, `kind` (`post`/`reply`), `text`, `target_url`, `target_username`, `hypothesis_ids_json`, `dry_run`, `posted_at`, `thread_url` | Published or dry-run posts |
 | `metrics` | `action_id`, `measured_at`, `views`, `likes`, `replies`, `reposts` | Repeated measurements |
+| `metric_jobs` | `agent_id`, `action_id`, `window_hours`, `due_at`, `not_before`, claim fence/lease, `completed_at`, `reason` | Durable fixed-window metric targets and recovery |
 | `notes` | `id`, `agent_id`, `text`, `created_at`, plus an FTS5 table | The agent's own notes |
 | `playbook` | `id`, `agent_id`, `text`, `status` (`testing`/`established`/`rejected`), `n`, `successes`, `created_at`, `decided_at` | Hypotheses; counters are written by code only |
 | `contacts` | `agent_id`, `username`, `reply_count_7d`, `do_not_contact`, `reason` | Rate limiting only; no description of the person |

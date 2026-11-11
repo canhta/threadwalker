@@ -27,11 +27,13 @@ func run(ctx context.Context, args []string, getenv func(string) string, stdout,
 
 	if len(args) == 0 {
 		logging.Emit(ctx, logger, slog.LevelError, logging.Record{Event: logging.CheckFinished, Operation: "check", Outcome: "error", Reason: "missing_command"})
-		fmt.Fprintln(stderr, "usage: threadwalker <check|run|eval>")
+		fmt.Fprintln(stderr, "usage: threadwalker <check|run|eval|metrics>")
 		return 1
 	}
 
 	switch args[0] {
+	case "metrics":
+		return runMetrics(ctx, args[1:], stdout, stderr)
 	case "run":
 		return runRuntime(ctx, args[1:], getenv, stdout, stderr)
 	case "eval":
@@ -40,7 +42,7 @@ func run(ctx context.Context, args []string, getenv func(string) string, stdout,
 		return runCheck(ctx, args[1:], getenv, stdout, stderr)
 	default:
 		logging.Emit(ctx, logger, slog.LevelError, logging.Record{Event: logging.CheckFinished, Operation: "check", Outcome: "error", Reason: "unknown_command"})
-		fmt.Fprintln(stderr, "unknown command (expected: check, run or eval)")
+		fmt.Fprintln(stderr, "unknown command (expected: check, run, eval or metrics)")
 		return 1
 	}
 }

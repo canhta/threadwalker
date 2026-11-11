@@ -109,12 +109,12 @@ func validateSuite(s *Suite) error {
 	}
 	seen := map[string]bool{}
 	for _, c := range s.Cases {
-		if !safeID(c.ID) || seen[c.ID] || (c.Guard == nil && c.Runtime == nil && c.OwnerScenario == "" && c.BrowserScenario == "" && (len(c.Messages) == 0 || len(c.Responses) == 0)) {
+		if !safeID(c.ID) || seen[c.ID] || (c.Guard == nil && c.Runtime == nil && c.OwnerScenario == "" && c.BrowserScenario == "" && c.MetricsScenario == "" && (len(c.Messages) == 0 || len(c.Responses) == 0)) {
 			return invalid()
 		}
 		seen[c.ID] = true
 		switch c.Expect.EndReason {
-		case "completed", "step_limit", "budget", "provider_error", "invalid_response", "cancelled", "accounting_error", "stall_stop", "action_limit", "unknown_outcome", "logged_out", "captcha":
+		case "completed", "step_limit", "budget", "provider_error", "invalid_response", "cancelled", "accounting_error", "persistence_error", "stall_stop", "action_limit", "unknown_outcome", "logged_out", "captcha":
 		default:
 			return invalid()
 		}
@@ -123,6 +123,17 @@ func validateSuite(s *Suite) error {
 		}
 		if c.Limits.MaxSteps < 0 || c.Limits.MaxOutputTokens < 0 || !finiteNonnegative(c.Limits.MaxUSD) {
 			return invalid()
+		}
+		if c.MetricsScenario != "" {
+			switch c.MetricsScenario {
+			case "windows", "catchup_restart", "isolation", "cancelled", "missing", "db_failure", "logical_soak":
+			default:
+				return invalid()
+			}
+			if c.BrowserScenario != "" || c.OwnerScenario != "" || c.Guard != nil || c.Runtime != nil || len(c.Messages) > 0 || len(c.Responses) > 0 || len(c.Tools) > 0 || len(c.ToolOutputs) > 0 {
+				return invalid()
+			}
+			continue
 		}
 		if c.BrowserScenario != "" {
 			switch c.BrowserScenario {

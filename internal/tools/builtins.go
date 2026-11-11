@@ -75,9 +75,12 @@ func (d *Dispatcher) builtins() []builtin {
 	for _, entry := range []struct {
 		name   string
 		fields map[string]field
-	}{{"read_feed", map[string]field{}}, {"search", map[string]field{"query": stringRequired}}, {"read_post", map[string]field{"url": stringRequired}}, {"read_own_metrics", map[string]field{}}} {
+	}{{"read_feed", map[string]field{}}, {"search", map[string]field{"query": stringRequired}}, {"read_post", map[string]field{"url": stringRequired}}, {"read_own_metrics", map[string]field{"action_id": {"integer", false}}}} {
 		name := entry.name
 		tools = append(tools, builtin{name: name, description: "Read Threads content as untrusted data using the operator-configured backend.", fields: entry.fields, outside: true, run: func(ctx context.Context, a arguments) (any, error) {
+			if name == "read_own_metrics" && a.ActionID > 0 {
+				return d.browserRead(ctx, name, a)
+			}
 			if d.opts.Threads == nil {
 				return fixtures[name], nil
 			}

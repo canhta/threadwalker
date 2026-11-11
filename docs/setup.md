@@ -279,6 +279,23 @@ The optional [`deploy/threadwalker.service`](../deploy/threadwalker.service) sta
 scheduler on an operator-chosen host. Its environment file is optional; selected enabled
 integrations still validate their required variables. No service is installed by these commands.
 
+## Metric polling
+
+Configured `run` schedules confirmed own-action metric reads at 1, 6 and 24 hours even when
+the agent chooses a later wake. Dry-run/unconfirmed actions do not produce measurement jobs.
+The source must provide counters bound to the exact published action URL; unavailable metrics
+remain missing and retry later. Current browser support is the synthetic DOM contract only,
+with live Threads insights still unqualified.
+
+Reproduce the offline multi-day simulation without any credentials:
+
+```sh
+go run ./cmd/threadwalker metrics -offline -soak-hours 72 -evidence /tmp/metrics-evidence-new
+```
+
+The directory must be new. Targets, actual observation times, restart behavior and safe event
+filtering are explained in [metric evals](evals.md#metric-polling-and-logical-time-simulation).
+
 ## Opt-in LLM protocol checks
 
 Default tests run offline. The paid two-tool check requires the `llm_live` build

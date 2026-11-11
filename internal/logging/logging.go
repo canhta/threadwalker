@@ -8,11 +8,17 @@ import (
 	"errors"
 	"io"
 	"log/slog"
+	"time"
 )
 
 // Stable events emitted by the components implemented today. LLM tool events
 // describe only the client dispatcher boundary, not a guard or audit outcome.
 const (
+	MetricsScheduled          = "metrics.scheduled"
+	MetricsMeasured           = "metrics.measured"
+	MetricsTargetCompleted    = "metrics.target.completed"
+	MetricsDeferred           = "metrics.deferred"
+	MetricsFinished           = "metrics.finished"
 	BrowserOperationFinished  = "browser.operation.finished"
 	TelegramOperationFinished = "telegram.operation.finished"
 	WakeStarted               = "wake.started"
@@ -82,6 +88,10 @@ type Record struct {
 	DurationMS                                             int64
 	TokensIn, TokensOut                                    int64
 	CostUSD                                                float64
+	ActionID                                               int64
+	WindowHours, Jobs, Samples                             int
+	TargetAt, MeasuredAt                                   time.Time
+	LatenessMS                                             int64
 }
 
 // Emit accepts a typed allowlist rather than arbitrary slog attributes. An
@@ -97,5 +107,16 @@ func Emit(ctx context.Context, logger *slog.Logger, level slog.Level, r Record) 
 		}
 	}
 	attrs = append(attrs, slog.Int64("wake_id", r.WakeID), slog.Int("request", r.Request), slog.Int("attempt", r.Attempt), slog.Int("http_status", r.HTTPStatus), slog.Int64("duration_ms", r.DurationMS), slog.Int("steps", r.Steps), slog.Int64("tokens_in", r.TokensIn), slog.Int64("tokens_out", r.TokensOut), slog.Float64("cost_usd", r.CostUSD))
+	if r.ActionID > 0 || r.Event == MetricsScheduled || r.Event == MetricsFinished {
+		attrs = append(attrs, slog.Int64("action_id", r.ActionID), slog.Int("window_hours", r.WindowHours), slog.Int("jobs", r.Jobs), slog.Int("samples", r.Samples), slog.Int64("lateness_ms", r.LatenessMS))
+	}
+	for _, field := range []struct {
+		key string
+		at  time.Time
+	}{{"target_at", r.TargetAt}, {"measured_at", r.MeasuredAt}} {
+		if !field.at.IsZero() {
+			attrs = append(attrs, slog.String(field.key, field.at.UTC().Format(time.RFC3339Nano)))
+		}
+	}
 	logger.LogAttrs(ctx, level, "threadwalker event", attrs...)
 }

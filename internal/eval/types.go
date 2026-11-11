@@ -25,6 +25,7 @@ type RuntimeCase struct {
 }
 
 type Case struct {
+	MetricsScenario string                `json:"metrics_scenario,omitempty"`
 	BrowserScenario string                `json:"browser_scenario,omitempty"`
 	OwnerScenario   string                `json:"owner_scenario,omitempty"`
 	Guard           *GuardCase            `json:"guard,omitempty"`
@@ -88,19 +89,22 @@ type Report struct {
 	Results           []CaseResult `json:"results"`
 }
 type CaseResult struct {
-	CaseID     string   `json:"case_id"`
-	ProfileID  string   `json:"profile_id"`
-	ProviderID string   `json:"provider_id"`
-	Model      string   `json:"model"`
-	Protocol   string   `json:"protocol"`
-	Repeat     int      `json:"repeat"`
-	Passed     bool     `json:"passed"`
-	Reason     string   `json:"reason"`
-	EndReason  string   `json:"end_reason"`
-	Steps      int      `json:"steps"`
-	ToolCalls  []string `json:"tool_calls"`
-	TokensIn   int64    `json:"tokens_in"`
-	TokensOut  int64    `json:"tokens_out"`
-	CostUSD    float64  `json:"cost_usd"`
-	DurationMS float64  `json:"duration_ms"`
+	CaseID        string   `json:"case_id"`
+	ProfileID     string   `json:"profile_id"`
+	ProviderID    string   `json:"provider_id"`
+	Model         string   `json:"model"`
+	Protocol      string   `json:"protocol"`
+	Repeat        int      `json:"repeat"`
+	Passed        bool     `json:"passed"`
+	Reason        string   `json:"reason"`
+	EndReason     string   `json:"end_reason"`
+	Steps         int      `json:"steps"`
+	ToolCalls     []string `json:"tool_calls"`
+	TokensIn      int64    `json:"tokens_in"`
+	TokensOut     int64    `json:"tokens_out"`
+	CostUSD       float64  `json:"cost_usd"`
+	DurationMS    float64  `json:"duration_ms"`
+	LogicalHours  int      `json:"logical_hours,omitempty"`
+	MetricSamples int      `json:"metric_samples,omitempty"`
+	MetricTargets int      `json:"metric_targets,omitempty"`
 }

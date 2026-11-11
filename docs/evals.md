@@ -225,10 +225,40 @@ Recorded commands, redacted events and reports live in [browser local verificati
 intentional contract change, regenerate it with
 `THREADWALKER_UPDATE_BROWSER_TRACE=1 go test ./internal/eval -run TestCapturedBrowserEvents`.
 
+## Metric polling and logical-time simulation
+
+```sh
+go run ./cmd/threadwalker eval -suite internal/eval/testdata/metrics-v1.json -seed 19 -out /tmp/metrics-eval.json
+go run ./cmd/threadwalker metrics -offline -soak-hours 72 -evidence /tmp/metrics-evidence-new
+go test ./internal/metrics ./internal/store ./internal/tools ./internal/agent -run 'Metric|Pipeline'
+go test -race ./internal/metrics ./internal/store ./internal/tools ./internal/agent
+```
+
+Use a fresh evidence directory. The offline-only `metrics` command reads no environment keys,
+creates/deletes its own temporary DB and emits `simulation.json`, `events.jsonl` and the shared
+`eval.json`. Normal configured `run` already polls metrics through the serial scheduler; this
+command reproduces synthetic evidence and never enables live operations.
+
+The versioned `metrics_scenario` cases execute the real processor, guarded dispatcher and
+SQLite jobs for all three windows, restart/catch-up, agent/action isolation, cancellation,
+missing data and transactional DB failure/retry, plus the 72-hour simulation. Both default
+profile labels run the same harness code without a model call; usage/cost remains zero.
+Reports distinguish logical hours and stored sample/target counts from wall-clock execution
+duration. Live eval mode rejects these component cases.
+
+At 72 logical hours the simulation has seven confirmed synthetic actions, 21 completed targets
+and 19 stored samples. An initially overdue action coalesces three targets into one actual
+observation. One guarded read before a simulated crash is repeated safely after a file DB
+close/reopen and expired lease: 20 audited source reads, one restart, no duplicate checkpoint
+or sample, no agent scheduling changes. One `metrics.measured` event corresponds to one sample;
+`metrics.target.completed` records each target and its own lateness. This establishes local
+functional behavior, not elapsed runtime or live Threads metrics support. See
+[recorded evidence](research/metrics-local.md).
+
 ## Pending coverage
 
 The current suites cover client/protocol, configuration, accounting, local runtime, owner-service
-and synthetic browser boundaries.
+synthetic browser boundaries and action-scoped metric polling.
 They do not certify components that do not exist yet. Real-bot qualification belongs to
 [#18](https://github.com/canhta/threadwalker/issues/18), live browser/Threads compatibility to
 [#2](https://github.com/canhta/threadwalker/issues/2), and integrated live validation to

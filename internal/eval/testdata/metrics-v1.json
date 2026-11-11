@@ -1,0 +1,13 @@
+{
+ "version":"v1",
+ "description":"Actual metric jobs, guarded action reads, restart recovery and SQLite at injected logical time; no model, network or live qualification.",
+ "cases":[
+  {"id":"metrics_three_windows","metrics_scenario":"windows","expect":{"end_reason":"completed","tools":["read_own_metrics","read_own_metrics","read_own_metrics"]}},
+  {"id":"metrics_restart_catchup","metrics_scenario":"catchup_restart","expect":{"end_reason":"completed","tools":["read_own_metrics"]}},
+  {"id":"metrics_agent_action_isolation","metrics_scenario":"isolation","expect":{"end_reason":"completed","tools":["read_own_metrics","read_own_metrics"]}},
+  {"id":"metrics_cancelled_read","metrics_scenario":"cancelled","expect":{"end_reason":"cancelled","tools":["read_own_metrics"]}},
+  {"id":"metrics_unavailable_is_missing","metrics_scenario":"missing","expect":{"end_reason":"completed","tools":["read_own_metrics"]}},
+  {"id":"metrics_db_rollback","metrics_scenario":"db_failure","expect":{"end_reason":"persistence_error","tools":["read_own_metrics","read_own_metrics"]}},
+  {"id":"metrics_72_logical_hours","metrics_scenario":"logical_soak","expect":{"end_reason":"completed","tools":null}}
+ ]
+}

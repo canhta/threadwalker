@@ -120,7 +120,7 @@ func operationForExpectedKind(kind string) (string, bool) {
 		return "search", true
 	case "post":
 		return "read_post", true
-	case "metrics":
+	case "metrics", "action_metrics":
 		return "read_own_metrics", true
 	case "compose":
 		return "compose", true
@@ -187,7 +187,7 @@ func ParseSnapshot(raw []byte, expectedKind string, baseURL string) (Page, error
 		return Page{}, snapshotError(operation, ErrLoggedOut)
 	case "captcha":
 		return Page{}, snapshotError(operation, ErrCaptcha)
-	case "feed", "search", "post", "metrics", "compose", "submitted":
+	case "feed", "search", "post", "metrics", "action_metrics", "compose", "submitted":
 		// Known page kind; checked below.
 	default:
 		return Page{}, snapshotError(operation, ErrUnknownPage)
@@ -231,12 +231,21 @@ func ParseSnapshot(raw []byte, expectedKind string, baseURL string) (Page, error
 			page.Form = &form
 		}
 
-	case "metrics":
+	case "metrics", "action_metrics":
 		if doc.Posts != nil && len(*doc.Posts) > 0 {
 			return Page{}, snapshotError(operation, ErrMalformedPage)
 		}
-		if doc.Form != nil || hasSnapshotThreadURL(doc.ThreadURL) {
+		if doc.Form != nil || (kind == "metrics" && hasSnapshotThreadURL(doc.ThreadURL)) {
 			return Page{}, snapshotError(operation, ErrMalformedPage)
+		}
+		if kind == "action_metrics" {
+			if !hasSnapshotThreadURL(doc.ThreadURL) {
+				return Page{}, snapshotError(operation, ErrMalformedPage)
+			}
+			page.ThreadURL, err = resolveSameOriginURL(*doc.ThreadURL, base)
+			if err != nil {
+				return Page{}, snapshotError(operation, ErrMalformedPage)
+			}
 		}
 		metrics, err := parseSnapshotMetrics(doc.Metrics)
 		if err != nil {

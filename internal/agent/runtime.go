@@ -15,6 +15,7 @@ import (
 	"github.com/canhta/threadwalker/internal/guard"
 	"github.com/canhta/threadwalker/internal/llm"
 	"github.com/canhta/threadwalker/internal/logging"
+	"github.com/canhta/threadwalker/internal/metrics"
 	"github.com/canhta/threadwalker/internal/store"
 	"github.com/canhta/threadwalker/internal/threads"
 	"github.com/canhta/threadwalker/internal/tools"
@@ -37,7 +38,10 @@ type Options struct {
 // ErrNotRunning allows the scheduler to absorb an owner control racing selection.
 var ErrNotRunning = errors.New("starting wake: agent is not running")
 
-type Runtime struct{ opts Options }
+type Runtime struct {
+	opts    Options
+	metrics *metrics.Processor
+}
 type WakeResult struct {
 	ID        int64
 	EndReason string
@@ -69,7 +73,11 @@ func New(opts Options) (*Runtime, error) {
 	if opts.Wait == nil {
 		opts.Wait = Wait
 	}
-	return &Runtime{opts: opts}, nil
+	processor, err := metrics.New(metrics.Options{Store: opts.Store, Template: opts.Template, Now: opts.Now, Logger: opts.Logger, ThreadsFactory: opts.ThreadsFactory, Owner: opts.Owner, Secrets: opts.Secrets})
+	if err != nil {
+		return nil, err
+	}
+	return &Runtime{opts: opts, metrics: processor}, nil
 }
 func (r *Runtime) fallback(at time.Time) time.Time {
 	interval := time.Hour
@@ -89,6 +97,10 @@ func (r *Runtime) Start(ctx context.Context) error {
 		return err
 	}
 	now := r.opts.Now()
+	before, err := r.opts.Store.AgentState(ctx, r.opts.Template.ID)
+	if err != nil {
+		return err
+	}
 	ids, err := r.opts.Store.RecoverWakes(ctx, r.opts.Template.ID, now, r.fallback(now))
 	if err != nil {
 		return err
@@ -97,13 +109,19 @@ func (r *Runtime) Start(ctx context.Context) error {
 		r.event(ctx, logging.WakeStopped, "stopped", "interrupted", id, 0)
 	}
 	if len(ids) > 0 {
-		r.event(ctx, logging.SchedulerScheduled, "success", "recovery_advanced", 0, 0)
+		after, err := r.opts.Store.AgentState(ctx, r.opts.Template.ID)
+		if err != nil {
+			return err
+		}
+		if !before.NextWake.Equal(after.NextWake) {
+			r.event(ctx, logging.SchedulerScheduled, "success", "recovery_advanced", 0, 0)
+		}
 	}
 	return nil
 }
 
 // Context includes only the immutable persona/goal and this agent's own state.
-// Playbook and fresh metrics are empty until their implementing issues land.
+// Playbook remains empty until its implementing issue lands.
 func (r *Runtime) Context(ctx context.Context) ([]llm.Message, error) { return r.buildContext(ctx, 0) }
 func (r *Runtime) buildContext(ctx context.Context, wakeID int64) ([]llm.Message, error) {
 	state, err := r.opts.Store.AgentState(ctx, r.opts.Template.ID)
@@ -126,6 +144,10 @@ func (r *Runtime) buildContext(ctx context.Context, wakeID int64) ([]llm.Message
 	if err != nil {
 		return nil, err
 	}
+	metrics, err := r.opts.Store.RecentMetricSamples(ctx, r.opts.Template.ID, 20)
+	if err != nil {
+		return nil, err
+	}
 	secrets := append([]config.Secret{}, r.opts.Secrets...)
 	secrets = append(secrets, r.opts.Template.LLM.APIKey, r.opts.Template.Telegram.BotToken, r.opts.Template.Telegram.OwnerChatID)
 	for i := range answers {
@@ -139,9 +161,9 @@ func (r *Runtime) buildContext(ctx context.Context, wakeID int64) ([]llm.Message
 		SelfNote     string               `json:"self_note"`
 		OwnerAnswers []store.OwnerMessage `json:"owner_answers"`
 		Playbook     []string             `json:"playbook"`
-		Metrics      []string             `json:"metrics"`
+		Metrics      []store.MetricSample `json:"metrics"`
 		RemainingUSD float64              `json:"remaining_usd"`
-	}{state.SelfNote, answers, []string{}, []string{}, remaining})
+	}{state.SelfNote, answers, []string{}, metrics, remaining})
 	r.event(ctx, logging.ContextBuilt, "success", "own_state_only", wakeID, 0)
 	mode := "dry-run"
 	if !r.opts.Template.DryRun {
@@ -289,6 +311,7 @@ func (s Scheduler) Run(ctx context.Context, once bool) error {
 		now := s.Now()
 		var selected *Runtime
 		var next time.Time
+		maintenance := false
 		for _, r := range s.Agents {
 			state, err := r.opts.Store.AgentState(ctx, r.opts.Template.ID)
 			if err != nil {
@@ -301,8 +324,17 @@ func (s Scheduler) Run(ctx context.Context, once bool) error {
 			if due.IsZero() {
 				due = now
 			}
+			metricDue, metricOK, err := r.metrics.NextDue(ctx)
+			if err != nil {
+				return err
+			}
+			isMetric := metricOK && !metricDue.After(due)
+			if isMetric {
+				due = metricDue
+			}
 			if selected == nil || due.Before(next) {
 				selected, next = r, due
+				maintenance = isMetric
 			}
 		}
 		if selected == nil {
@@ -321,6 +353,23 @@ func (s Scheduler) Run(ctx context.Context, once bool) error {
 			}
 			if err := s.Wait(ctx, delay); err != nil {
 				return err
+			}
+			continue
+		}
+		if maintenance {
+			result, err := selected.metrics.RunDue(ctx)
+			if err != nil {
+				return err
+			}
+			if once {
+				return nil
+			}
+			// Another process can own the agent's audit scope. Avoid a busy
+			// loop when the selected maintenance lost that race.
+			if result.ClaimedJobs == 0 {
+				if err := s.Wait(ctx, time.Minute); err != nil {
+					return err
+				}
 			}
 			continue
 		}

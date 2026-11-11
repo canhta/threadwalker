@@ -2,6 +2,7 @@ package tools
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -38,6 +39,9 @@ func (d *Dispatcher) browserRead(ctx context.Context, operation string, a argume
 	case "read_post":
 		page, err = d.opts.Threads.ReadPost(ctx, a.URL)
 	case "read_own_metrics":
+		if a.ActionID > 0 {
+			return d.actionMetrics(ctx, a.ActionID)
+		}
 		return d.opts.Threads.ReadOwnMetrics(ctx)
 	}
 	if err != nil {
@@ -53,6 +57,40 @@ func (d *Dispatcher) browserRead(ctx context.Context, operation string, a argume
 		}
 	}
 	return page, nil
+}
+
+// ActionMetrics retains the local action binding in the untrusted result. The
+// processor verifies it before committing code-owned outcomes.
+type ActionMetrics struct {
+	ActionID int64 `json:"action_id"`
+	threads.Metrics
+}
+
+func (d *Dispatcher) actionMetrics(ctx context.Context, actionID int64) (any, error) {
+	var threadURL string
+	err := d.opts.Store.DB().QueryRowContext(ctx, `SELECT thread_url FROM actions WHERE id=? AND agent_id=? AND dry_run=0 AND kind IN ('post','reply') AND thread_url<>''`, actionID, d.opts.Template.ID).Scan(&threadURL)
+	if errors.Is(err, sql.ErrNoRows) || (err == nil && strings.TrimSpace(threadURL) == "") {
+		return nil, threads.ErrMetricsUnavailable
+	}
+	if err != nil {
+		return nil, fmt.Errorf("reading own metric action: %w", err)
+	}
+	reader, ok := d.opts.Threads.(threads.ActionMetricsReader)
+	if !ok {
+		return nil, threads.ErrMetricsUnavailable
+	}
+	call, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+	values, err := reader.ReadActionMetrics(call, threadURL)
+	if err != nil {
+		return nil, err
+	}
+	for _, count := range []int64{values.Views, values.Likes, values.Replies, values.Reposts} {
+		if count < 0 || count > 1<<53 {
+			return nil, threads.ErrMetricsUnavailable
+		}
+	}
+	return ActionMetrics{ActionID: actionID, Metrics: values}, nil
 }
 
 func (d *Dispatcher) browserAction(ctx context.Context, operation string, a arguments) (data any, err error) {
@@ -105,6 +143,8 @@ func (d *Dispatcher) browserResult(ctx context.Context, operation string, starte
 			reason = "unknown_page"
 		case errors.Is(err, threads.ErrMalformedPage):
 			reason = "malformed_page"
+		case errors.Is(err, threads.ErrMetricsUnavailable):
+			reason = "metrics_unavailable"
 		case errors.Is(err, context.Canceled):
 			reason = "cancelled"
 		case errors.Is(err, context.DeadlineExceeded):

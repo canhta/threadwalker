@@ -30,6 +30,14 @@ type Backend interface {
 	Close(context.Context) error
 }
 
+// ActionMetricsReader is optional. It returns counters bound to the exact own
+// published thread URL supplied by the guarded dispatcher, never account totals.
+type ActionMetricsReader interface {
+	ReadActionMetrics(context.Context, string) (Metrics, error)
+}
+
+var ErrMetricsUnavailable = errors.New("action metrics unavailable")
+
 type Options struct {
 	AgentID        string
 	BaseURL        string
@@ -173,7 +181,11 @@ func (b *Browser) read(ctx context.Context, op, path, kind string) (page Page, e
 	if err != nil {
 		return Page{}, err
 	}
-	return ParseSnapshot(raw, kind, b.base.String())
+	page, err = ParseSnapshot(raw, kind, b.base.String())
+	if err == nil && kind == "action_metrics" && page.ThreadURL != dest {
+		return Page{}, ErrMalformedPage
+	}
+	return page, err
 }
 func (b *Browser) ReadFeed(ctx context.Context) (Page, error) {
 	return b.read(ctx, "read_feed", "/feed", "feed")
@@ -186,6 +198,20 @@ func (b *Browser) ReadPost(ctx context.Context, target string) (Page, error) {
 }
 func (b *Browser) ReadOwnMetrics(ctx context.Context) (Metrics, error) {
 	p, err := b.read(ctx, "read_own_metrics", "/metrics", "metrics")
+	if err != nil {
+		return Metrics{}, err
+	}
+	if p.Metrics == nil {
+		return Metrics{}, operationError("read_own_metrics", ErrMalformedPage)
+	}
+	return *p.Metrics, nil
+}
+
+func (b *Browser) ReadActionMetrics(ctx context.Context, threadURL string) (Metrics, error) {
+	// Same-origin validation also happens before navigation. The returned
+	// synthetic page must independently identify this exact thread, including
+	// its query (which may distinguish a reply from its parent).
+	p, err := b.read(ctx, "read_own_metrics", threadURL, "action_metrics")
 	if err != nil {
 		return Metrics{}, err
 	}

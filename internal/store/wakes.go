@@ -92,18 +92,25 @@ func (s *Store) RecoverWakes(ctx context.Context, id string, at, future time.Tim
 		return nil, fmt.Errorf("recovering wakes: %w", err)
 	}
 	defer tx.Rollback()
-	rows, err := tx.QueryContext(ctx, `SELECT id FROM wakes WHERE agent_id=? AND ended_at IS NULL ORDER BY id`, id)
+	rows, err := tx.QueryContext(ctx, `SELECT id,kind FROM wakes WHERE agent_id=? AND ended_at IS NULL ORDER BY id`, id)
 	if err != nil {
 		return nil, fmt.Errorf("reading interrupted wakes: %w", err)
 	}
 	ids := []int64{}
+	kinds := map[int64]string{}
+	recoverSchedule := false
 	for rows.Next() {
 		var wake int64
-		if err = rows.Scan(&wake); err != nil {
+		var kind string
+		if err = rows.Scan(&wake, &kind); err != nil {
 			rows.Close()
 			return nil, fmt.Errorf("reading interrupted wake: %w", err)
 		}
 		ids = append(ids, wake)
+		kinds[wake] = kind
+		if kind == "agent" {
+			recoverSchedule = true
+		}
 	}
 	err = rows.Err()
 	rows.Close()
@@ -111,14 +118,18 @@ func (s *Store) RecoverWakes(ctx context.Context, id string, at, future time.Tim
 		return nil, fmt.Errorf("reading interrupted wakes: %w", err)
 	}
 	for _, wake := range ids {
-		if _, err = tx.ExecContext(ctx, `UPDATE tool_calls SET result_json=? WHERE wake_id=? AND result_json=''`, `{"outcome":"unknown_assumed_sent","retry":false}`, wake); err != nil {
+		outcome := `{"outcome":"unknown_assumed_sent","retry":false}`
+		if kinds[wake] == "metrics" {
+			outcome = `{"outcome":"interrupted_read","retry":true}`
+		}
+		if _, err = tx.ExecContext(ctx, `UPDATE tool_calls SET result_json=? WHERE wake_id=? AND result_json=''`, outcome, wake); err != nil {
 			return nil, fmt.Errorf("retiring interrupted intents: %w", err)
 		}
 		if _, err = tx.ExecContext(ctx, `UPDATE wakes SET ended_at=?,end_reason='interrupted' WHERE id=?`, at.UTC().Format(time.RFC3339Nano), wake); err != nil {
 			return nil, fmt.Errorf("interrupting wake: %w", err)
 		}
 	}
-	if len(ids) > 0 {
+	if recoverSchedule {
 		var scheduled sql.NullString
 		if err = tx.QueryRowContext(ctx, `SELECT next_wake_at FROM agents WHERE id=?`, id).Scan(&scheduled); err != nil {
 			return nil, fmt.Errorf("reading recovery schedule: %w", err)
