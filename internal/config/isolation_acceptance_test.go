@@ -283,3 +283,34 @@ func TestIsolationAcceptancePublicLoaderReadsNoSecrets(t *testing.T) {
 		}
 	}
 }
+
+func TestIsolationAcceptanceTeasingTemplateIsDistinctAndNonInteracting(t *testing.T) {
+	path := filepath.Join("..", "..", "agents", "teasing.example.yaml")
+	tmpl, err := config.LoadFileWithCatalog(path, isolationGetenv, nil)
+	if err != nil {
+		t.Fatalf("loading canonical teasing template: %v", err)
+	}
+	if tmpl.ID != "teasing" || tmpl.Threads.Username != "synthetic_teasing" || tmpl.Threads.ProfileDir != "data/profiles/teasing" {
+		t.Fatalf("teasing identity = %q/%q/%q", tmpl.ID, tmpl.Threads.Username, tmpl.Threads.ProfileDir)
+	}
+	if !tmpl.DryRun || tmpl.Telegram.Enabled {
+		t.Fatalf("teasing template must be dry-run with Telegram disabled: dry_run=%v telegram=%v", tmpl.DryRun, tmpl.Telegram.Enabled)
+	}
+	if tmpl.LLM.APIKeyEnv != "LLM_API_KEY" || tmpl.LLM.APIKey.Expose() != "synthetic-isolation-test-key" {
+		t.Fatalf("teasing template must use the canonical inline key environment")
+	}
+	if tmpl.Persona.Name == "" || strings.EqualFold(tmpl.Persona.Name, "Kaito") {
+		t.Fatalf("teasing persona must be distinct from the builder template: %q", tmpl.Persona.Name)
+	}
+	joined := strings.Join(append(append(append([]string{tmpl.Goal, tmpl.Persona.Identity, tmpl.Persona.Voice}, tmpl.Persona.Topics...), tmpl.Persona.StyleRules...), tmpl.Persona.AvoidTopics...), "\n")
+	joined += "\n" + strings.Join(tmpl.Persona.GoodPosts, "\n") + "\n" + strings.Join(tmpl.Persona.GoodReplies, "\n") + "\n" + strings.Join(tmpl.SeedPlaybook, "\n")
+	if strings.Contains(strings.ToLower(joined), "kaito") || strings.Contains(strings.ToLower(joined), "solo-builder") {
+		t.Fatal("teasing template references the other configured account")
+	}
+	if strings.Contains(joined, "http://") || strings.Contains(joined, "https://") || strings.Contains(joined, "www.") {
+		t.Fatal("teasing template embeds a promotion link")
+	}
+	if !strings.Contains(strings.ToLower(joined), "tài khoản thí nghiệm còn lại") {
+		t.Fatal("teasing template lacks an explicit no-interaction rule")
+	}
+}
