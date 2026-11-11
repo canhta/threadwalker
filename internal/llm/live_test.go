@@ -9,6 +9,7 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"strconv"
 	"testing"
 	"time"
 
@@ -23,9 +24,25 @@ func TestLiveTwoToolLoop(t *testing.T) {
 	if os.Getenv("THREADWALKER_LIVE_LLM") != "1" {
 		t.Skip("requires explicit live-check authorization")
 	}
-	key := config.NewSecret(os.Getenv("OPENAI_API_KEY"))
-	if key.Expose() == "" {
-		t.Fatal("OPENAI_API_KEY is required")
+	keyEnv := os.Getenv("THREADWALKER_LIVE_KEY_ENV")
+	key := config.NewSecret(os.Getenv(keyEnv))
+	if keyEnv == "" || key.Expose() == "" {
+		t.Fatal("configured live key environment variable is required")
+	}
+	rate := func(name string) float64 {
+		n, err := strconv.ParseFloat(os.Getenv(name), 64)
+		if err != nil || n <= 0 || math.IsInf(n, 0) || math.IsNaN(n) {
+			t.Fatalf("%s must be a positive configured rate", name)
+		}
+		return n
+	}
+	cfg := config.LLMConfig{Protocol: os.Getenv("THREADWALKER_LIVE_PROTOCOL"), BaseURL: os.Getenv("THREADWALKER_LIVE_BASE_URL"), Model: os.Getenv("THREADWALKER_LIVE_MODEL"), APIKey: key, PricePerMTokInUSD: rate("THREADWALKER_LIVE_PRICE_IN"), PricePerMTokOutUSD: rate("THREADWALKER_LIVE_PRICE_OUT")}
+	if cfg.Protocol != "openai" && cfg.Protocol != "anthropic" {
+		t.Fatal("explicit supported live protocol is required")
+	}
+	// Bound the possible output bill for all three attempts of all three steps.
+	if 9*256.0/1e6*cfg.PricePerMTokOutUSD > 0.025 {
+		t.Fatal("configured live output rate exceeds spike cap")
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
 	defer cancel()
@@ -44,8 +61,8 @@ func TestLiveTwoToolLoop(t *testing.T) {
 		t.Fatal(err)
 	}
 	ledger := &liveLedger{Store: db}
-	cfg := config.LLMConfig{BaseURL: "https://api.openai.com/v1", Model: "gpt-5.6-luna", APIKey: key, PricePerMTokInUSD: 0.20, PricePerMTokOutUSD: 1.20}
-	client, err := llm.New(cfg, config.LimitsConfig{MaxStepsPerWake: 3, MaxUSDPerDay: 0.01}, ledger, llm.Options{Now: func() time.Time { return now }, RequestTimeout: 25 * time.Second, MaxCompletionTokens: 256, ReasoningEffort: "none"})
+
+	client, err := llm.New(cfg, config.LimitsConfig{MaxStepsPerWake: 3, MaxUSDPerDay: 0.01}, ledger, llm.Options{Now: func() time.Time { return now }, RequestTimeout: 25 * time.Second, MaxCompletionTokens: 256, ReasoningEffort: os.Getenv("THREADWALKER_LIVE_REASONING_EFFORT")})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -98,7 +115,7 @@ func TestLiveTwoToolLoop(t *testing.T) {
 	if total.TokensIn != sum.TokensIn || total.TokensOut != sum.TokensOut || math.Abs(total.CostUSD-sum.CostUSD) > 1e-12 {
 		t.Fatal("ledger and provider usage differ")
 	}
-	t.Logf("date=%s model=%s tools=%v responses=%d steps=%d tokens_in=%d tokens_out=%d ledger_cost_usd=%.10f", now.Format(time.RFC3339), cfg.Model, names, len(ledger.responses), result.Steps, total.TokensIn, total.TokensOut, total.CostUSD)
+	t.Logf("date=%s protocol=%s model=%s tools=%v responses=%d steps=%d tokens_in=%d tokens_out=%d ledger_cost_usd=%.10f", now.Format(time.RFC3339), cfg.Protocol, cfg.Model, names, len(ledger.responses), result.Steps, total.TokensIn, total.TokensOut, total.CostUSD)
 }
 
 type liveLedger struct {

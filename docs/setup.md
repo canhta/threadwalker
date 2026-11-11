@@ -50,9 +50,21 @@ provider's model ID and sets input and output prices per million tokens.
 
 Edit the example, or a copy of it, and fill every placeholder model ID and price
 before real use. The `openai` protocol also covers compatible custom endpoints.
-`anthropic` entries are valid configuration that `check` validates; the native
-Anthropic runtime is [issue #15](https://github.com/canhta/threadwalker/issues/15),
-so this configuration does not yet make Anthropic calls.
+`anthropic` selects native Messages: `base_url` may be the API root or end in
+`/v1`, and the adapter appends the Messages path once. The catalog's `primary`,
+`secondary`, `fast`, `reasoning` and `backup` names are examples; you can rename
+them and use any model ID supported by the selected endpoint. Changing
+`api_key_env` selects your own environment-variable name. Credentials stay in
+HTTP authentication headers, outside model messages. Neither protocol implies
+support for every vendor API.
+
+Both protocols use the same bounded tool loop, caller-supplied guarded dispatcher
+and usage ledger. Native Messages supports text and client-side function tools,
+with a 1024-token output limit unless the caller sets `MaxCompletionTokens`.
+OpenAI-specific `ReasoningEffort` is rejected for native Messages; extended
+thinking, streaming, images and provider-hosted tools are outside this contract.
+Reported native cache input is counted in total input; the catalog's two flat
+prices do not reproduce cache/tier pricing or provider invoices.
 
 A template selects a profile by replacing its entire inline `llm` block with
 `llm.profile`:
@@ -123,3 +135,27 @@ measured acceptance criteria hold.
 only `check`. It expects environment variables in
 `/etc/threadwalker/threadwalker.env`; the root `.env` is local setup storage. The
 unit does not yet start an agent loop.
+
+
+## Opt-in LLM protocol checks
+
+Default tests run offline. The paid two-tool check requires the `llm_live` build
+tag and `THREADWALKER_LIVE_LLM=1`. Configure `THREADWALKER_LIVE_PROTOCOL`
+(`openai` or `anthropic`), `THREADWALKER_LIVE_BASE_URL`,
+`THREADWALKER_LIVE_MODEL`, `THREADWALKER_LIVE_KEY_ENV` (the name of an existing
+key environment variable), and positive `THREADWALKER_LIVE_PRICE_IN` /
+`THREADWALKER_LIVE_PRICE_OUT` rates per million tokens. Optionally set
+`THREADWALKER_LIVE_REASONING_EFFORT` for the OpenAI protocol. The test has no
+provider/model defaults and invokes only fake local tools.
+
+```sh
+go test -tags llm_live ./internal/llm -run '^TestLiveTwoToolLoop$' -count=1 -v
+```
+
+Run only with authorization and verified current model rates. The check caps
+outputs at 256 tokens per response, three steps, three HTTP attempts per step,
+a 25-second request timeout, a 90-second wake timeout and a USD 0.01 local daily
+ledger budget. A response can cross that ledger threshold; the small fixed
+prompt and output cap bound this spike, rather than promising a provider billing
+cap. See [the measured evidence](research/spike-llm.md) for exact models, usage,
+computed costs and limitations.

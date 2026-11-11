@@ -123,3 +123,109 @@ shell code, and passed that value directly to the child environment. It never
 printed the value, copied the credential file, or passed secrets in command-line
 arguments. The test converts the environment value to `config.Secret` and prints
 only safe counts, computed costs, timestamps and fake tool names.
+
+## Configured protocol adapters (issue #15)
+
+Measured on 2026-11-11 after #4 and #14 closed with evidence. The runtime now
+selects an internal wire adapter from resolved `LLMConfig.Protocol`; an empty
+protocol preserves legacy OpenAI-compatible behavior. Provider/profile names,
+model IDs, endpoints, key variable names and prices remain operator inputs.
+Native Messages appends `/v1/messages` to the configured API root, or `/messages`
+when the base already ends in `/v1`. OpenAI-compatible Chat Completions preserves
+the configured base path and appends `/chat/completions`.
+
+Official protocol references checked for this implementation:
+
+- [OpenAI Chat Completions](https://developers.openai.com/api/reference/resources/chat/subresources/completions/methods/create):
+  function tool calls carry JSON arguments in a string; results identify the call.
+- [Anthropic Messages](https://platform.claude.com/docs/en/api/messages/create) and
+  [tool use](https://platform.claude.com/docs/en/agents-and-tools/tool-use/overview):
+  top-level system instructions, `input_schema`, assistant `tool_use` blocks and
+  user `tool_result` blocks, with native input/output token usage.
+- [Anthropic versions](https://platform.claude.com/docs/en/api/versioning):
+  the adapter pins the documented `2023-06-01` Messages contract. It sends
+  `x-api-key` and `anthropic-version` headers. The newer version is not required
+  for the text/client-tool subset implemented here.
+
+Both protocols use the same budget checks, bounded HTTP attempts, step counting,
+transactional usage writes and caller-owned guarded dispatcher. Native output
+uses `max_tokens`, defaulting to 1024 when no explicit output bound is supplied.
+OpenAI-specific reasoning effort is rejected for native requests. This subset
+supports text and client-side function tools; it does not claim support for
+extended thinking, multimodal content, streaming or provider-hosted tools.
+Unsupported native response blocks stop the loop after recording known usage.
+Truncated tool responses stop before dispatch even if their partial arguments
+happen to parse as a JSON object. Malformed arguments and unknown tools produce
+normalized tool errors; native
+errors have `is_error: true`. Consecutive native tool results are grouped in one
+user message. HTTP response bodies and transport errors are not echoed into
+errors; dispatcher failures use a generic tool error. Returned content and tool
+results redact the configured credential before becoming model context.
+
+### Per-protocol live evidence
+
+The owner authorized one small two-tool check for each provisioned protocol.
+Both ran the configurable `TestLiveTwoToolLoop`, with exactly the two fake local
+tools described above, then final `DONE`. The three-step, 256-output-token,
+25-second-request, 90-second-wake and USD 0.01 ledger limits were retained.
+Each check recorded three responses; the SQLite ledger matched their usage sum.
+No VPS, Threads or Telegram access occurred.
+
+| Protocol | Exact configured model | Started UTC | Elapsed | Input rate USD/MTok | Output rate USD/MTok |
+|---|---|---|---:|---:|---:|
+| `openai` | `gpt-5.6-luna` | 2026-11-11T12:08:39Z | 5.59 s | 0.20 | 1.20 |
+| `anthropic` | `claude-haiku-4-5-20251001` | 2026-11-11T12:08:45Z | 3.04 s | 1.00 | 5.00 |
+
+The chosen models/rates were checked against the official
+[OpenAI model page](https://developers.openai.com/api/docs/models/gpt-5.6-luna),
+[Anthropic model page](https://platform.claude.com/docs/en/models/haiku-4-5/overview)
+and [Anthropic pricing](https://platform.claude.com/docs/en/about-claude/pricing).
+They are run-specific inputs, not runtime or test defaults. Both protocols
+returned valid JSON object arguments and accepted the correlated tool results.
+
+| Protocol | Response | Provider input tokens | Provider output tokens | Computed ledger USD |
+|---|---|---:|---:|---:|
+| `openai` | `lookup_seed` | 196 | 17 | 0.0000596 |
+| `openai` | `append_marker` | 233 | 21 | 0.0000718 |
+| `openai` | `DONE` | 275 | 4 | 0.0000598 |
+| **OpenAI total** | | **704** | **42** | **0.0001912** |
+| `anthropic` | `lookup_seed` | 681 | 66 | 0.0010110 |
+| `anthropic` | `append_marker` | 770 | 73 | 0.0011350 |
+| `anthropic` | `DONE` | 868 | 5 | 0.0008930 |
+| **Anthropic total** | | **2319** | **144** | **0.0030390** |
+
+Combined locally computed cost was **USD 0.0032302**, below the authorized
+USD 0.10 total. Neither provider returned billed dollar amounts; these are flat
+rate ledger calculations, not invoice evidence. Native input normalization sums
+`input_tokens`, `cache_read_input_tokens` and `cache_creation_input_tokens` when
+reported. The ledger has only two configured prices, so it does not reproduce
+cache discounts/surcharges, long-context tiers or other special billing.
+
+A local Python launcher parsed only the selected credential entries from the
+owner's private root `.env` using `shlex`, without evaluating shell code. It
+passed the original `OPENAI_API_KEY` and `ANTHROPIC_API_KEY` into the respective
+child environments and set the nonsecret live settings separately. It printed
+only test status, token counts, computed costs, models and fake tool names. No
+credential contents entered model context, output, tracked files or command-line
+arguments. No private file was copied and no persistent launcher was created.
+
+The live test now requires explicit protocol, base URL, model, key environment
+variable name and positive price settings; it has no hardcoded provider/model
+selection. Repetition settings and limits are documented in
+[setup.md](../setup.md#opt-in-llm-protocol-checks). The earlier #4 command above
+remains the test entrypoint, with these new required settings. Default tests
+exclude the live file and run offline.
+
+
+Additional offline adapter evidence:
+
+- `TestNativeProtocolSelectionAndAccounting`: native endpoint/headers and usage
+  normalization through the unchanged public constructor and run loop.
+- `TestNativeCacheUsageAndMalformedContentAccounting`: all reported native input
+  categories are counted, negative/overflow usage is rejected, and valid usage
+  is retained before malformed or unsupported content is rejected.
+- `TestTransportAndToolResultsRedactCredentials`: reflected tool output and
+  caller-supplied message content cannot send the configured credential into
+  either protocol's model context; transport errors suppress credential text.
+- `TestTruncatedToolCallsNeverDispatch`: both protocols account for usage and
+  refuse incomplete tool responses before any caller/guard dispatch.

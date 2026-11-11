@@ -42,9 +42,13 @@ Two layers:
 Each agent uses one hand-written tool-calling loop with the LLM configuration resolved from
 its template. The optional catalog supports multiple providers and model profiles, including
 several profiles sharing one provider; selecting a profile resolves only that provider's key.
-The existing runtime client uses OpenAI-compatible Chat Completions. Protocols name implementation
-adapters: a vendor's arbitrary API does not become compatible merely by configuring its key.
-Native Anthropic runtime support remains follow-up [#15](https://github.com/canhta/threadwalker/issues/15).
+The runtime has internal adapters for OpenAI-compatible Chat Completions (`openai`) and native
+Anthropic Messages (`anthropic`). Both normalize messages, tool calls/results and token usage into
+the same bounded loop and ledger. Protocols name implemented wire contracts: a vendor's arbitrary
+API does not become compatible merely by configuring its key. Native Messages pins API version
+`2023-06-01`, uses `max_tokens` (1024 by default, or the caller's output limit), and supports text
+and client-side function tools. Unknown content blocks fail closed after recording known usage;
+extended thinking, multimodal input, streaming and server-side tools are outside this contract.
 **(decision)**
 
 No fixed triage/compose/critic pipeline and no same-model critic. **(sourced)**: first-party guidance says
@@ -128,7 +132,10 @@ How fast it opens is one of the experiment's results.
 ## 8. Budget
 
 - A local token ledger per agent, priced from the template's resolved LLM configuration (inline
-  rates or the selected model profile). **(sourced)**: flat
+  rates or the selected model profile). Both adapters record provider-reported input and output
+  tokens; native input includes cache-read and cache-creation categories when reported. The two
+  configured flat rates do not represent cache discounts, cache-write surcharges, tier pricing
+  or billed dollars. **(sourced)**: flat
   subscriptions expose no balance to read.
 - The agent always sees its remaining budget and decides how to spend it; the harness only blocks
   at the limit.
@@ -147,7 +154,7 @@ How fast it opens is one of the experiment's results.
 |---|---|---|
 | Language | Go, single binary | Research read the repos; nothing was run |
 | DB | SQLite via a pure-Go driver (`modernc.org/sqlite`) | Research read the repo; nothing was run |
-| LLM | Optional provider/model catalog ([canonical example](../llms.example.yaml)); templates select a profile or declare inline LLM settings | Configuration accepts `openai` and `anthropic` protocols; the current client implements OpenAI-compatible Chat Completions, with native Anthropic runtime in [#15](https://github.com/canhta/threadwalker/issues/15) |
+| LLM | Optional provider/model catalog ([canonical example](../llms.example.yaml)); templates select a profile or declare inline LLM settings | Standard-library adapters implement `openai` Chat Completions and native `anthropic` Messages, including custom base URLs; two-tool live evidence is in [spike-llm.md](research/spike-llm.md) |
 | Browser | Headless Chromium over CDP | **Untested**: which Go library, real memory use, whether Threads challenges datacenter IPs |
 | Deploy | systemd unit on the VPS | proposed |
 
@@ -187,7 +194,7 @@ threadwalker/
 ├── internal/
 │   ├── config/                  # load templates, optional LLM catalog and selected secrets
 │   ├── store/                   # SQLite, migrations, queries
-│   ├── llm/                     # OpenAI-compatible client and ledger
+│   ├── llm/                     # protocol adapters, shared tool loop and ledger
 │   ├── agent/                   # one wake: context assembly and tool loop
 │   ├── tools/                   # tool definitions and dispatcher
 │   ├── guard/                   # limits, forbidden phrases, do-not-contact

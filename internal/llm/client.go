@@ -1,4 +1,4 @@
-// Package llm implements the provider-agnostic Chat Completions loop.
+// Package llm implements a bounded tool loop over configured LLM protocols.
 package llm
 
 import (
@@ -42,6 +42,7 @@ type Message struct {
 	Content    string     `json:"content"`
 	ToolCalls  []ToolCall `json:"tool_calls,omitempty"`
 	ToolCallID string     `json:"tool_call_id,omitempty"`
+	ToolError  bool       `json:"-"`
 }
 
 // Dispatcher must be wrapped by internal/guard before production use. This
@@ -84,6 +85,7 @@ type Client struct {
 	sleep       func(context.Context, time.Duration) error
 	outputLimit int
 	reasoning   string
+	adapter     protocolAdapter
 }
 
 // Result contains the completed messages and steps consumed before stopping.
@@ -97,6 +99,13 @@ type Result struct {
 
 // New constructs a client with a 30-second request timeout unless overridden.
 func New(cfg config.LLMConfig, limits config.LimitsConfig, ledger Ledger, opts Options) (*Client, error) {
+	adapter, err := adapterFor(cfg.Protocol)
+	if err != nil {
+		return nil, err
+	}
+	if cfg.Protocol == "anthropic" && opts.ReasoningEffort != "" {
+		return nil, errors.New("configuring LLM client: reasoning effort is only supported by openai protocol")
+	}
 	u, err := url.Parse(cfg.BaseURL)
 	if err != nil || u.Host == "" || (u.Scheme != "http" && u.Scheme != "https") || u.User != nil || u.RawQuery != "" || u.Fragment != "" {
 		return nil, errors.New("configuring LLM client: invalid base URL")
@@ -127,7 +136,7 @@ func New(cfg config.LLMConfig, limits config.LimitsConfig, ledger Ledger, opts O
 	if opts.RequestTimeout == 0 {
 		opts.RequestTimeout = 30 * time.Second
 	}
-	return &Client{config: cfg, limits: limits, http: opts.HTTPClient, now: opts.Now, timeout: opts.RequestTimeout, ledger: ledger, sleep: opts.Sleep, outputLimit: opts.MaxCompletionTokens, reasoning: opts.ReasoningEffort}, nil
+	return &Client{config: cfg, limits: limits, http: opts.HTTPClient, now: opts.Now, timeout: opts.RequestTimeout, ledger: ledger, sleep: opts.Sleep, outputLimit: opts.MaxCompletionTokens, reasoning: opts.ReasoningEffort, adapter: adapter}, nil
 }
 
 type completion struct {
@@ -135,7 +144,8 @@ type completion struct {
 		PromptTokens     *int64 `json:"prompt_tokens"`
 		CompletionTokens *int64 `json:"completion_tokens"`
 	} `json:"usage"`
-	Choices json.RawMessage `json:"choices"`
+	Choices      json.RawMessage `json:"choices"`
+	MessageError error           `json:"-"`
 }
 
 // Run performs one wake's bounded conversation. The caller owns wake creation,
@@ -148,15 +158,12 @@ func (c *Client) Run(ctx context.Context, agentID string, wakeID int64, messages
 	for _, tool := range tools {
 		known[tool.Function.Name] = true
 	}
-	result := Result{Messages: append([]Message(nil), messages...)}
+	result := Result{Messages: make([]Message, len(messages))}
+	for i, message := range messages {
+		result.Messages[i] = c.redactMessage(message)
+	}
 	for result.Steps < c.limits.MaxStepsPerWake {
-		body, err := json.Marshal(struct {
-			Model               string    `json:"model"`
-			Messages            []Message `json:"messages"`
-			Tools               []Tool    `json:"tools,omitempty"`
-			MaxCompletionTokens int       `json:"max_completion_tokens,omitempty"`
-			ReasoningEffort     string    `json:"reasoning_effort,omitempty"`
-		}{c.config.Model, result.Messages, tools, c.outputLimit, c.reasoning})
+		body, err := c.adapter.encode(c.config.Model, result.Messages, tools, c.outputLimit, c.reasoning)
 		if err != nil {
 			return result, fmt.Errorf("encoding chat request: %w", err)
 		}
@@ -164,17 +171,23 @@ func (c *Client) Run(ctx context.Context, agentID string, wakeID int64, messages
 		if err != nil {
 			return result, err
 		}
+		if response.MessageError != nil {
+			return result, response.MessageError
+		}
 		var choices []struct {
 			Message      Message `json:"message"`
 			FinishReason string  `json:"finish_reason"`
 		}
 		if err := json.Unmarshal(response.Choices, &choices); err != nil {
-			return result, fmt.Errorf("decoding chat choices: %w", err)
+			return result, errors.New("decoding chat choices: invalid response")
 		}
 		if len(choices) != 1 || choices[0].Message.Role != "assistant" {
 			return result, errors.New("reading chat response: expected one assistant choice")
 		}
-		message := choices[0].Message
+		message := c.redactMessage(choices[0].Message)
+		if len(message.ToolCalls) > 0 && choices[0].FinishReason != "" && choices[0].FinishReason != "tool_calls" {
+			return result, errors.New("reading chat response: incomplete tool calls")
+		}
 		ids := make(map[string]bool, len(message.ToolCalls))
 		for _, call := range message.ToolCalls {
 			if call.ID == "" || ids[call.ID] {
@@ -200,6 +213,7 @@ func (c *Client) Run(ctx context.Context, agentID string, wakeID int64, messages
 			}
 			result.Steps++
 			var output string
+			toolError := true
 			var args map[string]json.RawMessage
 			switch {
 			case call.Type != "function":
@@ -210,11 +224,12 @@ func (c *Client) Run(ctx context.Context, agentID string, wakeID int64, messages
 				output = `{"error":"invalid JSON object arguments"}`
 			default:
 				output, err = dispatcher.Dispatch(ctx, call)
+				toolError = err != nil
 				if err != nil {
 					output = `{"error":"tool dispatcher rejected or failed the call"}`
 				}
 			}
-			result.Messages = append(result.Messages, Message{Role: "tool", Content: output, ToolCallID: call.ID})
+			result.Messages = append(result.Messages, c.redactMessage(Message{Role: "tool", Content: output, ToolCallID: call.ID, ToolError: toolError}))
 		}
 	}
 	return result, fmt.Errorf("running chat loop: %w", ErrStepLimit)
@@ -278,30 +293,30 @@ func (c *Client) request(ctx context.Context, agentID string, wakeID int64, body
 func (c *Client) attempt(ctx context.Context, body []byte) (completion, int, error) {
 	ctx, cancel := context.WithTimeout(ctx, c.timeout)
 	defer cancel()
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, strings.TrimRight(c.config.BaseURL, "/")+"/chat/completions", bytes.NewReader(body))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.adapter.endpoint(c.config.BaseURL), bytes.NewReader(body))
 	if err != nil {
 		return completion{}, 0, fmt.Errorf("creating chat request: %w", err)
 	}
-	req.Header.Set("Authorization", "Bearer "+c.config.APIKey.Expose())
+	c.adapter.authorize(req, c.config.APIKey.Expose())
 	req.Header.Set("Content-Type", "application/json")
 	res, err := c.http.Do(req)
 	if err != nil {
-		return completion{}, 0, fmt.Errorf("sending chat request: %w", err)
+		return completion{}, 0, safeHTTPError("sending chat request", err)
 	}
 	defer res.Body.Close()
 	raw, err := io.ReadAll(io.LimitReader(res.Body, (8<<20)+1))
 	if err != nil {
-		return completion{}, 0, fmt.Errorf("reading chat response: %w", err)
+		return completion{}, 0, safeHTTPError("reading chat response", err)
 	}
 	if len(raw) > 8<<20 {
 		return completion{}, 0, errors.New("reading chat response: exceeds 8 MiB limit")
 	}
-	var response completion
-	if err := json.Unmarshal(raw, &response); err != nil {
+	response, err := c.adapter.decode(raw)
+	if err != nil {
 		if res.StatusCode != http.StatusOK {
 			return completion{}, res.StatusCode, nil
 		}
-		return completion{}, 0, fmt.Errorf("decoding chat response: %w", err)
+		return completion{}, 0, errors.New("decoding chat response: invalid response")
 	}
 	return response, res.StatusCode, nil
 }
@@ -317,3 +332,27 @@ func sleep(ctx context.Context, d time.Duration) error {
 }
 
 func nonnegative(v float64) bool { return v >= 0 && !math.IsInf(v, 0) && !math.IsNaN(v) }
+
+// Errors from transports and bodies may contain credentials or reflected provider
+// content. Preserve cancellation identity, but never include untrusted error text.
+func safeHTTPError(operation string, err error) error {
+	if errors.Is(err, context.Canceled) {
+		return fmt.Errorf("%s: %w", operation, context.Canceled)
+	}
+	if errors.Is(err, context.DeadlineExceeded) {
+		return fmt.Errorf("%s: %w", operation, context.DeadlineExceeded)
+	}
+	return fmt.Errorf("%s: transport or response failure", operation)
+}
+func (c *Client) redactMessage(m Message) Message {
+	redact := func(value string) string { return strings.ReplaceAll(value, c.config.APIKey.Expose(), "[REDACTED]") }
+	m.Content = redact(m.Content)
+	m.ToolCallID = redact(m.ToolCallID)
+	m.ToolCalls = append([]ToolCall(nil), m.ToolCalls...)
+	for i := range m.ToolCalls {
+		m.ToolCalls[i].ID = redact(m.ToolCalls[i].ID)
+		m.ToolCalls[i].Function.Name = redact(m.ToolCalls[i].Function.Name)
+		m.ToolCalls[i].Function.Arguments = redact(m.ToolCalls[i].Function.Arguments)
+	}
+	return m
+}

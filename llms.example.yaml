@@ -6,7 +6,7 @@ providers:
     base_url: https://api.openai.com/v1
     api_key_env: LLM_API_KEY
   secondary:
-    protocol: anthropic           # validated by check; native adapter is issue #15
+    protocol: anthropic           # native Messages, also accepts a base ending /v1
     base_url: https://api.anthropic.com
     api_key_env: SECONDARY_LLM_API_KEY
 models:
