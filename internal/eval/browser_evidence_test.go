@@ -90,3 +90,18 @@ func TestBrowserScenariosFailClosedAndRequireOffline(t *testing.T) {
 		t.Fatal("live component evaluation accepted")
 	}
 }
+
+func TestBrowserReportIdentityIncludesEmbeddedSnapshots(t *testing.T) {
+	suite, err := LoadSuite("testdata/browser-v1.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	beforeSuite := suiteDigest(suite)
+	beforeInputs := inputsFingerprint(suite.Cases, Options{})
+	saved := browserSnapshots
+	t.Cleanup(func() { browserSnapshots = saved })
+	browserSnapshots = append(append([]byte{}, saved...), '\n')
+	if suiteDigest(suite) == beforeSuite || inputsFingerprint(suite.Cases, Options{}) == beforeInputs {
+		t.Fatal("embedded browser fixture changes must invalidate report identity")
+	}
+}

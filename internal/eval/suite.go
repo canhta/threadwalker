@@ -249,6 +249,9 @@ func suiteDigest(s *Suite) string {
 	var canonical any
 	_ = dec.Decode(&canonical)
 	b, _ = json.Marshal(canonical)
+	if fixture := browserFixtureDigest(s.Cases); fixture != "" {
+		b = append(b, []byte("\x00browser-snapshots:"+fixture)...)
+	}
 	hash := sha256.Sum256(b)
 	return hex.EncodeToString(hash[:])
 }

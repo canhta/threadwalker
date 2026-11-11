@@ -3,7 +3,9 @@ package eval
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	_ "embed"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"io"
@@ -25,6 +27,16 @@ import (
 //
 //go:embed testdata/browser-snapshots-v1.json
 var browserSnapshots []byte
+
+func browserFixtureDigest(cases []Case) string {
+	for _, c := range cases {
+		if c.BrowserScenario != "" {
+			h := sha256.Sum256(browserSnapshots)
+			return hex.EncodeToString(h[:])
+		}
+	}
+	return ""
+}
 
 type evalBrowser struct {
 	scenario       string
