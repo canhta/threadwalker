@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>Product Hunt (synthetic fixture)</title>
+  <entry>
+    <id>tag:producthunt,2026:1</id>
+    <title>Ship &amp; Tell — 日本語 &amp; Tiếng Việt</title>
+    <link rel="alternate" type="text/html" href="https://www.producthunt.com/posts/ship-and-tell?utm=x&amp;y=1"/>
+  </entry>
+  <entry>
+    <id>tag:producthunt,2026:2</id>
+    <title><![CDATA[CDATA <Tool> & More]]></title>
+    <link rel="alternate" type="text/html" href="https://www.producthunt.com/posts/cdata-tool"/>
+  </entry>
+  <entry>
+    <id>tag:producthunt,2026:3</id>
+    <link rel="alternate" type="text/html" href="https://www.producthunt.com/posts/no-title"/>
+  </entry>
+  <entry>
+    <id>tag:producthunt,2026:4</id>
+    <title>No link entry</title>
+  </entry>
+  <entry>
+    <id>tag:producthunt,2026:5</id>
+    <title>Fallback link ✓</title>
+    <link type="text/html" href="https://www.producthunt.com/posts/fallback"/>
+  </entry>
+</feed>
