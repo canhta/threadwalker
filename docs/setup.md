@@ -107,9 +107,44 @@ legacy inline template:
 go run ./cmd/threadwalker check -agents agents -db data/threadwalker.db
 ```
 
-Expect `check passed`. This validates templates and SQLite migrations without
-calling external services. Telegram entries are currently required even in dry
-run.
+`check` validates templates and SQLite migrations without calling external
+services. At its default `info` level it emits JSON lifecycle records to stdout.
+Telegram entries are currently required even in dry run.
+
+## Operational logs
+
+Choose the log level and format with flags. The canonical event names and
+metadata allowlist are in [`internal/logging/logging.go`](../internal/logging/logging.go);
+the contract is in [`docs/spec.md`](spec.md).
+
+```sh
+go run ./cmd/threadwalker check -agents agents -db data/threadwalker.db -log-format json -log-level debug
+```
+
+Default is `-log-format json -log-level info`. Use `-log-format text` for local
+reading. Even at `debug`, records carry allowlisted metadata only: no credentials,
+headers, endpoint URLs, prompts, notes, Threads text, stranger usernames, tool
+arguments/results or raw provider bodies.
+
+`journalctl` receives the same JSON lines. Filter retries by wake and HTTP status:
+
+```sh
+journalctl -u threadwalker -o cat --since '15 min ago' \
+  | jq -c 'select(.event == "llm.request.retry") | {time, agent_id, wake_id, request, attempt, http_status, reason}'
+```
+
+Correlate one wake's requests with its outcome and locally computed usage:
+
+```sh
+journalctl -u threadwalker -o cat --since '15 min ago' \
+  | jq -c 'select(.agent_id == "solo-builder" and .wake_id == 42) | {event, request, attempt, http_status, tokens_in, tokens_out, cost_usd, outcome, reason}'
+```
+
+The `wake_id 42` above and any durations or costs are synthetic example values,
+not production evidence. `llm.tool.finished` covers only the client dispatcher
+boundary. [`deploy/threadwalker.service`](../deploy/threadwalker.service) still
+runs `check` only, so journald will not contain wake-loop events until a
+scheduler issue implements them.
 
 ## Accounts and live checks
 
