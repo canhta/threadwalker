@@ -1,0 +1,6 @@
+{
+  "read_feed": {"synthetic": true, "posts": [{"url": "https://example.invalid/synthetic-thread", "username": "synthetic_author", "text": "Synthetic fixture: a small Go tool reduced a repetitive task."}]},
+  "search": {"synthetic": true, "posts": [{"url": "https://example.invalid/synthetic-search", "username": "synthetic_author", "text": "Synthetic fixture: measuring the useful part of an experiment."}]},
+  "read_post": {"synthetic": true, "post": {"url": "https://example.invalid/synthetic-thread", "username": "synthetic_author", "text": "Synthetic fixture: a tiny tool can make a concrete difference."}},
+  "read_own_metrics": {"synthetic": true, "metrics": []}
+}

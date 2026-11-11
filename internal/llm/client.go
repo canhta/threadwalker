@@ -69,9 +69,13 @@ var ErrStepLimit = errors.New("wake step limit reached")
 var ErrBudget = errors.New("daily LLM budget spent")
 
 type Options struct {
-	Logger     *slog.Logger
-	ProviderID string
-	ProfileID  string
+	// RejectedToolCall observes attempts rejected by local protocol validation.
+	// Production callers install their guard/audit boundary here. Legacy fake
+	// dispatchers may leave it nil. A marked terminal error stops the wake.
+	RejectedToolCall func(context.Context, ToolCall, string) error
+	Logger           *slog.Logger
+	ProviderID       string
+	ProfileID        string
 	// Zero omits provider-specific output/reasoning options.
 	MaxCompletionTokens int
 	ReasoningEffort     string
@@ -81,6 +85,7 @@ type Options struct {
 	RequestTimeout      time.Duration
 }
 type Client struct {
+	rejectedToolCall      func(context.Context, ToolCall, string) error
 	logger                *slog.Logger
 	providerID, profileID string
 	config                config.LLMConfig
@@ -146,7 +151,7 @@ func New(cfg config.LLMConfig, limits config.LimitsConfig, ledger Ledger, opts O
 	if cfg.Protocol == "" {
 		cfg.Protocol = "openai"
 	}
-	return &Client{logger: opts.Logger, providerID: opts.ProviderID, profileID: opts.ProfileID, config: cfg, limits: limits, http: opts.HTTPClient, now: opts.Now, timeout: opts.RequestTimeout, ledger: ledger, sleep: opts.Sleep, outputLimit: opts.MaxCompletionTokens, reasoning: opts.ReasoningEffort, adapter: adapter}, nil
+	return &Client{rejectedToolCall: opts.RejectedToolCall, logger: opts.Logger, providerID: opts.ProviderID, profileID: opts.ProfileID, config: cfg, limits: limits, http: opts.HTTPClient, now: opts.Now, timeout: opts.RequestTimeout, ledger: ledger, sleep: opts.Sleep, outputLimit: opts.MaxCompletionTokens, reasoning: opts.ReasoningEffort, adapter: adapter}, nil
 }
 
 type completion struct {
@@ -193,6 +198,9 @@ func (c *Client) Run(ctx context.Context, agentID string, wakeID int64, messages
 			return result, err
 		}
 		if response.MessageError != nil {
+			if err := c.rejectResponse(ctx, response.Choices, "invalid_response"); isTerminalToolError(err) {
+				return result, terminalToolFailure(err)
+			}
 			return result, failure("reading chat response", "invalid_response", response.MessageError)
 		}
 		var choices []struct {
@@ -200,18 +208,30 @@ func (c *Client) Run(ctx context.Context, agentID string, wakeID int64, messages
 			FinishReason string  `json:"finish_reason"`
 		}
 		if err := json.Unmarshal(response.Choices, &choices); err != nil {
+			if hookErr := c.rejectResponse(ctx, response.Choices, "invalid_response"); isTerminalToolError(hookErr) {
+				return result, terminalToolFailure(hookErr)
+			}
 			return result, failure("decoding chat choices", "malformed_choices", err)
 		}
 		if len(choices) != 1 || choices[0].Message.Role != "assistant" {
+			if err := c.rejectResponse(ctx, response.Choices, "invalid_response"); isTerminalToolError(err) {
+				return result, terminalToolFailure(err)
+			}
 			return result, failure("reading chat response", "invalid_choice", nil)
 		}
 		message := c.redactMessage(choices[0].Message)
 		if len(message.ToolCalls) > 0 && choices[0].FinishReason != "" && choices[0].FinishReason != "tool_calls" {
+			if err := c.rejectCalls(ctx, message.ToolCalls, "incomplete_tool_calls"); isTerminalToolError(err) {
+				return result, terminalToolFailure(err)
+			}
 			return result, failure("reading chat response", "incomplete_tool_calls", nil)
 		}
 		ids := make(map[string]bool, len(message.ToolCalls))
 		for _, call := range message.ToolCalls {
 			if call.ID == "" || ids[call.ID] {
+				if err := c.rejectCalls(ctx, message.ToolCalls, "invalid_tool_call_id"); isTerminalToolError(err) {
+					return result, terminalToolFailure(err)
+				}
 				return result, failure("reading chat response", "invalid_tool_call_id", nil)
 			}
 			ids[call.ID] = true
@@ -237,6 +257,7 @@ func (c *Client) Run(ctx context.Context, agentID string, wakeID int64, messages
 			outcome, reason := "success", "completed"
 			safeTool := ""
 			var output string
+			var toolErr error
 			toolError := true
 			var args map[string]json.RawMessage
 			switch {
@@ -251,12 +272,15 @@ func (c *Client) Run(ctx context.Context, agentID string, wakeID int64, messages
 				output = `{"error":"invalid JSON object arguments"}`
 			default:
 				safeTool = call.Function.Name
-				output, err = dispatcher.Dispatch(ctx, call)
-				toolError = err != nil
-				if err != nil {
+				output, toolErr = dispatcher.Dispatch(ctx, call)
+				toolError = toolErr != nil
+				if toolErr != nil {
 					outcome, reason = "error", "dispatch_failed"
 					output = `{"error":"tool dispatcher rejected or failed the call"}`
 				}
+			}
+			if safeTool == "" && c.rejectedToolCall != nil {
+				toolErr = c.rejectedToolCall(ctx, call, reason)
 			}
 			level := slog.LevelInfo
 			if outcome == "error" {
@@ -264,6 +288,9 @@ func (c *Client) Run(ctx context.Context, agentID string, wakeID int64, messages
 			}
 			logging.Emit(ctx, c.logger, level, logging.Record{Event: logging.LLMToolFinished, AgentID: agentID, WakeID: wakeID, Request: requestIndex, ToolCallID: fmt.Sprintf("%d/%d", wakeID, result.Steps), Tool: safeTool, ProviderID: c.providerID, ProfileID: c.profileID, Model: c.config.Model, Protocol: c.config.Protocol, Operation: "dispatch", Outcome: outcome, Reason: reason, DurationMS: c.now().Sub(toolStarted).Milliseconds(), Steps: result.Steps})
 			result.Messages = append(result.Messages, c.redactMessage(Message{Role: "tool", Content: output, ToolCallID: call.ID, ToolError: toolError}))
+			if isTerminalToolError(toolErr) {
+				return result, terminalToolFailure(toolErr)
+			}
 		}
 	}
 	return result, fmt.Errorf("running chat loop: %w", ErrStepLimit)
