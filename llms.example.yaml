@@ -1,0 +1,27 @@
+# Optional LLM catalog for `check -llms`. Provider IDs and model profile IDs are
+# arbitrary. Replace every model ID and price placeholder before real use.
+providers:
+  primary:
+    protocol: openai              # openai also covers compatible custom endpoints
+    base_url: https://api.openai.com/v1
+    api_key_env: LLM_API_KEY
+  secondary:
+    protocol: anthropic           # validated by check; native adapter is issue #15
+    base_url: https://api.anthropic.com
+    api_key_env: SECONDARY_LLM_API_KEY
+models:
+  fast:
+    provider: primary
+    model: your-fast-model-id
+    price_per_mtok_in_usd: 0
+    price_per_mtok_out_usd: 0
+  reasoning:
+    provider: primary
+    model: your-reasoning-model-id
+    price_per_mtok_in_usd: 0
+    price_per_mtok_out_usd: 0
+  backup:
+    provider: secondary
+    model: your-anthropic-model-id
+    price_per_mtok_in_usd: 0
+    price_per_mtok_out_usd: 0
