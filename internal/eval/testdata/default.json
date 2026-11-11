@@ -1,0 +1,1188 @@
+{
+  "version": "v1",
+  "description": "Versioned offline eval suite. Every response body is synthetic. The planted strings below exist only to prove reports never echo fixture content or credentials. Pending coverage belongs to #5 (wake, no-replay, stalls, context, notes and trends), #6 (guards, contacts and untrusted content), #7 (owner and kill-switch states), #8 (browser and Threads), #9 (integrated live run), #10 (playbook and gate), and #12 (multiple agents/templates); these components are not certified here. Selected-key isolation is verified by CLI/config acceptance tests alongside this fixture suite.",
+  "cases": [
+    {
+      "id": "valid_two_tool_loop",
+      "description": "Two-tool loop completes and exports only known tool names.",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Look up the seed and append its marker."
+        }
+      ],
+      "tools": [
+        {
+          "type": "function",
+          "function": {
+            "name": "lookup_seed",
+            "description": "Return the synthetic seed for a label.",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "label": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "label"
+              ]
+            }
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "append_marker",
+            "description": "Append a marker for a synthetic seed.",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "seed": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "seed"
+              ]
+            }
+          }
+        }
+      ],
+      "responses": {
+        "openai": [
+          {
+            "status": 200,
+            "body": {
+              "choices": [
+                {
+                  "message": {
+                    "role": "assistant",
+                    "tool_calls": [
+                      {
+                        "id": "call_lookup",
+                        "type": "function",
+                        "function": {
+                          "name": "lookup_seed",
+                          "arguments": "{\"label\":\"demo\"}"
+                        }
+                      }
+                    ]
+                  },
+                  "finish_reason": "tool_calls"
+                }
+              ],
+              "usage": {
+                "prompt_tokens": 100,
+                "completion_tokens": 20
+              }
+            }
+          },
+          {
+            "status": 200,
+            "body": {
+              "choices": [
+                {
+                  "message": {
+                    "role": "assistant",
+                    "tool_calls": [
+                      {
+                        "id": "call_append",
+                        "type": "function",
+                        "function": {
+                          "name": "append_marker",
+                          "arguments": "{\"seed\":\"seed-demo\"}"
+                        }
+                      }
+                    ]
+                  },
+                  "finish_reason": "tool_calls"
+                }
+              ],
+              "usage": {
+                "prompt_tokens": 120,
+                "completion_tokens": 12
+              }
+            }
+          },
+          {
+            "status": 200,
+            "body": {
+              "choices": [
+                {
+                  "message": {
+                    "role": "assistant",
+                    "content": "DONE"
+                  },
+                  "finish_reason": "stop"
+                }
+              ],
+              "usage": {
+                "prompt_tokens": 140,
+                "completion_tokens": 3
+              }
+            }
+          }
+        ],
+        "anthropic": [
+          {
+            "status": 200,
+            "body": {
+              "id": "msg_valid_1",
+              "type": "message",
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "looking up the seed"
+                },
+                {
+                  "type": "tool_use",
+                  "id": "toolu_lookup",
+                  "name": "lookup_seed",
+                  "input": {
+                    "label": "demo"
+                  }
+                }
+              ],
+              "stop_reason": "tool_use",
+              "usage": {
+                "input_tokens": 10,
+                "output_tokens": 4
+              }
+            }
+          },
+          {
+            "status": 200,
+            "body": {
+              "id": "msg_valid_2",
+              "type": "message",
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "tool_use",
+                  "id": "toolu_append",
+                  "name": "append_marker",
+                  "input": {
+                    "seed": "seed-demo"
+                  }
+                }
+              ],
+              "stop_reason": "tool_use",
+              "usage": {
+                "input_tokens": 20,
+                "output_tokens": 6
+              }
+            }
+          },
+          {
+            "status": 200,
+            "body": {
+              "id": "msg_valid_3",
+              "type": "message",
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "DONE"
+                }
+              ],
+              "stop_reason": "end_turn",
+              "usage": {
+                "input_tokens": 30,
+                "output_tokens": 2
+              }
+            }
+          }
+        ]
+      },
+      "tool_outputs": {
+        "lookup_seed": "{\"seed\":\"seed-demo\",\"note\":\"fixture-secret-PLANTED-9931\",\"username\":\"fixture_stranger_9931\"}",
+        "append_marker": "marker-set"
+      },
+      "expect": {
+        "end_reason": "completed",
+        "content": "DONE",
+        "tools": [
+          "lookup_seed",
+          "append_marker"
+        ]
+      },
+      "limits": {
+        "max_output_tokens": 64
+      }
+    },
+    {
+      "id": "retry_then_success",
+      "description": "A retryable provider failure is retried once, then a tool call and final answer succeed.",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Retry the synthetic provider once, then look up the seed."
+        }
+      ],
+      "tools": [
+        {
+          "type": "function",
+          "function": {
+            "name": "lookup_seed",
+            "description": "Return the synthetic seed for a label.",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "label": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "label"
+              ]
+            }
+          }
+        }
+      ],
+      "responses": {
+        "openai": [
+          {
+            "status": 500,
+            "body": {
+              "error": {
+                "message": "upstream unavailable for fixture-secret-PLANTED-9931 user fixture_stranger_9931"
+              }
+            }
+          },
+          {
+            "status": 200,
+            "body": {
+              "choices": [
+                {
+                  "message": {
+                    "role": "assistant",
+                    "tool_calls": [
+                      {
+                        "id": "call_retry_lookup",
+                        "type": "function",
+                        "function": {
+                          "name": "lookup_seed",
+                          "arguments": "{\"label\":\"retry\"}"
+                        }
+                      }
+                    ]
+                  },
+                  "finish_reason": "tool_calls"
+                }
+              ],
+              "usage": {
+                "prompt_tokens": 80,
+                "completion_tokens": 16
+              }
+            }
+          },
+          {
+            "status": 200,
+            "body": {
+              "choices": [
+                {
+                  "message": {
+                    "role": "assistant",
+                    "content": "RETRIED"
+                  },
+                  "finish_reason": "stop"
+                }
+              ],
+              "usage": {
+                "prompt_tokens": 120,
+                "completion_tokens": 8
+              }
+            }
+          }
+        ],
+        "anthropic": [
+          {
+            "status": 500,
+            "body": {
+              "error": {
+                "message": "upstream unavailable for fixture-secret-PLANTED-9931 user fixture_stranger_9931"
+              }
+            }
+          },
+          {
+            "status": 200,
+            "body": {
+              "id": "msg_retry_1",
+              "type": "message",
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "tool_use",
+                  "id": "toolu_retry_lookup",
+                  "name": "lookup_seed",
+                  "input": {
+                    "label": "retry"
+                  }
+                }
+              ],
+              "stop_reason": "tool_use",
+              "usage": {
+                "input_tokens": 8,
+                "output_tokens": 2
+              }
+            }
+          },
+          {
+            "status": 200,
+            "body": {
+              "id": "msg_retry_2",
+              "type": "message",
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "RETRIED"
+                }
+              ],
+              "stop_reason": "end_turn",
+              "usage": {
+                "input_tokens": 12,
+                "output_tokens": 2
+              }
+            }
+          }
+        ]
+      },
+      "tool_outputs": {
+        "lookup_seed": "seed-retry"
+      },
+      "expect": {
+        "end_reason": "completed",
+        "content": "RETRIED",
+        "tools": [
+          "lookup_seed"
+        ]
+      }
+    },
+    {
+      "id": "retry_exhaustion",
+      "description": "Three retryable failures exhaust the provider retry policy.",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Call the synthetic provider."
+        }
+      ],
+      "responses": {
+        "openai": [
+          {
+            "status": 500,
+            "body": {
+              "error": {
+                "message": "unavailable"
+              }
+            }
+          },
+          {
+            "status": 500,
+            "body": {
+              "error": {
+                "message": "unavailable"
+              }
+            }
+          },
+          {
+            "status": 500,
+            "body": {
+              "error": {
+                "message": "unavailable"
+              }
+            }
+          }
+        ],
+        "anthropic": [
+          {
+            "status": 500,
+            "body": {
+              "error": {
+                "message": "unavailable"
+              }
+            }
+          },
+          {
+            "status": 500,
+            "body": {
+              "error": {
+                "message": "unavailable"
+              }
+            }
+          },
+          {
+            "status": 500,
+            "body": {
+              "error": {
+                "message": "unavailable"
+              }
+            }
+          }
+        ]
+      },
+      "expect": {
+        "end_reason": "provider_error"
+      }
+    },
+    {
+      "id": "malformed_response",
+      "description": "A 200 response with malformed JSON fails closed as invalid_response.",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Return malformed JSON."
+        }
+      ],
+      "responses": {
+        "openai": [
+          {
+            "status": 200,
+            "body_raw": "{\"choices\":"
+          }
+        ],
+        "anthropic": [
+          {
+            "status": 200,
+            "body_raw": "{\"content\":"
+          }
+        ]
+      },
+      "expect": {
+        "end_reason": "invalid_response"
+      }
+    },
+    {
+      "id": "unknown_and_invalid_arguments_recover",
+      "description": "Unknown tools and invalid arguments are rejected without dispatch; the model then recovers.",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Try an unknown tool and malformed arguments, then recover."
+        }
+      ],
+      "tools": [
+        {
+          "type": "function",
+          "function": {
+            "name": "lookup_seed",
+            "description": "Return the synthetic seed for a label.",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "label": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "label"
+              ]
+            }
+          }
+        }
+      ],
+      "responses": {
+        "openai": [
+          {
+            "status": 200,
+            "body": {
+              "choices": [
+                {
+                  "message": {
+                    "role": "assistant",
+                    "tool_calls": [
+                      {
+                        "id": "call_unknown",
+                        "type": "function",
+                        "function": {
+                          "name": "delete_everything",
+                          "arguments": "{}"
+                        }
+                      },
+                      {
+                        "id": "call_bad_arguments",
+                        "type": "function",
+                        "function": {
+                          "name": "lookup_seed",
+                          "arguments": "{not-json"
+                        }
+                      }
+                    ]
+                  },
+                  "finish_reason": "tool_calls"
+                }
+              ],
+              "usage": {
+                "prompt_tokens": 40,
+                "completion_tokens": 10
+              }
+            }
+          },
+          {
+            "status": 200,
+            "body": {
+              "choices": [
+                {
+                  "message": {
+                    "role": "assistant",
+                    "content": "RECOVERED"
+                  },
+                  "finish_reason": "stop"
+                }
+              ],
+              "usage": {
+                "prompt_tokens": 60,
+                "completion_tokens": 4
+              }
+            }
+          }
+        ],
+        "anthropic": [
+          {
+            "status": 200,
+            "body": {
+              "id": "msg_unknown_1",
+              "type": "message",
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "tool_use",
+                  "id": "toolu_unknown",
+                  "name": "delete_everything",
+                  "input": {}
+                },
+                {
+                  "type": "tool_use",
+                  "id": "toolu_bad_arguments",
+                  "name": "lookup_seed",
+                  "input": [
+                    1,
+                    2
+                  ]
+                }
+              ],
+              "stop_reason": "tool_use",
+              "usage": {
+                "input_tokens": 4,
+                "output_tokens": 2
+              }
+            }
+          },
+          {
+            "status": 200,
+            "body": {
+              "id": "msg_unknown_2",
+              "type": "message",
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "RECOVERED"
+                }
+              ],
+              "stop_reason": "end_turn",
+              "usage": {
+                "input_tokens": 6,
+                "output_tokens": 1
+              }
+            }
+          }
+        ]
+      },
+      "tool_outputs": {
+        "lookup_seed": "seed-never-dispatched"
+      },
+      "expect": {
+        "end_reason": "completed",
+        "content": "RECOVERED",
+        "tools": []
+      }
+    },
+    {
+      "id": "budget_stop",
+      "description": "The first response's usage exceeds the case USD cap, so the next request stops on budget.",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Spend past the synthetic budget cap."
+        }
+      ],
+      "tools": [
+        {
+          "type": "function",
+          "function": {
+            "name": "lookup_seed",
+            "description": "Return the synthetic seed for a label.",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "label": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "label"
+              ]
+            }
+          }
+        }
+      ],
+      "responses": {
+        "openai": [
+          {
+            "status": 200,
+            "body": {
+              "choices": [
+                {
+                  "message": {
+                    "role": "assistant",
+                    "tool_calls": [
+                      {
+                        "id": "call_budget",
+                        "type": "function",
+                        "function": {
+                          "name": "lookup_seed",
+                          "arguments": "{\"label\":\"budget\"}"
+                        }
+                      }
+                    ]
+                  },
+                  "finish_reason": "tool_calls"
+                }
+              ],
+              "usage": {
+                "prompt_tokens": 100,
+                "completion_tokens": 20
+              }
+            }
+          }
+        ],
+        "anthropic": [
+          {
+            "status": 200,
+            "body": {
+              "id": "msg_budget_1",
+              "type": "message",
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "tool_use",
+                  "id": "toolu_budget",
+                  "name": "lookup_seed",
+                  "input": {
+                    "label": "budget"
+                  }
+                }
+              ],
+              "stop_reason": "tool_use",
+              "usage": {
+                "input_tokens": 100,
+                "output_tokens": 20
+              }
+            }
+          }
+        ]
+      },
+      "tool_outputs": {
+        "lookup_seed": "seed-budget"
+      },
+      "expect": {
+        "end_reason": "budget",
+        "tools": [
+          "lookup_seed"
+        ]
+      },
+      "limits": {
+        "max_usd": 0.0001
+      }
+    },
+    {
+      "id": "step_stop",
+      "description": "One tool call consumes the case step cap before its tool can run.",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Take one step."
+        }
+      ],
+      "tools": [
+        {
+          "type": "function",
+          "function": {
+            "name": "lookup_seed",
+            "description": "Return the synthetic seed for a label.",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "label": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "label"
+              ]
+            }
+          }
+        }
+      ],
+      "responses": {
+        "openai": [
+          {
+            "status": 200,
+            "body": {
+              "choices": [
+                {
+                  "message": {
+                    "role": "assistant",
+                    "tool_calls": [
+                      {
+                        "id": "call_step",
+                        "type": "function",
+                        "function": {
+                          "name": "lookup_seed",
+                          "arguments": "{\"label\":\"step\"}"
+                        }
+                      }
+                    ]
+                  },
+                  "finish_reason": "tool_calls"
+                }
+              ],
+              "usage": {
+                "prompt_tokens": 20,
+                "completion_tokens": 5
+              }
+            }
+          }
+        ],
+        "anthropic": [
+          {
+            "status": 200,
+            "body": {
+              "id": "msg_step_1",
+              "type": "message",
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "tool_use",
+                  "id": "toolu_step",
+                  "name": "lookup_seed",
+                  "input": {
+                    "label": "step"
+                  }
+                }
+              ],
+              "stop_reason": "tool_use",
+              "usage": {
+                "input_tokens": 20,
+                "output_tokens": 5
+              }
+            }
+          }
+        ]
+      },
+      "tool_outputs": {
+        "lookup_seed": "seed-step"
+      },
+      "expect": {
+        "end_reason": "step_limit"
+      },
+      "limits": {
+        "max_steps": 1
+      }
+    },
+    {
+      "id": "cancelled_request",
+      "description": "A cancelled synthetic transport is reported as a safe cancellation.",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Cancel the synthetic request."
+        }
+      ],
+      "responses": {
+        "openai": [
+          {
+            "error": "cancelled"
+          }
+        ],
+        "anthropic": [
+          {
+            "error": "cancelled"
+          }
+        ]
+      },
+      "expect": {
+        "end_reason": "cancelled"
+      }
+    },
+    {
+      "id": "deterministic_quality_rubric",
+      "description": "Deterministic rubric: exact content, required and forbidden substrings, rune cap. This is not a human or engagement judgement.",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Reply with one deterministic quality-check sentence."
+        }
+      ],
+      "responses": {
+        "openai": [
+          {
+            "status": 200,
+            "body": {
+              "choices": [
+                {
+                  "message": {
+                    "role": "assistant",
+                    "content": "Short deterministic quality check: one clear claim."
+                  },
+                  "finish_reason": "stop"
+                }
+              ],
+              "usage": {
+                "prompt_tokens": 30,
+                "completion_tokens": 9
+              }
+            }
+          }
+        ],
+        "anthropic": [
+          {
+            "status": 200,
+            "body": {
+              "id": "msg_quality_1",
+              "type": "message",
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Short deterministic quality check: one clear claim."
+                }
+              ],
+              "stop_reason": "end_turn",
+              "usage": {
+                "input_tokens": 8,
+                "output_tokens": 8
+              }
+            }
+          }
+        ]
+      },
+      "expect": {
+        "end_reason": "completed",
+        "content": "Short deterministic quality check: one clear claim.",
+        "required_substrings": [
+          "deterministic",
+          "quality check",
+          "one clear claim"
+        ],
+        "forbidden_substrings": [
+          "guaranteed",
+          "viral"
+        ],
+        "max_runes": 80
+      }
+    },
+    {
+      "id": "missing_usage",
+      "description": "Missing usage fails closed before final content is accepted.",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Complete this synthetic protocol check."
+        }
+      ],
+      "responses": {
+        "openai": [
+          {
+            "status": 200,
+            "body": {
+              "choices": [
+                {
+                  "message": {
+                    "role": "assistant",
+                    "content": "DONE"
+                  },
+                  "finish_reason": "stop"
+                }
+              ]
+            }
+          }
+        ],
+        "anthropic": [
+          {
+            "status": 200,
+            "body": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "DONE"
+                }
+              ],
+              "stop_reason": "end_turn"
+            }
+          }
+        ]
+      },
+      "expect": {
+        "end_reason": "accounting_error",
+        "tools": []
+      }
+    },
+    {
+      "id": "incomplete_usage",
+      "description": "Incomplete usage fails closed without inventing token counts.",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Complete this synthetic protocol check."
+        }
+      ],
+      "responses": {
+        "openai": [
+          {
+            "status": 200,
+            "body": {
+              "choices": [
+                {
+                  "message": {
+                    "role": "assistant",
+                    "content": "DONE"
+                  },
+                  "finish_reason": "stop"
+                }
+              ],
+              "usage": {
+                "prompt_tokens": 12
+              }
+            }
+          }
+        ],
+        "anthropic": [
+          {
+            "status": 200,
+            "body": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "DONE"
+                }
+              ],
+              "stop_reason": "end_turn",
+              "usage": {
+                "input_tokens": 12
+              }
+            }
+          }
+        ]
+      },
+      "expect": {
+        "end_reason": "accounting_error",
+        "tools": []
+      }
+    },
+    {
+      "id": "negative_usage",
+      "description": "Negative usage fails closed without recording invalid counters.",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Complete this synthetic protocol check."
+        }
+      ],
+      "responses": {
+        "openai": [
+          {
+            "status": 200,
+            "body": {
+              "choices": [
+                {
+                  "message": {
+                    "role": "assistant",
+                    "content": "DONE"
+                  },
+                  "finish_reason": "stop"
+                }
+              ],
+              "usage": {
+                "prompt_tokens": -1,
+                "completion_tokens": 2
+              }
+            }
+          }
+        ],
+        "anthropic": [
+          {
+            "status": 200,
+            "body": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "DONE"
+                }
+              ],
+              "stop_reason": "end_turn",
+              "usage": {
+                "input_tokens": -1,
+                "output_tokens": 2
+              }
+            }
+          }
+        ]
+      },
+      "expect": {
+        "end_reason": "accounting_error",
+        "tools": []
+      }
+    },
+    {
+      "id": "request_timeout",
+      "description": "Synthetic request timeout records a provider error without sleeping or accessing a network.",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Complete this synthetic protocol check."
+        }
+      ],
+      "responses": {
+        "openai": [
+          {
+            "error": "timeout"
+          }
+        ],
+        "anthropic": [
+          {
+            "error": "timeout"
+          }
+        ]
+      },
+      "expect": {
+        "end_reason": "provider_error",
+        "tools": []
+      }
+    },
+    {
+      "id": "native_cache_usage_normalization",
+      "description": "Equivalent normalized input usage across the two implemented protocol adapters.",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Complete this synthetic protocol check."
+        }
+      ],
+      "responses": {
+        "openai": [
+          {
+            "status": 200,
+            "body": {
+              "choices": [
+                {
+                  "message": {
+                    "role": "assistant",
+                    "content": "DONE"
+                  },
+                  "finish_reason": "stop"
+                }
+              ],
+              "usage": {
+                "prompt_tokens": 12,
+                "completion_tokens": 2
+              }
+            }
+          }
+        ],
+        "anthropic": [
+          {
+            "status": 200,
+            "body": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "DONE"
+                }
+              ],
+              "stop_reason": "end_turn",
+              "usage": {
+                "input_tokens": 3,
+                "output_tokens": 2,
+                "cache_read_input_tokens": 4,
+                "cache_creation_input_tokens": 5
+              }
+            }
+          }
+        ]
+      },
+      "expect": {
+        "end_reason": "completed",
+        "tools": [],
+        "content": "DONE"
+      }
+    },
+    {
+      "id": "output_bound",
+      "description": "A compliant response fits the configured per-request two-token output bound.",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Complete this synthetic protocol check."
+        }
+      ],
+      "responses": {
+        "openai": [
+          {
+            "status": 200,
+            "body": {
+              "choices": [
+                {
+                  "message": {
+                    "role": "assistant",
+                    "content": "DONE"
+                  },
+                  "finish_reason": "stop"
+                }
+              ],
+              "usage": {
+                "prompt_tokens": 12,
+                "completion_tokens": 2
+              }
+            }
+          }
+        ],
+        "anthropic": [
+          {
+            "status": 200,
+            "body": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "DONE"
+                }
+              ],
+              "stop_reason": "end_turn",
+              "usage": {
+                "input_tokens": 12,
+                "output_tokens": 2
+              }
+            }
+          }
+        ]
+      },
+      "expect": {
+        "end_reason": "completed",
+        "tools": [],
+        "content": "DONE"
+      },
+      "limits": {
+        "max_output_tokens": 2
+      }
+    }
+  ]
+}

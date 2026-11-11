@@ -1,0 +1,21 @@
+# Synthetic profiles for the offline regression demonstration. No keys are read.
+providers:
+  baseline-fake:
+    protocol: openai
+    base_url: https://fixture.invalid/v1
+    api_key_env: EVAL_UNUSED_BASELINE_KEY
+  regressed-fake:
+    protocol: anthropic
+    base_url: https://fixture.invalid
+    api_key_env: EVAL_UNUSED_REGRESSED_KEY
+models:
+  baseline:
+    provider: baseline-fake
+    model: synthetic-baseline
+    price_per_mtok_in_usd: 1
+    price_per_mtok_out_usd: 2
+  regressed:
+    provider: regressed-fake
+    model: synthetic-regression
+    price_per_mtok_in_usd: 1
+    price_per_mtok_out_usd: 2

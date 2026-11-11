@@ -22,6 +22,15 @@ type catalogModel struct {
 	in, out  float64
 }
 
+// ProviderID returns configured metadata without resolving any credentials.
+func (c *Catalog) ProviderID(profile string) (string, bool) {
+	if c == nil {
+		return "", false
+	}
+	model, ok := c.models[profile]
+	return model.provider, ok
+}
+
 // LoadCatalog loads provider and model declarations without reading environment variables.
 func LoadCatalog(path string) (*Catalog, error) {
 	data, err := os.ReadFile(path)

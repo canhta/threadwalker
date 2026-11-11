@@ -64,6 +64,22 @@ No fixed triage/compose/critic pipeline and no same-model critic. **(sourced)**:
 to maximise a single agent first, and in Anthropic's Project Vend a same-model supervisor shared
 the blind spots of the agent it supervised.
 
+Reproducible evaluations are an operator-run harness capability at the existing client/caller
+boundary, using versioned synthetic fixtures, scripted providers and injected time/randomness.
+Offline is the default; arbitrary configured profiles can be compared without modifying an
+agent's immutable template or prompt. Reports contain actual outcomes and safe reason codes,
+tool names/steps, normalized usage and estimated cost, plus separately labelled wall-clock
+timing. Suite/input identity, seed, repeats, code revision and secret-free input and configuration
+fingerprints make runs reproducible. Correctness, safety and explicit deterministic quality
+checks gate comparisons; token/cost/timing differences are reported separately. Human style
+judgments and real engagement outcomes require separate review and measurement. Optional live
+provider calls require explicit profiles/cases, environment credentials and positive USD,
+step and output bounds; they never access Threads, Telegram or the VPS. Canonical fixtures and
+report/runner code live in [`internal/eval`](../internal/eval); reproduce, comparison and failure
+inspection commands live in [`docs/evals.md`](evals.md). Issues #5/#6/#7/#8/#9/#10/#12 must extend
+the suite as their components land; these evaluations certify only implemented client,
+protocol, configuration and accounting behavior. **(decision)**
+
 ## 4. One wake
 
 1. The harness wakes the agent at the time the agent chose last wake, within a frequency limit.

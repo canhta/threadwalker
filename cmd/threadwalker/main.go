@@ -23,16 +23,18 @@ func run(ctx context.Context, args []string, getenv func(string) string, stdout,
 
 	if len(args) == 0 {
 		logging.Emit(ctx, logger, slog.LevelError, logging.Record{Event: logging.CheckFinished, Operation: "check", Outcome: "error", Reason: "missing_command"})
-		fmt.Fprintln(stderr, "usage: threadwalker <check>")
+		fmt.Fprintln(stderr, "usage: threadwalker <check|eval>")
 		return 1
 	}
 
 	switch args[0] {
+	case "eval":
+		return runEval(ctx, args[1:], getenv, stdout, stderr)
 	case "check":
 		return runCheck(ctx, args[1:], getenv, stdout, stderr)
 	default:
 		logging.Emit(ctx, logger, slog.LevelError, logging.Record{Event: logging.CheckFinished, Operation: "check", Outcome: "error", Reason: "unknown_command"})
-		fmt.Fprintln(stderr, "unknown command (expected: check)")
+		fmt.Fprintln(stderr, "unknown command (expected: check or eval)")
 		return 1
 	}
 }
