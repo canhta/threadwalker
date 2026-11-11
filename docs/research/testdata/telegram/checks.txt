@@ -1,0 +1,42 @@
+Source: 2e0b535d379ff21e90ef4577f0acc4575344d183 (rebased on 559ed6c)
+All commands below are offline; no real service qualification.
+
+go vet ./... && go test ./...
+Exit: 0
+ok  	github.com/canhta/threadwalker/cmd/threadwalker	3.286s
+ok  	github.com/canhta/threadwalker/internal/agent	16.711s
+ok  	github.com/canhta/threadwalker/internal/config	0.071s
+ok  	github.com/canhta/threadwalker/internal/eval	25.630s
+ok  	github.com/canhta/threadwalker/internal/guard	7.435s
+ok  	github.com/canhta/threadwalker/internal/llm	(cached)
+ok  	github.com/canhta/threadwalker/internal/logging	(cached)
+ok  	github.com/canhta/threadwalker/internal/store	(cached)
+ok  	github.com/canhta/threadwalker/internal/telegram	2.169s
+ok  	github.com/canhta/threadwalker/internal/tools	8.591s
+
+go test -race ./...
+Exit: 0
+ok  	github.com/canhta/threadwalker/cmd/threadwalker	6.174s
+ok  	github.com/canhta/threadwalker/internal/agent	19.876s
+ok  	github.com/canhta/threadwalker/internal/config	1.206s
+ok  	github.com/canhta/threadwalker/internal/eval	35.102s
+ok  	github.com/canhta/threadwalker/internal/guard	11.508s
+ok  	github.com/canhta/threadwalker/internal/llm	(cached)
+ok  	github.com/canhta/threadwalker/internal/logging	(cached)
+ok  	github.com/canhta/threadwalker/internal/store	(cached)
+ok  	github.com/canhta/threadwalker/internal/telegram	4.483s
+ok  	github.com/canhta/threadwalker/internal/tools	12.919s
+
+CLI checks against the same rebased source:
+go run ./cmd/threadwalker eval -suite internal/eval/testdata/owner-v1.json -seed 7 -repeat 2 -revision 2e0b535d379ff21e90ef4577f0acc4575344d183 -out docs/research/testdata/telegram/eval.json
+Exit: 0; 16/16 passed; tokens in=160 out=80; synthetic estimated USD=0.000320000.
+go run ./cmd/threadwalker eval -suite internal/eval/testdata/guard-v1.json -seed 1 -revision 2e0b535d379ff21e90ef4577f0acc4575344d183 -out /tmp/threadwalker-owner-final-guard-eval.json
+Exit: 0; 58/58 passed; no provider tokens or cost.
+go run ./cmd/threadwalker eval -suite internal/eval/testdata/runtime-v1.json -seed 1 -revision 2e0b535d379ff21e90ef4577f0acc4575344d183 -out /tmp/threadwalker-owner-final-runtime-eval.json
+Exit: 0; 16/16 passed; synthetic estimated USD=0.000520000.
+go run ./cmd/threadwalker run -once -offline
+Exit: 0; synthetic dry-run CLI smoke completed without environment credentials or external requests.
+THREADWALKER_OWNER_TRACE=docs/research/testdata/telegram/events.jsonl go test ./internal/telegram -run TestFakeBotPauseResumeWakeAndRedactedTrace -count=1
+Exit: 0; complete captured metadata-only synthetic Bot API trace includes successful and failed delivery.
+go test ./internal/telegram -run TestSavedOwnerEvidence -count=1
+Exit: 0; shared report contract, accounting, event allowlist and payload exclusion validated.

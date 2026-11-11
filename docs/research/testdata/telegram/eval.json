@@ -3,7 +3,7 @@
   "suite_version": "v1",
   "suite_digest": "fdaafffe25f77273418d0191589661417d3d2b000746312994317c70c458aabb",
   "mode": "offline",
-  "revision": "3ee213a",
+  "revision": "2e0b535d379ff21e90ef4577f0acc4575344d183",
   "seed": 7,
   "repeat": 2,
   "config_fingerprint": "eb126ecbf7e4f906ae4d6cd230fa3324dcb4b203d6eab96c8fe505f42169cbb7",
@@ -28,7 +28,7 @@
       "tokens_in": 30,
       "tokens_out": 15,
       "cost_usd": 0.00006000000000000001,
-      "duration_ms": 276.096862
+      "duration_ms": 377.128055
     },
     {
       "case_id": "owner_async_question_next_wake",
@@ -48,7 +48,7 @@
       "tokens_in": 30,
       "tokens_out": 15,
       "cost_usd": 0.00006000000000000001,
-      "duration_ms": 277.827195
+      "duration_ms": 376.798628
     },
     {
       "case_id": "owner_async_question_next_wake",
@@ -68,7 +68,7 @@
       "tokens_in": 30,
       "tokens_out": 15,
       "cost_usd": 0.00006000000000000001,
-      "duration_ms": 406.834205
+      "duration_ms": 373.234801
     },
     {
       "case_id": "owner_async_question_next_wake",
@@ -88,7 +88,7 @@
       "tokens_in": 30,
       "tokens_out": 15,
       "cost_usd": 0.00006000000000000001,
-      "duration_ms": 435.998171
+      "duration_ms": 385.747334
     },
     {
       "case_id": "owner_delivery_failure_no_replay",
@@ -105,7 +105,7 @@
       "tokens_in": 0,
       "tokens_out": 0,
       "cost_usd": 0,
-      "duration_ms": 131.499051
+      "duration_ms": 96.007297
     },
     {
       "case_id": "owner_delivery_failure_no_replay",
@@ -122,7 +122,7 @@
       "tokens_in": 0,
       "tokens_out": 0,
       "cost_usd": 0,
-      "duration_ms": 130.316992
+      "duration_ms": 113.277249
     },
     {
       "case_id": "owner_delivery_failure_no_replay",
@@ -139,7 +139,7 @@
       "tokens_in": 0,
       "tokens_out": 0,
       "cost_usd": 0,
-      "duration_ms": 121.317255
+      "duration_ms": 113.318881
     },
     {
       "case_id": "owner_delivery_failure_no_replay",
@@ -156,7 +156,7 @@
       "tokens_in": 0,
       "tokens_out": 0,
       "cost_usd": 0,
-      "duration_ms": 124.23583
+      "duration_ms": 123.741824
     },
     {
       "case_id": "owner_notices_digest_dedupe",
@@ -173,7 +173,7 @@
       "tokens_in": 0,
       "tokens_out": 0,
       "cost_usd": 0,
-      "duration_ms": 611.805051
+      "duration_ms": 517.67666
     },
     {
       "case_id": "owner_notices_digest_dedupe",
@@ -190,7 +190,7 @@
       "tokens_in": 0,
       "tokens_out": 0,
       "cost_usd": 0,
-      "duration_ms": 614.34829
+      "duration_ms": 511.71702
     },
     {
       "case_id": "owner_notices_digest_dedupe",
@@ -207,7 +207,7 @@
       "tokens_in": 0,
       "tokens_out": 0,
       "cost_usd": 0,
-      "duration_ms": 598.668712
+      "duration_ms": 523.297598
     },
     {
       "case_id": "owner_notices_digest_dedupe",
@@ -224,7 +224,7 @@
       "tokens_in": 0,
       "tokens_out": 0,
       "cost_usd": 0,
-      "duration_ms": 594.370403
+      "duration_ms": 527.329322
     },
     {
       "case_id": "owner_only_controls",
@@ -241,7 +241,7 @@
       "tokens_in": 10,
       "tokens_out": 5,
       "cost_usd": 0.00002,
-      "duration_ms": 544.103425
+      "duration_ms": 552.988779
     },
     {
       "case_id": "owner_only_controls",
@@ -258,7 +258,7 @@
       "tokens_in": 10,
       "tokens_out": 5,
       "cost_usd": 0.00002,
-      "duration_ms": 461.385152
+      "duration_ms": 555.125242
     },
     {
       "case_id": "owner_only_controls",
@@ -275,7 +275,7 @@
       "tokens_in": 10,
       "tokens_out": 5,
       "cost_usd": 0.00002,
-      "duration_ms": 391.634392
+      "duration_ms": 553.344021
     },
     {
       "case_id": "owner_only_controls",
@@ -292,7 +292,7 @@
       "tokens_in": 10,
       "tokens_out": 5,
       "cost_usd": 0.00002,
-      "duration_ms": 401.79988
+      "duration_ms": 570.009381
     }
   ]
 }

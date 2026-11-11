@@ -29,7 +29,9 @@ To capture the complete synthetic integration trace explicitly:
 THREADWALKER_OWNER_TRACE=/tmp/owner-events.jsonl go test ./internal/telegram -run TestFakeBotPauseResumeWakeAndRedactedTrace -count=1
 ```
 
-The saved trace and shared v1 report live in [`testdata/telegram`](testdata/telegram).
+The saved trace, shared v1 report and `checks.txt` live in [`testdata/telegram`](testdata/telegram).
+The final rebased source passed full vet/test/race, owner eval 16/16, guard eval 58/58,
+runtime eval 16/16 and an actual offline CLI smoke; the report identifies its source revision.
 The report records the implementation revision, suite/input/configuration fingerprints, actual
 executed tool names, persisted normalized wake usage and separately labelled wall-clock time.
 
