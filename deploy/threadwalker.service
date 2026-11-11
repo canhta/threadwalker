@@ -9,7 +9,6 @@ User=threadwalker
 Group=threadwalker
 WorkingDirectory=/opt/threadwalker
 EnvironmentFile=/etc/threadwalker/threadwalker.env
-ExecStartPre=/opt/threadwalker/threadwalker check -agents /opt/threadwalker/agents -db /opt/threadwalker/data/threadwalker.db
 ExecStart=/opt/threadwalker/threadwalker check -agents /opt/threadwalker/agents -db /opt/threadwalker/data/threadwalker.db
 Restart=on-failure
 RestartSec=10s

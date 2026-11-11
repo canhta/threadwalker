@@ -326,3 +326,77 @@ func TestLoadDir(t *testing.T) {
 		t.Fatalf("LoadDir returned %+v, want 1 template with ID solo-builder", tmpls)
 	}
 }
+
+func TestLoadFile_BlockScalarPreservesHashAndErrorsOnInvalidSyntax(t *testing.T) {
+	examplePath := filepath.Join("..", "..", "agents", "solo-builder.example.yaml")
+	rawBytes, err := os.ReadFile(examplePath)
+	if err != nil {
+		t.Fatalf("reading example template: %v", err)
+	}
+	baseYAML := string(rawBytes)
+
+	// Block scalar should preserve literal # characters (e.g. #threads)
+	withHash := strings.Replace(baseYAML, "sống sót qua ngày", "sống sót #threads qua ngày", 1)
+	tmpHash := filepath.Join(t.TempDir(), "hash.yaml")
+	if err := os.WriteFile(tmpHash, []byte(withHash), 0o600); err != nil {
+		t.Fatalf("writing temp template: %v", err)
+	}
+	tmpl, err := config.LoadFile(tmpHash, validEnv())
+	if err != nil {
+		t.Fatalf("LoadFile failed on block scalar with #: %v", err)
+	}
+	if !strings.Contains(tmpl.Goal, "#threads") {
+		t.Errorf("Goal %q did not preserve #threads inside block scalar", tmpl.Goal)
+	}
+
+	// Negative price_per_mtok_in_usd and invalid number/bool syntax
+	negPrice := strings.Replace(baseYAML, "  price_per_mtok_in_usd: 0", "  price_per_mtok_in_usd: -1", 1)
+	negPrice = strings.Replace(negPrice, "  posts_per_day: 3", "  posts_per_day: abc", 1)
+	negPrice = strings.Replace(negPrice, "  max_usd_per_day: 0.50", "  max_usd_per_day: xyz", 1)
+	negPrice = strings.Replace(negPrice, "dry_run: true", "dry_run: maybe", 1)
+	tmpNeg := filepath.Join(t.TempDir(), "neg.yaml")
+	if err := os.WriteFile(tmpNeg, []byte(negPrice), 0o600); err != nil {
+		t.Fatalf("writing temp template: %v", err)
+	}
+	_, err = config.LoadFile(tmpNeg, validEnv())
+	if err == nil {
+		t.Fatal("expected error for negative price and invalid types, got nil")
+	}
+	for _, want := range []string{"llm.price_per_mtok_in_usd", "limits.posts_per_day", "limits.max_usd_per_day", "dry_run"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("error %q missing field %q", err.Error(), want)
+		}
+	}
+
+	// YAML syntax errors: unexpected list item, missing colon, unexpected indentation
+	syntaxCases := []struct {
+		name string
+		yaml string
+		want string
+	}{
+		{name: "unexpected_list_item", yaml: "- orphan\n", want: "unexpected list item"},
+		{name: "missing_colon", yaml: "invalid_line_without_colon\n", want: "expected key: value"},
+		{name: "unexpected_indent", yaml: "  indented_first: value\n", want: "unexpected indentation"},
+	}
+	for _, sc := range syntaxCases {
+		t.Run(sc.name, func(t *testing.T) {
+			p := filepath.Join(t.TempDir(), sc.name+".yaml")
+			if err := os.WriteFile(p, []byte(sc.yaml), 0o600); err != nil {
+				t.Fatalf("writing file: %v", err)
+			}
+			_, err := config.LoadFile(p, validEnv())
+			if err == nil || !strings.Contains(err.Error(), sc.want) {
+				t.Errorf("LoadFile(%s) error = %v, want substring %q", sc.name, err, sc.want)
+			}
+		})
+	}
+
+	// Empty directory and non-existent directory in LoadDir
+	emptyDir := t.TempDir()
+	if _, err := config.LoadDir(emptyDir, validEnv()); err == nil {
+		t.Errorf("LoadDir on empty dir: expected error, got nil")
+	}
+	if _, err := config.LoadDir(filepath.Join(emptyDir, "missing"), validEnv()); err == nil {
+		t.Errorf("LoadDir on missing dir: expected error, got nil")
+	}
+}

@@ -197,7 +197,7 @@ no code path executes a tool without passing the guards.
 
 ## 15. Database schema
 
-Every table carries `agent_id`, even while only one agent runs.
+Every table carries `agent_id`, even while only one agent runs. Canonical DDL lives in [`internal/store/migrations/001_initial_schema.sql`](../internal/store/migrations/001_initial_schema.sql).
 
 | Table | Main columns | Purpose |
 |---|---|---|

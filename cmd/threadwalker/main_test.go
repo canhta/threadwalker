@@ -61,3 +61,19 @@ func TestRun_UnknownCommandExitsOne(t *testing.T) {
 		t.Fatalf("run(unknown) = %d, want 1", code)
 	}
 }
+
+func TestRun_NoArgsAndBadFlagsAndBadDBPathExitOne(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	if code := run(context.Background(), nil, func(string) string { return "" }, &stdout, &stderr); code != 1 {
+		t.Fatalf("run(nil) = %d, want 1", code)
+	}
+	if code := run(context.Background(), []string{"check", "-unknown-flag"}, func(string) string { return "" }, &stdout, &stderr); code != 1 {
+		t.Fatalf("run(check -unknown-flag) = %d, want 1", code)
+	}
+	// Passing a directory path as the DB file path causes store.Open to fail.
+	badDBPath := t.TempDir()
+	agentsDir := filepath.Join("..", "..", "agents")
+	if code := run(context.Background(), []string{"check", "-agents", agentsDir, "-db", badDBPath}, func(string) string { return "val" }, &stdout, &stderr); code != 1 {
+		t.Fatalf("run(check with directory as db) = %d, want 1", code)
+	}
+}

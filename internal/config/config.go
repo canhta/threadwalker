@@ -10,7 +10,7 @@ import (
 	"strings"
 )
 
-// Secret holds a sensitive value that redacts itself when formatted or marshaled.
+// Secret holds a sensitive value that redacts itself when formatted.
 type Secret struct {
 	value string
 }
@@ -33,11 +33,6 @@ func (s Secret) String() string {
 // GoString returns a redacted placeholder for %#v formatting.
 func (s Secret) GoString() string {
 	return "config.Secret([REDACTED])"
-}
-
-// MarshalText returns a redacted placeholder for text/json marshaling.
-func (s Secret) MarshalText() ([]byte, error) {
-	return []byte("[REDACTED]"), nil
 }
 
 // Template represents an agent template loaded from YAML (spec section 16).
@@ -164,18 +159,6 @@ func LoadFile(path string, getenv func(string) string) (Template, error) {
 		if list, ok := doc.lists[field]; ok && len(list) > 0 {
 			return list
 		}
-		if raw, ok := doc.scalars[field]; ok && strings.TrimSpace(raw) != "" {
-			list, err := parseInlineStringList(raw)
-			if err != nil {
-				addErr(field, err.Error())
-				return nil
-			}
-			if len(list) == 0 {
-				addErr(field, "must not be empty")
-				return nil
-			}
-			return list
-		}
 		addErr(field, "required field is missing")
 		return nil
 	}
@@ -197,7 +180,7 @@ func LoadFile(path string, getenv func(string) string) (Template, error) {
 		return n
 	}
 
-	requirePositiveFloat := func(field string) float64 {
+	requireFloat := func(field string, allowZero bool) float64 {
 		raw, ok := doc.scalars[field]
 		if !ok || strings.TrimSpace(raw) == "" {
 			addErr(field, "required field is missing")
@@ -208,25 +191,10 @@ func LoadFile(path string, getenv func(string) string) (Template, error) {
 			addErr(field, fmt.Sprintf("must be a number: %v", err))
 			return 0
 		}
-		if f <= 0 {
-			addErr(field, fmt.Sprintf("must be positive, got %v", f))
-		}
-		return f
-	}
-
-	requireNonNegativeFloat := func(field string) float64 {
-		raw, ok := doc.scalars[field]
-		if !ok || strings.TrimSpace(raw) == "" {
-			addErr(field, "required field is missing")
-			return 0
-		}
-		f, err := strconv.ParseFloat(strings.TrimSpace(raw), 64)
-		if err != nil {
-			addErr(field, fmt.Sprintf("must be a number: %v", err))
-			return 0
-		}
-		if f < 0 {
+		if allowZero && f < 0 {
 			addErr(field, fmt.Sprintf("must be non-negative, got %v", f))
+		} else if !allowZero && f <= 0 {
+			addErr(field, fmt.Sprintf("must be positive, got %v", f))
 		}
 		return f
 	}
@@ -252,15 +220,15 @@ func LoadFile(path string, getenv func(string) string) (Template, error) {
 	tmpl.LLM.BaseURL = requireString("llm.base_url")
 	tmpl.LLM.Model = requireString("llm.model")
 	tmpl.LLM.APIKeyEnv = requireString("llm.api_key_env")
-	tmpl.LLM.PricePerMTokInUSD = requireNonNegativeFloat("llm.price_per_mtok_in_usd")
-	tmpl.LLM.PricePerMTokOutUSD = requireNonNegativeFloat("llm.price_per_mtok_out_usd")
+	tmpl.LLM.PricePerMTokInUSD = requireFloat("llm.price_per_mtok_in_usd", true)
+	tmpl.LLM.PricePerMTokOutUSD = requireFloat("llm.price_per_mtok_out_usd", true)
 
 	tmpl.Limits.PostsPerDay = requirePositiveInt("limits.posts_per_day")
 	tmpl.Limits.RepliesPerDay = requirePositiveInt("limits.replies_per_day")
 	tmpl.Limits.RepliesPerUser7d = requirePositiveInt("limits.replies_per_user_7d")
 	tmpl.Limits.MinSecondsBetweenActions = requirePositiveInt("limits.min_seconds_between_actions")
 	tmpl.Limits.MaxStepsPerWake = requirePositiveInt("limits.max_steps_per_wake")
-	tmpl.Limits.MaxUSDPerDay = requirePositiveFloat("limits.max_usd_per_day")
+	tmpl.Limits.MaxUSDPerDay = requireFloat("limits.max_usd_per_day", false)
 	tmpl.Limits.MinMinutesBetweenWakes = requirePositiveInt("limits.min_minutes_between_wakes")
 
 	tmpl.Threads.ProfileDir = requireString("threads.profile_dir")
@@ -334,17 +302,21 @@ func parseSimpleYAML(input string) (yamlDoc, error) {
 
 	for lineNo, rawLine := range lines {
 		trimmed := strings.TrimSpace(rawLine)
-		if trimmed == "" || strings.HasPrefix(trimmed, "#") {
-			continue
-		}
 		indent := len(rawLine) - len(strings.TrimLeft(rawLine, " "))
 
 		if blockKey != "" {
+			if trimmed == "" {
+				continue
+			}
 			if indent > blockIndent {
-				blockLines = append(blockLines, stripInlineComment(trimmed))
+				blockLines = append(blockLines, trimmed)
 				continue
 			}
 			flushBlock()
+		}
+
+		if trimmed == "" || strings.HasPrefix(trimmed, "#") {
+			continue
 		}
 
 		if strings.HasPrefix(trimmed, "- ") || trimmed == "-" {
@@ -429,44 +401,4 @@ func unquoteScalar(s string) string {
 		}
 	}
 	return s
-}
-
-func parseInlineStringList(s string) ([]string, error) {
-	s = strings.TrimSpace(s)
-	if !strings.HasPrefix(s, "[") || !strings.HasSuffix(s, "]") {
-		return nil, fmt.Errorf("expected bracketed list, got %q", s)
-	}
-	inner := strings.TrimSpace(s[1 : len(s)-1])
-	if inner == "" {
-		return nil, nil
-	}
-	var items []string
-	var cur strings.Builder
-	var inQuote byte
-	for i := 0; i < len(inner); i++ {
-		ch := inner[i]
-		if inQuote != 0 {
-			if ch == inQuote {
-				inQuote = 0
-			} else {
-				cur.WriteByte(ch)
-			}
-			continue
-		}
-		if ch == '"' || ch == '\'' {
-			inQuote = ch
-			continue
-		}
-		if ch == ',' {
-			items = append(items, strings.TrimSpace(cur.String()))
-			cur.Reset()
-			continue
-		}
-		cur.WriteByte(ch)
-	}
-	if inQuote != 0 {
-		return nil, fmt.Errorf("unterminated quote in list %q", s)
-	}
-	items = append(items, strings.TrimSpace(cur.String()))
-	return items, nil
 }
