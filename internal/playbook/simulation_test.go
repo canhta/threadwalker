@@ -3,13 +3,14 @@ package playbook_test
 import (
 	"math"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/canhta/threadwalker/internal/playbook"
 )
 
 func TestSimulationIsInjectedSeedDeterministic(t *testing.T) {
-	cfg := playbook.SimulationConfig{Name: "strong-effect", Seed: 17, Runs: 2, Hypotheses: 5, HorizonDays: 90, ActionsPerDay: 30, EffectMultiplier: 4, BaselineMultiplier: 1, BaselineAvailable: true}
+	cfg := playbook.SimulationConfig{Name: "strong-effect", Seed: 17, Runs: 2, Hypotheses: 5, HorizonDays: 90, ActionsPerDay: 30, ControlActionsPerDay: 10, ControlMultiplier: 1, EffectMultiplier: 4, BaselineMultiplier: 1, BaselineAvailable: true}
 	a, err := playbook.RunSimulation(cfg)
 	if err != nil {
 		t.Fatal(err)
@@ -28,8 +29,8 @@ func TestSimulationIsInjectedSeedDeterministic(t *testing.T) {
 
 func TestPredeclaredSimulationSuite(t *testing.T) {
 	configs := playbook.DefaultSimulationConfigs()
-	if len(configs) != 14 {
-		t.Fatalf("versioned suite has %d configurations, want14", len(configs))
+	if len(configs) != 26 {
+		t.Fatalf("versioned suite has %d configurations, want26", len(configs))
 	}
 	nullRuns := 0
 	nullEstablished := 0
@@ -49,7 +50,7 @@ func TestPredeclaredSimulationSuite(t *testing.T) {
 			if cfg.BaselineAvailable {
 				baselineActions = int64(cfg.Runs * 300)
 			}
-			accounted := baselineActions + got.MeasuredTestOutcomes + got.CensoredOutcomes + got.PendingOutcomes + got.IgnoredAfterDecision + got.BaselineUnavailableActions
+			accounted := baselineActions + got.MeasuredControlOutcomes + got.MeasuredTestOutcomes + got.CensoredOutcomes + got.PendingOutcomes + got.IgnoredAfterDecision + got.BaselineUnavailableActions
 			if accounted != got.SyntheticActions {
 				t.Fatalf("actions not conserved: got%d accounted%d", got.SyntheticActions, accounted)
 			}
@@ -59,12 +60,15 @@ func TestPredeclaredSimulationSuite(t *testing.T) {
 			if got.EstimatedPaidCalls != 0 || got.EstimatedPaidUSD != 0 {
 				t.Fatal("offline synthetic suite has paid cost")
 			}
-			if cfg.EffectMultiplier == cfg.BaselineMultiplier && cfg.BaselineAvailable && cfg.CensorProbability == 0 {
+			if strings.HasPrefix(cfg.Name, "null-") {
 				nullRuns += cfg.Runs
 				nullEstablished += got.NullEstablishedRuns
 				if got.EstablishedRunFraction >= .05 {
 					t.Fatalf("null false promotion %.4f >=5%%", got.EstablishedRunFraction)
 				}
+			}
+			if cfg.EffectMultiplier == cfg.ControlMultiplier && got.EstablishedRunFraction >= .05 {
+				t.Fatalf("common-shift/null rate %.4f >=5%%", got.EstablishedRunFraction)
 			}
 			if cfg.Name == "missing-baseline" || cfg.Name == "no-evidence" || cfg.Name == "sparse-2x" {
 				if got.EstablishedHypotheses != 0 || got.PendingHypotheses != cfg.Runs*cfg.Hypotheses {
@@ -75,6 +79,7 @@ func TestPredeclaredSimulationSuite(t *testing.T) {
 				t.Fatalf("bad detection delays: %+v", got)
 			}
 			t.Logf("seed=%d runs=%d horizon_days=%d rate=%.6f established_runs=%d established=%d rejected=%d pending=%d undetected=%d median_days=%d p90_days=%d baseline_p=%.6f test_p=%.6f actions=%d measured=%d censored=%d awaiting=%d warmup_days=%.2f paid_calls=%d paid_usd=%.2f", cfg.Seed, cfg.Runs, cfg.HorizonDays, got.EstablishedRunFraction, got.EstablishedRuns, got.EstablishedHypotheses, got.RejectedHypotheses, got.PendingHypotheses, got.UndetectedHypotheses, got.MedianDetectionDays, got.P90DetectionDays, got.BaselineSuccessRate, got.TestSuccessRate, got.SyntheticActions, got.MeasuredTestOutcomes, got.CensoredOutcomes, got.PendingOutcomes, got.BaselineWarmupDays, got.EstimatedPaidCalls, got.EstimatedPaidUSD)
+			t.Logf("matched_control_p=%.6f measured_control_outcomes=%d unavailable_control_looks=%d", got.ControlSuccessRate, got.MeasuredControlOutcomes, got.UnavailableControlLooks)
 		})
 	}
 	if nullRuns != 1500 {
@@ -124,7 +129,7 @@ func TestSimulationRejectsInvalidConfiguration(t *testing.T) {
 }
 
 func TestSparseSimulationUsesEligibleHistoricalBaseline(t *testing.T) {
-	cfg := playbook.SimulationConfig{Name: "slow-after-baseline", Seed: 17, Runs: 1, Hypotheses: 5, HorizonDays: 28, ActionsPerDay: 5, EffectMultiplier: 2, BaselineMultiplier: 1, BaselineAvailable: true}
+	cfg := playbook.SimulationConfig{Name: "slow-after-baseline", Seed: 17, Runs: 1, Hypotheses: 5, HorizonDays: 28, ActionsPerDay: 5, ControlActionsPerDay: 1, ControlMultiplier: 1, EffectMultiplier: 2, BaselineMultiplier: 1, BaselineAvailable: true}
 	got, err := playbook.RunSimulation(cfg)
 	// Baseline controls arrive at30/day before the candidate pace slows to5/day;
 	// 300 controls at5/day would violate production's30-day baseline window.

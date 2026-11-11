@@ -13,7 +13,7 @@ import (
 
 // SimulationVersion identifies both the synthetic generator and the frozen
 // outcome/gate rules. These are synthetic estimates, never live qualification.
-const SimulationVersion = "playbook-heavy-tail-v1"
+const SimulationVersion = "playbook-heavy-tail-v2"
 
 // SimulationConfig predeclares inputs. Seed constructs a private deterministic
 // source; no global randomness, wall clock, environment or network is read.
@@ -21,16 +21,22 @@ const SimulationVersion = "playbook-heavy-tail-v1"
 // EffectMultiplier and BaselineMultiplier scale engagement rates, not binary
 // success probabilities. Their measured probabilities are reported separately.
 type SimulationConfig struct {
-	Name               string  `json:"name"`
-	Seed               int64   `json:"seed"`
-	Runs               int     `json:"runs"`
-	Hypotheses         int     `json:"hypotheses"`
-	HorizonDays        int     `json:"horizon_days"`
-	ActionsPerDay      int     `json:"actions_per_day"`
-	EffectMultiplier   float64 `json:"effect_multiplier"`
-	BaselineMultiplier float64 `json:"baseline_multiplier"`
-	CensorProbability  float64 `json:"censor_probability"`
-	BaselineAvailable  bool    `json:"baseline_available"`
+	Name                  string  `json:"name"`
+	Seed                  int64   `json:"seed"`
+	Runs                  int     `json:"runs"`
+	Hypotheses            int     `json:"hypotheses"`
+	HorizonDays           int     `json:"horizon_days"`
+	ActionsPerDay         int     `json:"actions_per_day"`
+	ControlActionsPerDay  int     `json:"control_actions_per_day"`
+	ControlMultiplier     float64 `json:"control_multiplier"`
+	ShiftDay              int     `json:"shift_day"`
+	ShiftMultiplier       float64 `json:"shift_multiplier"`
+	SecondShiftDay        int     `json:"second_shift_day"`
+	SecondShiftMultiplier float64 `json:"second_shift_multiplier"`
+	EffectMultiplier      float64 `json:"effect_multiplier"`
+	BaselineMultiplier    float64 `json:"baseline_multiplier"`
+	CensorProbability     float64 `json:"censor_probability"`
+	BaselineAvailable     bool    `json:"baseline_available"`
 }
 
 // SimulationReport counts a false positive at run level: at least one
@@ -54,6 +60,9 @@ type SimulationReport struct {
 	DetectionDays              []int            `json:"detection_days"`
 	MedianDetectionDays        int              `json:"median_detection_days"`
 	P90DetectionDays           int              `json:"p90_detection_days"`
+	MeasuredControlOutcomes    int64            `json:"measured_control_outcomes"`
+	UnavailableControlLooks    int64            `json:"unavailable_control_looks"`
+	ControlSuccessRate         float64          `json:"control_success_rate"`
 	MeasuredTestOutcomes       int64            `json:"measured_test_outcomes"`
 	CensoredOutcomes           int64            `json:"censored_outcomes"`
 	PendingOutcomes            int64            `json:"pending_outcomes"`
@@ -68,7 +77,7 @@ type SimulationReport struct {
 	BaselineActionsPerDay      int              `json:"baseline_actions_per_day"`
 }
 
-//go:embed testdata/gate-v1.json
+//go:embed testdata/gate-v2.json
 var defaultSimulationFixture []byte
 
 // DefaultSimulationConfigs returns fresh independent values from the versioned
@@ -96,15 +105,15 @@ func DefaultSimulationConfigs() []SimulationConfig {
 // and temporal correlation or baseline drift can defeat null calibration.
 func RunSimulation(cfg SimulationConfig) (SimulationReport, error) {
 	report := SimulationReport{Version: SimulationVersion, Config: cfg, DetectionDays: []int{}}
-	if cfg.Name == "" || cfg.Runs < 1 || cfg.Runs > 10000 || cfg.Hypotheses < 1 || cfg.Hypotheses > 5 || cfg.HorizonDays < 1 || cfg.HorizonDays > 1095 || cfg.ActionsPerDay < 1 || cfg.ActionsPerDay > 1000 || int64(cfg.Runs)*int64(cfg.HorizonDays)*int64(cfg.ActionsPerDay) > 100000000 || !finiteNonnegative(cfg.EffectMultiplier) || !finiteNonnegative(cfg.BaselineMultiplier) || !validScore(cfg.CensorProbability) {
+	if cfg.Name == "" || cfg.Runs < 1 || cfg.Runs > 10000 || cfg.Hypotheses < 1 || cfg.Hypotheses > 5 || cfg.HorizonDays < 1 || cfg.HorizonDays > 1095 || cfg.ActionsPerDay < 1 || cfg.ActionsPerDay > 1000 || cfg.ControlActionsPerDay < 0 || cfg.ControlActionsPerDay >= cfg.ActionsPerDay || int64(cfg.Runs)*int64(cfg.HorizonDays)*int64(cfg.ActionsPerDay) > 100000000 || !finiteNonnegative(cfg.EffectMultiplier) || !finiteNonnegative(cfg.BaselineMultiplier) || !finiteNonnegative(cfg.ControlMultiplier) || !validScore(cfg.CensorProbability) || cfg.ShiftDay < 0 || cfg.SecondShiftDay < 0 || !finiteNonnegative(cfg.ShiftMultiplier) || !finiteNonnegative(cfg.SecondShiftMultiplier) || (cfg.SecondShiftDay > 0 && (cfg.ShiftDay == 0 || cfg.SecondShiftDay <= cfg.ShiftDay)) {
 		return SimulationReport{}, errors.New("running playbook simulation: invalid configuration")
 	}
 	rng := rand.New(rand.NewSource(cfg.Seed))
 	if cfg.BaselineAvailable {
 		report.BaselineActionsPerDay = 30
-		report.BaselineWarmupDays = float64(BaselineWindowSize)/float64(report.BaselineActionsPerDay) + 30.0/24
+		report.BaselineWarmupDays = 11.25
 	}
-	var baselineN, baselineSuccesses, testSuccesses int64
+	var baselineN, baselineSuccesses, testSuccesses, selectedControlN, selectedControlSuccesses int64
 	for run := 0; run < cfg.Runs; run++ {
 		baseline := Baseline{}
 		if cfg.BaselineAvailable {
@@ -127,20 +136,28 @@ func RunSimulation(cfg SimulationConfig) (SimulationReport, error) {
 		}
 		states := make([]GateInput, cfg.Hypotheses)
 		decisions := make([]string, cfg.Hypotheses)
+		candidateDays := make([]map[int]int64, cfg.Hypotheses)
 		for h := range states {
 			states[h] = GateInput{BaselineN: baseline.N, BaselineSuccesses: baseline.Successes, TestIndex: int64(h + 1)}
+			candidateDays[h] = make(map[int]int64)
 		}
+		controlDays := make(map[int][]simulationEvent)
 		queue := &simulationEvents{}
 		established := false
 		consume := func(until float64) error {
 			for queue.Len() > 0 && (*queue)[0].hour <= until {
 				event := heap.Pop(queue).(simulationEvent)
-				if decisions[event.hypothesis] != "" {
+				if event.hypothesis >= 0 && decisions[event.hypothesis] != "" {
 					report.IgnoredAfterDecision++
 					continue
 				}
 				if event.stale {
 					report.CensoredOutcomes++
+					continue
+				}
+				if event.hypothesis < 0 {
+					report.MeasuredControlOutcomes++
+					controlDays[event.day] = append(controlDays[event.day], event)
 					continue
 				}
 				success, err := OutcomeSuccess(event.score, baseline.Threshold)
@@ -150,9 +167,25 @@ func RunSimulation(cfg SimulationConfig) (SimulationReport, error) {
 				state := &states[event.hypothesis]
 				state.N++
 				report.MeasuredTestOutcomes++
+				candidateDays[event.hypothesis][event.day]++
 				if success {
 					state.Successes++
 					testSuccesses++
+				}
+				state.ControlN = 0
+				state.ControlSuccesses = 0
+				if isGateLook(state.N) {
+					n, k, err := matchedSimulationControls(candidateDays[event.hypothesis], controlDays, state.N, baseline.Threshold, event.hour)
+					if err != nil {
+						return err
+					}
+					state.ControlN = n
+					state.ControlSuccesses = k
+					selectedControlN += n
+					selectedControlSuccesses += k
+					if n == 0 {
+						report.UnavailableControlLooks++
+					}
 				}
 				decision, err := EvaluateGate(*state)
 				if err != nil {
@@ -172,22 +205,47 @@ func RunSimulation(cfg SimulationConfig) (SimulationReport, error) {
 			return nil
 		}
 		slots := cfg.HorizonDays * cfg.ActionsPerDay
+		candidateSlot := 0
 		for slot := 0; slot < slots; slot++ {
 			hour := float64(slot) * 24 / float64(cfg.ActionsPerDay)
 			if err := consume(hour); err != nil {
 				return SimulationReport{}, err
 			}
-			hypothesis := slot % cfg.Hypotheses
-			// Fixed allocation never redistributes a retired hypothesis's slots.
-			if decisions[hypothesis] != "" {
-				continue
+			active := false
+			for _, status := range decisions {
+				if status == "" {
+					active = true
+					break
+				}
+			}
+			if !active {
+				break
+			}
+			dailySlot := slot % cfg.ActionsPerDay
+			control := (dailySlot+1)*cfg.ControlActionsPerDay/cfg.ActionsPerDay > dailySlot*cfg.ControlActionsPerDay/cfg.ActionsPerDay
+			hypothesis := -1
+			multiplier := cfg.ControlMultiplier
+			if !control {
+				hypothesis = candidateSlot % cfg.Hypotheses
+				candidateSlot++
+				if decisions[hypothesis] != "" {
+					continue
+				}
+				multiplier = cfg.EffectMultiplier
 			}
 			report.SyntheticActions++
-			if !cfg.BaselineAvailable {
+			if !control && !cfg.BaselineAvailable {
 				report.BaselineUnavailableActions++
 				continue
 			}
-			score, err := syntheticScore(rng, cfg.EffectMultiplier)
+			day := slot / cfg.ActionsPerDay
+			if cfg.ShiftDay > 0 && day >= cfg.ShiftDay {
+				multiplier *= cfg.ShiftMultiplier
+			}
+			if cfg.SecondShiftDay > 0 && day >= cfg.SecondShiftDay {
+				multiplier *= cfg.SecondShiftMultiplier
+			}
+			score, err := syntheticScore(rng, multiplier)
 			if err != nil {
 				return SimulationReport{}, fmt.Errorf("generating simulation outcome: %w", err)
 			}
@@ -195,8 +253,8 @@ func RunSimulation(cfg SimulationConfig) (SimulationReport, error) {
 			stale := rng.Float64() < cfg.CensorProbability
 			if stale {
 				delay = 32
-			} // More than 6h late: permanently excluded.
-			heap.Push(queue, simulationEvent{hour: hour + delay, score: score, hypothesis: hypothesis, stale: stale, sequence: slot})
+			}
+			heap.Push(queue, simulationEvent{hour: hour + delay, score: score, hypothesis: hypothesis, stale: stale, sequence: slot, day: day})
 		}
 		if err := consume(float64(cfg.HorizonDays) * 24); err != nil {
 			return SimulationReport{}, err
@@ -209,7 +267,7 @@ func RunSimulation(cfg SimulationConfig) (SimulationReport, error) {
 		}
 		if established {
 			report.EstablishedRuns++
-			if cfg.EffectMultiplier == cfg.BaselineMultiplier {
+			if cfg.EffectMultiplier == cfg.ControlMultiplier {
 				report.NullEstablishedRuns++
 			}
 		}
@@ -222,12 +280,58 @@ func RunSimulation(cfg SimulationConfig) (SimulationReport, error) {
 	if report.MeasuredTestOutcomes > 0 {
 		report.TestSuccessRate = float64(testSuccesses) / float64(report.MeasuredTestOutcomes)
 	}
+	if selectedControlN > 0 {
+		report.ControlSuccessRate = float64(selectedControlSuccesses) / float64(selectedControlN)
+	}
 	sort.Ints(report.DetectionDays)
 	if len(report.DetectionDays) > 0 {
 		report.MedianDetectionDays = report.DetectionDays[(len(report.DetectionDays)-1)/2]
 		report.P90DetectionDays = report.DetectionDays[int(math.Ceil(float64(len(report.DetectionDays))*.9))-1]
 	}
 	return report, nil
+}
+
+// Matching is an availability rule using publication days and IDs only. Every
+// counted candidate day must receive exactly its proportional share of200;
+// fractional requirements, missing days or unavailable metrics consume the look
+// without evaluation. No outcome-based selection, rounding or dropped days.
+func matchedSimulationControls(days map[int]int64, controls map[int][]simulationEvent, n int64, threshold, now float64) (int64, int64, error) {
+	var successes int64
+	for day, count := range days {
+		numerator := count * BaselineReferenceSize
+		if numerator%n != 0 {
+			return 0, 0, nil
+		}
+		required := numerator / n
+		available := controls[day]
+		// Appended in observation-time/sequence order by the event heap, matching
+		// production measured_at then local ID selection within each posting day.
+		selected := int64(0)
+		for _, event := range available {
+			if event.hour >= now {
+				continue
+			}
+			success, err := OutcomeSuccess(event.score, threshold)
+			if err != nil {
+				return 0, 0, fmt.Errorf("classifying matched simulation control: %w", err)
+			}
+			if success {
+				successes++
+			}
+			selected++
+			if selected == required {
+				break
+			}
+		}
+		if selected < required {
+			return 0, 0, nil
+		}
+	}
+	return BaselineReferenceSize, successes, nil
+}
+
+func isGateLook(n int64) bool {
+	return n == 50 || n == 100 || n == 200 || n == 400 || n == 800 || n == 1600
 }
 
 func finiteNonnegative(v float64) bool {
@@ -241,9 +345,9 @@ func syntheticScore(rng *rand.Rand, multiplier float64) (float64, error) {
 }
 
 type simulationEvent struct {
-	hour, score          float64
-	hypothesis, sequence int
-	stale                bool
+	hour, score               float64
+	hypothesis, sequence, day int
+	stale                     bool
 }
 type simulationEvents []simulationEvent
 
