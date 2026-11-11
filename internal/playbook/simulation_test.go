@@ -80,6 +80,18 @@ func TestPredeclaredSimulationSuite(t *testing.T) {
 			}
 			t.Logf("seed=%d runs=%d horizon_days=%d rate=%.6f established_runs=%d established=%d rejected=%d pending=%d undetected=%d median_days=%d p90_days=%d baseline_p=%.6f test_p=%.6f actions=%d measured=%d censored=%d awaiting=%d warmup_days=%.2f paid_calls=%d paid_usd=%.2f", cfg.Seed, cfg.Runs, cfg.HorizonDays, got.EstablishedRunFraction, got.EstablishedRuns, got.EstablishedHypotheses, got.RejectedHypotheses, got.PendingHypotheses, got.UndetectedHypotheses, got.MedianDetectionDays, got.P90DetectionDays, got.BaselineSuccessRate, got.TestSuccessRate, got.SyntheticActions, got.MeasuredTestOutcomes, got.CensoredOutcomes, got.PendingOutcomes, got.BaselineWarmupDays, got.EstimatedPaidCalls, got.EstimatedPaidUSD)
 			t.Logf("matched_control_p=%.6f measured_control_outcomes=%d unavailable_control_looks=%d", got.ControlSuccessRate, got.MeasuredControlOutcomes, got.UnavailableControlLooks)
+			var unavailable int64
+			for i, look := range got.LookCounts {
+				if look.N != []int64{50, 100, 200, 400, 800, 1600}[i] || look.Unavailable > look.Attempted {
+					t.Fatalf("invalid per-look report %+v", look)
+				}
+				unavailable += look.Unavailable
+				t.Logf("look_n=%d attempted=%d unavailable=%d", look.N, look.Attempted, look.Unavailable)
+			}
+			if len(got.LookCounts) != 6 || unavailable != got.UnavailableControlLooks {
+				t.Fatal("per-look counts do not match aggregate")
+			}
+
 		})
 	}
 	if nullRuns != 1500 {
@@ -101,10 +113,19 @@ func TestSimulationRejectsInvalidConfiguration(t *testing.T) {
 	mutate(func(c *playbook.SimulationConfig) { c.HorizonDays = 1096 })
 	mutate(func(c *playbook.SimulationConfig) { c.ActionsPerDay = 0 })
 	mutate(func(c *playbook.SimulationConfig) { c.ActionsPerDay = 1001 })
+	mutate(func(c *playbook.SimulationConfig) { c.ControlActionsPerDay = -1 })
+	mutate(func(c *playbook.SimulationConfig) { c.ControlActionsPerDay = c.ActionsPerDay })
+	mutate(func(c *playbook.SimulationConfig) { c.ShiftDay = -1 })
+	mutate(func(c *playbook.SimulationConfig) { c.SecondShiftDay = -1 })
+	mutate(func(c *playbook.SimulationConfig) { c.SecondShiftDay = 10 })
+	mutate(func(c *playbook.SimulationConfig) { c.ShiftDay = 10; c.SecondShiftDay = 5 })
 	mutate(func(c *playbook.SimulationConfig) { c.Runs = 10000; c.HorizonDays = 1095; c.ActionsPerDay = 1000 })
 	for _, value := range []float64{-1, 1e7, math.NaN(), math.Inf(1)} {
 		mutate(func(c *playbook.SimulationConfig) { c.EffectMultiplier = value })
 		mutate(func(c *playbook.SimulationConfig) { c.BaselineMultiplier = value })
+		mutate(func(c *playbook.SimulationConfig) { c.ControlMultiplier = value })
+		mutate(func(c *playbook.SimulationConfig) { c.ShiftMultiplier = value })
+		mutate(func(c *playbook.SimulationConfig) { c.SecondShiftMultiplier = value })
 	}
 	for _, value := range []float64{-1, 2, math.NaN(), math.Inf(1)} {
 		mutate(func(c *playbook.SimulationConfig) { c.CensorProbability = value })
@@ -135,5 +156,32 @@ func TestSparseSimulationUsesEligibleHistoricalBaseline(t *testing.T) {
 	// 300 controls at5/day would violate production's30-day baseline window.
 	if err != nil || got.BaselineWarmupDays != 11.25 {
 		t.Fatalf("ineligible baseline history assumed: %.2f days,%v", got.BaselineWarmupDays, err)
+	}
+}
+
+func TestSimulationReportsEveryLookIncludingUnavailableAndZero(t *testing.T) {
+	cfg := playbook.SimulationConfig{Name: "missing-current", Seed: 101, Runs: 1, Hypotheses: 5, HorizonDays: 430, ActionsPerDay: 30, ControlMultiplier: 1, EffectMultiplier: 2, BaselineMultiplier: 1, BaselineAvailable: true}
+	got, err := playbook.RunSimulation(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got.LookCounts) != 6 {
+		t.Fatalf("look count=%d", len(got.LookCounts))
+	}
+	for i, n := range []int64{50, 100, 200, 400, 800, 1600} {
+		look := got.LookCounts[i]
+		if look.N != n || look.Attempted != 5 || look.Unavailable != 5 {
+			t.Fatalf("look %d=%+v", n, look)
+		}
+	}
+	cfg.CensorProbability = 1
+	got, err = playbook.RunSimulation(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, look := range got.LookCounts {
+		if look.Attempted != 0 || look.Unavailable != 0 {
+			t.Fatalf("missing outcomes show attempted look: %+v", look)
+		}
 	}
 }

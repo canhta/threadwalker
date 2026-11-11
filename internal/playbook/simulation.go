@@ -20,6 +20,10 @@ const SimulationVersion = "playbook-heavy-tail-v2"
 // HorizonDays starts at first tagged action, after the baseline warmup.
 // EffectMultiplier and BaselineMultiplier scale engagement rates, not binary
 // success probabilities. Their measured probabilities are reported separately.
+// ActionsPerDay includes ControlActionsPerDay; remaining slots are tagged in
+// round-robin order. ShiftDay and SecondShiftDay apply shared rate multipliers
+// to candidates and controls from that UTC publication day onward. Zero means
+// no shift. They model common changes with no relative strategy improvement.
 type SimulationConfig struct {
 	Name                  string  `json:"name"`
 	Seed                  int64   `json:"seed"`
@@ -47,6 +51,9 @@ type SimulationConfig struct {
 // Rejected includes negative evidence and inconclusive maximum-sample stops.
 // Undetected includes both rejected and pending hypotheses, never just survivors.
 // Paid estimates are zero: this generator makes zero provider/tool calls.
+// ControlSuccessRate aggregates the selected matched cohorts across looks;
+// reused controls contribute at each look. It is not the rate of all measured
+// controls. TestSuccessRate is likewise descriptive under outcome-based stopping.
 type SimulationReport struct {
 	Version                    string           `json:"version"`
 	Config                     SimulationConfig `json:"config"`
@@ -62,6 +69,7 @@ type SimulationReport struct {
 	P90DetectionDays           int              `json:"p90_detection_days"`
 	MeasuredControlOutcomes    int64            `json:"measured_control_outcomes"`
 	UnavailableControlLooks    int64            `json:"unavailable_control_looks"`
+	LookCounts                 []SimulationLook `json:"look_counts"`
 	ControlSuccessRate         float64          `json:"control_success_rate"`
 	MeasuredTestOutcomes       int64            `json:"measured_test_outcomes"`
 	CensoredOutcomes           int64            `json:"censored_outcomes"`
@@ -75,6 +83,14 @@ type SimulationReport struct {
 	TestSuccessRate            float64          `json:"test_success_rate"`
 	BaselineWarmupDays         float64          `json:"baseline_warmup_days"`
 	BaselineActionsPerDay      int              `json:"baseline_actions_per_day"`
+}
+
+// SimulationLook reports alignment feasibility at every predeclared N,
+// including zero attempts and looks consumed without sufficient matched controls.
+type SimulationLook struct {
+	N           int64 `json:"n"`
+	Attempted   int64 `json:"attempted"`
+	Unavailable int64 `json:"unavailable"`
 }
 
 //go:embed testdata/gate-v2.json
@@ -100,13 +116,19 @@ func DefaultSimulationConfigs() []SimulationConfig {
 // replies/reposts are zero in this explicit synthetic generator. A 300-action
 // prehistory at 30 untagged controls/day creates each run's shared baseline;
 // candidate pace may then slow (the sparse scenario). This history fits the
-// production 30-day window. Independent conditional samples
-// and fixed round-robin assignment are optimistic; labels are observational,
-// and temporal correlation or baseline drift can defeat null calibration.
+// production 30-day window. Current controls cover the FULL candidate epoch,
+// with exactly proportional counts per UTC publication day; fractional/missing
+// matches consume their fixed look without promotion. Independent observations,
+// interleaved control slots and fixed allocation are optimistic. Nonrandomized
+// labels, intraday confounding and temporal correlation remain limitations;
+// these shared daily-shift simulations do not prove arbitrary drift robustness.
 func RunSimulation(cfg SimulationConfig) (SimulationReport, error) {
 	report := SimulationReport{Version: SimulationVersion, Config: cfg, DetectionDays: []int{}}
 	if cfg.Name == "" || cfg.Runs < 1 || cfg.Runs > 10000 || cfg.Hypotheses < 1 || cfg.Hypotheses > 5 || cfg.HorizonDays < 1 || cfg.HorizonDays > 1095 || cfg.ActionsPerDay < 1 || cfg.ActionsPerDay > 1000 || cfg.ControlActionsPerDay < 0 || cfg.ControlActionsPerDay >= cfg.ActionsPerDay || int64(cfg.Runs)*int64(cfg.HorizonDays)*int64(cfg.ActionsPerDay) > 100000000 || !finiteNonnegative(cfg.EffectMultiplier) || !finiteNonnegative(cfg.BaselineMultiplier) || !finiteNonnegative(cfg.ControlMultiplier) || !validScore(cfg.CensorProbability) || cfg.ShiftDay < 0 || cfg.SecondShiftDay < 0 || !finiteNonnegative(cfg.ShiftMultiplier) || !finiteNonnegative(cfg.SecondShiftMultiplier) || (cfg.SecondShiftDay > 0 && (cfg.ShiftDay == 0 || cfg.SecondShiftDay <= cfg.ShiftDay)) {
 		return SimulationReport{}, errors.New("running playbook simulation: invalid configuration")
+	}
+	for _, n := range [...]int64{50, 100, 200, 400, 800, 1600} {
+		report.LookCounts = append(report.LookCounts, SimulationLook{N: n})
 	}
 	rng := rand.New(rand.NewSource(cfg.Seed))
 	if cfg.BaselineAvailable {
@@ -185,6 +207,15 @@ func RunSimulation(cfg SimulationConfig) (SimulationReport, error) {
 					selectedControlSuccesses += k
 					if n == 0 {
 						report.UnavailableControlLooks++
+					}
+					for i := range report.LookCounts {
+						if report.LookCounts[i].N == state.N {
+							report.LookCounts[i].Attempted++
+							if n == 0 {
+								report.LookCounts[i].Unavailable++
+							}
+							break
+						}
 					}
 				}
 				decision, err := EvaluateGate(*state)
