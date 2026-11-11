@@ -171,6 +171,18 @@ reviewing an event-contract change, run
 Shared report identities, safe outcomes and separately labelled wall timing remain unchanged.
 These are synthetic implementation checks, not real service qualification.
 
+Saved #6 implementation evidence is in
+[`docs/research/testdata/guard`](research/testdata/guard): `eval.json` records 116/116 passing
+results (29 cases × two profile labels × two repeats, seed 1, zero provider tokens/cost),
+`runtime-eval.json` records 16/16 actual local-runtime cases, and `soak-wakes.json` records
+48 completed wakes, one interrupted wake, 49 dry-run intents and one restart over 48 logical
+hours. The soak used source `9804490` and its explicit synthetic 24-post/day stress quota;
+the final guard report identifies its source revision. The CLI-generated runtime report retains
+`revision: unknown`; its source association comes from this recorded command run, not embedded
+build metadata. `checks.txt` captures successful full-package test and race output after `go vet`;
+`smoke.jsonl` is the metadata-only offline CLI smoke. No actual account, bot, paid provider,
+VPS or elapsed live-run qualification is claimed.
+
 ## Pending coverage
 
 The current suites cover the client, protocols, configuration, accounting and local runtime boundaries.
