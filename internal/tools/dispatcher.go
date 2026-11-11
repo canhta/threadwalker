@@ -173,7 +173,9 @@ func (d *Dispatcher) dispatch(ctx context.Context, call llm.ToolCall, rejected s
 		// Decode before redaction so JSON escaping cannot hide a configured
 		// credential in outside content. Audit stores only outcome and byte count.
 		var safe any
-		if json.Unmarshal(result, &safe) != nil {
+		decoder := json.NewDecoder(strings.NewReader(string(result)))
+		decoder.UseNumber()
+		if decoder.Decode(&safe) != nil {
 			return "", errors.New("encoding tool result: failed")
 		}
 		result, err = json.Marshal(d.redact(safe))

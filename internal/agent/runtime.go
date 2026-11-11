@@ -50,7 +50,11 @@ func New(opts Options) (*Runtime, error) {
 	}
 	if opts.ThreadsFactory == nil && opts.Template.Threads.Backend == "browser" {
 		opts.ThreadsFactory = func(ctx context.Context, tmpl config.Template) (threads.Backend, error) {
-			return threads.New(ctx, threads.Options{AgentID: tmpl.ID, BaseURL: tmpl.Threads.BaseURL, ProfileDir: tmpl.Threads.ProfileDir, ExecutablePath: tmpl.Threads.ExecutablePath, Timeout: 15 * time.Second, StartupTimeout: 30 * time.Second, Logger: opts.Logger, Now: opts.Now, NoSandbox: tmpl.Threads.NoSandbox})
+			browser, err := threads.New(ctx, threads.Options{AgentID: tmpl.ID, BaseURL: tmpl.Threads.BaseURL, ProfileDir: tmpl.Threads.ProfileDir, ExecutablePath: tmpl.Threads.ExecutablePath, Timeout: 15 * time.Second, StartupTimeout: 30 * time.Second, Logger: opts.Logger, Now: opts.Now, NoSandbox: tmpl.Threads.NoSandbox})
+			if browser == nil {
+				return nil, err
+			}
+			return browser, err
 		}
 	}
 	if !opts.Template.DryRun && opts.ThreadsFactory == nil {

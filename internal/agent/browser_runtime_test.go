@@ -127,3 +127,30 @@ func TestWakeBrowserFactoryClosesEveryExitAndPreservesPartialAccounting(t *testi
 		})
 	}
 }
+
+func TestConfiguredBrowserLaunchFailureClosesWakeSafely(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	st, err := store.Open(ctx, filepath.Join(t.TempDir(), "launch.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	tmpl := agent.OfflineTemplate()
+	tmpl.Threads = config.ThreadsConfig{Backend: "browser", BaseURL: "https://fixture.invalid", ExecutablePath: "/absent/synthetic-chrome", ProfileDir: filepath.Join(t.TempDir(), "profile")}
+	r, err := agent.New(agent.Options{Store: st, Template: tmpl})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = r.Start(ctx); err != nil {
+		t.Fatal(err)
+	}
+	wake, err := r.Wake(ctx)
+	if err == nil || wake.EndReason != "browser_error" {
+		t.Fatalf("wake=%+v err=%v", wake, err)
+	}
+	var reason string
+	if err = st.DB().QueryRow(`SELECT end_reason FROM wakes WHERE id=?`, wake.ID).Scan(&reason); err != nil || reason != "browser_error" {
+		t.Fatalf("reason=%s err=%v", reason, err)
+	}
+}
