@@ -277,6 +277,9 @@ func RunIsolationSoak(ctx context.Context, dbPath string, hours int, logger *slo
 			sample(hour)
 		}
 	}
+	// Execute the half-open [start,end) wake interval, then advance the clock to
+	// its exact end before the final local memory sample.
+	now = start.Add(time.Duration(hours) * time.Hour)
 	sample(hours)
 	rows, err := st.DB().QueryContext(ctx, `SELECT agent_id,id,started_at,ended_at,end_reason,steps,tokens_in,tokens_out,cost_usd FROM wakes ORDER BY id`)
 	if err != nil {
