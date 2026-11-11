@@ -3,11 +3,12 @@
 An open-source experiment: given only a goal, one Threads account and a budget, how far can an AI
 agent run, learn and improve by itself with nobody approving its output?
 
-Status: no code yet. The design is settled and the work is in
+Start with the [setup guide](docs/setup.md). Implementation and live-run gates are tracked in
 [GitHub Issues](https://github.com/canhta/threadwalker/issues).
 
 | Read | For |
 |---|---|
+| [`docs/setup.md`](docs/setup.md) | Local checks, credentials and owner setup |
 | [`docs/spec.md`](docs/spec.md) | The spec: architecture, tools, guards, schema, order of work |
 | [`GLOSSARY.md`](GLOSSARY.md) | Terms used in code and issues |
 | [`AGENTS.md`](AGENTS.md) | Rules for coding agents working in this repo |
