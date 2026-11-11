@@ -82,7 +82,7 @@ func New(opts Options) (*Guard, error) {
 
 // Matches prevents accidentally auditing one scope while mutating another.
 func (g *Guard) Matches(st *store.Store, agentID string, wakeID int64) bool {
-	return g != nil && g.opts.Store == st && g.opts.Template.ID == agentID && g.opts.WakeID == wakeID
+	return g != nil && st != nil && agentID != "" && wakeID > 0 && g.opts.Template.DryRun && g.opts.Store == st && g.opts.Template.ID == agentID && g.opts.WakeID == wakeID
 }
 func (g *Guard) event(ctx context.Context, event, outcome, reason, tool string) {
 	if tool == "unknown" {

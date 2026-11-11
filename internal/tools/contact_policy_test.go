@@ -162,6 +162,13 @@ func TestDispatcherCannotBeConstructedWithoutMatchingGuard(t *testing.T) {
 	if _, err := tools.NewDispatcher(nil, h.opts); err == nil {
 		t.Fatal("dispatcher accepted a nil guard")
 	}
+	emptyScope := h.opts
+	emptyScope.Store = nil
+	emptyScope.Template.ID = ""
+	emptyScope.WakeID = 0
+	if _, err := tools.NewDispatcher(&guard.Guard{}, emptyScope); err == nil {
+		t.Fatal("dispatcher accepted matching zero guard and empty scope")
+	}
 	if _, err := tools.NewDispatcher(&guard.Guard{}, h.opts); err == nil {
 		t.Fatal("dispatcher accepted a zero guard")
 	}
