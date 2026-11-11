@@ -215,7 +215,7 @@ and `TestSyntheticRetryFailureTrace`; operator filtering commands are in
 | Language | Go, single binary | Research read the repos; nothing was run |
 | DB | SQLite via a pure-Go driver (`modernc.org/sqlite`) | Research read the repo; nothing was run |
 | LLM | Optional provider/model catalog ([canonical example](../llms.example.yaml)); templates select a profile or declare inline LLM settings | Standard-library adapters implement `openai` Chat Completions and native `anthropic` Messages, including custom base URLs; two-tool live evidence is in [spike-llm.md](research/spike-llm.md) |
-| Browser | Headless Chromium over CDP | **Untested**: which Go library, real memory use, whether Threads challenges datacenter IPs |
+| Browser | Headless Chromium over CDP via `chromedp v0.23.0` | Local synthetic transport/lifecycle and sampled process memory measured in [spike-browser.md](research/spike-browser.md); current Threads selectors, account survival, production memory and datacenter-IP behavior remain unverified |
 | Deploy | Local process; optional systemd deployment on a chosen Linux host | decision |
 
 ## 11. Non-goals for v0

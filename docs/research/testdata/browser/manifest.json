@@ -1,0 +1,76 @@
+{
+  "contract": "synthetic-v1",
+  "evidence_kind": "synthetic-local-only",
+  "fixtures": [
+    {
+      "file": "feed.html",
+      "sha256": "cd2983efcff69e1716da37ea3e27096de825dc9db40cc1f6206fb86b47b52f66",
+      "page": "feed"
+    },
+    {
+      "file": "search.html",
+      "sha256": "f6c644be6af8111a4ceee6a07b2ae03144de8cde6c04a332d68e7a6bc49bd4f7",
+      "page": "search"
+    },
+    {
+      "file": "post.html",
+      "sha256": "f94a91d74129dac44bce314cb6c7b9700bddfe44e46bc8514e3a84298985f4b8",
+      "page": "post"
+    },
+    {
+      "file": "metrics.html",
+      "sha256": "7535a270caae236c0f50f7f22db87443dfff50ab982c19dd4b56fd13c8b195aa",
+      "page": "metrics"
+    },
+    {
+      "file": "compose.html",
+      "sha256": "802798cd9725a63daa2cea650b0b2b8bce00fe1e377973595c4fac47a125eb8d",
+      "page": "compose"
+    },
+    {
+      "file": "uncertain.html",
+      "sha256": "99986008509c9c0aaf14f12f95cef993e245e0b48efd000e21882a01d993499c",
+      "page": "compose"
+    },
+    {
+      "file": "logged-out.html",
+      "sha256": "b60b3bf54551ab9e135ee8a17d5818d01c45c96e7f6dbeeed3eb07739c684350",
+      "page": "logged_out"
+    },
+    {
+      "file": "captcha.html",
+      "sha256": "64422de8411dcf4124dc243c3bb96ebc73df81407e8adfcdecd2a9c0e02836b7",
+      "page": "captcha"
+    },
+    {
+      "file": "unknown.html",
+      "sha256": "87b74d56974028909a2b59a0309b12b1141f42522abc1611f22483fe59075a9e",
+      "page": null
+    },
+    {
+      "file": "submitted.html",
+      "sha256": "4bfdeb600b8de62e0769f79b56974cb9db53e064ad6af23fdd166006fd44162b",
+      "page": "submitted"
+    }
+  ],
+  "expected_metrics": {
+    "views": 123,
+    "likes": 7,
+    "replies": 3,
+    "reposts": 1
+  },
+  "submit": {
+    "method": "POST",
+    "text_field": "text",
+    "accepted_text": "Synthetic local submission",
+    "success_fixture": "submitted.html",
+    "success_url": "/post",
+    "uncertain_behavior": "Increment server acceptance once, then wait for request context cancellation without replying; browser waits 300 ms for success marker and must not retry."
+  },
+  "states": {
+    "logged_out": "pause and notify in #8; marker recognition only measured here",
+    "captcha": "pause and notify in #8; marker recognition only measured here",
+    "unknown_page": "operation error, never guess"
+  },
+  "injection_fixture": "feed.html contains an instruction-shaped string; transport must return it literally as untrusted text, never execute it."
+}

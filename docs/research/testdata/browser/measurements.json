@@ -1,0 +1,266 @@
+{
+  "baseline": {
+    "harness_rss_kib": 9424,
+    "harness_pss_kib": 7817,
+    "browser_rss_kib": 0,
+    "browser_pss_kib": 0,
+    "browser_processes": 0
+  },
+  "cycles": [
+    {
+      "outcomes": [
+        {
+          "operation": "read_feed",
+          "pass": true,
+          "reason": "expected_synthetic_data",
+          "duration_ms": 51
+        },
+        {
+          "operation": "search",
+          "pass": true,
+          "reason": "expected_synthetic_data",
+          "duration_ms": 16
+        },
+        {
+          "operation": "read_post",
+          "pass": true,
+          "reason": "expected_synthetic_data",
+          "duration_ms": 14
+        },
+        {
+          "operation": "read_own_metrics",
+          "pass": true,
+          "reason": "expected_synthetic_data",
+          "duration_ms": 13
+        },
+        {
+          "operation": "post",
+          "pass": true,
+          "reason": "local_submit_acknowledged",
+          "duration_ms": 74
+        },
+        {
+          "operation": "reply",
+          "pass": true,
+          "reason": "local_submit_acknowledged",
+          "duration_ms": 101
+        },
+        {
+          "operation": "logged-out",
+          "pass": true,
+          "reason": "logged_out",
+          "duration_ms": 13
+        },
+        {
+          "operation": "captcha",
+          "pass": true,
+          "reason": "captcha",
+          "duration_ms": 12
+        },
+        {
+          "operation": "unknown",
+          "pass": true,
+          "reason": "unknown_page",
+          "duration_ms": 15
+        },
+        {
+          "operation": "timeout",
+          "pass": true,
+          "reason": "deadline_exceeded_no_retry",
+          "duration_ms": 161
+        },
+        {
+          "operation": "uncertain_submit",
+          "pass": true,
+          "reason": "accepted_once_ack_timed_out_no_retry",
+          "duration_ms": 352
+        }
+      ],
+      "launch_ms": 166,
+      "close_ms": 67,
+      "remaining_processes": 0,
+      "remaining_zombies": 0,
+      "sampled_peak": {
+        "harness_rss_kib": 18228,
+        "harness_pss_kib": 16618,
+        "browser_rss_kib": 1368796,
+        "browser_pss_kib": 433907,
+        "browser_processes": 11
+      },
+      "samples": 34
+    },
+    {
+      "outcomes": [
+        {
+          "operation": "read_feed",
+          "pass": true,
+          "reason": "expected_synthetic_data",
+          "duration_ms": 49
+        },
+        {
+          "operation": "search",
+          "pass": true,
+          "reason": "expected_synthetic_data",
+          "duration_ms": 14
+        },
+        {
+          "operation": "read_post",
+          "pass": true,
+          "reason": "expected_synthetic_data",
+          "duration_ms": 14
+        },
+        {
+          "operation": "read_own_metrics",
+          "pass": true,
+          "reason": "expected_synthetic_data",
+          "duration_ms": 15
+        },
+        {
+          "operation": "post",
+          "pass": true,
+          "reason": "local_submit_acknowledged",
+          "duration_ms": 94
+        },
+        {
+          "operation": "reply",
+          "pass": true,
+          "reason": "local_submit_acknowledged",
+          "duration_ms": 115
+        },
+        {
+          "operation": "logged-out",
+          "pass": true,
+          "reason": "logged_out",
+          "duration_ms": 13
+        },
+        {
+          "operation": "captcha",
+          "pass": true,
+          "reason": "captcha",
+          "duration_ms": 12
+        },
+        {
+          "operation": "unknown",
+          "pass": true,
+          "reason": "unknown_page",
+          "duration_ms": 12
+        },
+        {
+          "operation": "timeout",
+          "pass": true,
+          "reason": "deadline_exceeded_no_retry",
+          "duration_ms": 160
+        },
+        {
+          "operation": "uncertain_submit",
+          "pass": true,
+          "reason": "accepted_once_ack_timed_out_no_retry",
+          "duration_ms": 403
+        }
+      ],
+      "launch_ms": 160,
+      "close_ms": 66,
+      "remaining_processes": 0,
+      "remaining_zombies": 0,
+      "sampled_peak": {
+        "harness_rss_kib": 17900,
+        "harness_pss_kib": 16292,
+        "browser_rss_kib": 1366008,
+        "browser_pss_kib": 434958,
+        "browser_processes": 11
+      },
+      "samples": 37
+    },
+    {
+      "outcomes": [
+        {
+          "operation": "read_feed",
+          "pass": true,
+          "reason": "expected_synthetic_data",
+          "duration_ms": 48
+        },
+        {
+          "operation": "search",
+          "pass": true,
+          "reason": "expected_synthetic_data",
+          "duration_ms": 15
+        },
+        {
+          "operation": "read_post",
+          "pass": true,
+          "reason": "expected_synthetic_data",
+          "duration_ms": 14
+        },
+        {
+          "operation": "read_own_metrics",
+          "pass": true,
+          "reason": "expected_synthetic_data",
+          "duration_ms": 13
+        },
+        {
+          "operation": "post",
+          "pass": true,
+          "reason": "local_submit_acknowledged",
+          "duration_ms": 96
+        },
+        {
+          "operation": "reply",
+          "pass": true,
+          "reason": "local_submit_acknowledged",
+          "duration_ms": 139
+        },
+        {
+          "operation": "logged-out",
+          "pass": true,
+          "reason": "logged_out",
+          "duration_ms": 14
+        },
+        {
+          "operation": "captcha",
+          "pass": true,
+          "reason": "captcha",
+          "duration_ms": 13
+        },
+        {
+          "operation": "unknown",
+          "pass": true,
+          "reason": "unknown_page",
+          "duration_ms": 11
+        },
+        {
+          "operation": "timeout",
+          "pass": true,
+          "reason": "deadline_exceeded_no_retry",
+          "duration_ms": 157
+        },
+        {
+          "operation": "uncertain_submit",
+          "pass": true,
+          "reason": "accepted_once_ack_timed_out_no_retry",
+          "duration_ms": 385
+        }
+      ],
+      "launch_ms": 154,
+      "close_ms": 62,
+      "remaining_processes": 0,
+      "remaining_zombies": 0,
+      "sampled_peak": {
+        "harness_rss_kib": 18156,
+        "harness_pss_kib": 16549,
+        "browser_rss_kib": 1369132,
+        "browser_pss_kib": 436724,
+        "browser_processes": 11
+      },
+      "samples": 37
+    }
+  ],
+  "submissions": {
+    "post": 3,
+    "reply": 3,
+    "uncertain": 3
+  },
+  "evidence_kind": "synthetic-local-only",
+  "candidate": "github.com/chromedp/chromedp v0.23.0",
+  "chromium": "Google Chrome for Testing 157.0.8103.50 linux64",
+  "sampling": "25 ms ticker plus proc traversal; independent peak fields; KiB"
+}
