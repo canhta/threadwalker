@@ -722,3 +722,212 @@ func TestPlaybookCRUDTimestampsAndLimits(t *testing.T) {
 		t.Fatalf("limit 2 = %+v, want first two ids %d,%d", limited, all[0].ID, all[1].ID)
 	}
 }
+
+func TestPlaybookCRUDConcurrentInitializationIsExactlyOnce(t *testing.T) {
+	ctx := context.Background()
+	st1, path := crudPlaybookOpen(t)
+	crudPlaybookAgent(t, st1, "alpha")
+	st2, err := store.Open(ctx, path)
+	if err != nil {
+		t.Fatalf("opening second initialization handle: %v", err)
+	}
+	defer st2.Close()
+
+	const workers = 12
+	start := make(chan struct{})
+	results := make(chan bool, workers)
+	errs := make(chan error, workers)
+	var wg sync.WaitGroup
+	for i := 0; i < workers; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			<-start
+			st := st1
+			if i%2 == 1 {
+				st = st2
+			}
+			texts := []string{"a", "b"}
+			if i%3 == 0 {
+				texts = []string{"c", "d", "e"}
+			}
+			created, err := st.InitializePlaybook(ctx, "alpha", texts, crudPlaybookBase.Add(time.Duration(i)*time.Minute))
+			if err != nil {
+				errs <- err
+				return
+			}
+			results <- created
+		}(i)
+	}
+	close(start)
+	wg.Wait()
+	close(errs)
+	close(results)
+
+	createdCount := 0
+	for created := range results {
+		if created {
+			createdCount++
+		}
+	}
+	for err := range errs {
+		t.Errorf("concurrent initialization error: %v", err)
+	}
+	if createdCount != 1 {
+		t.Fatalf("concurrent initializations reported %d creators, want exactly 1", createdCount)
+	}
+	var markers int
+	if err := st2.DB().QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM playbook_initializations WHERE agent_id='alpha'`).Scan(&markers); err != nil {
+		t.Fatalf("counting initialization markers: %v", err)
+	}
+	if markers != 1 {
+		t.Fatalf("initialization markers = %d, want 1", markers)
+	}
+	entries := crudPlaybookEntries(t, st2, "alpha", 100)
+	if len(entries) != 2 && len(entries) != 3 {
+		t.Fatalf("seeded entries = %d, want one complete two- or three-entry seed", len(entries))
+	}
+	for _, entry := range entries {
+		if entry.Revision != 1 || entry.Status != "testing" || entry.N != 0 || entry.Successes != 0 {
+			t.Fatalf("concurrently seeded entry = %+v, want untouched testing revision 1", entry)
+		}
+	}
+}
+
+func TestPlaybookCRUDConcurrentAmendmentsSerialize(t *testing.T) {
+	ctx := context.Background()
+	st1, path := crudPlaybookOpen(t)
+	crudPlaybookAgent(t, st1, "alpha")
+	entry := crudPlaybookAdd(t, st1, "alpha", "original")
+	st2, err := store.Open(ctx, path)
+	if err != nil {
+		t.Fatalf("opening second amendment handle: %v", err)
+	}
+	defer st2.Close()
+
+	start := make(chan struct{})
+	var wg sync.WaitGroup
+	errs := make(chan error, 2)
+	for i, text := range []string{"left", "right"} {
+		wg.Add(1)
+		go func(i int, text string) {
+			defer wg.Done()
+			<-start
+			st := st1
+			if i == 1 {
+				st = st2
+			}
+			_, err := st.ProposePlaybook(ctx, "alpha", entry.ID, text, crudPlaybookBase.Add(time.Duration(i+1)*time.Hour))
+			if err != nil {
+				errs <- err
+			}
+		}(i, text)
+	}
+	close(start)
+	wg.Wait()
+	close(errs)
+	for err := range errs {
+		t.Errorf("concurrent amendment error: %v", err)
+	}
+
+	entries := crudPlaybookEntries(t, st2, "alpha", 100)
+	if len(entries) != 1 {
+		t.Fatalf("concurrent amendments produced %d rows, want 1", len(entries))
+	}
+	final := entries[0]
+	if final.Revision != 3 {
+		t.Fatalf("concurrent amendment revision = %d, want 3", final.Revision)
+	}
+	if final.Text != "left" && final.Text != "right" {
+		t.Fatalf("concurrent amendment text = %q, want one proposer's text", final.Text)
+	}
+	if final.N != 0 || final.Successes != 0 || final.Status != "testing" {
+		t.Fatalf("concurrent amendment evidence/status = %+v, want reset testing entry", final)
+	}
+	if !final.CreatedAt.Equal(entry.CreatedAt) {
+		t.Fatalf("concurrent amendment created_at = %s, want preserved %s", final.CreatedAt, entry.CreatedAt)
+	}
+}
+
+func TestPlaybookCRUDTextBoundaryPausedReadsAndSafeCorruptionErrors(t *testing.T) {
+	ctx := context.Background()
+	st, _ := crudPlaybookOpen(t)
+	crudPlaybookAgent(t, st, "alpha")
+
+	boundary := strings.Repeat("界", store.MaxHypothesisTextRunes)
+	entry, err := st.ProposePlaybook(ctx, "alpha", 0, boundary, crudPlaybookBase)
+	if err != nil {
+		t.Fatalf("proposing exactly %d codepoints: %v", store.MaxHypothesisTextRunes, err)
+	}
+	if entry.Text != boundary {
+		t.Fatal("boundary text was not stored exactly")
+	}
+	if _, err := st.ProposePlaybook(ctx, "alpha", 0, boundary+"界", crudPlaybookBase); !errors.Is(err, store.ErrPlaybookInput) {
+		t.Fatalf("oversized proposal error = %v, want input error", err)
+	}
+	farFuture := time.Date(10000, 1, 1, 0, 0, 0, 0, time.UTC)
+	if _, err := st.ProposePlaybook(ctx, "alpha", 0, "future", farFuture); !errors.Is(err, store.ErrPlaybookInput) {
+		t.Fatalf("year-10000 proposal error = %v, want input error", err)
+	}
+	if _, err := st.InitializePlaybook(ctx, "alpha", []string{"x"}, farFuture); !errors.Is(err, store.ErrPlaybookInput) {
+		t.Fatalf("year-10000 initialization error = %v, want input error", err)
+	}
+
+	// Paused and killed agents keep read access to their own playbook but can
+	// neither add nor amend.
+	for _, status := range []string{"paused", "killed"} {
+		agentID := "reader-" + status
+		crudPlaybookAgent(t, st, agentID)
+		existing := crudPlaybookAdd(t, st, agentID, "readable")
+		if status == "paused" {
+			if err := st.PauseOwnerAgent(ctx, agentID); err != nil {
+				t.Fatalf("pausing %q: %v", agentID, err)
+			}
+		} else if _, err := st.DB().ExecContext(ctx, `UPDATE agents SET status='killed' WHERE id=?`, agentID); err != nil {
+			t.Fatalf("killing %q: %v", agentID, err)
+		}
+		entries := crudPlaybookEntries(t, st, agentID, 100)
+		if len(entries) != 1 || entries[0].ID != existing.ID {
+			t.Fatalf("%s read = %+v, want own existing entry", status, entries)
+		}
+		if _, err := st.ProposePlaybook(ctx, agentID, existing.ID, "amended", crudPlaybookBase.Add(time.Hour)); !errors.Is(err, store.ErrPlaybookInput) {
+			t.Fatalf("%s amendment error = %v, want input error", status, err)
+		}
+		entries = crudPlaybookEntries(t, st, agentID, 100)
+		if len(entries) != 1 || entries[0].Text != "readable" || entries[0].Revision != 1 {
+			t.Fatalf("%s amendment changed state: %+v", status, entries)
+		}
+	}
+
+	// Per-agent initialization markers are independent.
+	crudPlaybookAgent(t, st, "seed-one")
+	crudPlaybookAgent(t, st, "seed-two")
+	if created, err := st.InitializePlaybook(ctx, "seed-one", []string{"one"}, crudPlaybookBase); err != nil || !created {
+		t.Fatalf("seed-one initialization = (%v, %v)", created, err)
+	}
+	if created, err := st.InitializePlaybook(ctx, "seed-two", []string{"two", "three"}, crudPlaybookBase); err != nil || !created {
+		t.Fatalf("seed-two initialization = (%v, %v)", created, err)
+	}
+	if got := crudPlaybookCount(t, st, "seed-one"); got != 1 {
+		t.Fatalf("seed-one rows = %d, want 1", got)
+	}
+	if got := crudPlaybookCount(t, st, "seed-two"); got != 2 {
+		t.Fatalf("seed-two rows = %d, want 2", got)
+	}
+
+	// A malformed row's error must not echo hypothesis text.
+	const secret = "SECRET-HYPOTHESIS-TEXT"
+	if _, err := st.DB().ExecContext(ctx,
+		`INSERT INTO playbook(agent_id,text,status,revision,n,successes,created_at) VALUES('alpha',?,'testing',1,-1,0,?)`,
+		secret, crudPlaybookBase.Format(time.RFC3339Nano)); err != nil {
+		t.Fatalf("inserting secret malformed row: %v", err)
+	}
+	_, err = st.PlaybookEntries(ctx, "alpha", 100)
+	if err == nil {
+		t.Fatal("malformed secret row was accepted")
+	}
+	if strings.Contains(err.Error(), secret) {
+		t.Fatalf("malformed-row error leaked hypothesis text: %v", err)
+	}
+}
