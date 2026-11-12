@@ -3,7 +3,7 @@ package threads
 // This file is the measured live Threads accessibility mapping. It parses the
 // compact accessibility tree produced by agent-browser/Orca snapshots. It uses
 // no invented page attributes: roles, nesting, link URLs and visible text are
-// the only inputs. It is a read mapping; live writes remain unqualified.
+// the only inputs. Reads and measured guarded writes share this mapping.
 
 import (
 	"net/url"
@@ -211,19 +211,36 @@ func parseThreadsPage(snapshot, pageURL, expectedKind, baseURL string) (Page, er
 		if err != nil {
 			return Page{}, snapshotError(operation, err)
 		}
-		if len(posts) == 0 || !sameThreadPath(posts[0].URL, page) {
+		if len(posts) == 0 {
 			return Page{}, snapshotError(operation, ErrUnknownPage)
 		}
-		// The measured post page exposes the root and the author's own thread
-		// continuation. External replies were not rendered; do not label an
-		// unmeasured reply block as context.
-		contextPosts := []Post{posts[0]}
-		for _, post := range posts[1:] {
-			if post.Username == posts[0].Username {
-				contextPosts = append(contextPosts, post)
+		var result Page
+		if sameThreadPath(posts[0].URL, page) {
+			// The measured post page exposes the root and the author's own
+			// thread continuation.
+			contextPosts := []Post{posts[0]}
+			for _, post := range posts[1:] {
+				if post.Username == posts[0].Username {
+					contextPosts = append(contextPosts, post)
+				}
 			}
+			result = Page{Kind: "post", Posts: contextPosts}
+		} else {
+			// The measured reply permalink page shows the parent chain plus the
+			// reply. Return the page's posts in order instead of pretending the
+			// parent is the requested reply.
+			matched := false
+			for _, post := range posts {
+				if sameThreadPath(post.URL, page) {
+					matched = true
+					break
+				}
+			}
+			if !matched {
+				return Page{}, snapshotError(operation, ErrUnknownPage)
+			}
+			result = Page{Kind: "post", Posts: posts}
 		}
-		result := Page{Kind: "post", Posts: contextPosts}
 		if form, ok := threadsInlineComposer(root, pageURL); ok {
 			result.Form = &form
 		}
@@ -518,25 +535,170 @@ func digitsOnly(value string) bool {
 	return true
 }
 
+// threadsInlineComposer recognizes the post page's inline reply composer. The
+// measured composer has one textbox inside the post block; its submit control
+// ("Reply") only appears after text is entered, so recognition is textbox-based.
 func threadsInlineComposer(root *axNode, pageURL string) (Form, bool) {
-	region := threadsColumn(root)
-	if region == nil {
+	if threadsColumn(root) == nil {
 		return Form{}, false
 	}
-	textbox, post := false, false
-	region.walk(func(n *axNode) bool {
-		if n.role == "textbox" {
-			textbox = true
-		}
-		if n.role == "button" && strings.EqualFold(n.name, "Post") {
-			post = true
-		}
-		return true
-	})
-	if !textbox || !post {
+	container, ok := threadsComposerContainer(root)
+	if !ok || !isThreadsPostBlock(container) {
+		return Form{}, false
+	}
+	if _, ok = threadsComposerTextbox(container); !ok {
 		return Form{}, false
 	}
 	return Form{Action: pageURL, Method: "POST", Composer: true, Submit: true}, true
+}
+
+// threadsComposerContainer returns the innermost measured composer container:
+// either a dialog with a New thread/Reply heading or a post block holding the
+// inline reply textbox. Scoping to that container keeps a reply submit from
+// resolving to an unrelated Reply button in another post.
+func threadsComposerContainer(root *axNode) (*axNode, bool) {
+	var found *axNode
+	root.walk(func(n *axNode) bool {
+		if n == nil {
+			return true
+		}
+		if isThreadsComposerDialog(n) || (isThreadsPostBlock(n) && nodeHasTextbox(n)) {
+			found = n
+		}
+		return true
+	})
+	return found, found != nil
+}
+
+func isThreadsComposerDialog(node *axNode) bool {
+	if node.role != "dialog" {
+		return false
+	}
+	heading := false
+	node.walk(func(n *axNode) bool {
+		if n.role == "heading" && (strings.EqualFold(n.name, "New thread") || strings.EqualFold(n.name, "Reply")) {
+			heading = true
+			return false
+		}
+		return true
+	})
+	return heading
+}
+
+func isThreadsPostBlock(node *axNode) bool {
+	if node.role != "generic" {
+		return false
+	}
+	for _, child := range node.children {
+		if child.role != "link" || child.url == "" {
+			continue
+		}
+		u, err := url.Parse(child.url)
+		if err != nil {
+			continue
+		}
+		if _, _, ok := threadsPostPathParts(u.Path); ok {
+			return true
+		}
+	}
+	return false
+}
+
+func nodeHasTextbox(node *axNode) bool {
+	found := false
+	node.walk(func(n *axNode) bool {
+		if n.role == "textbox" {
+			found = true
+			return false
+		}
+		return true
+	})
+	return found
+}
+
+func threadsComposerTextbox(container *axNode) (*axNode, bool) {
+	var textbox *axNode
+	container.walk(func(n *axNode) bool {
+		if textbox != nil {
+			return false
+		}
+		if n.role == "textbox" && n.ref != "" {
+			textbox = n
+			return false
+		}
+		return true
+	})
+	return textbox, textbox != nil
+}
+
+// threadsComposerControls resolves the textbox and its submit control inside one
+// composer container. The submit is the first Post/Reply button that follows the
+// textbox in document order, which excludes the post's metric Reply button (it
+// precedes the inline composer) and reply blocks further down the page.
+func threadsComposerControls(root *axNode) (textbox, submit *axNode, ok bool) {
+	container, found := threadsComposerContainer(root)
+	if !found {
+		return nil, nil, false
+	}
+	textbox, ok = threadsComposerTextbox(container)
+	if !ok {
+		return nil, nil, false
+	}
+	if isThreadsPostBlock(container) {
+		// Inline composer: the submit is a sibling of the textbox. Never walk
+		// into following reply blocks, whose Reply buttons are unrelated.
+		parent := threadsParent(container, textbox)
+		if parent == nil {
+			return nil, nil, false
+		}
+		seen := false
+		for _, child := range parent.children {
+			if child == textbox {
+				seen = true
+				continue
+			}
+			if seen && child.role == "button" && child.ref != "" && (strings.EqualFold(child.name, "Post") || strings.EqualFold(child.name, "Reply")) {
+				return textbox, child, true
+			}
+		}
+		return textbox, nil, false
+	}
+	seen := false
+	container.walk(func(n *axNode) bool {
+		if n == textbox {
+			seen = true
+			return true
+		}
+		if !seen {
+			return true
+		}
+		if n.role == "button" && n.ref != "" && (strings.EqualFold(n.name, "Post") || strings.EqualFold(n.name, "Reply")) {
+			submit = n
+			return false
+		}
+		return true
+	})
+	return textbox, submit, submit != nil
+}
+
+// threadsParent returns the parent of target within root, or nil.
+func threadsParent(root, target *axNode) *axNode {
+	var parent *axNode
+	var walk func(*axNode)
+	walk = func(n *axNode) {
+		if n == nil || parent != nil {
+			return
+		}
+		for _, child := range n.children {
+			if child == target {
+				parent = n
+				return
+			}
+			walk(child)
+		}
+	}
+	walk(root)
+	return parent
 }
 
 func threadsComposer(root *axNode, pageURL string, base *url.URL) (Form, bool) {
@@ -549,37 +711,150 @@ func threadsComposer(root *axNode, pageURL string, base *url.URL) (Form, bool) {
 		if dialog != nil {
 			return false
 		}
-		if n.role == "dialog" {
-			hasHeading := false
-			for _, child := range n.children {
-				if child.role == "heading" && (strings.EqualFold(child.name, "New thread") || strings.EqualFold(child.name, "Reply")) {
-					hasHeading = true
-				}
-			}
-			if hasHeading {
-				dialog = n
-				return false
-			}
+		if isThreadsComposerDialog(n) {
+			dialog = n
+			return false
 		}
 		return true
 	})
 	if dialog == nil {
 		return Form{}, false
 	}
-	textbox, post := false, false
+	if _, ok := threadsComposerTextbox(dialog); !ok {
+		return Form{}, false
+	}
+	post := false
 	dialog.walk(func(n *axNode) bool {
-		if n.role == "textbox" {
-			textbox = true
-		}
 		if n.role == "button" && strings.EqualFold(n.name, "Post") {
 			post = true
+			return false
 		}
 		return true
 	})
-	if !textbox || !post {
+	if !post {
 		return Form{}, false
 	}
 	return Form{Action: pageURL, Method: "POST", Composer: true, Submit: true}, true
+}
+
+// threadsOwnUsername reads the measured authenticated navigation's Profile
+// link. It is used only to recognize a newly published own post/reply.
+func threadsOwnUsername(root *axNode) string {
+	own := ""
+	root.walk(func(n *axNode) bool {
+		if own != "" {
+			return false
+		}
+		if n.role != "link" || !(strings.EqualFold(n.name, "Profile") || strings.EqualFold(n.name, "Profile Profile")) {
+			return true
+		}
+		u, err := url.Parse(n.url)
+		if err != nil {
+			return true
+		}
+		if user := threadsUserFromPath(u.Path); user != "" {
+			own = user
+			return false
+		}
+		return true
+	})
+	return own
+}
+
+// threadsAckURL recognizes a measured successful write acknowledgement: either
+// the status toast whose "View" link points at the new own post/reply, or a post
+// block with the submitted text / new own permalink that was not present before
+// the click. It never guesses from unrelated page text.
+func threadsAckURL(root *axNode, base *url.URL, ownUser, submitted string, known map[string]bool) (string, bool) {
+	toast := ""
+	root.walk(func(n *axNode) bool {
+		if toast != "" {
+			return false
+		}
+		if n.role != "status" {
+			return true
+		}
+		n.walk(func(m *axNode) bool {
+			if m.role != "link" || !strings.EqualFold(strings.TrimSpace(m.name), "View") {
+				return true
+			}
+			u, err := url.Parse(m.url)
+			if err != nil || !sameOrigin(base, u) {
+				return true
+			}
+			user, _, ok := threadsPostPathParts(u.Path)
+			if !ok || (ownUser != "" && !strings.EqualFold(user, ownUser)) {
+				return true
+			}
+			toast = u.String()
+			return false
+		})
+		return toast == ""
+	})
+	if toast != "" && !known[toast] {
+		return toast, true
+	}
+
+	match, ownNew := "", ""
+	root.walk(func(n *axNode) bool {
+		if n.role != "generic" {
+			return true
+		}
+		raw, user, ok := threadsPostBlockPermalink(n, base)
+		if !ok || known[raw] {
+			return true
+		}
+		if threadsAckText(threadsPostText(n), submitted) && match == "" {
+			match = raw
+		}
+		if ownNew == "" && ownUser != "" && strings.EqualFold(user, ownUser) {
+			ownNew = raw
+		}
+		return true
+	})
+	if match != "" {
+		return match, true
+	}
+	if ownNew != "" {
+		return ownNew, true
+	}
+	return "", false
+}
+
+func threadsPostBlockPermalink(node *axNode, base *url.URL) (string, string, bool) {
+	for _, child := range node.children {
+		if child.role != "link" || child.url == "" {
+			continue
+		}
+		u, err := url.Parse(child.url)
+		if err != nil || !sameOrigin(base, u) {
+			continue
+		}
+		user, _, ok := threadsPostPathParts(u.Path)
+		if ok {
+			return u.String(), user, true
+		}
+	}
+	return "", "", false
+}
+
+func threadsAckText(blockText, submitted string) bool {
+	block := strings.TrimSpace(blockText)
+	want := strings.TrimSpace(submitted)
+	if block == "" || want == "" {
+		return false
+	}
+	if block == want {
+		return true
+	}
+	block = strings.TrimSuffix(block, "…")
+	if len([]rune(block)) >= 12 && strings.HasPrefix(want, block) {
+		return true
+	}
+	if len([]rune(want)) >= 12 && strings.HasPrefix(block, want) {
+		return true
+	}
+	return false
 }
 
 func threadsLoadingText(snapshot string) bool {

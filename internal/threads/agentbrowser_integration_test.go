@@ -359,7 +359,7 @@ func TestAgentBrowserThreadsLiveLoggedOutFailsClosed(t *testing.T) {
 	if _, err = browser.ReadFeed(ctx); !errors.Is(err, threads.ErrLoggedOut) {
 		t.Fatalf("public Threads page did not fail closed as logged out: %v", err)
 	}
-	if _, err = browser.Post(ctx, "must not submit"); !errors.Is(err, threads.ErrLiveWriteUnqualified) {
-		t.Fatalf("live write was not refused: %v", err)
+	if _, err = browser.Post(ctx, "must not submit"); !errors.Is(err, threads.ErrLoggedOut) {
+		t.Fatalf("logged-out live write was not refused: %v", err)
 	}
 }

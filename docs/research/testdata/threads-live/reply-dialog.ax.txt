@@ -1,0 +1,61 @@
+- generic [ref=e466] clickable [onclick]
+  - navigation
+    - link "Threads" [ref=e468, url=https://www.threads.com/]
+      - image "Threads"
+    - link "Home" [ref=e469, url=https://www.threads.com/]
+      - image "Home"
+    - button "New thread" [ref=e470]
+      - image "New thread"
+    - link "Search" [ref=e471, url=https://www.threads.com/search]
+      - image "Search"
+    - link "Messages" [ref=e517, url=https://www.threads.com/messages/]
+      - image "Messages"
+    - link "Notifications" [ref=e473, url=https://www.threads.com/activity]
+      - image "Notifications"
+    - link "Profile" [ref=e474, url=https://www.threads.com/@synthetic_author]
+      - image "Profile"
+    - link "Insights" [ref=e475, url=https://www.threads.com/insights/]
+      - image "Insights"
+  - button "Create" [expanded=false, ref=e467]
+    - image "Create"
+  - generic [ref=e518] clickable [onclick]
+    - generic
+      - generic
+        - dialog
+          - generic
+            - button "Cancel" [ref=e519]
+            - heading "Reply" [level=1, ref=e520]
+            - button "More" [expanded=false, ref=e521]
+            - link "synthetic_author's profile picture" [ref=e538, url=https://www.threads.com/@synthetic_author]
+            - link "synthetic_author" [ref=e536, url=https://www.threads.com/@synthetic_author]
+            - time
+            - StaticText "Replying to "
+            - StaticText "@"
+            - StaticText "synthetic_creator"
+            - StaticText "Synthetic external reply."
+            - StaticText "1"
+            - StaticText "/"
+            - StaticText "2"
+            - image "synthetic_author's profile picture"
+            - StaticText "synthetic_author"
+            - image
+            - searchbox "Community or topic" [ref=e537]
+            - StaticText "2"
+            - StaticText "/"
+            - StaticText "2"
+            - generic
+              - textbox "Empty text field. Type to compose a new post." [ref=e534]: 
+
+            - button "Attach media" [ref=e522]
+            - button "Add a GIF" [ref=e523]
+            - button "Choose a like effect" [ref=e524]
+            - button "Add an emoji" [expanded=false, ref=e525]
+            - button "Add a sticker" [expanded=false, ref=e526]
+            - button "Add a poll" [ref=e527]
+            - button "Quote post" [ref=e528]
+            - button "Attach text" [ref=e529]
+            - button "Add a location" [ref=e530]
+            - button "Add music" [ref=e531]
+            - button "Add to thread" [disabled, ref=e532]
+            - button "Post" [ref=e535]
+            - button "Post Options" [expanded=false, ref=e533]

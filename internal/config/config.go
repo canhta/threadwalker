@@ -101,7 +101,7 @@ type ThreadsConfig struct {
 	BaseURL          string
 	ExecutablePath   string // Chrome executable for either browser backend.
 	AgentBrowserPath string // Pinned agent-browser CLI binary; agent_browser only.
-	PageProfile      string // fixture (default) or threads for live read mapping.
+	PageProfile      string // fixture (default) or threads for the measured live read/write mapping.
 	ProfileDir       string
 	NoSandbox        bool // Explicit operator choice for constrained local hosts.
 }
@@ -452,10 +452,6 @@ func loadFile(path string, getenv func(string) string, catalog *Catalog, secrets
 			tmpl.DryRun = b
 		}
 	}
-	if tmpl.Threads.PageProfile == "threads" && !tmpl.DryRun {
-		addErr("threads.page_profile", "threads live reads require dry_run true until write qualification")
-	}
-
 	resolveSecret := func(field, envName string) Secret {
 		if envName == "" {
 			return Secret{}

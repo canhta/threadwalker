@@ -68,7 +68,7 @@ func TestBrowserConfigurationExplicitAndFailClosed(t *testing.T) {
 	}
 }
 
-func TestThreadsLiveProfileRequiresDryRun(t *testing.T) {
+func TestThreadsLiveProfileAllowsMeasuredWrites(t *testing.T) {
 	raw, err := os.ReadFile("../../agents/solo-builder.example.yaml")
 	if err != nil {
 		t.Fatal(err)
@@ -80,7 +80,11 @@ func TestThreadsLiveProfileRequiresDryRun(t *testing.T) {
 	if err = os.WriteFile(path, []byte(input), 0600); err != nil {
 		t.Fatal(err)
 	}
-	if _, err = LoadFile(path, func(string) string { return "synthetic-secret" }); err == nil || !strings.Contains(err.Error(), "dry_run true") {
-		t.Fatalf("non-dry-run live profile accepted: %v", err)
+	tmpl, err := LoadFile(path, func(string) string { return "synthetic-secret" })
+	if err != nil {
+		t.Fatalf("measured live write profile rejected: %v", err)
+	}
+	if tmpl.DryRun || tmpl.Threads.PageProfile != "threads" || tmpl.Threads.Backend != "agent_browser" {
+		t.Fatalf("live write config lost: %+v", tmpl.Threads)
 	}
 }

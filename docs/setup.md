@@ -108,7 +108,7 @@ threads:
   profile_dir: /path/to/agent-profile
 ```
 
-For measured **read-only** Threads pages, add `page_profile: threads` and keep `dry_run: true`:
+For measured Threads pages and live posts/replies, add `page_profile: threads`:
 
 ```yaml
 threads:
@@ -120,16 +120,19 @@ threads:
   profile_dir: /path/to/agent-profile
 ```
 
-The live profile requires `agent_browser`, an HTTPS `threads.com`/`threads.net` origin and dry run.
-It maps feed, search and post reads from the measured accessibility tree. Own metrics remain
-unavailable because the measured Insights overview lacks all four counters. Post/reply submission
-is refused before any click with `live_write_unqualified`; non-dry-run live templates are rejected
-until [#18](https://github.com/canhta/threadwalker/issues/18) measures acknowledgement. The
-authorized Orca Browser session is a measurement surface, not a portable VPS profile.
+The live profile requires `agent_browser` and an HTTPS `threads.com`/`threads.net` origin. It maps
+feed, search and post reads from the measured accessibility tree, plus measured post/reply
+submission and acknowledgement. Own metrics remain unavailable because the measured Insights
+overview lacks all four counters. Keep `dry_run: true` to read without publishing; `dry_run: false`
+publishes with `page_profile: threads`, and every write still goes through the Go guard's audit
+row, reserved intent and limits before the click. An unacknowledged click is recorded as unknown and
+never retried. Multi-line fill, captcha, rate-limit banners and account survival remain unmeasured
+in [#18](https://github.com/canhta/threadwalker/issues/18). The authorized Orca Browser session is a
+measurement surface, not a portable VPS profile.
 
 **The default fixture profile supports saved synthetic contracts, not the current Threads site.**
-Real selectors, login/session behavior, reply acknowledgement and action-bound insights remain to
-be qualified in [#2](https://github.com/canhta/threadwalker/issues/2) and
+Real selectors, login/session behavior and action-bound insights remain to be qualified in
+[#2](https://github.com/canhta/threadwalker/issues/2) and
 [#18](https://github.com/canhta/threadwalker/issues/18). Local reproduction commands are in
 [browser evidence](research/browser-local.md), [agent-browser evidence](research/agent-browser.md)
 and [Threads live mapping](research/threads-live-mapping.md).

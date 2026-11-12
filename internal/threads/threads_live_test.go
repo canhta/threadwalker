@@ -3,6 +3,7 @@ package threads
 import (
 	"context"
 	"errors"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -171,28 +172,194 @@ func TestAgentBrowserThreadsReadProfile(t *testing.T) {
 	}
 }
 
-func TestAgentBrowserThreadsWritesAreUnqualifiedBeforeClick(t *testing.T) {
+func liveThreadsBrowser(t *testing.T, cli *fakeAgentCLI, sleep func(context.Context, time.Duration) error) *Browser {
+	t.Helper()
 	base := "https://www.threads.com"
-	cli := &fakeAgentCLI{openURL: base + "/", snapshot: agentbrowser.Snapshot{Origin: base + "/", Text: liveFixture(t, "compose.ax.txt")}}
-	b := testAgentBrowser(t, cli, nil)
+	b := testAgentBrowser(t, cli, sleep)
 	b.base = mustBase(base)
 	driver := b.driver.(*agentBrowserDriver)
 	driver.base = b.base
 	driver.profile = pageProfileThreads
+	b.feedPath = "/"
+	b.metricsPath = "/insights/"
 	b.postPath = "/"
-	if _, err := b.Post(context.Background(), "Synthetic local text"); !errors.Is(err, ErrLiveWriteUnqualified) {
-		t.Fatalf("live post accepted: %v", err)
+	return b
+}
+
+func TestAgentBrowserThreadsPostAcknowledgesToast(t *testing.T) {
+	base := "https://www.threads.com"
+	compose := agentbrowser.Snapshot{Origin: base + "/", Text: liveFixture(t, "post-compose.ax.txt")}
+	cli := &fakeAgentCLI{openURL: base + "/", snapshots: []agentbrowser.Snapshot{
+		compose,
+		compose,
+		compose,
+		{Origin: base + "/", Text: liveFixture(t, "post-submitted.ax.txt")},
+	}}
+	b := liveThreadsBrowser(t, cli, nil)
+	got, err := b.Post(context.Background(), "Synthetic live post one.")
+	if err != nil || got != base+"/@synthetic_author/post/fixtureLivePost1" {
+		t.Fatalf("confirmed=%q err=%v", got, err)
+	}
+	if cli.clicks != 1 || len(cli.fills) != 1 || cli.fills[0] != "Synthetic live post one." {
+		t.Fatalf("clicks=%d fills=%v", cli.clicks, cli.fills)
+	}
+}
+
+func TestAgentBrowserThreadsReplyAcknowledgesToast(t *testing.T) {
+	base := "https://www.threads.com"
+	target := base + "/@synthetic_author/post/fixtureLiveReply1"
+	empty := agentbrowser.Snapshot{Origin: target, Text: liveFixture(t, "reply-live.ax.txt")}
+	filled := agentbrowser.Snapshot{Origin: target, Text: liveFixture(t, "reply-live-filled.ax.txt")}
+	cli := &fakeAgentCLI{openURL: target, snapshots: []agentbrowser.Snapshot{
+		empty,
+		filled,
+		filled,
+		{Origin: target, Text: liveFixture(t, "reply-toast.ax.txt")},
+	}}
+	b := liveThreadsBrowser(t, cli, nil)
+	got, err := b.Reply(context.Background(), target, "Synthetic nested reply.")
+	if err != nil || got != base+"/@synthetic_author/post/fixtureNestedReply1" {
+		t.Fatalf("confirmed=%q err=%v", got, err)
+	}
+	if cli.clicks != 1 || len(cli.fills) != 1 {
+		t.Fatalf("clicks=%d fills=%v", cli.clicks, cli.fills)
+	}
+}
+
+func TestAgentBrowserThreadsMissingAckIsUnknownAndNeverRetried(t *testing.T) {
+	base := "https://www.threads.com"
+	target := base + "/@synthetic_author/post/fixtureLiveReply1"
+	empty := agentbrowser.Snapshot{Origin: target, Text: liveFixture(t, "reply-live.ax.txt")}
+	filled := agentbrowser.Snapshot{Origin: target, Text: liveFixture(t, "reply-live-filled.ax.txt")}
+	cli := &fakeAgentCLI{openURL: target, snapshots: []agentbrowser.Snapshot{empty, filled, filled, empty}}
+	b := liveThreadsBrowser(t, cli, func(context.Context, time.Duration) error { return context.DeadlineExceeded })
+	_, err := b.Reply(context.Background(), target, "Synthetic uncertain reply.")
+	if !errors.Is(err, ErrUnknownOutcome) || !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("uncertain outcome lost: %v", err)
+	}
+	if cli.clicks != 1 || len(cli.fills) != 1 {
+		t.Fatalf("retry detected: clicks=%d fills=%d", cli.clicks, len(cli.fills))
+	}
+}
+
+func TestAgentBrowserThreadsComposeMissingFailsBeforeClick(t *testing.T) {
+	base := "https://www.threads.com"
+	cli := &fakeAgentCLI{openURL: base + "/insights/", snapshot: agentbrowser.Snapshot{Origin: base + "/insights/", Text: liveFixture(t, "insights.ax.txt")}}
+	b := liveThreadsBrowser(t, cli, nil)
+	if _, err := b.Post(context.Background(), "Synthetic local text"); !errors.Is(err, ErrUnknownPage) || errors.Is(err, ErrUnknownOutcome) {
+		t.Fatalf("missing compose accepted or marked unknown: %v", err)
 	}
 	if cli.clicks != 0 || len(cli.fills) != 0 {
-		t.Fatalf("live post interacted: clicks=%d fills=%d", cli.clicks, len(cli.fills))
+		t.Fatalf("missing compose interacted: clicks=%d fills=%d", cli.clicks, len(cli.fills))
 	}
-	cli.openURL = base + "/@synthetic_author/post/fixturePost1"
-	cli.snapshot = agentbrowser.Snapshot{Origin: cli.openURL, Text: liveFixture(t, "post.ax.txt")}
-	if _, err := b.Reply(context.Background(), cli.openURL, "Synthetic local reply"); !errors.Is(err, ErrLiveWriteUnqualified) {
-		t.Fatalf("live reply accepted: %v", err)
+}
+
+func TestAgentBrowserThreadsLoggedOutWriteFailsBeforeClick(t *testing.T) {
+	base := "https://www.threads.com"
+	cli := &fakeAgentCLI{openURL: base + "/", snapshot: agentbrowser.Snapshot{Origin: base + "/", Text: liveFixture(t, "logged-out.ax.txt")}}
+	b := liveThreadsBrowser(t, cli, nil)
+	if _, err := b.Post(context.Background(), "Synthetic local text"); !errors.Is(err, ErrLoggedOut) || errors.Is(err, ErrUnknownOutcome) {
+		t.Fatalf("logged-out write accepted or marked unknown: %v", err)
 	}
 	if cli.clicks != 0 || len(cli.fills) != 0 {
-		t.Fatalf("live reply interacted: clicks=%d fills=%d", cli.clicks, len(cli.fills))
+		t.Fatalf("logged-out write interacted: clicks=%d fills=%d", cli.clicks, len(cli.fills))
+	}
+}
+
+func TestAgentBrowserThreadsBlankTextFailsBeforeClick(t *testing.T) {
+	base := "https://www.threads.com"
+	compose := agentbrowser.Snapshot{Origin: base + "/", Text: liveFixture(t, "post-compose.ax.txt")}
+	cli := &fakeAgentCLI{openURL: base + "/", snapshots: []agentbrowser.Snapshot{compose, compose}}
+	b := liveThreadsBrowser(t, cli, nil)
+	if _, err := b.Post(context.Background(), "   "); !errors.Is(err, ErrMalformedPage) || errors.Is(err, ErrUnknownOutcome) {
+		t.Fatalf("blank text accepted or marked unknown: %v", err)
+	}
+	if cli.clicks != 0 || len(cli.fills) != 0 {
+		t.Fatalf("blank text interacted: clicks=%d fills=%d", cli.clicks, len(cli.fills))
+	}
+}
+
+func TestThreadsLiveComposerAndAckMapping(t *testing.T) {
+	base := "https://www.threads.com"
+	compose, err := parseThreadsPage(liveFixture(t, "post-compose.ax.txt"), base+"/", "compose", base)
+	if err != nil || compose.Form == nil {
+		t.Fatalf("live post compose=%+v err=%v", compose, err)
+	}
+	replyDialog, err := parseThreadsPage(liveFixture(t, "reply-dialog.ax.txt"), base+"/@synthetic_author/post/fixtureExternalReply1", "compose", base)
+	if err != nil || replyDialog.Form == nil {
+		t.Fatalf("live reply dialog=%+v err=%v", replyDialog, err)
+	}
+	postPage, err := parseThreadsPage(liveFixture(t, "post-live.ax.txt"), base+"/@synthetic_author/post/fixtureLivePost1", "post", base)
+	if err != nil || postPage.Form == nil {
+		t.Fatalf("live post page composer=%+v err=%v", postPage, err)
+	}
+	replyPage, err := parseThreadsPage(liveFixture(t, "reply-live.ax.txt"), base+"/@synthetic_author/post/fixtureLiveReply1", "post", base)
+	if err != nil || replyPage.Form == nil || len(replyPage.Posts) == 0 {
+		t.Fatalf("live reply page=%+v err=%v", replyPage, err)
+	}
+	external, err := parseThreadsPage(liveFixture(t, "external-reply-live.ax.txt"), base+"/@synthetic_author/post/fixtureExternalReply1", "post", base)
+	if err != nil || external.Form == nil || len(external.Posts) != 2 {
+		t.Fatalf("external reply page=%+v err=%v", external, err)
+	}
+	if got := external.Posts[1].Username; got != "synthetic_author" {
+		t.Fatalf("external reply author=%q", got)
+	}
+
+	root, err := parseAXTree(liveFixture(t, "post-submitted.ax.txt"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	baseURL, _ := url.Parse(base)
+	got, ok := threadsAckURL(root, baseURL, "synthetic_author", "Synthetic live post one.", map[string]bool{})
+	if !ok || got != base+"/@synthetic_author/post/fixtureLivePost1" {
+		t.Fatalf("post ack=%q ok=%v", got, ok)
+	}
+	root, err = parseAXTree(liveFixture(t, "reply-toast.ax.txt"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, ok = threadsAckURL(root, baseURL, "synthetic_author", "Synthetic nested reply.", map[string]bool{})
+	if !ok || got != base+"/@synthetic_author/post/fixtureNestedReply1" {
+		t.Fatalf("reply ack=%q ok=%v", got, ok)
+	}
+}
+
+func TestThreadsAckFallsBackToNewOwnPostBlock(t *testing.T) {
+	base := "https://www.threads.com"
+	tree, err := parseAXTree(`- navigation
+  - link "Profile" [ref=e1, url=https://www.threads.com/@synthetic_author]
+- region "Column body" [ref=e2]
+  - generic [ref=e3] clickable [cursor:pointer, onclick]
+    - link "synthetic_author" [ref=e4, url=https://www.threads.com/@synthetic_author]
+    - link "a few seconds ago" [ref=e5, url=https://www.threads.com/@synthetic_author/post/fixtureNewReply]
+    - button "More" [ref=e6]
+`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	baseURL, _ := url.Parse(base)
+	known := map[string]bool{base + "/@synthetic_author/post/fixtureOldPost": true}
+	if got, ok := threadsAckURL(tree, baseURL, "synthetic_author", "body not rendered", known); !ok || got != base+"/@synthetic_author/post/fixtureNewReply" {
+		t.Fatalf("new own block ack=%q ok=%v", got, ok)
+	}
+	known[base+"/@synthetic_author/post/fixtureNewReply"] = true
+	if got, ok := threadsAckURL(tree, baseURL, "synthetic_author", "body not rendered", known); ok {
+		t.Fatalf("known block accepted: %q", got)
+	}
+}
+
+func TestThreadsComposerControlsSkipMetricReply(t *testing.T) {
+	base := "https://www.threads.com"
+	root, err := parseAXTree(liveFixture(t, "reply-live-filled.ax.txt"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	textbox, submit, ok := threadsComposerControls(root)
+	if !ok || textbox == nil || submit == nil || submit.name != "Reply" || submit.ref != "e580" {
+		t.Fatalf("composer controls textbox=%+v submit=%+v ok=%v", textbox, submit, ok)
+	}
+	if _, err := parseThreadsPage(liveFixture(t, "reply-live-filled.ax.txt"), base+"/@synthetic_author/post/fixtureLiveReply1", "post", base); err == nil {
+		t.Fatal("unposted filled reply page fabricated a post")
 	}
 }
 

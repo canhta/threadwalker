@@ -176,16 +176,18 @@ refs. It accepts only the invented `agent-browser-v1` fixture document in
 Both backends start at most one browser per wake, close it on every exit (including cancellation),
 and allow only configured-origin navigation and submissions. Unknown or malformed pages return
 operation-specific safe errors without guessed selectors. `agent_browser` also has an optional
-measured **live read profile** (`threads.page_profile: threads`) that parses the current Threads
+measured **live profile** (`threads.page_profile: threads`) that parses the current Threads
 accessibility tree using only roles, nesting, link URLs and visible text; it requires no invented
 page attributes. It maps feed, search and post reads, and fails closed as `unknown_page` or
 `logged_out` when the measured authenticated structure is absent. The measured Insights overview
 does not expose all four metric counters, so own metrics remain `ErrMetricsUnavailable`, never
-zero. The composer dialog is recognized structurally, but live post/reply submission is refused
-before any fill or click with `ErrLiveWriteUnqualified`, and non-dry-run live templates are
-rejected until #18 measures acknowledgement. External replies, captcha flows, session
+zero. The composer dialog, inline reply composer, one-click submit and acknowledgement are
+measured: a success is the status toast's same-origin `View` URL or a new own post block, and the
+guarded backend returns that `/post/<id>` URL. A missing acknowledgement within the deadline is
+`ErrUnknownOutcome` and is never retried. A missing or ambiguous composer is refused before any
+fill or click. Captcha flows, explicit rate-limit/error banners, multi-line `fill`, session
 portability, account survival and real-account operation remain unverified in #2/#18; the live
-profile does not claim live writes or a portable VPS session. **(decision, #22/#24)**
+profile does not claim a portable VPS session. **(decision, #22/#24/#25)**
 
 `dry_run` browser reads execute normally; writes retain a single guarded intent without
 submitting. A configured non-dry-run backend submits only after that intent commits and stores
@@ -480,7 +482,7 @@ connection pool; no connection is held during Bot API HTTP. Canonical delivery D
 | Language | Go, single binary | Research read the repos; nothing was run |
 | DB | SQLite via a pure-Go driver (`modernc.org/sqlite`) | Research read the repo; nothing was run |
 | LLM | Optional provider/model catalog ([canonical example](../llms.example.yaml)); templates select a profile or declare inline LLM settings | Standard-library adapters implement `openai` Chat Completions and native `anthropic` Messages, including custom base URLs; two-tool live evidence is in [spike-llm.md](research/spike-llm.md) |
-| Browser | Headless Chromium over CDP via `chromedp v0.23.0` (default `browser`), or the pinned `agent-browser 0.42.0` CLI (`agent_browser`) | Local synthetic transport/lifecycle measured for both in [spike-browser.md](research/spike-browser.md) and [agent-browser.md](research/agent-browser.md); measured read-only Threads accessibility mapping in [threads-live-mapping.md](research/threads-live-mapping.md); live writes, account survival, production memory and datacenter-IP behavior remain unverified |
+| Browser | Headless Chromium over CDP via `chromedp v0.23.0` (default `browser`), or the pinned `agent-browser 0.42.0` CLI (`agent_browser`) | Local synthetic transport/lifecycle measured for both in [spike-browser.md](research/spike-browser.md) and [agent-browser.md](research/agent-browser.md); measured Threads reads and live post/reply writes in [threads-live-mapping.md](research/threads-live-mapping.md); account survival, captcha/rate-limit banners, production memory and datacenter-IP behavior remain unverified |
 | Deploy | Local process; optional systemd deployment on a chosen Linux host | decision |
 
 ## 11. Non-goals for v0
@@ -511,14 +513,14 @@ operations, the seven-day live experiment, and the two-agent 48-hour memory obse
 open until actually measured. These may run on a local machine or an operator-chosen deployment
 host; a VPS is optional. A datacenter-IP conclusion still requires measurement from that IP.
 The `agent_browser` CLI adapter is implemented and tested against local fixtures, and its optional
-live read profile is tested against measured sanitized Threads accessibility fixtures; its pinned
-version, verified flags, measured mapping and limits are in
-[agent-browser.md](research/agent-browser.md) and
-[threads-live-mapping.md](research/threads-live-mapping.md). Live writes, reply acknowledgement,
-session portability, host memory and elapsed soak remain #2/#18. Synthetic DOM fixtures do not
-establish that selectors work on the current Threads site, and simulated time does not count as
-elapsed soak/live time. Live posting still requires the named
-issue scope, owner-provided account/session and explicit live-run approval. **(decision)**
+live profile is tested against measured sanitized Threads accessibility fixtures, including
+measured post/reply submission and acknowledgement; its pinned version, verified flags, measured
+mapping and limits are in [agent-browser.md](research/agent-browser.md) and
+[threads-live-mapping.md](research/threads-live-mapping.md). Captcha/rate-limit behavior, session
+portability, account survival, host memory and elapsed soak remain #2/#18. Synthetic DOM fixtures
+do not establish that selectors work on the current Threads site, and simulated time does not count
+as elapsed soak/live time. Live posting still requires the named issue scope, owner-provided
+account/session and explicit live-run approval. **(decision, #25)**
 
 ## 13. Unknowns
 
@@ -608,9 +610,10 @@ Each agent template in `agents/*.yaml` (see [`agents/solo-builder.example.yaml`]
 - `threads`: `profile_dir`, `username` (operator-declared own account, required for several agents), optional `backend` (`stub` by default, `browser`, or `agent_browser`). Browser modes
   require an explicit HTTP(S) origin `base_url` and installed Chromium `executable_path`;
   `agent_browser` also requires an absolute `agent_browser_path` to the pinned CLI. Optional
-  `page_profile` is `fixture` by default or `threads` for the measured live read mapping; `threads`
-  requires `agent_browser`, an HTTPS `threads.com`/`threads.net` origin and `dry_run: true` until
-  #18. Optional `no_sandbox` defaults to false and is an operator host choice, never a model field.
+  `page_profile` is `fixture` by default or `threads` for the measured live read/write mapping;
+  `threads` requires `agent_browser` and an HTTPS `threads.com`/`threads.net` origin. `dry_run`
+  remains the switch: true reads without publishing, false enables measured guarded writes.
+  Optional `no_sandbox` defaults to false and is an operator host choice, never a model field.
 - `telegram`: optional `enabled` (defaults to `false`); `bot_token_env` and `owner_chat_id_env` are required and resolved only when enabled. Optional `digest_hour` is 0..23 UTC and defaults to 18. The canonical example keeps this optional integration disabled for local operation without a bot.
 
 Secrets live only in environment variables named by `*_env`, never in a template, catalog, log

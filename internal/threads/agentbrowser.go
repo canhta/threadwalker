@@ -147,6 +147,11 @@ type agentBrowserDriver struct {
 	profile  string
 	once     sync.Once
 	closeErr error
+
+	// Live write acknowledgement state, set immediately before the submit click.
+	pendingText  string
+	pendingOwn   string
+	pendingKnown map[string]bool
 }
 
 var _ transport = (*agentBrowserDriver)(nil)
@@ -186,10 +191,10 @@ func (d *agentBrowserDriver) page(ctx context.Context, kind string) (Page, error
 }
 
 // threadsPage uses the full compact accessibility tree, not an interactive-only
-// snapshot, so post bodies are present. Live writes are refused before a click.
+// snapshot, so post bodies are present.
 func (d *agentBrowserDriver) threadsPage(ctx context.Context, kind string) (Page, error) {
 	if kind == "compose" {
-		return Page{}, ErrLiveWriteUnqualified
+		return d.threadsComposePage(ctx)
 	}
 	for {
 		snapshot, err := d.cli.Snapshot(ctx)
@@ -213,12 +218,181 @@ func (d *agentBrowserDriver) threadsPage(ctx context.Context, kind string) (Page
 	}
 }
 
+// threadsComposePage opens the measured New thread dialog from the live feed or
+// profile page, then returns the recognized composer form. The dialog is opened
+// only after the guard has already reserved and audited the write intent.
+func (d *agentBrowserDriver) threadsComposePage(ctx context.Context) (Page, error) {
+	opened := false
+	for {
+		snapshot, err := d.cli.Snapshot(ctx)
+		if err != nil {
+			return Page{}, err
+		}
+		root, err := d.threadsRoot(snapshot)
+		if err != nil {
+			return Page{}, err
+		}
+		if form, ok := threadsComposer(root, snapshot.Origin, d.base); ok {
+			return Page{Kind: "compose", Form: &form}, nil
+		}
+		if !opened {
+			ref, ok := threadsButtonRef(root, "New thread")
+			if !ok {
+				return Page{}, ErrUnknownPage
+			}
+			if err = d.cli.Click(ctx, ref); err != nil {
+				return Page{}, err
+			}
+			opened = true
+		}
+		if err = d.sleep(ctx, 150*time.Millisecond); err != nil {
+			return Page{}, err
+		}
+	}
+}
+
+// threadsRoot parses and classifies one live snapshot without guessing. A page
+// that is neither authenticated, logged out nor a captcha remains unknown to the
+// caller.
+func (d *agentBrowserDriver) threadsRoot(snapshot agentbrowser.Snapshot) (*axNode, error) {
+	u, err := url.Parse(snapshot.Origin)
+	if err != nil || !sameOrigin(d.base, u) {
+		return nil, ErrMalformedPage
+	}
+	root, err := parseAXTree(snapshot.Text)
+	if err != nil {
+		return nil, ErrMalformedPage
+	}
+	if threadsCaptcha(root) {
+		return nil, ErrCaptcha
+	}
+	if !threadsAuthenticated(root) && threadsLoggedOut(root) {
+		return nil, ErrLoggedOut
+	}
+	return root, nil
+}
+
+func threadsButtonRef(root *axNode, name string) (string, bool) {
+	var refs []string
+	root.walk(func(n *axNode) bool {
+		if n.role == "button" && strings.EqualFold(n.name, name) && validAgentBrowserRef(n.ref) {
+			refs = append(refs, n.ref)
+		}
+		return true
+	})
+	if len(refs) != 1 {
+		return "", false
+	}
+	return refs[0], true
+}
+
+// threadsSubmitLive fills the recognized composer once, re-reads the same
+// container for its submit control, records the pre-click page state, clicks
+// once, and arms acknowledgement polling. It never retries a click.
+func (d *agentBrowserDriver) threadsSubmitLive(ctx context.Context, text string) (bool, error) {
+	refuse := func(err error) (bool, error) {
+		return false, errors.Join(ErrWriteRefused, err)
+	}
+	if strings.TrimSpace(text) == "" || len([]rune(text)) > 500 {
+		return refuse(ErrMalformedPage)
+	}
+	snapshot, err := d.cli.Snapshot(ctx)
+	if err != nil {
+		return refuse(err)
+	}
+	root, err := d.threadsRoot(snapshot)
+	if err != nil {
+		return refuse(err)
+	}
+	container, ok := threadsComposerContainer(root)
+	if !ok {
+		return refuse(ErrUnknownPage)
+	}
+	textbox, ok := threadsComposerTextbox(container)
+	if !ok || !validAgentBrowserRef(textbox.ref) {
+		return refuse(ErrMalformedPage)
+	}
+	if err = d.cli.Fill(ctx, textbox.ref, text); err != nil {
+		return refuse(err)
+	}
+	var submit *axNode
+	for attempt := 0; ; attempt++ {
+		snapshot, err = d.cli.Snapshot(ctx)
+		if err != nil {
+			return refuse(err)
+		}
+		root, err = d.threadsRoot(snapshot)
+		if err != nil {
+			return refuse(err)
+		}
+		textbox, submit, ok = threadsComposerControls(root)
+		if ok && textbox != nil && validAgentBrowserRef(textbox.ref) && validAgentBrowserRef(submit.ref) {
+			break
+		}
+		if attempt >= 9 {
+			return refuse(ErrMalformedPage)
+		}
+		if err = d.sleep(ctx, 150*time.Millisecond); err != nil {
+			return refuse(err)
+		}
+	}
+	d.pendingText = text
+	d.pendingOwn = threadsOwnUsername(root)
+	d.pendingKnown = map[string]bool{}
+	root.walk(func(n *axNode) bool {
+		if n.role == "generic" {
+			if raw, _, ok := threadsPostBlockPermalink(n, d.base); ok {
+				d.pendingKnown[raw] = true
+			}
+		}
+		return true
+	})
+	if err = d.cli.Click(ctx, submit.ref); err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+// threadsAcknowledgement polls the measured acknowledgement shapes after one
+// click. A missing acknowledgement is returned as the caller's deadline error,
+// which the backend records as an unknown outcome and never retries.
+func (d *agentBrowserDriver) threadsAcknowledgement(ctx context.Context) (Page, error) {
+	for {
+		if err := ctx.Err(); err != nil {
+			return Page{}, err
+		}
+		snapshot, err := d.cli.Snapshot(ctx)
+		if err != nil {
+			if ctx.Err() != nil {
+				return Page{}, ctx.Err()
+			}
+			return Page{}, err
+		}
+		root, err := d.threadsRoot(snapshot)
+		if err != nil {
+			if errors.Is(err, ErrLoggedOut) || errors.Is(err, ErrCaptcha) || errors.Is(err, ErrMalformedPage) {
+				return Page{}, err
+			}
+			if err = d.sleep(ctx, 150*time.Millisecond); err != nil {
+				return Page{}, err
+			}
+			continue
+		}
+		if u, ok := threadsAckURL(root, d.base, d.pendingOwn, d.pendingText, d.pendingKnown); ok {
+			return Page{Kind: "submitted", ThreadURL: u}, nil
+		}
+		if err = d.sleep(ctx, 150*time.Millisecond); err != nil {
+			return Page{}, err
+		}
+	}
+}
+
 // submit uses the compact accessibility snapshot only for interaction refs. It
 // requires exactly one textbox and one button, so a page cannot redirect the
 // click to an unrelated control.
 func (d *agentBrowserDriver) submit(ctx context.Context, text string) (bool, error) {
 	if d.profile == pageProfileThreads {
-		return false, ErrLiveWriteUnqualified
+		return d.threadsSubmitLive(ctx, text)
 	}
 	snapshot, err := d.cli.Snapshot(ctx)
 	if err != nil {
@@ -242,6 +416,9 @@ func (d *agentBrowserDriver) submit(ctx context.Context, text string) (bool, err
 }
 
 func (d *agentBrowserDriver) acknowledgement(ctx context.Context) (Page, error) {
+	if d.profile == pageProfileThreads {
+		return d.threadsAcknowledgement(ctx)
+	}
 	for {
 		if err := ctx.Err(); err != nil {
 			return Page{}, err

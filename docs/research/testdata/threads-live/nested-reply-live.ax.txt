@@ -1,0 +1,81 @@
+- generic [ref=e596] clickable [onclick]
+  - navigation
+    - link "Threads" [ref=e598, url=https://www.threads.com/]
+      - image "Threads"
+    - link "Home" [ref=e599, url=https://www.threads.com/]
+      - image "Home"
+    - button "New thread" [ref=e600]
+      - image "New thread"
+    - link "Search" [ref=e601, url=https://www.threads.com/search]
+      - image "Search"
+    - link "Messages" [ref=e645, url=https://www.threads.com/messages/]
+      - image "Messages"
+    - link "Notifications" [ref=e603, url=https://www.threads.com/activity]
+      - image "Notifications"
+    - link "Profile" [ref=e604, url=https://www.threads.com/@synthetic_author]
+      - image "Profile"
+    - link "Insights" [ref=e605, url=https://www.threads.com/insights/]
+      - image "Insights"
+  - generic
+    - generic
+      - generic
+        - button "Back" [ref=e607]
+          - image "Back"
+        - generic
+          - link "Column title" [ref=e608, url=https://www.threads.com/@synthetic_author/post/fixtureNestedReply1]
+            - heading "Thread" [level=1, ref=e612]
+          - button "More" [expanded=false, ref=e613]
+            - image "More"
+      - region "Column body" [ref=e606] focusable [tabindex]
+        - generic
+          - generic [ref=e614] clickable [cursor:pointer, onclick]
+            - generic
+              - link "synthetic_author's profile picture" [ref=e643, url=https://www.threads.com/@synthetic_author]
+              - link "synthetic_author" [ref=e636, url=https://www.threads.com/@synthetic_author]
+              - link "5 minutes ago" [ref=e637, url=https://www.threads.com/@synthetic_author/post/fixtureLivePost1]
+              - button "More" [expanded=false, ref=e638]
+              - button "Like" [ref=e624]
+              - button "Replied 2" [ref=e625]
+              - button "Repost" [expanded=false, ref=e626]
+              - button "Share" [ref=e627]
+          - generic [ref=e615] clickable [cursor:pointer, onclick]
+            - generic
+              - link "synthetic_author's profile picture" [ref=e644, url=https://www.threads.com/@synthetic_author]
+              - link "synthetic_author" [ref=e639, url=https://www.threads.com/@synthetic_author]
+              - link "5 minutes ago" [ref=e640, url=https://www.threads.com/@synthetic_author/post/fixtureLiveReply1]
+              - button "More" [expanded=false, ref=e641]
+              - button "Like" [ref=e628]
+              - button "Replied 1" [ref=e629]
+              - button "Repost" [expanded=false, ref=e630]
+              - button "Share" [ref=e631]
+          - generic [ref=e616] clickable [cursor:pointer, onclick]
+            - link "synthetic_author's profile picture" [ref=e642, url=https://www.threads.com/@synthetic_author]
+            - link "synthetic_author" [ref=e632, url=https://www.threads.com/@synthetic_author]
+            - link "a few seconds ago" [ref=e633, url=https://www.threads.com/@synthetic_author/post/fixtureNestedReply1]
+            - button "More" [expanded=false, ref=e634]
+            - StaticText "Synthetic nested reply."
+            - StaticText "3"
+            - StaticText "/"
+            - StaticText "3"
+            - button "Like" [ref=e617]
+            - button "Reply" [ref=e618]
+            - button "Repost" [expanded=false, ref=e619]
+            - button "Share" [ref=e620]
+            - StaticText "No replies yet"
+            - image "synthetic_author's profile picture"
+            - generic
+              - textbox "Empty text field. Type to compose a new post." [ref=e635]: 
+
+            - button "Attach media" [ref=e621]
+            - button "Add a GIF" [ref=e622]
+            - button "Expand composer" [ref=e623]
+      - contentinfo
+        - list
+          - listitem [level=1]
+          - listitem [level=1]
+            - link "Threads Terms" [ref=e609, url=https://help.instagram.com/769983657850450]
+          - listitem [level=1]
+            - link "Privacy Policy" [ref=e610, url=https://help.instagram.com/515230437301944]
+          - listitem [level=1]
+            - link "Cookies Policy" [ref=e611, url=https://help.instagram.com/1896641480634370/]
+  - button "Create" [expanded=false, ref=e597]

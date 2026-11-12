@@ -1,10 +1,12 @@
-# Measured Threads accessibility mapping (#24)
+# Measured Threads accessibility mapping (#24, #25)
 
 Measured on 2026-11-12 from the owner-authorized **authenticated Orca Browser**
 tab (`https://www.threads.com/`, tab title `(4) Home • Threads`) plus a fresh
-agent-browser profile for the logged-out case. This is a **read mapping** for one
-account on one host on one day. It does not qualify live posting, account
-survival, captcha handling, replies or session portability.
+agent-browser profile for the logged-out case. #24 measured reads; #25 measured
+live **posts and replies**, including success acknowledgement, on the owner's
+explicitly authorized throwaway account. This is one account on one host on one
+day. It does not qualify account survival, captcha handling, rate-limit
+behavior, multi-line input or session portability.
 
 No cookie, storage, token, profile export or raw session data was read or
 written. Page content is treated as untrusted data. The fixtures below replace
@@ -22,6 +24,9 @@ orca exec --page <threads-tab> --command "read" --json
 orca goto --page <threads-tab> --url https://www.threads.com/search?q=...
 orca scroll --page <threads-tab> --direction down --amount 1000 --json
 orca keypress --page <threads-tab> --key Escape --json
+# live write measurement (#25)
+orca click --page <threads-tab> --element <ref> --json
+orca fill --page <threads-tab> --element <ref> --value "<neutral text>" --json
 ```
 
 The public logged-out check used the pinned agent-browser binary with a new
@@ -50,8 +55,9 @@ children include:
 `snapshot -i` omits the body; the full compact tree (`snapshot -c -u`) contains
 it. Thread continuation posts by the same author appear as sibling post blocks
 with `N / M` counters. The measured post page did not render external replies
-(only the root and the author's thread parts), so replies are not mapped or
-claimed.
+(only the root and the author's thread parts). A reply permalink page measured in
+#25 did render the parent chain plus the reply; ordinary post pages still did not
+render unrelated reply blocks.
 
 The Insights overview exposed `Views`, `Viewers`, `Net followers` and
 `Interactions`. It did not expose likes/replies/reposts, and the test account had
@@ -59,25 +65,49 @@ no posts. Own per-post metrics are therefore unavailable, not zero.
 
 `New thread` and a post's `Reply N` open a `dialog` with a heading
 (`New thread` / `Reply`), a textbox and a `Post` button. No form action URL is
-exposed and no real submit was performed, so acknowledgement is unmeasured.
+exposed.
+
+### Measured write path (#25)
+
+- **Post compose.** `button "New thread"` opens the dialog. After a fill, the
+  same dialog exposes `button "Post"`. Clicking `Post` closes the dialog and
+  leaves an accessibility `status` toast: `status > generic > image + generic >
+  link "View"` whose same-origin URL is the new `/@<user>/post/<id>`.
+- **Reply compose.** A post page has an inline composer: a textbox inside the
+  post block, and after typing, a `button "Reply"` in the same block. The reply
+  appears as a sibling post block with its own `/post/<id>` permalink nested
+  under the parent. `Reply N` also opens the dialog form with `Post`.
+- **Acknowledgement.** The new own permalink is observed either in the status
+  toast or in a post block that did not exist before the click. For a reply the
+  permalink page shows the parent chain plus the reply.
+- **Failure shape.** An empty `Post` click is a no-op (`page unchanged`). No
+  in-page error toast was observed. Missing acknowledgement within the deadline
+  is `ErrUnknownOutcome` and the click is never repeated.
+- A URL in post text renders as a separate `link` plus a link card; the read
+  mapping keeps the surrounding `StaticText`, not the embedded URL. `fill`
+  collapses `\n` into one line, so multi-line composition was not measured.
 
 Logged-out pages show a login dialog and `Continue with Instagram` instead of the
 authenticated navigation.
 
 ## Mapping decisions
 
-`threads.page_profile: threads` selects the live read profile. It requires
-`backend: agent_browser`, an HTTPS `threads.com`/`threads.net` origin and
-`dry_run: true` until #18 qualifies writes.
+`threads.page_profile: threads` selects the live profile. It requires
+`backend: agent_browser` and an HTTPS `threads.com`/`threads.net` origin. It now
+supports measured reads and writes; `dry_run` remains the template-level switch
+the guard uses to decide whether a reserved action may click.
 
 | Tool | Mapping |
 |---|---|
 | `read_feed` | Navigate `/`; parse post blocks from `Column body`; body from direct `StaticText`, with measured `N / M` counters removed. Media-only posts with no direct text are omitted. |
 | `search` | Navigate `/search?q=...`; same post extraction. |
-| `read_post` | Navigate the supplied same-origin post URL; return the root post plus same-author thread continuation posts. External replies are not claimed. |
+| `read_post` | Navigate the supplied same-origin post URL; return the root post plus same-author thread continuation posts. A reply permalink returns the measured parent chain plus the reply. |
 | `read_own_metrics` | Navigate `/insights/`; return `ErrMetricsUnavailable` because the measured page lacks all four required counters. |
 | `read_own_metrics` with `action_id` | Same; `ErrMetricsUnavailable`. |
-| `post` / `reply` | The composer dialog is recognized structurally, but submission returns `ErrLiveWriteUnqualified` before any fill or click. Non-dry-run live templates are rejected by config. |
+| `post` | Navigate `/`; open `New thread`; fill the dialog textbox; click the one `Post` control; poll for the status toast `View` URL or a new own post block. Return the acknowledged `/post/<id>` URL. |
+| `reply` | Navigate the target post; fill the inline composer textbox; click its one `Reply` control (or the dialog `Post`); poll for the toast/new own reply block. Return the acknowledged `/post/<id>` URL. |
+| Missing acknowledgement | Deadline after the single click is `ErrUnknownOutcome`; the harness retains the intent and stops the wake. No retry. |
+| Compose not found | No dialog and no unambiguous `New thread` button, or no single textbox/submit in the composer: `ErrUnknownPage` / `ErrMalformedPage` before any fill/click. |
 | Logged out | Authenticated navigation is absent and a login dialog/button is present: `ErrLoggedOut`. |
 | Unknown | No authenticated navigation, no known region and no recognized dialog: `ErrUnknownPage`. |
 | Captcha | A heading/dialog containing `captcha`, `verify you are human` or `security check`: `ErrCaptcha`. This is a defensive heuristic, not measured against a real challenge. |
@@ -98,7 +128,19 @@ no posts exist, bounded by the operation deadline.
 
 Parser tests cover feed, search, post context, insights unavailability,
 compose/reply recognition, logged-out, unknown, malformed indentation, bounds and
-same-origin rejection.
+same-origin rejection. Write tests cover post success via the toast, reply
+success via the toast, missing acknowledgement after one click, compose not
+found, logged-out and blank text failing before any fill/click, and the composer
+control that skips the post's metric `Reply` button.
+
+Live write evidence (#25): 5 posts and 3 replies were published on the
+owner-authorized throwaway account; every text-only permalink was re-read and
+matched. Post click commands took 0.48-1.48s and the `View` acknowledgement was
+observed about 3s after the click. Reply clicks took 1.07-1.59s; the reply
+permalink or `View` toast appeared about 4-5s after the click. The 470-character
+post, emoji/Vietnamese text, duplicate text and a URL post all acknowledged.
+Empty text was a no-op. No captcha or rate-limit banner appeared. Details are in
+[`measurement.txt`](testdata/threads-live/measurement.txt).
 
 The opt-in real-browser check loads public Threads with a fresh profile and
 asserts that the live profile fails closed as logged out and refuses a write:
@@ -120,9 +162,11 @@ shared eval suite passed 30/30 offline at revision `8c92054`, seed 8
 
 ## Not measured
 
-External replies, reply threading beyond the author's own thread parts, real
-post/reply submission and acknowledgement, captcha/challenge flows, login
-persistence, session portability to another host or VPS, account survival,
-datacenter-IP behavior, headed operation, production memory and elapsed soak.
-The Orca tab is an authorized measurement surface, not a portable browser
-profile for a VPS or unattended runtime. Those remain #2/#18/#21/#9.
+Captcha/challenge flows, explicit in-page error/rate-limit banners, login
+persistence, multi-line composition through `fill`, session portability to
+another host or VPS, account survival, datacenter-IP behavior, headed operation,
+production memory and elapsed soak. Embedded URLs are present in post text but
+the read mapping omits the link node's text. Duplicate text was accepted once;
+no long-run duplicate policy is claimed. The Orca tab is an authorized
+measurement surface, not a portable browser profile for a VPS or unattended
+runtime. Those remain #2/#18/#21/#9.

@@ -38,9 +38,10 @@ type ActionMetricsReader interface {
 
 var ErrMetricsUnavailable = errors.New("action metrics unavailable")
 
-// ErrLiveWriteUnqualified means the measured live Threads profile can read but
-// has no measured submit acknowledgement. It is refused before any fill/click.
-var ErrLiveWriteUnqualified = errors.New("live Threads write unqualified")
+// ErrWriteRefused means a write stopped before the submit click. It is safe to
+// report as a normal failure because no effect was attempted; it must not be
+// promoted to an unknown outcome.
+var ErrWriteRefused = errors.New("write refused before submit")
 
 type Options struct {
 	AgentID        string
@@ -88,7 +89,7 @@ func operationError(op string, err error) error {
 		return nil
 	}
 	cause := errors.New("transport_failure")
-	for _, sentinel := range []error{ErrUnknownOutcome, ErrLoggedOut, ErrCaptcha, ErrUnknownPage, ErrMalformedPage, ErrLiveWriteUnqualified, ErrMetricsUnavailable, context.Canceled, context.DeadlineExceeded} {
+	for _, sentinel := range []error{ErrUnknownOutcome, ErrLoggedOut, ErrCaptcha, ErrUnknownPage, ErrMalformedPage, ErrWriteRefused, ErrMetricsUnavailable, context.Canceled, context.DeadlineExceeded} {
 		if errors.Is(err, sentinel) {
 			cause = sentinel
 			break
@@ -256,7 +257,7 @@ func (b *Browser) write(ctx context.Context, op, path, kind, text string) (threa
 	}
 	attempted, err := b.driver.submit(call, text)
 	if err != nil {
-		if errors.Is(err, ErrLiveWriteUnqualified) {
+		if errors.Is(err, ErrWriteRefused) {
 			return "", err
 		}
 		return "", errors.Join(ErrUnknownOutcome, err)

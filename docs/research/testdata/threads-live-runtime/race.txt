@@ -1,2 +1,4 @@
-ok  	github.com/canhta/threadwalker/internal/threads	1.437s
-ok  	github.com/canhta/threadwalker/internal/agentbrowser	51.683s
+ok  	github.com/canhta/threadwalker/internal/threads	1.652s
+ok  	github.com/canhta/threadwalker/internal/agentbrowser	52.745s
+ok  	github.com/canhta/threadwalker/internal/guard	8.720s
+ok  	github.com/canhta/threadwalker/internal/tools	11.462s

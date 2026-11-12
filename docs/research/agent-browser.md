@@ -110,11 +110,11 @@ Rules enforced by the parser:
 
 This is deliberately text-first: it demonstrates that feed reads return the
 noninteractive post body, not just accessibility refs. The optional live
-`threads` profile now parses the measured accessibility tree by roles, nesting,
-link URLs and visible text; see
-[threads-live-mapping.md](threads-live-mapping.md). It is a read mapping only:
-live post/reply submission is refused before any click, and replies, captcha,
-session portability and acknowledgement remain unmeasured in #2/#18.
+`threads` profile parses the measured accessibility tree by roles, nesting, link
+URLs and visible text, and now includes measured post/reply submission and
+acknowledgement; see [threads-live-mapping.md](threads-live-mapping.md).
+Captcha, session portability, rate-limit/error banners and long-run account
+survival remain unmeasured in #2/#18.
 
 ## Lifecycle
 
@@ -166,13 +166,13 @@ blocked the first full run was fixed separately in #23 (commit `833af26`).
 
 ## Not measured
 
-Live Threads **read** structure is mapped in
+Live Threads reads and writes are mapped in
 [threads-live-mapping.md](threads-live-mapping.md) from one authenticated
-measurement. Live write submission/acknowledgement, external replies,
-login/session persistence and portability, account survival, challenge
-avoidance, headed operation, sandbox-enabled Linux behavior, production memory
-(Chrome + daemon + harness PSS/RSS), launch peaks and elapsed soak remain
-unmeasured. The earlier chromedp memory samples do not predict this stack and do not
-prove a 3,659 MiB host can run live Threads reliably. Those remain #2, #18, #21
-and #9. This change does not post, reply, access Threads or Telegram, or change
-the VPS.
+measurement and an owner-authorized throwaway-account write run. Captcha and
+explicit rate-limit/error banners, multi-line fill, login/session persistence and
+portability, account survival, headed operation, sandbox-enabled Linux behavior,
+production memory (Chrome + daemon + harness PSS/RSS), launch peaks and elapsed
+soak remain unmeasured. The earlier chromedp memory samples do not predict this
+stack and do not prove a 3,659 MiB host can run live Threads reliably. Those
+remain #2, #18, #21 and #9. This adapter change does not access Threads or
+Telegram itself or change the VPS.

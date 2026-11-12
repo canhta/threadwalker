@@ -41,3 +41,57 @@ Validation against the saved full measured snapshots (content not logged):
 Sanitized fixtures: docs/research/testdata/threads-live/*.ax.txt
 No cookies, storage, tokens, profile export or raw personal content were read
 or written. All fixture usernames, text, IDs and media alt text are synthetic.
+
+Live write measurement (2026-11-12, owner-authorized throwaway account)
+======================================================================
+
+Commands (write): orca click --element <ref>, orca fill --element <ref>
+--value <text>, orca snapshot --compact --urls --json. Writes were paced; text
+was neutral "test" plus an ISO timestamp. No captcha or rate-limit banner was
+seen.
+
+Compose:
+  - nav button "New thread" opened a dialog with heading "New thread",
+    textbox "Empty text field. Type to compose a new post.", Post button.
+  - clicking "Post" with empty text left the page unchanged (no submission).
+  - after a fill, clicking "Post" closed the dialog and left an accessibility
+    status toast: status > generic > image + generic > link "View" whose URL is
+    the new /@<user>/post/<id>.
+
+Posts published (5, including one intentional duplicate):
+  1. text only, ack View URL observed ~3s after the click.
+  2. emoji + Vietnamese diacritics, ack View URL observed ~3s after the click.
+  3. 470-character long text, ack View URL observed ~3s after the click.
+  4. text containing https://example.com: the URL rendered as a separate link
+     (with a link-card preview); ack View URL still observed ~3s after click.
+     Read mapping keeps the surrounding StaticText but not the embedded link.
+  5. the exact text from post 2 again: Threads accepted the duplicate and
+     returned a new URL; no duplicate rejection was observed.
+  Click command durations: 0.48s, 0.79s, 1.16s, 1.48s, plus 1.31s for the
+  first measured post.
+
+Replies published (3):
+  - to the account's own post: inline composer textbox plus button "Reply"
+    after typing; the reply appeared as a sibling post block under the parent
+    with its own /post/<id> permalink. Click command 1.07s.
+  - to another author's public post: reply count changed 49 -> 50; the reply
+    permalink page showed the parent block plus the reply block. Click 1.59s;
+    new reply URL observed ~5s after the click.
+  - nested reply to the account's own reply: status toast with View URL to the
+    nested reply; reply permalink page showed root -> reply -> nested reply.
+    Click 1.31s; View URL observed ~4s after the click.
+  - clicking a post's "Reply N" metric opened a dialog with heading "Reply",
+    a textbox and a Post button (reply-dialog fixture).
+
+Multi-line note: fill collapsed "\n" characters into one line. Emoji and
+Vietnamese diacritics survived. A multi-line composer path was not measured.
+
+Re-read: every text-only post/reply permalink was opened and its StaticText
+matched the submitted text. URL posts expose the URL as a separate link node,
+so only the surrounding text is present in the parsed body.
+
+Unknown/failure: no post or reply produced an ambiguous on-screen error. An
+empty submit is a no-op. The adapter therefore records a missing acknowledgement
+within the deadline as unknown and never retries the click. Logged-out remains
+the measured login dialog.
+

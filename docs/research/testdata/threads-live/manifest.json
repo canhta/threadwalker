@@ -2,13 +2,17 @@
   "contract": "threads-accessibility-v1",
   "source": "https://www.threads.com/ measured in the owner-authorized authenticated Orca Browser tab",
   "measured_at": "2026-11-12",
-  "auth_state": "authenticated for feed/search/post/insights/compose/reply; logged-out for logged-out fixture",
-  "replacements": "usernames, post text, post IDs, media alt text and profile data replaced with synthetic content; roles, nesting, control labels and URL patterns preserved",
-  "limits": "one account, one host, one day; external replies, captcha, submit acknowledgement and session portability were not measured",
+  "auth_state": "authenticated for feed/search/post/insights/compose/reply/post-submitted/reply-toast and live write pages; logged-out for logged-out fixture",
+  "replacements": "usernames, post text, post IDs, media alt text, tracking URLs and profile data replaced with synthetic content; roles, nesting, control labels and URL patterns preserved",
+  "limits": "one throwaway account, one host, one day; captcha/challenge, account survival, session portability and rate-limit banners were not measured",
   "fixtures": [
     {
       "file": "compose.ax.txt",
       "sha256": "29fbb1db4fe7bcf7569ca78ea535e4de932e1dab76d7161787d401d0ff3f8753"
+    },
+    {
+      "file": "external-reply-live.ax.txt",
+      "sha256": "732da974d00fe3be7c512588bad0866e6841a4eec39e82bc42854c64cda62bdb"
     },
     {
       "file": "feed.ax.txt",
@@ -23,8 +27,40 @@
       "sha256": "b6cf50ce672ec10f165153a1f203bc21cab3c7f544ed143658d1e7afbe04b4d5"
     },
     {
+      "file": "nested-reply-live.ax.txt",
+      "sha256": "780f192829b815fd5b674da568ec39d9cc1d68ac9b35f425e8450d7317603fd2"
+    },
+    {
+      "file": "post-compose.ax.txt",
+      "sha256": "b4719c90040452173ca9ec4f35802b24f5fec47c87a1b5be7870d61051b9252c"
+    },
+    {
+      "file": "post-live.ax.txt",
+      "sha256": "01538b1e800c542554ed91a24ee76b0ec0b9364a79b84e20df6c214c0a9ed5c9"
+    },
+    {
+      "file": "post-submitted.ax.txt",
+      "sha256": "9224211897a43c701e5a2a3114dd3ae6f4971a09c37a3a643f02eb5b9162ec9d"
+    },
+    {
       "file": "post.ax.txt",
       "sha256": "b33094264339f4ccb7e86810a1e89a7418ff9ed28fe79476c3b38a4a9817ff2b"
+    },
+    {
+      "file": "reply-dialog.ax.txt",
+      "sha256": "2656478b07e6a192e5a827d52b73258b170da85a990d22c7311b00f7068cd196"
+    },
+    {
+      "file": "reply-live-filled.ax.txt",
+      "sha256": "c2354b2ab8bf1025f0a4cf56558f4a17659cf8e15d94616679dbc95fa09b1d54"
+    },
+    {
+      "file": "reply-live.ax.txt",
+      "sha256": "88cb9d564eac584b6c3f7e73d54b6cb20419d5f7b984b8fede5cc953946fec91"
+    },
+    {
+      "file": "reply-toast.ax.txt",
+      "sha256": "c424ec1aae2e86eabf661fe66f1e96c1c70f9b42eb2b385701e8ebcff0dca708"
     },
     {
       "file": "reply.ax.txt",

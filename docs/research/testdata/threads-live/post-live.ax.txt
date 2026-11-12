@@ -1,0 +1,60 @@
+- generic [ref=e148] clickable [onclick]
+  - navigation
+    - link "Threads" [ref=e150, url=https://www.threads.com/]
+      - image "Threads"
+    - link "Home" [ref=e151, url=https://www.threads.com/]
+      - image "Home"
+    - button "New thread" [ref=e152]
+      - image "New thread"
+    - link "Search" [ref=e153, url=https://www.threads.com/search]
+      - image "Search"
+    - link "Messages" [ref=e181, url=https://www.threads.com/messages/]
+      - image "Messages"
+    - link "Notifications" [ref=e155, url=https://www.threads.com/activity]
+      - image "Notifications"
+    - link "Profile" [ref=e156, url=https://www.threads.com/@synthetic_author]
+      - image "Profile"
+    - link "Insights" [ref=e157, url=https://www.threads.com/insights/]
+      - image "Insights"
+  - generic
+    - generic
+      - generic
+        - button "Back" [ref=e159]
+          - image "Back"
+        - generic
+          - link "Column title" [ref=e160, url=https://www.threads.com/@synthetic_author/post/fixtureLivePost1]
+            - heading "Thread" [level=1, ref=e164]
+          - generic
+            - button "Notification settings" [ref=e165]
+            - button "More" [expanded=false, ref=e166]
+      - region "Column body" [ref=e158] focusable [tabindex]
+        - generic
+          - generic [ref=e167] clickable [cursor:pointer, onclick]
+            - link "synthetic_author's profile picture" [ref=e180, url=https://www.threads.com/@synthetic_author]
+            - link "synthetic_author" [ref=e176, url=https://www.threads.com/@synthetic_author]
+            - link "a few seconds ago" [ref=e177, url=https://www.threads.com/@synthetic_author/post/fixtureLivePost1]
+            - button "More" [expanded=false, ref=e178]
+            - StaticText "Synthetic live post one."
+            - button "Like" [ref=e168]
+            - button "Reply" [ref=e169]
+            - button "Repost" [expanded=false, ref=e170]
+            - button "Share" [ref=e171]
+            - link "View insights" [ref=e172, url=https://www.threads.com/insights/post/fixtureLivePost1]
+            - StaticText "No replies yet"
+            - image "synthetic_author's profile picture"
+            - generic
+              - textbox "Empty text field. Type to compose a new post." [ref=e179]: 
+
+            - button "Attach media" [ref=e173]
+            - button "Add a GIF" [ref=e174]
+            - button "Expand composer" [ref=e175]
+      - contentinfo
+        - list
+          - listitem [level=1]
+          - listitem [level=1]
+            - link "Threads Terms" [ref=e161, url=https://help.instagram.com/769983657850450]
+          - listitem [level=1]
+            - link "Privacy Policy" [ref=e162, url=https://help.instagram.com/515230437301944]
+          - listitem [level=1]
+            - link "Cookies Policy" [ref=e163, url=https://help.instagram.com/1896641480634370/]
+  - button "Create" [expanded=false, ref=e149]

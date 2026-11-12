@@ -1,0 +1,94 @@
+- generic [ref=e466] clickable [onclick]
+  - navigation
+    - link "Threads" [ref=e468, url=https://www.threads.com/]
+      - image "Threads"
+    - link "Home" [ref=e469, url=https://www.threads.com/]
+      - image "Home"
+    - button "New thread" [ref=e470]
+      - image "New thread"
+    - link "Search" [ref=e471, url=https://www.threads.com/search]
+      - image "Search"
+    - link "Messages" [ref=e517, url=https://www.threads.com/messages/]
+      - image "Messages"
+    - link "Notifications" [ref=e473, url=https://www.threads.com/activity]
+      - image "Notifications"
+    - link "Profile" [ref=e474, url=https://www.threads.com/@synthetic_author]
+      - image "Profile"
+    - link "Insights" [ref=e475, url=https://www.threads.com/insights/]
+      - image "Insights"
+  - generic
+    - generic
+      - generic
+        - button "Back" [ref=e477]
+          - image "Back"
+        - generic
+          - link "Column title" [ref=e478, url=https://www.threads.com/@synthetic_author/post/fixtureExternalReply1]
+            - heading "Thread" [level=1, ref=e482]
+              - StaticText "Thread"
+          - button "More" [expanded=false, ref=e483]
+            - image "More"
+      - region "Column body" [ref=e476] focusable [tabindex]
+        - generic
+          - generic [ref=e484] clickable [cursor:pointer, onclick]
+            - generic
+              - link "synthetic_creator's profile picture" [ref=e505, url=https://www.threads.com/@synthetic_creator]
+                - image "synthetic_creator's profile picture"
+              - link "synthetic_creator" [ref=e501, url=https://www.threads.com/@synthetic_creator]
+                - StaticText "synthetic_creator"
+              - image "Verified"
+              - link "a day ago" [ref=e502, url=https://www.threads.com/@synthetic_creator/post/fixtureExternalPost1]
+                - time
+              - button "More" [expanded=false, ref=e503]
+                - image "More"
+              - StaticText "Synthetic creator post body."
+              - StaticText "Synthetic creator post paragraph two."
+              - StaticText "Synthetic creator post paragraph three."
+              - generic
+                - generic
+                  - button "Synthetic media" [ref=e511]
+                  - button "Combine media into panorama" [ref=e506]
+                - generic
+                  - button "Synthetic media" [ref=e512]
+                  - button "Combine media into panorama" [ref=e507]
+                - generic
+                  - button "Synthetic media" [ref=e513]
+                  - button "Combine media into panorama" [ref=e508]
+                - generic
+                  - button "Synthetic media" [ref=e514]
+                  - button "Combine media into panorama" [ref=e509]
+                - generic
+                  - button "Synthetic media" [ref=e515]
+                  - button "Combine media into panorama" [ref=e510]
+                - button "Synthetic media" [ref=e516]
+              - button "Like 2.6K" [ref=e493]
+              - button "Reply 50" [ref=e494]
+              - button "Repost 300" [expanded=false, ref=e495]
+              - button "Share 291" [ref=e496]
+          - generic [ref=e485] clickable [cursor:pointer, onclick]
+            - link "synthetic_author's profile picture" [ref=e504, url=https://www.threads.com/@synthetic_author]
+            - link "synthetic_author" [ref=e497, url=https://www.threads.com/@synthetic_author]
+            - link "a few seconds ago" [ref=e498, url=https://www.threads.com/@synthetic_author/post/fixtureExternalReply1]
+            - button "More" [expanded=false, ref=e499]
+            - StaticText "Synthetic external reply."
+            - button "Like" [ref=e486]
+            - button "Reply" [ref=e487]
+            - button "Repost" [expanded=false, ref=e488]
+            - button "Share" [ref=e489]
+            - StaticText "No replies yet"
+            - image "synthetic_author's profile picture"
+            - generic
+              - textbox "Empty text field. Type to compose a new post." [ref=e500]: 
+
+            - button "Attach media" [ref=e490]
+            - button "Add a GIF" [ref=e491]
+            - button "Expand composer" [ref=e492]
+      - contentinfo
+        - list
+          - listitem [level=1]
+          - listitem [level=1]
+            - link "Threads Terms" [ref=e479, url=https://help.instagram.com/769983657850450]
+          - listitem [level=1]
+            - link "Privacy Policy" [ref=e480, url=https://help.instagram.com/515230437301944]
+          - listitem [level=1]
+            - link "Cookies Policy" [ref=e481, url=https://help.instagram.com/1896641480634370/]
+  - button "Create" [expanded=false, ref=e467]

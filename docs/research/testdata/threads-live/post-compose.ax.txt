@@ -1,0 +1,48 @@
+- generic
+  - navigation
+    - link "Threads" [ref=e762, url=https://www.threads.com/]
+      - image "Threads"
+    - link "Home" [ref=e763, url=https://www.threads.com/]
+      - image "Home"
+    - button "New thread" [ref=e764]
+      - image "New thread"
+    - link "Search" [ref=e765, url=https://www.threads.com/search]
+      - image "Search"
+    - link "Messages" [ref=e776, url=https://www.threads.com/messages/]
+      - image "Messages"
+    - link "Notifications" [ref=e767, url=https://www.threads.com/activity]
+      - image "Notifications"
+    - link "Profile" [ref=e768, url=https://www.threads.com/@synthetic_author]
+      - image "Profile"
+    - link "Insights" [ref=e769, url=https://www.threads.com/insights/]
+      - image "Insights"
+  - button "Create" [expanded=false, ref=e761]
+    - image "Create"
+  - generic
+    - generic
+      - dialog
+        - generic
+          - button "Cancel" [ref=e882]
+          - heading "New thread" [level=1, ref=e883]
+          - button "Drafts" [ref=e885]
+          - button "More" [expanded=false, ref=e884]
+          - image "synthetic_author's profile picture"
+          - StaticText "synthetic_author"
+          - image
+          - searchbox "Community or topic" [ref=e900]
+          - generic
+            - textbox "Empty text field. Type to compose a new post." [ref=e898]: 
+
+          - button "Attach media" [ref=e886]
+          - button "Add a GIF" [ref=e887]
+          - button "Choose a like effect" [ref=e888]
+          - button "Add an emoji" [expanded=false, ref=e889]
+          - button "Add a sticker" [expanded=false, ref=e890]
+          - button "Add a poll" [ref=e891]
+          - button "Quote post" [ref=e892]
+          - button "Attach text" [ref=e893]
+          - button "Add a location" [ref=e894]
+          - button "Add music" [ref=e895]
+          - button "Add to thread" [disabled, ref=e896]
+          - button "Post" [ref=e899]
+          - button "Post Options" [expanded=false, ref=e897]

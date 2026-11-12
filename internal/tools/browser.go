@@ -145,8 +145,8 @@ func (d *Dispatcher) browserResult(ctx context.Context, operation string, starte
 			reason = "malformed_page"
 		case errors.Is(err, threads.ErrMetricsUnavailable):
 			reason = "metrics_unavailable"
-		case errors.Is(err, threads.ErrLiveWriteUnqualified):
-			reason = "live_write_unqualified"
+		case errors.Is(err, threads.ErrWriteRefused):
+			reason = "write_refused"
 		case errors.Is(err, context.Canceled):
 			reason = "cancelled"
 		case errors.Is(err, context.DeadlineExceeded):

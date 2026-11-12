@@ -1,0 +1,62 @@
+- generic [ref=e539] clickable [onclick]
+  - navigation
+    - link "Threads" [ref=e541, url=https://www.threads.com/]
+      - image "Threads"
+    - link "Home" [ref=e542, url=https://www.threads.com/]
+      - image "Home"
+    - button "New thread" [ref=e543]
+      - image "New thread"
+    - link "Search" [ref=e544, url=https://www.threads.com/search]
+      - image "Search"
+    - link "Messages" [ref=e579, url=https://www.threads.com/messages/]
+      - image "Messages"
+    - link "Notifications" [ref=e546, url=https://www.threads.com/activity]
+      - image "Notifications"
+    - link "Profile" [ref=e547, url=https://www.threads.com/@synthetic_author]
+      - image "Profile"
+    - link "Insights" [ref=e548, url=https://www.threads.com/insights/]
+      - image "Insights"
+  - generic
+    - generic
+      - generic
+        - button "Back" [ref=e550]
+          - image "Back"
+        - generic
+          - link "Column title" [ref=e551, url=https://www.threads.com/@synthetic_author/post/fixtureLiveReply1]
+            - heading "Thread" [level=1, ref=e555]
+          - button "More" [expanded=false, ref=e556]
+            - image "More"
+      - region "Column body" [ref=e549] focusable [tabindex]
+        - generic
+          - generic [ref=e557] clickable [cursor:pointer, onclick]
+            - generic
+              - link "synthetic_author's profile picture" [ref=e578, url=https://www.threads.com/@synthetic_author]
+              - link "synthetic_author" [ref=e574, url=https://www.threads.com/@synthetic_author]
+              - link "5 minutes ago" [ref=e575, url=https://www.threads.com/@synthetic_author/post/fixtureLivePost1]
+              - button "More" [expanded=false, ref=e576]
+              - button "Like" [ref=e566]
+              - button "Replied 1" [ref=e567]
+              - button "Repost" [expanded=false, ref=e568]
+              - button "Share" [ref=e569]
+          - generic [ref=e558] clickable [cursor:pointer, onclick]
+            - link "synthetic_author's profile picture" [ref=e577, url=https://www.threads.com/@synthetic_author]
+            - link "synthetic_author" [ref=e570, url=https://www.threads.com/@synthetic_author]
+            - link "4 minutes ago" [ref=e571, url=https://www.threads.com/@synthetic_author/post/fixtureLiveReply1]
+            - button "More" [expanded=false, ref=e572]
+            - button "Like" [ref=e559]
+            - button "Reply" [ref=e560]
+            - button "Repost" [expanded=false, ref=e561]
+            - button "Share" [ref=e562]
+            - textbox "Empty text field. Type to compose a new post." [ref=e573]: Synthetic nested reply.
+            - button "Expand composer" [ref=e565]
+            - button "Reply" [ref=e580]
+      - contentinfo
+        - list
+          - listitem [level=1]
+          - listitem [level=1]
+            - link "Threads Terms" [ref=e552, url=https://help.instagram.com/769983657850450]
+          - listitem [level=1]
+            - link "Privacy Policy" [ref=e553, url=https://help.instagram.com/515230437301944]
+          - listitem [level=1]
+            - link "Cookies Policy" [ref=e554, url=https://help.instagram.com/1896641480634370/]
+  - button "Create" [expanded=false, ref=e540]
