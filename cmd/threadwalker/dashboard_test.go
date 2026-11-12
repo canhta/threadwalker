@@ -19,8 +19,8 @@ func TestDashboardCLIRejectsNonLoopbackAndNeverResolvesSecrets(t *testing.T) {
 	st.Close()
 	for _, args := range [][]string{{"-listen", "0.0.0.0:8080"}, {"-listen", "example.invalid:8080"}, {"-listen", "127.0.0.1:0", "-unknown"}, {"unexpected"}, {"-listen", "[::]:8080"}, {"-listen", "127.0.0.1:http"}, {"-listen", "127.0.0.1:-1"}} {
 		var out, errs bytes.Buffer
-		if code := run(context.Background(), append([]string{"dashboard"}, args...), func(string) string { t.Fatal("dashboard resolved environment"); return "" }, &out, &errs); code != 1 {
-			t.Fatalf("args %v: code %d", args, code)
+		if code := run(context.Background(), append([]string{"dashboard"}, args...), func(string) string { t.Fatal("dashboard resolved environment"); return "" }, &out, &errs); code != exitUsage {
+			t.Fatalf("args %v: code %d, want %d", args, code, exitUsage)
 		}
 		if strings.Contains(out.String()+errs.String(), "example.invalid") {
 			t.Fatal("reflected listen address")
@@ -65,16 +65,19 @@ func TestDashboardCLIStartsFromPublicConfigWithoutCredentials(t *testing.T) {
 }
 
 func TestDashboardCLIFailuresDoNotExposeConfigurationOrPaths(t *testing.T) {
-	for _, args := range [][]string{
-		{"-llms", "SYSTEM-PROMPT-private-path"},
-		{"-agents", "SYSTEM-PROMPT-private-path"},
-		{"-agents", filepath.Join("..", "..", "agents"), "-db", "SYSTEM-PROMPT-private-path"},
-		{"-log-level", "SYSTEM-PROMPT-private-path"},
-		{"-log-format", "SYSTEM-PROMPT-private-path"},
+	for _, tc := range []struct {
+		args []string
+		want int
+	}{
+		{[]string{"-llms", "SYSTEM-PROMPT-private-path"}, exitFailure},
+		{[]string{"-agents", "SYSTEM-PROMPT-private-path"}, exitFailure},
+		{[]string{"-agents", filepath.Join("..", "..", "agents"), "-db", "SYSTEM-PROMPT-private-path"}, exitFailure},
+		{[]string{"-log-level", "SYSTEM-PROMPT-private-path"}, exitUsage},
+		{[]string{"-log-format", "SYSTEM-PROMPT-private-path"}, exitUsage},
 	} {
 		var out, errs bytes.Buffer
-		if code := run(context.Background(), append([]string{"dashboard"}, args...), func(string) string { t.Fatal("resolved environment"); return "" }, &out, &errs); code != 1 {
-			t.Fatalf("invalid config returned %d", code)
+		if code := run(context.Background(), append([]string{"dashboard"}, tc.args...), func(string) string { t.Fatal("resolved environment"); return "" }, &out, &errs); code != tc.want {
+			t.Fatalf("args %v: code %d, want %d", tc.args, code, tc.want)
 		}
 		if strings.Contains(out.String()+errs.String(), "SYSTEM-PROMPT-private-path") {
 			t.Fatal("reflected private path/config")

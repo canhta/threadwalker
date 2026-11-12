@@ -558,8 +558,9 @@ threadwalker/
 │   ├── threads/                 # browser backend for the Threads tools
 │   ├── playbook/                # hypotheses and the gate
 │   └── telegram/                # owner notifications and commands
-├── agents/                      # one template per agent
+├── agents/                      # example templates
 │   └── solo-builder.example.yaml
+├── templates/                   # live agent templates (*.agent.yaml)
 ├── llms.example.yaml             # canonical provider/model catalog example
 ├── deploy/threadwalker.service
 └── docs/
@@ -620,4 +621,10 @@ Secrets live only in environment variables named by `*_env`, never in a template
 or the LLM context. Catalog loading validates references and configuration without reading keys;
 loading a template resolves only its selected provider's key into a redacting `config.Secret`.
 `check` accepts an optional `-llms` catalog path and preserves legacy inline invocation without it.
+The CLI reads `./.env` at startup when present, never overriding an already-set variable and never
+logging a value; `THREADWALKER_ENV_FILE` selects another file. Every command keeps GNU-style long
+flags (`--agents`, `--db`, `--llms`, ...) with `-a`/`-d`/`-l` shorthands, and a flag beats
+`THREADWALKER_AGENTS`/`THREADWALKER_DB`/`THREADWALKER_LLMS`, which beat the built-in defaults
+(`templates/` when it exists, else `agents/`; `data/threadwalker.db`). Usage errors exit 2 and
+runtime failures exit 1. `help`/`--help` and `version`/`--version` are commands too. **(decision)**
 See [`docs/setup.md`](setup.md) for setup and validation commands. **(decision)**

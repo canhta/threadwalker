@@ -6,14 +6,19 @@ Use the Go version in [go.mod](../go.mod). Run commands from the repository root
 
 ```sh
 go vet ./... && go test ./...
-go run ./cmd/threadwalker run -once -offline
+go run ./cmd/threadwalker run --once --offline
 ```
+
+Build the binary with `go build -o threadwalker ./cmd/threadwalker`; the commands below use it.
+`threadwalker --help` and `threadwalker <command> --help` print usage, `threadwalker version` prints
+the build version, and exit codes are 0 success, 1 runtime failure, 2 usage error. Structured
+operational events stay on stdout; human diagnostics and usage errors go to stderr.
 
 The smoke run uses a temporary SQLite DB and in-process synthetic services. It reads no keys
 and cannot publish. To export a two-agent **48-hour logical-time** soak with one restart:
 
 ```sh
-go run ./cmd/threadwalker run -offline -soak-hours 48 -soak-agents 2 -evidence /tmp/threadwalker-isolation
+threadwalker run --offline --soak-hours 48 --soak-agents 2 --evidence /tmp/threadwalker-isolation
 ```
 
 Use a fresh evidence directory. It contains `isolation.json`, `events.jsonl` and `eval.json`.
@@ -55,7 +60,9 @@ llm:
 its inline LLM settings. Do not mix inline fields with `profile`. Only selected providers need
 keys. Prices produce local estimates, not provider balances or invoices.
 
-The binary reads environment variables; it does not load `.env` itself:
+The binary reads environment variables and loads `./.env` at startup when that file exists. It never
+overrides a variable that is already set and never logs a value; `THREADWALKER_ENV_FILE` points at a
+different file. To inject the file yourself instead:
 
 ```sh
 set -a
@@ -66,8 +73,10 @@ set +a
 ## Choose agent templates
 
 The `agents/` directory contains [builder](../agents/solo-builder.example.yaml) and
-[teasing](../agents/teasing.example.yaml) examples; both load by default. Copy only the templates
-you want into your own directory and select it with `-agents`.
+[teasing](../agents/teasing.example.yaml) examples. The `templates/` directory holds the live account
+template, [viral](../templates/viral.agent.yaml) (`*.agent.yaml` files are templates). `check` and
+`run` use `templates/` when it exists and fall back to the shipped `agents/` examples; `--agents`
+(or `-a`) selects any directory. Copy only the templates you want into your own directory.
 
 Set each agent's goal, persona, limits and LLM selection. Keep `dry_run: true`. For multiple
 agents, use distinct IDs, `threads.username` values and browser profile paths. Replace the
@@ -76,13 +85,17 @@ synthetic usernames before real-account operation; usernames are not inferred fr
 Validate your directory and optional catalog without making external calls:
 
 ```sh
-go run ./cmd/threadwalker check -agents /path/to/templates -llms /path/to/llms.yaml -db data/threadwalker.db
+threadwalker check
+threadwalker check --agents /path/to/templates --llms /path/to/llms.yaml
 ```
 
-Omit `-llms` for inline LLM settings. Once configured, `run` uses the same paths:
+`--db` defaults to `data/threadwalker.db`; `THREADWALKER_AGENTS`, `THREADWALKER_DB` and
+`THREADWALKER_LLMS` set the same defaults. A flag beats the environment variable, which beats the
+built-in default. Omit `--llms` for inline LLM settings. Once configured, `run` uses the same paths:
 
 ```sh
-go run ./cmd/threadwalker run -agents /path/to/templates -llms /path/to/llms.yaml -db data/threadwalker.db
+threadwalker run
+threadwalker run --agents /path/to/templates --llms /path/to/llms.yaml
 ```
 
 This command may call the selected LLM and trend sources. `-once` limits it to one due wake.

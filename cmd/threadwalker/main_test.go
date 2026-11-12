@@ -55,21 +55,21 @@ func TestRun_CheckFailsAndPrintsEachErrorWhenInvalid(t *testing.T) {
 	}
 }
 
-func TestRun_UnknownCommandExitsOne(t *testing.T) {
+func TestRun_UnknownCommandExitsTwo(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	code := run(context.Background(), []string{"unknown"}, func(string) string { return "" }, &stdout, &stderr)
-	if code != 1 {
-		t.Fatalf("run(unknown) = %d, want 1", code)
+	if code != exitUsage {
+		t.Fatalf("run(unknown) = %d, want %d", code, exitUsage)
 	}
 }
 
-func TestRun_NoArgsAndBadFlagsAndBadDBPathExitOne(t *testing.T) {
+func TestRun_NoArgsAndBadFlagsExitTwoAndBadDBPathExitOne(t *testing.T) {
 	var stdout, stderr bytes.Buffer
-	if code := run(context.Background(), nil, func(string) string { return "" }, &stdout, &stderr); code != 1 {
-		t.Fatalf("run(nil) = %d, want 1", code)
+	if code := run(context.Background(), nil, func(string) string { return "" }, &stdout, &stderr); code != exitUsage {
+		t.Fatalf("run(nil) = %d, want %d", code, exitUsage)
 	}
-	if code := run(context.Background(), []string{"check", "-unknown-flag"}, func(string) string { return "" }, &stdout, &stderr); code != 1 {
-		t.Fatalf("run(check -unknown-flag) = %d, want 1", code)
+	if code := run(context.Background(), []string{"check", "-unknown-flag"}, func(string) string { return "" }, &stdout, &stderr); code != exitUsage {
+		t.Fatalf("run(check -unknown-flag) = %d, want %d", code, exitUsage)
 	}
 	// Passing a directory path as the DB file path causes store.Open to fail.
 	badDBPath := t.TempDir()

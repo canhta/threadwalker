@@ -241,8 +241,8 @@ func TestCLILoggingRejectsInvalidOptions(t *testing.T) {
 				"check", "-agents", agentsDir, "-db", dbPath,
 				"-log-level", tc.level, "-log-format", tc.format,
 			}, cmdLoggingEnv())
-			if code != 1 {
-				t.Fatalf("invalid logging options = %d, want 1; stderr=%s stdout=%s", code, stderr, stdout)
+			if code != exitUsage {
+				t.Fatalf("invalid logging options = %d, want %d; stderr=%s stdout=%s", code, exitUsage, stderr, stdout)
 			}
 			if !strings.Contains(strings.ToLower(stderr), tc.want) {
 				t.Errorf("stderr %q does not name the invalid %s option", stderr, tc.want)

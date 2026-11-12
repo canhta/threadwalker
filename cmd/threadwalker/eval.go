@@ -32,38 +32,44 @@ func runEval(ctx context.Context, args []string, getenv func(string) string, std
 	maxSteps := fs.Int("max-steps", 0, "per-case step cap (required for live)")
 	maxOutput := fs.Int("max-output-tokens", 0, "per-request output cap (required for live)")
 	live := fs.Bool("live", false, "explicitly opt in to bounded provider calls")
-	if err := fs.Parse(args); err != nil || fs.NArg() != 0 || *repeat < 1 || *repeat > 1000 || *maxSteps < 0 || *maxOutput < 0 || *maxUSD < 0 || math.IsNaN(*maxUSD) || math.IsInf(*maxUSD, 0) || strings.TrimSpace(*revision) == "" {
+	help, parseErr := parseFlags(fs, args)
+	if help {
+		writeUsage(stdout, "eval")
+		return exitOK
+	}
+	if parseErr != nil || fs.NArg() != 0 || *repeat < 1 || *repeat > 1000 || *maxSteps < 0 || *maxOutput < 0 || *maxUSD < 0 || math.IsNaN(*maxUSD) || math.IsInf(*maxUSD, 0) || strings.TrimSpace(*revision) == "" {
 		fmt.Fprintln(stderr, "invalid eval arguments or limits")
-		return 1
+		writeUsage(stderr, "eval")
+		return exitUsage
 	}
 	profiles, err := evalIDs(*profileNames)
 	if err != nil {
 		fmt.Fprintln(stderr, "invalid eval profile selection")
-		return 1
+		return exitUsage
 	}
 	cases, err := evalIDs(*caseNames)
 	if err != nil {
 		fmt.Fprintln(stderr, "invalid eval case selection")
-		return 1
+		return exitUsage
 	}
 	if (len(profiles) > 0) != (*catalogPath != "") {
 		fmt.Fprintln(stderr, "eval requires -llms and -profiles together")
-		return 1
+		return exitUsage
 	}
 	if *live && (len(profiles) == 0 || len(cases) == 0 || *maxUSD <= 0 || *maxSteps <= 0 || *maxOutput <= 0) {
 		fmt.Fprintln(stderr, "live eval requires explicit -llms, -profiles, -cases, positive -max-usd, -max-steps and -max-output-tokens")
-		return 1
+		return exitUsage
 	}
 	if *outPath != "" {
 		for _, input := range []string{*suitePath, *catalogPath, *baselinePath} {
 			if input != "" && sameEvalPath(*outPath, input) {
 				fmt.Fprintln(stderr, "eval report destination must differ from input files")
-				return 1
+				return exitUsage
 			}
 		}
 		if err := checkEvalOutput(*outPath); err != nil {
 			fmt.Fprintln(stderr, err)
-			return 1
+			return exitFailure
 		}
 	}
 	var baseline eval.Report
@@ -71,13 +77,13 @@ func runEval(ctx context.Context, args []string, getenv func(string) string, std
 		baseline, err = eval.ReadReport(*baselinePath)
 		if err != nil {
 			fmt.Fprintln(stderr, err)
-			return 1
+			return exitFailure
 		}
 	}
 	suite, err := eval.LoadSuite(*suitePath)
 	if err != nil {
 		fmt.Fprintln(stderr, "loading eval suite failed")
-		return 1
+		return exitFailure
 	}
 	opts := eval.Options{Seed: *seed, Repeat: *repeat, Mode: "offline", Revision: *revision, CaseIDs: cases, MaxUSD: *maxUSD, MaxSteps: *maxSteps, MaxOutputTokens: *maxOutput}
 	if *live {
@@ -87,7 +93,7 @@ func runEval(ctx context.Context, args []string, getenv func(string) string, std
 		catalog, err := config.LoadCatalog(*catalogPath)
 		if err != nil {
 			fmt.Fprintln(stderr, "loading eval catalog failed")
-			return 1
+			return exitFailure
 		}
 		selectedEnv := func(string) string { return "synthetic-offline-key" }
 		if *live {
@@ -98,7 +104,7 @@ func runEval(ctx context.Context, args []string, getenv func(string) string, std
 			provider, ok := catalog.ProviderID(id)
 			if err != nil || !ok {
 				fmt.Fprintln(stderr, "resolving selected eval profile failed")
-				return 1
+				return exitFailure
 			}
 			opts.Profiles = append(opts.Profiles, eval.Profile{ID: id, ProviderID: provider, Config: cfg})
 		}
@@ -107,13 +113,13 @@ func runEval(ctx context.Context, args []string, getenv func(string) string, std
 	if runErr != nil {
 		fmt.Fprintln(stderr, "eval execution failed")
 		if report.Version == "" {
-			return 1
+			return exitFailure
 		}
 	}
 	if *outPath != "" {
 		if err := eval.WriteReport(*outPath, report); err != nil {
 			fmt.Fprintln(stderr, err)
-			return 1
+			return exitFailure
 		}
 	}
 	fmt.Fprint(stdout, eval.Summary(report))
@@ -125,13 +131,13 @@ func runEval(ctx context.Context, args []string, getenv func(string) string, std
 		compared, err := eval.Compare(baseline, report)
 		if err != nil {
 			fmt.Fprintln(stderr, err)
-			return 1
+			return exitFailure
 		}
 		fmt.Fprint(stdout, eval.ComparisonSummary(compared))
 		failed = failed || compared.HasRegressions
 	}
 	if failed {
-		return 1
+		return exitFailure
 	}
 	return 0
 }
