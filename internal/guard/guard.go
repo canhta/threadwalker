@@ -20,11 +20,14 @@ type Options struct {
 	OwnUsernames []string
 	// AllowLive is an operator capability, never a model tool argument.
 	AllowLive bool
-	Store     *store.Store
-	Template  config.Template
-	WakeID    int64
-	Now       func() time.Time
-	Logger    *slog.Logger
+	// Phase is the harness-owned wake phase: agent (default), dream or study.
+	// Dream and study allow only read and note/playbook tools.
+	Phase    string
+	Store    *store.Store
+	Template config.Template
+	WakeID   int64
+	Now      func() time.Time
+	Logger   *slog.Logger
 }
 type Guard struct {
 	opts        Options
@@ -66,6 +69,12 @@ func New(opts Options) (*Guard, error) {
 	if opts.Store == nil || opts.Template.ID == "" || opts.WakeID <= 0 || (!opts.Template.DryRun && !opts.AllowLive) {
 		return nil, errors.New("configuring guard: store, agent, wake and action capability required")
 	}
+	if opts.Phase != "" && opts.Phase != PhaseAgent && opts.Phase != PhaseDream && opts.Phase != PhaseStudy {
+		return nil, errors.New("configuring guard: unknown wake phase")
+	}
+	if opts.Phase == "" {
+		opts.Phase = PhaseAgent
+	}
 	if opts.Now == nil {
 		opts.Now = time.Now
 	}
@@ -105,6 +114,14 @@ func (g *Guard) Matches(st *store.Store, agentID string, wakeID int64) bool {
 
 // MatchesMode prevents a dispatcher from changing a reserved intent's dry-run mode.
 func (g *Guard) MatchesMode(dryRun bool) bool { return g != nil && g.opts.Template.DryRun == dryRun }
+
+// MatchesPhase prevents a dispatcher from widening the guard's phase boundary.
+func (g *Guard) MatchesPhase(phase string) bool {
+	if phase == "" {
+		phase = PhaseAgent
+	}
+	return g != nil && g.opts.Phase == phase
+}
 func (g *Guard) event(ctx context.Context, event, outcome, reason, tool string) {
 	if tool == "unknown" {
 		tool = ""
@@ -138,6 +155,9 @@ func (g *Guard) Execute(ctx context.Context, a Attempt, effect func() (string, e
 		}
 	}
 	var intent *actionIntent
+	if reason == "" {
+		reason = g.phaseBlock(a.Tool)
+	}
 	if reason == "" {
 		intent, reason = g.content(a)
 	}
@@ -201,9 +221,43 @@ func (g *Guard) Execute(ctx context.Context, a Attempt, effect func() (string, e
 
 func safeTool(name string) string {
 	switch name {
-	case "playbook_read", "playbook_propose", "note_write", "note_search", "schedule_next_wake", "fetch_trends", "read_feed", "search", "read_post", "post", "reply", "read_own_metrics", "mark_do_not_contact", "notify_owner", "ask_owner":
+	case "playbook_read", "playbook_propose", "note_write", "note_search", "schedule_next_wake", "fetch_trends", "web_search", "read_feed", "search", "read_post", "post", "reply", "read_own_metrics", "mark_do_not_contact", "notify_owner", "ask_owner":
 		return name
 	default:
 		return "unknown"
 	}
+}
+
+// Phase identities are harness-owned, never model arguments.
+const (
+	PhaseAgent = "agent"
+	PhaseDream = "dream"
+	PhaseStudy = "study"
+)
+
+// phaseBlock is the hard phase boundary: dream and study may only read external
+// data and edit their own notes/playbook. Every Threads write, owner message and
+// schedule change is refused here, not by prompting.
+func (g *Guard) phaseBlock(tool string) string {
+	if PhaseAllowed(g.opts.Phase, tool) {
+		return ""
+	}
+	return "phase_read_only"
+}
+
+// PhaseAllowed exposes the same boundary for tool-definition filtering.
+func PhaseAllowed(phase, tool string) bool {
+	if tool == "web_search" {
+		// Optional bounded search exists only during study, never in a normal
+		// wake or a dream.
+		return phase == PhaseStudy
+	}
+	if phase == "" || phase == PhaseAgent {
+		return true
+	}
+	switch tool {
+	case "playbook_read", "playbook_propose", "note_write", "note_search", "fetch_trends", "read_feed", "search", "read_post", "read_own_metrics":
+		return true
+	}
+	return false
 }

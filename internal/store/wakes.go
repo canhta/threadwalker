@@ -119,7 +119,8 @@ func (s *Store) RecoverWakes(ctx context.Context, id string, at, future time.Tim
 	}
 	for _, wake := range ids {
 		outcome := `{"outcome":"unknown_assumed_sent","retry":false}`
-		if kinds[wake] == "metrics" {
+		if kinds[wake] == "metrics" || kinds[wake] == "dream" || kinds[wake] == "study" {
+			// Dream/study are read-only by guard; nothing can have been posted.
 			outcome = `{"outcome":"interrupted_read","retry":true}`
 		}
 		if _, err = tx.ExecContext(ctx, `UPDATE tool_calls SET result_json=? WHERE wake_id=? AND result_json=''`, outcome, wake); err != nil {

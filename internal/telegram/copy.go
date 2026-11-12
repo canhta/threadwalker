@@ -29,14 +29,20 @@ type OwnerMessageData struct {
 	RepliesLimit int
 	Cost         string
 	Budget       string
-	HasMetrics   bool
-	Views        int
-	Likes        int
-	Responses    int
-	Reposts      int
-	Playbook     int
-	Username     string
-	Notice       string
+	// Phase split of today's spend. HasPhaseSpend hides the line until study or
+	// dream spend exists, so normal wakes keep the old digest length.
+	WakeCost      string
+	StudyCost     string
+	DreamCost     string
+	HasPhaseSpend bool
+	HasMetrics    bool
+	Views         int
+	Likes         int
+	Responses     int
+	Reposts       int
+	Playbook      int
+	Username      string
+	Notice        string
 }
 
 // defaultOwnerMessages are neutral fallbacks for a template that does not
@@ -45,8 +51,8 @@ type OwnerMessageData struct {
 func defaultOwnerMessages(lang string) map[string]string {
 	if strings.HasPrefix(strings.ToLower(lang), "vi") {
 		return map[string]string{
-			"digest":        "hôm nay đăng {{.Posts}}{{if .PostsLimit}}/{{.PostsLimit}}{{end}} bài, reply {{.Replies}}{{if .RepliesLimit}}/{{.RepliesLimit}}{{end}}, xài {{.Cost}}{{if .Budget}} trên {{.Budget}}{{end}}.{{if .HasMetrics}}{{nl}}số liệu mới nhất: {{.Views}} view, {{.Likes}} like, {{.Responses}} reply, {{.Reposts}} repost.{{end}}{{if .Playbook}}{{nl}}playbook vừa sửa {{.Playbook}} chỗ.{{end}}{{if .NotRunning}}{{nl}}{{.StatusText}}.{{end}}{{if .NextWake}}{{nl}}{{.NextWake}} ({{.NextIn}}) chạy tiếp nha.{{end}}",
-			"status":        "{{.StatusText}}.{{if .NextWake}}{{nl}}lần dậy tới: {{.NextWake}} ({{.NextIn}}){{else}}{{nl}}chưa có lần dậy tiếp theo{{end}}{{nl}}hôm nay: {{.Posts}}{{if .PostsLimit}}/{{.PostsLimit}}{{end}} bài · {{.Replies}}{{if .RepliesLimit}}/{{.RepliesLimit}}{{end}} reply · {{.Cost}}{{if .Budget}}/{{.Budget}}{{end}}{{if .HasMetrics}}{{nl}}số liệu: {{.Views}} view · {{.Likes}} like · {{.Responses}} reply · {{.Reposts}} repost{{end}}{{if .Playbook}}{{nl}}playbook: {{.Playbook}} chỗ vừa sửa{{end}}",
+			"digest":        "hôm nay đăng {{.Posts}}{{if .PostsLimit}}/{{.PostsLimit}}{{end}} bài, reply {{.Replies}}{{if .RepliesLimit}}/{{.RepliesLimit}}{{end}}, xài {{.Cost}}{{if .Budget}} trên {{.Budget}}{{end}}.{{if .HasPhaseSpend}}{{nl}}chia ra: thức {{.WakeCost}} · bắt trend {{.StudyCost}} · mơ {{.DreamCost}}{{end}}{{if .HasMetrics}}{{nl}}số liệu mới nhất: {{.Views}} view, {{.Likes}} like, {{.Responses}} reply, {{.Reposts}} repost.{{end}}{{if .Playbook}}{{nl}}playbook vừa sửa {{.Playbook}} chỗ.{{end}}{{if .NotRunning}}{{nl}}{{.StatusText}}.{{end}}{{if .NextWake}}{{nl}}{{.NextWake}} ({{.NextIn}}) chạy tiếp nha.{{end}}",
+			"status":        "{{.StatusText}}.{{if .NextWake}}{{nl}}lần dậy tới: {{.NextWake}} ({{.NextIn}}){{else}}{{nl}}chưa có lần dậy tiếp theo{{end}}{{nl}}hôm nay: {{.Posts}}{{if .PostsLimit}}/{{.PostsLimit}}{{end}} bài · {{.Replies}}{{if .RepliesLimit}}/{{.RepliesLimit}}{{end}} reply · {{.Cost}}{{if .Budget}}/{{.Budget}}{{end}}{{if .HasPhaseSpend}}{{nl}}chia ra: thức {{.WakeCost}} · bắt trend {{.StudyCost}} · mơ {{.DreamCost}}{{end}}{{if .HasMetrics}}{{nl}}số liệu: {{.Views}} view · {{.Likes}} like · {{.Responses}} reply · {{.Reposts}} repost{{end}}{{if .Playbook}}{{nl}}playbook: {{.Playbook}} chỗ vừa sửa{{end}}",
 			"pause":         "ok, tạm dừng đây. gõ /resume để chạy tiếp nha.",
 			"resume":        "ok, chạy tiếp đây.",
 			"kill":          "ok, tắt hẳn luôn. /resume ko cứu được nữa đâu.",
@@ -58,8 +64,8 @@ func defaultOwnerMessages(lang string) map[string]string {
 		}
 	}
 	return map[string]string{
-		"digest":        "today: {{.Posts}}{{if .PostsLimit}}/{{.PostsLimit}}{{end}} posts, {{.Replies}}{{if .RepliesLimit}}/{{.RepliesLimit}}{{end}} replies, spent {{.Cost}}{{if .Budget}} of {{.Budget}}{{end}}.{{if .HasMetrics}}{{nl}}latest: {{.Views}} views, {{.Likes}} likes, {{.Responses}} replies, {{.Reposts}} reposts.{{end}}{{if .Playbook}}{{nl}}playbook changed {{.Playbook}} places.{{end}}{{if .NotRunning}}{{nl}}{{.StatusText}}.{{end}}{{if .NextWake}}{{nl}}next run {{.NextWake}} ({{.NextIn}}).{{end}}",
-		"status":        "{{.StatusText}}.{{if .NextWake}}{{nl}}next run: {{.NextWake}} ({{.NextIn}}){{else}}{{nl}}no next run scheduled{{end}}{{nl}}today: {{.Posts}}{{if .PostsLimit}}/{{.PostsLimit}}{{end}} posts · {{.Replies}}{{if .RepliesLimit}}/{{.RepliesLimit}}{{end}} replies · {{.Cost}}{{if .Budget}}/{{.Budget}}{{end}}{{if .HasMetrics}}{{nl}}metrics: {{.Views}} views · {{.Likes}} likes · {{.Responses}} replies · {{.Reposts}} reposts{{end}}{{if .Playbook}}{{nl}}playbook: {{.Playbook}} edits{{end}}",
+		"digest":        "today: {{.Posts}}{{if .PostsLimit}}/{{.PostsLimit}}{{end}} posts, {{.Replies}}{{if .RepliesLimit}}/{{.RepliesLimit}}{{end}} replies, spent {{.Cost}}{{if .Budget}} of {{.Budget}}{{end}}.{{if .HasPhaseSpend}}{{nl}}split: wake {{.WakeCost}} · study {{.StudyCost}} · dream {{.DreamCost}}{{end}}{{if .HasMetrics}}{{nl}}latest: {{.Views}} views, {{.Likes}} likes, {{.Responses}} replies, {{.Reposts}} reposts.{{end}}{{if .Playbook}}{{nl}}playbook changed {{.Playbook}} places.{{end}}{{if .NotRunning}}{{nl}}{{.StatusText}}.{{end}}{{if .NextWake}}{{nl}}next run {{.NextWake}} ({{.NextIn}}).{{end}}",
+		"status":        "{{.StatusText}}.{{if .NextWake}}{{nl}}next run: {{.NextWake}} ({{.NextIn}}){{else}}{{nl}}no next run scheduled{{end}}{{nl}}today: {{.Posts}}{{if .PostsLimit}}/{{.PostsLimit}}{{end}} posts · {{.Replies}}{{if .RepliesLimit}}/{{.RepliesLimit}}{{end}} replies · {{.Cost}}{{if .Budget}}/{{.Budget}}{{end}}{{if .HasPhaseSpend}}{{nl}}split: wake {{.WakeCost}} · study {{.StudyCost}} · dream {{.DreamCost}}{{end}}{{if .HasMetrics}}{{nl}}metrics: {{.Views}} views · {{.Likes}} likes · {{.Responses}} replies · {{.Reposts}} reposts{{end}}{{if .Playbook}}{{nl}}playbook: {{.Playbook}} edits{{end}}",
 		"pause":         "ok, pausing. send /resume to wake me.",
 		"resume":        "ok, back to work.",
 		"kill":          "ok, shut down for good. /resume can't bring me back.",
@@ -184,24 +190,28 @@ func (s *Service) ownerData(id string, summary store.OwnerSummary) OwnerMessageD
 	now := s.opts.Now()
 	lang := messageLanguage(tmpl)
 	data := OwnerMessageData{
-		Name:         tmpl.Persona.Name,
-		Language:     lang,
-		AgentID:      id,
-		MultiAgent:   len(s.ids) > 1,
-		Status:       summary.Status,
-		StatusText:   statusText(lang, summary.Status),
-		NotRunning:   summary.Status != "" && summary.Status != "running",
-		Posts:        summary.Posts,
-		PostsLimit:   tmpl.Limits.PostsPerDay,
-		Replies:      summary.Replies,
-		RepliesLimit: tmpl.Limits.RepliesPerDay,
-		Cost:         money(summary.CostUSD),
-		HasMetrics:   summary.MetricSamples > 0,
-		Views:        summary.Views,
-		Likes:        summary.Likes,
-		Responses:    summary.Responses,
-		Reposts:      summary.Reposts,
-		Playbook:     summary.PlaybookChanges,
+		Name:          tmpl.Persona.Name,
+		Language:      lang,
+		AgentID:       id,
+		MultiAgent:    len(s.ids) > 1,
+		Status:        summary.Status,
+		StatusText:    statusText(lang, summary.Status),
+		NotRunning:    summary.Status != "" && summary.Status != "running",
+		Posts:         summary.Posts,
+		PostsLimit:    tmpl.Limits.PostsPerDay,
+		Replies:       summary.Replies,
+		RepliesLimit:  tmpl.Limits.RepliesPerDay,
+		Cost:          money(summary.CostUSD),
+		WakeCost:      money(summary.WakeCostUSD),
+		StudyCost:     money(summary.StudyCostUSD),
+		DreamCost:     money(summary.DreamCostUSD),
+		HasPhaseSpend: summary.StudyCostUSD > 0 || summary.DreamCostUSD > 0,
+		HasMetrics:    summary.MetricSamples > 0,
+		Views:         summary.Views,
+		Likes:         summary.Likes,
+		Responses:     summary.Responses,
+		Reposts:       summary.Reposts,
+		Playbook:      summary.PlaybookChanges,
 	}
 	if tmpl.Limits.MaxUSDPerDay > 0 {
 		data.Budget = money(tmpl.Limits.MaxUSDPerDay)

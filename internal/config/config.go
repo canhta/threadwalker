@@ -50,9 +50,88 @@ type Template struct {
 	SeedPlaybook []string
 	LLM          LLMConfig
 	Limits       LimitsConfig
+	Schedule     ScheduleConfig
+	Study        StudyConfig
+	Trends       TrendsConfig
 	Threads      ThreadsConfig
 	Telegram     TelegramConfig
 	DryRun       bool
+}
+
+// ScheduleConfig holds the agent's own local-time phases. An empty DreamAt or
+// StudySlots disables that phase; normal wakes are unaffected.
+type ScheduleConfig struct {
+	// Timezone is the operator's IANA zone for dream and study times. It is
+	// independent of the Telegram display zone and defaults to Asia/Ho_Chi_Minh.
+	Timezone   string
+	DreamAt    string   // "HH:MM" local time; empty disables dreaming.
+	StudySlots []string // "HH:MM" local times; empty disables study wakes.
+}
+
+// TrendsConfig holds deterministic ranking keywords for fetch_trends. Omitted
+// lists derive keywords from the persona topics and avoid_topics.
+type TrendsConfig struct {
+	IncludeKeywords []string
+	AvoidKeywords   []string
+}
+
+// StudySourceNames is the canonical bounded set of study-phase sources. Reddit
+// needs an app-only OAuth client; every other source needs no credentials.
+var StudySourceNames = []string{
+	"google_news_vn", "google_news_global", "google_news_topics",
+	"vnexpress", "genk", "tinhte", "vietnamnet",
+	"the_verge", "techcrunch", "arstechnica",
+	"hacker_news", "product_hunt", "google_trends",
+	"reddit_localllama", "reddit_openai", "reddit_singularity",
+	"github_trending", "youtube",
+}
+
+// DefaultStudySources keeps credential-free sources on by default. Reddit is
+// opt-in because unauthenticated access is blocked.
+var DefaultStudySources = []string{
+	"google_news_vn", "google_news_global", "google_news_topics",
+	"vnexpress", "genk", "tinhte", "vietnamnet",
+	"the_verge", "techcrunch", "arstechnica",
+	"hacker_news", "product_hunt", "google_trends",
+	"github_trending", "youtube",
+}
+
+// DefaultYouTubeChannels are public, no-login channel feeds verified locally.
+var DefaultYouTubeChannels = []string{
+	"UCXZCJLdBC09xxGZ6gcdrc6A", // OpenAI
+	"UCP7jMXSY2xbc3KCAE0MHQ-A", // Google DeepMind
+	"UCSHZKyawb77ixDdsGog4iWA", // Lex Fridman
+	"UCddiUEpeqJcYeBxX1IVBKvQ", // The Verge
+}
+
+// StudyConfig selects study sources per agent. Empty Sources selects
+// DefaultStudySources. Reddit is optional and reads its app credentials from
+// environment variables only when both are set.
+type StudyConfig struct {
+	Sources               []string
+	YouTubeChannels       []string
+	RedditClientIDEnv     string
+	RedditClientSecretEnv string
+	RedditClientID        Secret
+	RedditClientSecret    Secret
+	// Threads-native sampling during study. MaxThreadsReads bounds total
+	// page reads (one feed plus keyword searches), ReadPauseMS paces them and
+	// ThreadsKeywords defaults to the first persona keywords.
+	MaxThreadsReads int
+	ThreadsKeywords []string
+	ReadPauseMS     int
+	// Opportunistic study triggers on a deterministic story-score spike.
+	MaxStudiesPerDay         int
+	MinMinutesBetweenStudies int
+	SpikeMultiplier          float64
+	SpikeMinScore            int
+	// WebSearch is an optional, bounded OpenAI Responses web-search call made
+	// only in study. It stays disabled unless the template enables it.
+	WebSearch           bool
+	WebSearchModel      string
+	WebSearchBaseURL    string
+	WebSearchMaxResults int
+	WebSearchMaxOutput  int
 }
 
 // GuardConfig configures harness-only stop-request matching. Omitted phrases
@@ -96,6 +175,9 @@ type LimitsConfig struct {
 	MaxStepsPerWake          int
 	MaxUSDPerDay             float64
 	MinMinutesBetweenWakes   int
+	// Dreaming has its own spend and step caps and is excluded from MaxUSDPerDay.
+	MaxUSDPerDream   float64
+	MaxStepsPerDream int
 }
 
 type ThreadsConfig struct {
@@ -330,6 +412,193 @@ func loadFile(path string, getenv func(string) string, catalog *Catalog, secrets
 	if tmpl.Limits.MinMinutesBetweenWakes > 1440 {
 		addErr("limits.min_minutes_between_wakes", "must be at most 1440")
 	}
+	tmpl.Limits.MaxUSDPerDream = 0.30
+	if doc.keys["limits.max_usd_per_dream"] {
+		tmpl.Limits.MaxUSDPerDream = requireFloat("limits.max_usd_per_dream", false)
+	}
+	tmpl.Limits.MaxStepsPerDream = 20
+	if doc.keys["limits.max_steps_per_dream"] {
+		tmpl.Limits.MaxStepsPerDream = requirePositiveInt("limits.max_steps_per_dream")
+	}
+
+	tmpl.Schedule.Timezone = "Asia/Ho_Chi_Minh"
+	if doc.keys["schedule.timezone"] {
+		zone := strings.TrimSpace(doc.scalars["schedule.timezone"])
+		if _, err := time.LoadLocation(zone); err != nil {
+			addErr("schedule.timezone", "must be an IANA timezone name")
+		} else {
+			tmpl.Schedule.Timezone = zone
+		}
+	}
+	parseClock := func(field, raw string) string {
+		parsed, err := time.Parse("15:04", strings.TrimSpace(raw))
+		if err != nil {
+			addErr(field, "must be a 24-hour HH:MM local time")
+			return ""
+		}
+		if parsed.Hour() > 23 || parsed.Minute() > 59 {
+			addErr(field, "must be a 24-hour HH:MM local time")
+			return ""
+		}
+		return parsed.Format("15:04")
+	}
+	if doc.keys["schedule.dream_at"] {
+		tmpl.Schedule.DreamAt = parseClock("schedule.dream_at", doc.scalars["schedule.dream_at"])
+	}
+	if doc.keys["schedule.study_slots"] {
+		slots := requireStringList("schedule.study_slots")
+		seen := map[string]bool{}
+		for _, slot := range slots {
+			parsed := parseClock("schedule.study_slots", slot)
+			if parsed != "" && !seen[parsed] {
+				tmpl.Schedule.StudySlots = append(tmpl.Schedule.StudySlots, parsed)
+				seen[parsed] = true
+			}
+		}
+	}
+	for _, field := range []string{"trends.include_keywords", "trends.avoid_keywords"} {
+		if !doc.keys[field] {
+			continue
+		}
+		list := requireStringList(field)
+		for _, keyword := range list {
+			if strings.TrimSpace(keyword) == "" {
+				addErr(field, "keywords must be nonempty")
+			}
+		}
+		if field == "trends.include_keywords" {
+			tmpl.Trends.IncludeKeywords = list
+		} else {
+			tmpl.Trends.AvoidKeywords = list
+		}
+	}
+	if doc.keys["study.sources"] {
+		known := map[string]bool{}
+		for _, name := range StudySourceNames {
+			known[name] = true
+		}
+		seen := map[string]bool{}
+		for _, source := range requireStringList("study.sources") {
+			if !known[source] {
+				addErr("study.sources", "unknown source "+source)
+				continue
+			}
+			if !seen[source] {
+				tmpl.Study.Sources = append(tmpl.Study.Sources, source)
+				seen[source] = true
+			}
+		}
+	}
+	tmpl.Study.YouTubeChannels = append([]string{}, DefaultYouTubeChannels...)
+	if doc.keys["study.youtube_channels"] {
+		channels := requireStringList("study.youtube_channels")
+		tmpl.Study.YouTubeChannels = nil
+		for _, channel := range channels {
+			if len(channel) < 10 || len(channel) > 64 || strings.ContainsAny(channel, " \t/?#&=\"'<>") {
+				addErr("study.youtube_channels", "must be a YouTube channel ID")
+				continue
+			}
+			tmpl.Study.YouTubeChannels = append(tmpl.Study.YouTubeChannels, channel)
+		}
+	}
+	tmpl.Study.RedditClientIDEnv = "REDDIT_CLIENT_ID"
+	tmpl.Study.RedditClientSecretEnv = "REDDIT_CLIENT_SECRET"
+	if doc.keys["study.reddit_client_id_env"] {
+		tmpl.Study.RedditClientIDEnv = requireString("study.reddit_client_id_env")
+	}
+	if doc.keys["study.reddit_client_secret_env"] {
+		tmpl.Study.RedditClientSecretEnv = requireString("study.reddit_client_secret_env")
+	}
+	tmpl.Study.MaxThreadsReads = 4
+	if doc.keys["study.threads_sample.max_reads"] {
+		tmpl.Study.MaxThreadsReads = requirePositiveInt("study.threads_sample.max_reads")
+		if tmpl.Study.MaxThreadsReads > 20 {
+			addErr("study.threads_sample.max_reads", "must be at most 20")
+		}
+	}
+	tmpl.Study.ReadPauseMS = 1500
+	if doc.keys["study.threads_sample.pause_ms"] {
+		raw, err := strconv.Atoi(strings.TrimSpace(doc.scalars["study.threads_sample.pause_ms"]))
+		if err != nil || raw < 0 || raw > 60000 {
+			addErr("study.threads_sample.pause_ms", "must be an integer within 0..60000")
+		} else {
+			tmpl.Study.ReadPauseMS = raw
+		}
+	}
+	if doc.keys["study.threads_sample.keywords"] {
+		keywords := requireStringList("study.threads_sample.keywords")
+		for _, keyword := range keywords {
+			if strings.TrimSpace(keyword) == "" {
+				addErr("study.threads_sample.keywords", "keywords must be nonempty")
+			}
+		}
+		tmpl.Study.ThreadsKeywords = keywords
+	}
+	tmpl.Study.MaxStudiesPerDay = 8
+	if doc.keys["study.max_sessions_per_day"] {
+		tmpl.Study.MaxStudiesPerDay = requirePositiveInt("study.max_sessions_per_day")
+	}
+	tmpl.Study.MinMinutesBetweenStudies = 120
+	if doc.keys["study.min_minutes_between_sessions"] {
+		tmpl.Study.MinMinutesBetweenStudies = requirePositiveInt("study.min_minutes_between_sessions")
+	}
+	tmpl.Study.SpikeMultiplier = 2.0
+	if doc.keys["study.spike_multiplier"] {
+		value, err := strconv.ParseFloat(strings.TrimSpace(doc.scalars["study.spike_multiplier"]), 64)
+		if err != nil || value < 1 || value > 20 {
+			addErr("study.spike_multiplier", "must be a number within 1..20")
+		} else {
+			tmpl.Study.SpikeMultiplier = value
+		}
+	}
+	tmpl.Study.SpikeMinScore = 6
+	if doc.keys["study.spike_min_score"] {
+		tmpl.Study.SpikeMinScore = requirePositiveInt("study.spike_min_score")
+	}
+	if doc.keys["study.web_search.enabled"] {
+		value, err := strconv.ParseBool(strings.TrimSpace(doc.scalars["study.web_search.enabled"]))
+		if err != nil {
+			addErr("study.web_search.enabled", "must be a boolean")
+		} else {
+			tmpl.Study.WebSearch = value
+		}
+	}
+	tmpl.Study.WebSearchBaseURL = "https://api.openai.com/v1"
+	if doc.keys["study.web_search.base_url"] {
+		raw := strings.TrimSpace(doc.scalars["study.web_search.base_url"])
+		parsed, err := url.Parse(raw)
+		if err != nil || parsed == nil || (parsed.Scheme != "http" && parsed.Scheme != "https") || parsed.Hostname() == "" || parsed.User != nil || parsed.RawQuery != "" || parsed.Fragment != "" {
+			addErr("study.web_search.base_url", "must be an HTTP(S) endpoint without query or fragment")
+		} else {
+			tmpl.Study.WebSearchBaseURL = strings.TrimRight(raw, "/")
+		}
+	}
+	tmpl.Study.WebSearchModel = strings.TrimSpace(doc.scalars["study.web_search.model"])
+	tmpl.Study.WebSearchMaxResults = 5
+	if doc.keys["study.web_search.max_results"] {
+		tmpl.Study.WebSearchMaxResults = requirePositiveInt("study.web_search.max_results")
+		if tmpl.Study.WebSearchMaxResults > 10 {
+			addErr("study.web_search.max_results", "must be at most 10")
+		}
+	}
+	tmpl.Study.WebSearchMaxOutput = 512
+	if doc.keys["study.web_search.max_output_tokens"] {
+		tmpl.Study.WebSearchMaxOutput = requirePositiveInt("study.web_search.max_output_tokens")
+		if tmpl.Study.WebSearchMaxOutput > 1024 {
+			addErr("study.web_search.max_output_tokens", "must be at most 1024")
+		}
+	}
+	if tmpl.Study.WebSearch {
+		if tmpl.Study.WebSearchModel == "" {
+			tmpl.Study.WebSearchModel = tmpl.LLM.Model
+		}
+		if tmpl.LLM.Protocol != "openai" {
+			addErr("study.web_search.enabled", "requires the openai protocol")
+		}
+		if tmpl.Study.WebSearchModel == "" {
+			addErr("study.web_search.model", "required when web search is enabled")
+		}
+	}
 
 	tmpl.Threads.ProfileDir = requireString("threads.profile_dir")
 	tmpl.Threads.Username = strings.TrimSpace(doc.scalars["threads.username"])
@@ -480,6 +749,14 @@ func loadFile(path string, getenv func(string) string, catalog *Catalog, secrets
 	if tmpl.Telegram.Enabled && secrets {
 		tmpl.Telegram.BotToken = resolveSecret("telegram.bot_token_env", tmpl.Telegram.BotTokenEnv)
 		tmpl.Telegram.OwnerChatID = resolveSecret("telegram.owner_chat_id_env", tmpl.Telegram.OwnerChatIDEnv)
+	}
+	if secrets && getenv != nil && studyRedditEnabled(tmpl.Study.Sources) {
+		clientID := getenv(tmpl.Study.RedditClientIDEnv)
+		clientSecret := getenv(tmpl.Study.RedditClientSecretEnv)
+		if clientID != "" && clientSecret != "" {
+			tmpl.Study.RedditClientID = NewSecret(clientID)
+			tmpl.Study.RedditClientSecret = NewSecret(clientSecret)
+		}
 	}
 
 	if len(errs) > 0 {

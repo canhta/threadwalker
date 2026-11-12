@@ -255,6 +255,9 @@ type OwnerSummary struct {
 	NextWake                                                                         time.Time
 	Posts, Replies, Views, Likes, Responses, Reposts, PlaybookChanges, MetricSamples int
 	CostUSD                                                                          float64
+	// Phase costs split today's ledger: waking/studying count toward the daily
+	// cap, dreaming has its own cap.
+	WakeCostUSD, StudyCostUSD, DreamCostUSD float64
 }
 
 // PauseOwnerAgent is an automatic harness control, independent of the model
@@ -280,6 +283,16 @@ func (s *Store) OwnerSummary(ctx context.Context, id string, from, to time.Time)
 		return out, err
 	}
 	out.CostUSD = usage.CostUSD
+	phases, err := s.LLMUsageByPhaseForDay(ctx, id, from.UTC().Format("2006-01-02"))
+	if err != nil {
+		return out, err
+	}
+	out.WakeCostUSD = usage.CostUSD - phases["dream"].CostUSD
+	if out.WakeCostUSD < 0 {
+		out.WakeCostUSD = 0
+	}
+	out.StudyCostUSD = phases["study"].CostUSD
+	out.DreamCostUSD = phases["dream"].CostUSD
 	counts, err := s.CountActions(ctx, id, from, to)
 	out.Posts, out.Replies = counts.Posts, counts.Replies
 	if err != nil {

@@ -128,8 +128,49 @@ Two rules keep a wake from doing damage **(sourced: patterns in `docs/research/r
 - **No replay.** An interrupted wake is never re-run. A `post` or `reply` whose outcome is unknown
   is recorded as sent and never retried, so a crash cannot double-post.
 
-Reflection is something the agent chooses to do when new metrics exist; there is no fixed nightly
-job. **(proposed)**
+The agent has three harness-owned wake phases: the normal `agent` wake, a nightly `dream` and
+scheduled `study` sessions. Phases are template settings, never global flags or separate config
+files: `schedule.timezone` (IANA, default `Asia/Ho_Chi_Minh`), `schedule.dream_at` (local `HH:MM`,
+empty disables), `schedule.study_slots` (local `HH:MM` list, empty disables),
+`limits.max_usd_per_dream` (default 0.30), `limits.max_steps_per_dream` (default 20) and the
+`study`/`trends` blocks in section 16.
+
+`dream` is a private nightly review: the agent reads its own day (own posts/replies, metrics,
+notes, playbook, owner notes), consolidates notes and proposes playbook updates. `study` is
+trend-hunting, not rote learning: it samples outside sources and Threads read-only, then writes a
+short trend brief of hot stories, why each is hot, the roast angle and whether to post or reply.
+Study slots are a minimum cadence; a deterministic story-score spike may add a session within
+`study.min_minutes_between_sessions`, `study.max_sessions_per_day`, `study.spike_multiplier` and
+`study.spike_min_score`. Normal wakes are unchanged. **(decision, owner 2026-11-12)**
+
+Dream and study have no Threads writes, owner messages or schedule changes. `internal/guard` refuses
+`post`, `reply`, `notify_owner`, `ask_owner`, `mark_do_not_contact` and `schedule_next_wake` with the
+fixed reason `phase_read_only` before any effect; the prompt is not the boundary. They may use
+`read_feed`, `search`, `read_post`, `read_own_metrics`, `fetch_trends`, `note_write`, `note_search`,
+`playbook_read` and `playbook_propose`. Phase rows use `wakes.kind` (`dream`/`study`) and a durable
+`phase_key`; a partial unique index makes one dream per local day and one run per study slot
+impossible to repeat, including after a restart. A dream missed while the process was down runs
+once on the next start, never twice for that local day. Dream and study wakes do not move
+`next_wake_at`. Dream spend is excluded from `limits.max_usd_per_day` and bounded by
+`limits.max_usd_per_dream` and its step cap; study spend counts toward the daily cap. Ledger rows
+carry the phase so the dashboard and digest can show wake, study and dream spend separately.
+
+`fetch_trends` ranks results deterministically for the template's `trends.include_keywords` and
+removes `trends.avoid_keywords` hits; when the lists are omitted, keywords are derived from the
+persona topics/avoid_topics. No extra model call is made. During study it reads the broader
+`study.sources` set (Google News VN/global per-topic queries, VN tech RSS (including VietnamNet, which now serves the former ICTnews feed), global tech RSS, Hacker
+News, Product Hunt, Google Trends VN, public GitHub trending, public YouTube channel feeds and
+optional Reddit app-only OAuth), fail-soft per source with per-source and overall timeouts, then
+clusters the same story across sources so it scores as one hot story. Source IDs are validated
+against a fixed set; Reddit is skipped without `REDDIT_CLIENT_ID`/`REDDIT_CLIENT_SECRET` and open
+X/Facebook/TikTok feeds are not implemented because no stable no-login source was measured.
+Study also samples Threads itself read-only through the guarded tools
+(`study.threads_sample.max_reads`, `pause_ms`, `keywords`), stores bounded observations and computes
+rising keywords, reply velocity, hot posts and format counts. An optional `web_search` tool is
+available only in study, powered by one OpenAI Responses web-search call that reuses the template's
+OpenAI key and prices, checks the shared daily cap and records study-phase usage. Recent study stories and a compact
+computed `threads_trend_brief` enter the next normal wake and dream context as untrusted data.
+**(decision, owner 2026-11-12)**
 
 The existing client emits run start/finish/stop, request start/finish/retry, usage-accounting and
 client dispatcher-result events. Correlation uses available operator-configured agent/provider/
@@ -155,7 +196,9 @@ No future component is considered instrumented until its issue implements and te
 | Group | Tools | Notes |
 |---|---|---|
 | Threads (browser) | `read_feed`, `search`, `read_post`, `post`, `reply`, `read_own_metrics` | One browser profile per agent |
-| Outside sources | `fetch_trends` (Hacker News API, Product Hunt RSS, Google Trends VN RSS) | Bounded results round-robin across sources; any source failure fails the call. Network behavior is tested offline with fixtures, not claimed as current live availability |
+| Outside sources | `fetch_trends` (Hacker News API, Product Hunt RSS, Google Trends VN RSS; in study also Google News, VN/global tech RSS, GitHub trending, YouTube channel feeds and optional Reddit) | Results are ranked/filtered by template keywords without an extra model call. Normal wakes stay bounded round-robin across the three trend sources; study is fail-soft per source with per-source and overall timeouts. Network behavior is tested offline with fixtures, not claimed as current live availability |
+| Threads trends | No model-visible write surface; harness samples `read_feed`/`search` during study | Bounded reads, paced, guard-audited; observations and computed briefs are read-only data |
+| Study search | `web_search` (optional, study only) | One bounded OpenAI Responses web-search call; disabled unless `study.web_search.enabled`, capped by output tokens, citation count, daily spend and a single request; results are untrusted data |
 | Notes | `note_write`, `note_search` | SQLite FTS5; vector search is not justified at this scale **(sourced)** |
 | Playbook | `playbook_read`, `playbook_propose` | See section 7 |
 | Owner | `notify_owner`, `ask_owner` | Telegram; `ask_owner` never blocks the wake |
@@ -224,9 +267,12 @@ qualification of live Threads per-post insights. **(decision, #19)**
 - Forbidden-phrase check by plain string match before posting.
 - A reply contains no URL and mentions no username other than the author it answers.
 - At most one reply per thread per day.
-- No profiles of strangers: store only username and counters needed for rate limiting.
-  **(sourced)**: Meta Platform Terms 3.a.v, and stored third-party content is a known
-  memory-injection surface.
+- No profiles of strangers: rate limiting stores only username and counters needed for rate limiting.
+  Study may additionally store bounded public post observations (canonical post URL, public author
+  username, text hash, at most a 280-rune snippet, nullable visible counters, source keyword,
+  observation time), never profile fields or inferred traits, and never renders them publicly.
+  **(owner 2026-11-12; sourced for the base rule)**: Meta Platform Terms 3.a.v, and stored
+  third-party content is a known memory-injection surface.
 - Everything read from Threads is marked as untrusted data. Secrets never enter the LLM context.
 - Kill switch: Telegram `/pause`, `/resume`, `/kill`, `/dnc`; automatic stop on reaching a daily limit or
   when the browser is logged out or shown a captcha.
@@ -430,6 +476,12 @@ separate in #2/#18/#21/#9. **(decision)**
   at the limit.
 - Feeding real revenue back into the budget is out of scope for v0.
 
+Usage accounting also splits each day by wake phase in `ledger_phases` (`agent`, `study`,
+`dream`). A phase budget check reads only the phases that share that cap: agent and study share
+`limits.max_usd_per_day`, dream reads only `limits.max_usd_per_dream`. The budget is checked before
+a request, not reserved, so a stop can follow the request that crossed the cap, as before.
+**(decision, owner 2026-11-12)**
+
 Usage-accounting events at the client/ledger boundary distinguish a committed local ledger
 write from a failed write, with known token counts and computed USD retained for diagnosis.
 Every HTTP attempt has a correlated result, including budget rejection, cancellation, malformed
@@ -544,8 +596,9 @@ account/session and explicit live-run approval. **(decision, #25)**
 
 ## 14. Read-only activity page and repo layout
 
-`dashboard` serves selected configured agent IDs and today's budget/spend, wake history,
-confirmed own actions, hypothesis state/counters and recent tool names/outcomes.
+`dashboard` serves selected configured agent IDs and today's budget/spend split by wake, study and
+dream phase, wake history, confirmed own actions, hypothesis state/counters and recent tool
+names/outcomes.
 The HTTP service defaults to `127.0.0.1:8080`, accepts GET/HEAD only, and uses a read-only
 SQLite handle without migrations or agent initialization. Config declarations/references
 are validated through `config.LoadPublicDirWithCatalog` without resolving any credentials.
@@ -584,12 +637,12 @@ no code path executes a tool without passing the guards.
 
 ## 15. Database schema
 
-Every table carries `agent_id`, even while only one agent runs. Canonical initial DDL lives in [`internal/store/migrations/001_initial_schema.sql`](../internal/store/migrations/001_initial_schema.sql); delivery/offset changes live in [`003_owner_delivery.sql`](../internal/store/migrations/003_owner_delivery.sql), metric checkpoints and wake kinds in [`004_metric_jobs.sql`](../internal/store/migrations/004_metric_jobs.sql), bounded playbook revisions/seeding in [`005_playbook.sql`](../internal/store/migrations/005_playbook.sql), and revision snapshots/baselines/outcomes/looks in [`006_playbook_outcomes.sql`](../internal/store/migrations/006_playbook_outcomes.sql).
+Every table carries `agent_id`, even while only one agent runs. Canonical initial DDL lives in [`internal/store/migrations/001_initial_schema.sql`](../internal/store/migrations/001_initial_schema.sql); delivery/offset changes live in [`003_owner_delivery.sql`](../internal/store/migrations/003_owner_delivery.sql), metric checkpoints and wake kinds in [`004_metric_jobs.sql`](../internal/store/migrations/004_metric_jobs.sql), bounded playbook revisions/seeding in [`005_playbook.sql`](../internal/store/migrations/005_playbook.sql), and revision snapshots/baselines/outcomes/looks in [`006_playbook_outcomes.sql`](../internal/store/migrations/006_playbook_outcomes.sql), dream/study phases, phase ledger splits and trend rows in [`007_phases.sql`](../internal/store/migrations/007_phases.sql).
 
 | Table | Main columns | Purpose |
 |---|---|---|
 | `agents` | `id`, `status` (`running`/`paused`/`killed`), `next_wake_at`, `self_note` | State and the note left for the next wake |
-| `wakes` | `id`, `agent_id`, `kind` (`agent`/`metrics`), `started_at`, `ended_at`, `steps`, `tokens_in`, `tokens_out`, `cost_usd`, `end_reason` | One row per agent session or metric audit scope |
+| `wakes` | `id`, `agent_id`, `kind` (`agent`/`metrics`/`dream`/`study`), `phase_key`, `started_at`, `ended_at`, `steps`, `tokens_in`, `tokens_out`, `cost_usd`, `end_reason` | One row per agent session, metric scope or phase run; `phase_key` makes dream/study occurrences unique |
 | `tool_calls` | `id`, `wake_id`, `tool`, `args_json`, `result_json`, `blocked_by`, `at` | Audit log; `blocked_by` names the guard that refused the call |
 | `actions` | `id`, `agent_id`, `kind` (`post`/`reply`), `text`, `target_url`, `target_username`, `hypothesis_ids_json`, `dry_run`, `posted_at`, `thread_url` | Published or dry-run posts |
 | `metrics` | `action_id`, `measured_at`, `views`, `likes`, `replies`, `reposts` | Repeated measurements |
@@ -598,6 +651,9 @@ Every table carries `agent_id`, even while only one agent runs. Canonical initia
 | `playbook` | `id`, `agent_id`, `text`, `status` (`testing`/`established`/`rejected`), `revision`, `n`, `successes`, `created_at`, `decided_at` | Hypotheses; counters are written by code only |
 | `contacts` | `agent_id`, `username`, `reply_count_7d`, `do_not_contact`, `reason` | Rate limiting only; no description of the person |
 | `ledger` | `agent_id`, `day`, `tokens_in`, `tokens_out`, `cost_usd` | Budget |
+| `ledger_phases` | `agent_id`, `day`, `phase` (`agent`/`study`/`dream`), token and USD totals | Daily spend split for caps and display |
+| `trend_stories` | `agent_id`, `observed_at`, `phase`, `source`, `title`, `url`, `rank`, `score` | Ranked external stories; study rows feed the next wake |
+| `threads_observations` | `agent_id`, `post_url`, `author`, `text_hash`, `snippet`, nullable visible counters, `kind`, `keyword`, `observed_at` | Bounded public Threads sampling for deterministic trend analysis |
 | `owner_msgs` | `id`, `agent_id`, `direction`, `text`, `answered_id`, `at` | Telegram exchange |
 
 ## 16. Agent template
@@ -622,7 +678,19 @@ Each agent template in `agents/*.yaml` (see [`agents/solo-builder.example.yaml`]
   [`agents/solo-builder.example.yaml`](../agents/solo-builder.example.yaml).
 - `limits` (all positive): `posts_per_day`, `replies_per_day`, `replies_per_user_7d`,
   `min_seconds_between_actions`, `max_steps_per_wake`, `max_usd_per_day`,
-  `min_minutes_between_wakes`.
+  `min_minutes_between_wakes`. Optional `max_usd_per_dream` (default 0.30) and
+  `max_steps_per_dream` (default 20) cap the dream phase separately.
+- `schedule`: optional `timezone` (IANA, default `Asia/Ho_Chi_Minh`), `dream_at` (local `HH:MM`;
+  empty disables dreaming) and `study_slots` (local `HH:MM` list; empty disables study).
+- `trends`: optional `include_keywords` and `avoid_keywords` lists for deterministic
+  `fetch_trends` ranking. Omission derives keywords from the persona topics/avoid_topics.
+- `study`: optional `sources` (validated against the fixed source set, listed in
+  [`docs/setup.md`](setup.md)), `youtube_channels` (channel IDs, default measured public list),
+  `threads_sample` (`max_reads`, `pause_ms`, `keywords`), `min_minutes_between_sessions`,
+  `max_sessions_per_day`, `spike_multiplier`, `spike_min_score`, optional
+  `reddit_client_id_env`/`reddit_client_secret_env`, and optional `web_search` (`enabled`,
+  `model`, `base_url`, `max_results` 1..10, `max_output_tokens` 1..1024). Reddit credentials are read only when that
+  source is enabled and both variables are set; otherwise the source is skipped.
 - `guard`: optional nonempty `stop_phrases` list; omission selects the code defaults.
 - `threads`: `profile_dir`, `username` (operator-declared own account, required for several agents), optional `backend` (`stub` by default, `browser`, or `agent_browser`). Browser modes
   require an explicit HTTP(S) origin `base_url` and installed Chromium `executable_path`;

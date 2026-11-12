@@ -31,8 +31,8 @@ func (s *Store) RecordLLMUsage(ctx context.Context, agentID string, wakeID int64
 		_ = tx.Rollback()
 	}()
 
-	var wakeAgentID string
-	err = tx.QueryRowContext(ctx, `SELECT agent_id FROM wakes WHERE id = ?`, wakeID).Scan(&wakeAgentID)
+	var wakeAgentID, wakeKind string
+	err = tx.QueryRowContext(ctx, `SELECT agent_id,kind FROM wakes WHERE id = ?`, wakeID).Scan(&wakeAgentID, &wakeKind)
 	if errors.Is(err, sql.ErrNoRows) {
 		return fmt.Errorf("recording LLM usage for agent %q on %s: wake %d not found: %w", agentID, day, wakeID, sql.ErrNoRows)
 	}
@@ -41,6 +41,13 @@ func (s *Store) RecordLLMUsage(ctx context.Context, agentID string, wakeID int64
 	}
 	if wakeAgentID != agentID {
 		return fmt.Errorf("recording LLM usage for agent %q on %s: wake %d belongs to agent %q", agentID, day, wakeID, wakeAgentID)
+	}
+	phase := "agent"
+	switch wakeKind {
+	case "dream":
+		phase = "dream"
+	case "study":
+		phase = "study"
 	}
 
 	_, err = tx.ExecContext(ctx, `
@@ -53,6 +60,18 @@ func (s *Store) RecordLLMUsage(ctx context.Context, agentID string, wakeID int64
 	`, agentID, day, usage.TokensIn, usage.TokensOut, usage.CostUSD)
 	if err != nil {
 		return fmt.Errorf("recording LLM usage for agent %q on %s: updating ledger: %w", agentID, day, err)
+	}
+
+	_, err = tx.ExecContext(ctx, `
+		INSERT INTO ledger_phases (agent_id, day, phase, tokens_in, tokens_out, cost_usd)
+		VALUES (?, ?, ?, ?, ?, ?)
+		ON CONFLICT(agent_id, day, phase) DO UPDATE SET
+			tokens_in = ledger_phases.tokens_in + excluded.tokens_in,
+			tokens_out = ledger_phases.tokens_out + excluded.tokens_out,
+			cost_usd = ledger_phases.cost_usd + excluded.cost_usd
+	`, agentID, day, phase, usage.TokensIn, usage.TokensOut, usage.CostUSD)
+	if err != nil {
+		return fmt.Errorf("recording LLM usage for agent %q on %s: updating phase ledger: %w", agentID, day, err)
 	}
 
 	result, err := tx.ExecContext(ctx, `

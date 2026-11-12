@@ -189,6 +189,11 @@ study:
   max_sessions_per_day: 8
   spike_multiplier: 2.0
   spike_min_score: 6
+  web_search:                     # optional bounded OpenAI Responses web search
+    enabled: true
+    model: gpt-6-luna
+    max_results: 5
+    max_output_tokens: 512
 threads:
   username: giaosullm # operator-owned throwaway account; never inferred from the persona name.
   backend: stub # Live reads add page_profile: threads with backend: agent_browser and a dry_run: true template.
@@ -201,8 +206,8 @@ telegram:
   # Owner-facing copy in the professor's voice. Only code-owned facts and
   # persona fields are available; a missing kind falls back to neutral copy.
   messages:
-    digest: "hôm nay tôi đăng {{.Posts}}{{if .PostsLimit}}/{{.PostsLimit}}{{end}} bài, reply {{.Replies}}{{if .RepliesLimit}}/{{.RepliesLimit}}{{end}}, xài {{.Cost}}{{if .Budget}} trên {{.Budget}}{{end}}.{{if .HasMetrics}}{{nl}}số liệu mới nhất: {{.Views}} view, {{.Likes}} like, {{.Responses}} reply, {{.Reposts}} repost.{{end}}{{if .Playbook}}{{nl}}playbook sửa {{.Playbook}} chỗ.{{end}}{{if .NotRunning}}{{nl}}{{.StatusText}}.{{end}}{{if .NextWake}}{{nl}}{{.NextWake}} ({{.NextIn}}) tôi chạy tiếp.{{end}}"
-    status: "{{.StatusText}}.{{if .NextWake}}{{nl}}lần chạy tới: {{.NextWake}} ({{.NextIn}}){{else}}{{nl}}chưa hẹn lần nào tiếp{{end}}{{nl}}hôm nay: {{.Posts}}{{if .PostsLimit}}/{{.PostsLimit}}{{end}} bài · {{.Replies}}{{if .RepliesLimit}}/{{.RepliesLimit}}{{end}} reply · {{.Cost}}{{if .Budget}}/{{.Budget}}{{end}}{{if .HasMetrics}}{{nl}}số liệu: {{.Views}} view · {{.Likes}} like · {{.Responses}} reply · {{.Reposts}} repost{{end}}{{if .Playbook}}{{nl}}playbook: {{.Playbook}} chỗ vừa sửa{{end}}"
+    digest: "hôm nay tôi đăng {{.Posts}}{{if .PostsLimit}}/{{.PostsLimit}}{{end}} bài, reply {{.Replies}}{{if .RepliesLimit}}/{{.RepliesLimit}}{{end}}, xài {{.Cost}}{{if .Budget}} trên {{.Budget}}{{end}}.{{if .HasPhaseSpend}}{{nl}}chia ra: thức {{.WakeCost}} · bắt trend {{.StudyCost}} · mơ {{.DreamCost}}{{end}}{{if .HasMetrics}}{{nl}}số liệu mới nhất: {{.Views}} view, {{.Likes}} like, {{.Responses}} reply, {{.Reposts}} repost.{{end}}{{if .Playbook}}{{nl}}playbook sửa {{.Playbook}} chỗ.{{end}}{{if .NotRunning}}{{nl}}{{.StatusText}}.{{end}}{{if .NextWake}}{{nl}}{{.NextWake}} ({{.NextIn}}) tôi chạy tiếp.{{end}}"
+    status: "{{.StatusText}}.{{if .NextWake}}{{nl}}lần chạy tới: {{.NextWake}} ({{.NextIn}}){{else}}{{nl}}chưa hẹn lần nào tiếp{{end}}{{nl}}hôm nay: {{.Posts}}{{if .PostsLimit}}/{{.PostsLimit}}{{end}} bài · {{.Replies}}{{if .RepliesLimit}}/{{.RepliesLimit}}{{end}} reply · {{.Cost}}{{if .Budget}}/{{.Budget}}{{end}}{{if .HasPhaseSpend}}{{nl}}chia ra: thức {{.WakeCost}} · bắt trend {{.StudyCost}} · mơ {{.DreamCost}}{{end}}{{if .HasMetrics}}{{nl}}số liệu: {{.Views}} view · {{.Likes}} like · {{.Responses}} reply · {{.Reposts}} repost{{end}}{{if .Playbook}}{{nl}}playbook: {{.Playbook}} chỗ vừa sửa{{end}}"
     pause: "ừ, tôi nghỉ. gõ /resume khi muốn tôi chạy tiếp."
     resume: "tôi dậy rồi, chạy tiếp. được chưa?"
     kill: "tắt thì tắt. /resume không cứu được tôi đâu."

@@ -76,6 +76,14 @@ type Options struct {
 	Logger           *slog.Logger
 	ProviderID       string
 	ProfileID        string
+	// Phase selects phase-scoped accounting: agent (default), study or dream.
+	// Dream spend is measured against CapUSD, not limits.MaxUSDPerDay.
+	Phase string
+	// CapUSD overrides the spend cap for this phase. Zero uses
+	// limits.MaxUSDPerDay (agent/study) or requires a positive value for dream.
+	CapUSD float64
+	// MaxSteps overrides limits.MaxStepsPerWake when positive.
+	MaxSteps int
 	// Zero omits provider-specific output/reasoning options.
 	MaxCompletionTokens int
 	ReasoningEffort     string
@@ -98,6 +106,9 @@ type Client struct {
 	outputLimit           int
 	reasoning             string
 	adapter               protocolAdapter
+	phase                 string
+	capUSD                float64
+	maxSteps              int
 }
 
 // Result contains the completed messages and steps consumed before stopping.
@@ -128,6 +139,30 @@ func New(cfg config.LLMConfig, limits config.LimitsConfig, ledger Ledger, opts O
 	if !nonnegative(cfg.PricePerMTokInUSD) || !nonnegative(cfg.PricePerMTokOutUSD) || !nonnegative(limits.MaxUSDPerDay) || limits.MaxUSDPerDay == 0 || limits.MaxStepsPerWake <= 0 {
 		return nil, errors.New("configuring LLM client: invalid prices or limits")
 	}
+	phase := opts.Phase
+	if phase == "" {
+		phase = "agent"
+	}
+	if phase != "agent" && phase != "study" && phase != "dream" {
+		return nil, errors.New("configuring LLM client: unknown phase")
+	}
+	capUSD := opts.CapUSD
+	if phase == "dream" && capUSD <= 0 {
+		return nil, errors.New("configuring LLM client: dream phase requires a positive spend cap")
+	}
+	if capUSD == 0 {
+		capUSD = limits.MaxUSDPerDay
+	}
+	if !nonnegative(capUSD) || capUSD <= 0 {
+		return nil, errors.New("configuring LLM client: invalid phase spend cap")
+	}
+	maxSteps := opts.MaxSteps
+	if maxSteps == 0 {
+		maxSteps = limits.MaxStepsPerWake
+	}
+	if maxSteps <= 0 {
+		return nil, errors.New("configuring LLM client: invalid step limit")
+	}
 	if ledger == nil || opts.RequestTimeout < 0 || opts.MaxCompletionTokens < 0 {
 		return nil, errors.New("configuring LLM client: ledger and nonnegative timeout required")
 	}
@@ -151,7 +186,7 @@ func New(cfg config.LLMConfig, limits config.LimitsConfig, ledger Ledger, opts O
 	if cfg.Protocol == "" {
 		cfg.Protocol = "openai"
 	}
-	return &Client{rejectedToolCall: opts.RejectedToolCall, logger: opts.Logger, providerID: opts.ProviderID, profileID: opts.ProfileID, config: cfg, limits: limits, http: opts.HTTPClient, now: opts.Now, timeout: opts.RequestTimeout, ledger: ledger, sleep: opts.Sleep, outputLimit: opts.MaxCompletionTokens, reasoning: opts.ReasoningEffort, adapter: adapter}, nil
+	return &Client{rejectedToolCall: opts.RejectedToolCall, logger: opts.Logger, providerID: opts.ProviderID, profileID: opts.ProfileID, config: cfg, limits: limits, http: opts.HTTPClient, now: opts.Now, timeout: opts.RequestTimeout, ledger: ledger, sleep: opts.Sleep, outputLimit: opts.MaxCompletionTokens, reasoning: opts.ReasoningEffort, adapter: adapter, phase: phase, capUSD: capUSD, maxSteps: maxSteps}, nil
 }
 
 type completion struct {
@@ -187,7 +222,7 @@ func (c *Client) Run(ctx context.Context, agentID string, wakeID int64, messages
 	for i, message := range messages {
 		result.Messages[i] = c.redactMessage(message)
 	}
-	for result.Steps < c.limits.MaxStepsPerWake {
+	for result.Steps < c.maxSteps {
 		requestIndex++
 		body, err := c.adapter.encode(c.config.Model, result.Messages, tools, c.outputLimit, c.reasoning)
 		if err != nil {
@@ -249,7 +284,7 @@ func (c *Client) Run(ctx context.Context, agentID string, wakeID int64, messages
 			if err := ctx.Err(); err != nil {
 				return result, fmt.Errorf("dispatching tool call: %w", err)
 			}
-			if result.Steps >= c.limits.MaxStepsPerWake {
+			if result.Steps >= c.maxSteps {
 				return result, fmt.Errorf("running chat loop: %w", ErrStepLimit)
 			}
 			result.Steps++
@@ -343,14 +378,14 @@ func (c *Client) requestAttempt(ctx context.Context, agentID string, wakeID int6
 		c.event(ctx, level, logging.LLMRequestFinished, agentID, wakeID, requestIndex, attempt, started, outcome, reason, usage, status, 0)
 	}()
 	day := started.UTC().Format("2006-01-02")
-	spent, err := c.ledger.LLMUsageForDay(ctx, agentID, day)
+	spent, err := c.spentForBudget(ctx, agentID, day)
 	if err != nil {
 		return completion{}, 0, failure("checking daily LLM budget", "accounting_read_failed", err)
 	}
 	if !nonnegative(spent.CostUSD) {
 		return completion{}, 0, failure("checking daily LLM budget", "invalid_ledger_cost", nil)
 	}
-	if spent.CostUSD >= c.limits.MaxUSDPerDay {
+	if spent.CostUSD >= c.capUSD {
 		return completion{}, 0, fmt.Errorf("requesting chat completion: %w", ErrBudget)
 	}
 	response, status, err = c.attempt(ctx, body)
@@ -431,6 +466,27 @@ func sleep(ctx context.Context, d time.Duration) error {
 }
 
 func nonnegative(v float64) bool { return v >= 0 && !math.IsInf(v, 0) && !math.IsNaN(v) }
+
+// PhaseLedger is implemented by stores that split spend by wake phase. Agent
+// and study spend share limits.max_usd_per_day; dream spend uses its own cap.
+type PhaseLedger interface {
+	LLMUsageForDayPhases(context.Context, string, string, ...string) (Usage, error)
+}
+
+func (c *Client) spentForBudget(ctx context.Context, agentID, day string) (Usage, error) {
+	ledger, ok := c.ledger.(PhaseLedger)
+	if !ok {
+		if c.phase == "dream" {
+			return Usage{}, errors.New("phase accounting unavailable for dream")
+		}
+		return c.ledger.LLMUsageForDay(ctx, agentID, day)
+	}
+	phases := []string{"agent", "study"}
+	if c.phase == "dream" {
+		phases = []string{"dream"}
+	}
+	return ledger.LLMUsageForDayPhases(ctx, agentID, day, phases...)
+}
 
 // Errors from transports and bodies may contain credentials or reflected provider
 // content. Preserve cancellation identity, but never include untrusted error text.

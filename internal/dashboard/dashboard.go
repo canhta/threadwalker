@@ -26,11 +26,16 @@ type AgentView struct {
 	DailyBudgetUSD float64
 	SpentUSD       float64
 	RemainingUSD   float64
-	NextWake       string
-	Wakes          []WakeView
-	Actions        []ActionView
-	Playbook       []HypothesisView
-	Tools          []ToolView
+	// Phase split of today's spend. Waking and studying share the daily cap;
+	// dreaming has its own template cap.
+	WakeUSD  float64
+	StudyUSD float64
+	DreamUSD float64
+	NextWake string
+	Wakes    []WakeView
+	Actions  []ActionView
+	Playbook []HypothesisView
+	Tools    []ToolView
 }
 type WakeView struct {
 	ID        int64
@@ -164,6 +169,17 @@ func readAgent(ctx context.Context, tx *sql.Tx, a Agent, day string) (AgentView,
 		return v, errors.New("invalid usage")
 	}
 	v.RemainingUSD = math.Max(0, v.DailyBudgetUSD-v.SpentUSD)
+	var studyCost, dreamCost float64
+	err = tx.QueryRowContext(ctx, `SELECT COALESCE(SUM(CASE WHEN phase='study' THEN cost_usd END),0),COALESCE(SUM(CASE WHEN phase='dream' THEN cost_usd END),0) FROM ledger_phases WHERE agent_id=? AND day=?`, a.ID, day).Scan(&studyCost, &dreamCost)
+	if err != nil {
+		return v, err
+	}
+	if !finite(studyCost) || !finite(dreamCost) {
+		return v, errors.New("invalid phase usage")
+	}
+	v.WakeUSD = math.Max(0, v.SpentUSD-dreamCost)
+	v.StudyUSD = studyCost
+	v.DreamUSD = dreamCost
 	rows, err := tx.QueryContext(ctx, `SELECT id,substr(started_at,1,64),substr(ended_at,1,64),substr(end_reason,1,64),substr(kind,1,32),steps,tokens_in,tokens_out,cost_usd FROM wakes WHERE agent_id=? ORDER BY id DESC LIMIT ?`, a.ID, RowLimit)
 	if err != nil {
 		return v, err
@@ -181,7 +197,7 @@ func readAgent(ctx context.Context, tx *sql.Tx, a Agent, day string) (AgentView,
 		}
 		w.StartedAt = timestamp(w.StartedAt)
 		w.EndedAt = timestamp(end.String)
-		w.Kind = oneOf(w.Kind, "agent", "metrics")
+		w.Kind = oneOf(w.Kind, "agent", "metrics", "dream", "study")
 		if !end.Valid {
 			w.EndReason = "in_progress"
 		} else {
@@ -257,7 +273,7 @@ func readAgent(ctx context.Context, tx *sql.Tx, a Agent, day string) (AgentView,
 			rows.Close()
 			return v, errors.New("invalid tool metadata")
 		}
-		tool.Name = oneOf(tool.Name, "read_feed", "search", "read_post", "post", "reply", "read_own_metrics", "fetch_trends", "note_write", "note_search", "playbook_read", "playbook_propose", "notify_owner", "ask_owner", "mark_do_not_contact", "schedule_next_wake")
+		tool.Name = oneOf(tool.Name, "read_feed", "search", "read_post", "post", "reply", "read_own_metrics", "fetch_trends", "web_search", "note_write", "note_search", "playbook_read", "playbook_propose", "notify_owner", "ask_owner", "mark_do_not_contact", "schedule_next_wake")
 		tool.At = timestamp(tool.At)
 		tool.Outcome, tool.Detail = toolSummary(result, blocked)
 		v.Tools = append(v.Tools, tool)

@@ -131,3 +131,31 @@ func TestRelativeTimeAndMoney(t *testing.T) {
 		t.Fatal("money format")
 	}
 }
+
+func TestDigestShowsWakeStudyAndDreamSpendSeparately(t *testing.T) {
+	s := copyService(config.Template{ID: "one", Persona: config.PersonaConfig{Language: "vi"}})
+	data := sampleData()
+	data.Cost = "$0.70"
+	data.WakeCost = "$0.40"
+	data.StudyCost = "$0.20"
+	data.DreamCost = "$0.10"
+	data.HasPhaseSpend = true
+	text, err := s.render("one", "digest", data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, part := range []string{"thức $0.40", "bắt trend $0.20", "mơ $0.10"} {
+		if !strings.Contains(text, part) {
+			t.Fatalf("digest missing %q: %s", part, text)
+		}
+	}
+	// A normal wake-only day keeps the short digest.
+	data.HasPhaseSpend = false
+	text, err = s.render("one", "digest", data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(text, "chia ra") {
+		t.Fatalf("phase line leaked on a wake-only day: %s", text)
+	}
+}

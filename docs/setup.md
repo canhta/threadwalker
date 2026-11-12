@@ -82,6 +82,57 @@ Set each agent's goal, persona, limits and LLM selection. Keep `dry_run: true`. 
 agents, use distinct IDs, `threads.username` values and browser profile paths. Replace the
 synthetic usernames before real-account operation; usernames are not inferred from agent IDs.
 
+## Dreaming, study and trend signals
+
+These are per-agent template fields, not flags or separate files. Omit them to disable dreaming
+and study; normal wakes are unchanged.
+
+```yaml
+limits:
+  max_usd_per_day: 2.00
+  max_usd_per_dream: 0.30   # dream spend is outside max_usd_per_day
+  max_steps_per_dream: 20
+schedule:
+  timezone: Asia/Ho_Chi_Minh
+  dream_at: "23:30"          # once per local day; a missed one runs once on next start
+  study_slots: ["09:00", "15:00", "20:30"]
+trends:
+  include_keywords: ["AI", "LLM", "agent", "benchmark"]
+  avoid_keywords: ["crypto", "airdrop"]
+study:
+  sources: [google_news_vn, google_news_global, google_news_topics, vnexpress]
+  threads_sample:
+    max_reads: 4
+    pause_ms: 1500
+    keywords: ["AI thay dev", "agent tự động"]
+  web_search:                # optional, study only, reuses OPENAI_API_KEY
+    enabled: true
+    model: gpt-6-luna
+    max_results: 5
+    max_output_tokens: 512
+```
+
+Dream and study are guard-enforced read-only: `post`, `reply`, owner messages and schedule changes
+are refused with `phase_read_only`. Study is trend-hunting: it samples outside sources and Threads
+read-only, then writes notes on hot stories, why they are hot and the roast angle. Study slots are
+a minimum cadence; a deterministic score spike can add a session. Dream and study do not move the
+agent's normal next wake.
+
+`study.sources` accepts only these IDs: `google_news_vn`, `google_news_global`,
+`google_news_topics`, `vnexpress`, `genk`, `tinhte`, `vietnamnet`, `the_verge`, `techcrunch`,
+`arstechnica`, `hacker_news`, `product_hunt`, `google_trends`, `reddit_localllama`,
+`reddit_openai`, `reddit_singularity`, `github_trending`, `youtube`. Omitted sources default to all
+credential-free sources. `youtube_channels` defaults to the measured public channel list.
+
+Reddit has no unauthenticated public feed. To enable the Reddit sources, create a Reddit app at
+<https://www.reddit.com/prefs/apps> and register its app-only (client-credentials) OAuth client,
+then set `REDDIT_CLIENT_ID` and `REDDIT_CLIENT_SECRET`. Without both variables those sources are
+skipped without a network call.
+Optional template fields `study.reddit_client_id_env`/`study.reddit_client_secret_env` rename
+those variables. YouTube channel feeds need no key. `study.web_search` uses the selected
+template's OpenAI key (for the live template, `OPENAI_API_KEY`) for one bounded Responses
+web-search call in study, never the chat/tool loop.
+
 Validate your directory and optional catalog without making external calls:
 
 ```sh

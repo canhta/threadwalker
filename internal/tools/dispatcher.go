@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"log/slog"
+	"net/http"
 	"strings"
 	"sync"
 	"time"
@@ -24,8 +25,11 @@ type Owner interface {
 }
 
 type Options struct {
-	Threads     threads.Backend
-	AllowLive   bool // Trusted harness capability; never exposed in a tool schema.
+	Threads   threads.Backend
+	AllowLive bool // Trusted harness capability; never exposed in a tool schema.
+	// Phase is harness-owned: agent, dream or study. Dream/study expose only
+	// read and note/playbook tools, and the guard refuses anything else.
+	Phase       string
 	Secrets     []config.Secret
 	Owner       Owner
 	Store       *store.Store
@@ -34,6 +38,11 @@ type Options struct {
 	Now         func() time.Time
 	Logger      *slog.Logger
 	FetchTrends func(context.Context) ([]Trend, error)
+	// FetchStudy is the broad, fail-soft study source fetch. Nil builds the
+	// default bounded set from the template.
+	FetchStudy func(context.Context) (StudyFeed, error)
+	// WebSearchClient overrides the optional study web-search transport.
+	WebSearchClient *http.Client
 }
 type stallStop struct{}
 
@@ -45,19 +54,23 @@ func (*stallStop) TerminalToolError() bool { return true }
 var ErrStallStop = &stallStop{}
 
 type Dispatcher struct {
-	mu       sync.Mutex
-	guard    *guard.Guard
-	opts     Options
-	registry map[string]builtin
-	order    []string
-	attempts map[[32]byte]int
-	stopped  error
-	nextWake time.Time
-	secrets  []string
+	mu           sync.Mutex
+	guard        *guard.Guard
+	opts         Options
+	registry     map[string]builtin
+	order        []string
+	attempts     map[[32]byte]int
+	stopped      error
+	nextWake     time.Time
+	secrets      []string
+	trendProfile TrendProfile
 }
 
 func NewDispatcher(g *guard.Guard, opts Options) (*Dispatcher, error) {
-	if !g.Matches(opts.Store, opts.Template.ID, opts.WakeID) || !g.MatchesMode(opts.Template.DryRun) || (!opts.Template.DryRun && (!opts.AllowLive || opts.Threads == nil)) || opts.Template.Limits.MinMinutesBetweenWakes < 1 || opts.Template.Limits.MinMinutesBetweenWakes > 1440 {
+	if opts.Phase == "" {
+		opts.Phase = guard.PhaseAgent
+	}
+	if !g.Matches(opts.Store, opts.Template.ID, opts.WakeID) || !g.MatchesMode(opts.Template.DryRun) || !g.MatchesPhase(opts.Phase) || (!opts.Template.DryRun && (!opts.AllowLive || opts.Threads == nil)) || opts.Template.Limits.MinMinutesBetweenWakes < 1 || opts.Template.Limits.MinMinutesBetweenWakes > 1440 {
 		return nil, errors.New("configuring tools: matching guard scope, action capability and valid wake interval required")
 	}
 	if opts.Now == nil {
@@ -66,7 +79,15 @@ func NewDispatcher(g *guard.Guard, opts Options) (*Dispatcher, error) {
 	if opts.FetchTrends == nil {
 		opts.FetchTrends = func(ctx context.Context) ([]Trend, error) { return FetchTrends(ctx, TrendsOptions{}) }
 	}
+	if opts.FetchStudy == nil {
+		study := StudySourcesFromTemplate(opts.Template)
+		opts.FetchStudy = func(ctx context.Context) (StudyFeed, error) {
+			return FetchStudySources(ctx, study)
+		}
+	}
 	d := &Dispatcher{guard: g, opts: opts, registry: map[string]builtin{}, attempts: map[[32]byte]int{}}
+	include, avoid := opts.Template.TrendKeywords()
+	d.trendProfile = TrendProfile{Include: include, Avoid: avoid}
 	secrets := append([]config.Secret{}, opts.Secrets...)
 	secrets = append(secrets, opts.Template.LLM.APIKey, opts.Template.Telegram.BotToken, opts.Template.Telegram.OwnerChatID)
 	for _, secret := range secrets {
