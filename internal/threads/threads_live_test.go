@@ -478,6 +478,123 @@ func TestAgentBrowserThreadsWaitsForLoadingFeed(t *testing.T) {
 	}
 }
 
+// The first snapshot after open can precede Threads' client-rendered
+// navigation and column body, which parses as unknown_page. Reads retry that
+// snapshot instead of failing closed on the first attempt.
+func TestAgentBrowserThreadsReadWaitsForClientRender(t *testing.T) {
+	base := "https://www.threads.com"
+	for _, tc := range []struct {
+		name    string
+		path    string
+		fixture string
+		call    func(*Browser) (Page, error)
+	}{
+		{"feed", "/", "feed.ax.txt", func(b *Browser) (Page, error) { return b.ReadFeed(context.Background()) }},
+		{"search", "/search?q=synthetic%20query", "search.ax.txt", func(b *Browser) (Page, error) {
+			return b.Search(context.Background(), "synthetic query")
+		}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			pageURL := base + tc.path
+			cli := &fakeAgentCLI{openURL: pageURL, snapshots: []agentbrowser.Snapshot{
+				// Nothing rendered yet: no authenticated navigation, no column body.
+				{Origin: pageURL, Text: "- generic\n  - StaticText \"Loading\"\n"},
+				{Origin: pageURL, Text: liveFixture(t, tc.fixture)},
+			}}
+			b := liveThreadsBrowser(t, cli, func(context.Context, time.Duration) error { return nil })
+			page, err := tc.call(b)
+			if err != nil || len(page.Posts) == 0 {
+				t.Fatalf("%s after render=%+v err=%v", tc.name, page, err)
+			}
+			if cli.snapCalls != 2 {
+				t.Fatalf("%s snapshots=%d want 2", tc.name, cli.snapCalls)
+			}
+		})
+	}
+}
+
+func TestAgentBrowserThreadsRenderWaitIsBounded(t *testing.T) {
+	base := "https://www.threads.com"
+	pageURL := base + "/search?q=AI"
+	cli := &fakeAgentCLI{openURL: pageURL, snapshot: agentbrowser.Snapshot{Origin: pageURL, Text: "- generic\n  - StaticText \"Loading\"\n"}}
+	b := liveThreadsBrowser(t, cli, nil)
+	driver := b.driver.(*agentBrowserDriver)
+	start := time.Date(2026, 11, 12, 9, 0, 0, 0, time.UTC)
+	now := start
+	driver.now = func() time.Time { return now }
+	driver.sleep = func(_ context.Context, d time.Duration) error { now = now.Add(d); return nil }
+	if _, err := b.Search(context.Background(), "AI"); !errors.Is(err, ErrUnknownPage) {
+		t.Fatalf("unrendered search err=%v", err)
+	}
+	if waited := now.Sub(start); waited < threadsRenderWait || waited > threadsRenderWait+threadsRenderPoll {
+		t.Fatalf("render wait %v outside bound", waited)
+	}
+	if cli.snapCalls < 2 {
+		t.Fatalf("render wait took %d snapshots", cli.snapCalls)
+	}
+}
+
+func TestAgentBrowserThreadsAuthPagesDoNotWait(t *testing.T) {
+	base := "https://www.threads.com"
+	for _, tc := range []struct {
+		name string
+		text string
+		want error
+	}{
+		{"logged_out", liveFixture(t, "logged-out.ax.txt"), ErrLoggedOut},
+		{"captcha", "- dialog\n  - heading \"Captcha challenge\" [level=1, ref=e1]\n", ErrCaptcha},
+		{"malformed", "- generic\n   - link \"x\" [ref=e1]\n", ErrMalformedPage},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			for _, read := range []struct {
+				name string
+				path string
+				call func(*Browser) (Page, error)
+			}{
+				{"feed", "/", func(b *Browser) (Page, error) { return b.ReadFeed(context.Background()) }},
+				{"search", "/search?q=synthetic", func(b *Browser) (Page, error) {
+					return b.Search(context.Background(), "synthetic")
+				}},
+			} {
+				pageURL := base + read.path
+				cli := &fakeAgentCLI{openURL: pageURL, snapshot: agentbrowser.Snapshot{Origin: pageURL, Text: tc.text}}
+				b := liveThreadsBrowser(t, cli, func(context.Context, time.Duration) error {
+					t.Error("fail-closed page was retried")
+					return nil
+				})
+				if _, err := read.call(b); !errors.Is(err, tc.want) {
+					t.Fatalf("%s %s err=%v want=%v", tc.name, read.name, err, tc.want)
+				}
+				if cli.snapCalls != 1 {
+					t.Fatalf("%s %s snapshots=%d want 1", tc.name, read.name, cli.snapCalls)
+				}
+			}
+		})
+	}
+}
+
+func TestAgentBrowserThreadsRenderedEmptySearchReturns(t *testing.T) {
+	base := "https://www.threads.com"
+	pageURL := base + "/search?q=none"
+	empty := `- navigation
+  - link "Profile Profile" [ref=e1, url=https://www.threads.com/@synthetic_author]
+  - link "Insights Insights" [ref=e2, url=https://www.threads.com/insights/]
+- region "Column body" [ref=e3]
+`
+	cli := &fakeAgentCLI{openURL: pageURL, snapshot: agentbrowser.Snapshot{Origin: pageURL, Text: empty}}
+	b := liveThreadsBrowser(t, cli, func(context.Context, time.Duration) error {
+		t.Error("rendered empty search waited")
+		return nil
+	})
+	page, err := b.Search(context.Background(), "none")
+	if err != nil || len(page.Posts) != 0 || page.Kind != "search" {
+		t.Fatalf("empty search=%+v err=%v", page, err)
+	}
+	if cli.snapCalls != 1 {
+		t.Fatalf("empty search snapshots=%d want 1", cli.snapCalls)
+	}
+}
+
 func TestAgentBrowserThreadsLoggedOut(t *testing.T) {
 	base := "https://www.threads.com"
 	cli := &fakeAgentCLI{openURL: base + "/", snapshot: agentbrowser.Snapshot{Origin: base + "/", Text: liveFixture(t, "logged-out.ax.txt")}}

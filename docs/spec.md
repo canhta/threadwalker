@@ -221,8 +221,12 @@ and allow only configured-origin navigation and submissions. Unknown or malforme
 operation-specific safe errors without guessed selectors. `agent_browser` also has an optional
 measured **live profile** (`threads.page_profile: threads`) that parses the current Threads
 accessibility tree using only roles, nesting, link URLs and visible text; it requires no invented
-page attributes. It maps feed, search and post reads, and fails closed as `unknown_page` or
-`logged_out` when the measured authenticated structure is absent. The measured Insights overview
+page attributes. It maps feed, search and post reads. Because Threads renders the authenticated
+navigation and column body on the client, a read retries the accessibility snapshot for a bounded
+interval (8s, 150ms apart, inside the per-operation timeout) while that measured structure is still
+absent; a rendered, logged-out or captcha page resolves on its first snapshot. It fails closed as
+`unknown_page` or `logged_out` when the measured authenticated structure is still absent when the
+bounded wait ends. The measured Insights overview
 does not expose all four metric counters, so own metrics remain `ErrMetricsUnavailable`, never
 zero. The composer dialog, inline reply composer, one-click submit and acknowledgement are
 measured: a success is the status toast's same-origin `View` URL or a new own post block, and the
@@ -232,7 +236,7 @@ fill or click. Multi-line text is typed line by line and separated with measured
 soft breaks; a plain newline would submit the inline reply composer. Captcha flows, explicit
 rate-limit/error banners, session portability, account survival and real-account operation remain
 unverified in #2/#18; the live profile does not claim a portable VPS session.
-**(decision, #22/#24/#25)**
+**(decision, #22/#24/#25/#36)**
 
 `dry_run` browser reads execute normally; writes retain a single guarded intent without
 submitting. A configured non-dry-run backend submits only after that intent commits and stores

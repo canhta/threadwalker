@@ -53,6 +53,7 @@ type fakeAgentCLI struct {
 	closed    int
 	started   int
 	readCalls int
+	snapCalls int
 }
 
 func (f *fakeAgentCLI) Start(context.Context) error { f.started++; return nil }
@@ -67,6 +68,7 @@ func (f *fakeAgentCLI) Read(ctx context.Context) (agentbrowser.Document, error) 
 	return f.reads(ctx)
 }
 func (f *fakeAgentCLI) Snapshot(context.Context) (agentbrowser.Snapshot, error) {
+	f.snapCalls++
 	if len(f.snapshots) > 0 {
 		next := f.snapshots[0]
 		f.snapshots = f.snapshots[1:]
@@ -111,7 +113,7 @@ func testAgentBrowser(t *testing.T, cli *fakeAgentCLI, sleep func(context.Contex
 	}
 	return &Browser{
 		base:    base,
-		driver:  &agentBrowserDriver{cli: cli, base: base, timeout: time.Second, release: func() {}, sleep: sleep},
+		driver:  &agentBrowserDriver{cli: cli, base: base, timeout: time.Second, release: func() {}, sleep: sleep, now: time.Now, renderWait: threadsRenderWait},
 		timeout: time.Second,
 		now:     time.Now,
 		gate:    make(chan struct{}, 1),

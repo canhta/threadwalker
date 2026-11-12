@@ -14,6 +14,17 @@ import (
 	"github.com/canhta/threadwalker/internal/agentbrowser"
 )
 
+const (
+	// threadsRenderPoll is the pause between snapshots of a page that Threads is
+	// still rendering on the client.
+	threadsRenderPoll = 150 * time.Millisecond
+	// threadsRenderWait bounds how long one live read waits for the measured
+	// navigation and column body to render. It stays inside the 15s per-operation
+	// browser timeout the runtime configures, and a rendered page, a logged-out
+	// page and a captcha return on the first snapshot.
+	threadsRenderWait = 8 * time.Second
+)
+
 // AgentBrowserOptions configures the agent-browser CLI transport. It keeps the
 // existing browser template fields: BaseURL, ProfileDir, ExecutablePath (Chrome)
 // and NoSandbox. AgentBrowserPath is the pinned CLI binary.
@@ -107,7 +118,7 @@ func NewAgentBrowser(ctx context.Context, opts AgentBrowserOptions) (result *Bro
 		release.close()
 		return nil, err
 	}
-	d := &agentBrowserDriver{cli: client, base: base, timeout: b.timeout, release: release.close, sleep: sleepContext, profile: opts.PageProfile}
+	d := &agentBrowserDriver{cli: client, base: base, timeout: b.timeout, release: release.close, sleep: sleepContext, profile: opts.PageProfile, now: opts.Now, renderWait: threadsRenderWait}
 	b.driver = d
 	startup, cancel := context.WithTimeout(ctx, opts.StartupTimeout)
 	defer cancel()
@@ -142,14 +153,18 @@ func agentBrowserIdentifiers(agentID string) (string, string) {
 }
 
 type agentBrowserDriver struct {
-	cli      agentBrowserCLI
-	base     *url.URL
-	timeout  time.Duration
-	release  func()
-	sleep    func(context.Context, time.Duration) error
-	profile  string
-	once     sync.Once
-	closeErr error
+	cli     agentBrowserCLI
+	base    *url.URL
+	timeout time.Duration
+	release func()
+	sleep   func(context.Context, time.Duration) error
+	profile string
+	now     func() time.Time
+	// renderWait bounds how long a live read retries a page that is still
+	// rendering. A zero value means no wait: one snapshot, then the parse result.
+	renderWait time.Duration
+	once       sync.Once
+	closeErr   error
 
 	// Live write acknowledgement state, set immediately before the submit click.
 	pendingText  string
@@ -194,11 +209,16 @@ func (d *agentBrowserDriver) page(ctx context.Context, kind string) (Page, error
 }
 
 // threadsPage uses the full compact accessibility tree, not an interactive-only
-// snapshot, so post bodies are present.
+// snapshot, so post bodies are present. Threads renders the authenticated
+// navigation and the column body on the client, so the first snapshot after open
+// can legitimately precede them; those snapshots are retried within a bounded
+// window instead of failing closed as unknown_page. Logged-out, captcha and
+// malformed pages fail closed on the first snapshot.
 func (d *agentBrowserDriver) threadsPage(ctx context.Context, kind string) (Page, error) {
 	if kind == "compose" {
 		return d.threadsComposePage(ctx)
 	}
+	deadline := d.now().Add(d.renderWait)
 	for {
 		snapshot, err := d.cli.Snapshot(ctx)
 		if err != nil {
@@ -209,13 +229,25 @@ func (d *agentBrowserDriver) threadsPage(ctx context.Context, kind string) (Page
 			return Page{}, ErrMalformedPage
 		}
 		page, parseErr := parseThreadsPage(snapshot.Text, snapshot.Origin, kind, d.base.String())
-		if parseErr != nil {
+		switch {
+		case parseErr == nil:
+			if len(page.Posts) > 0 || kind == "metrics" || kind == "action_metrics" || !threadsLoadingText(snapshot.Text) {
+				return page, nil
+			}
+		case errors.Is(parseErr, ErrUnknownPage):
+			// The measured structure is not rendered yet. Keep waiting.
+		default:
 			return Page{}, parseErr
 		}
-		if len(page.Posts) > 0 || kind == "metrics" || kind == "action_metrics" || !threadsLoadingText(snapshot.Text) {
+		if !d.now().Before(deadline) {
+			if parseErr != nil {
+				return Page{}, parseErr
+			}
+			// A page that parsed but never left its loading state is returned as
+			// read, so an empty feed or search stays a real empty result.
 			return page, nil
 		}
-		if err = d.sleep(ctx, 150*time.Millisecond); err != nil {
+		if err = d.sleep(ctx, threadsRenderPoll); err != nil {
 			return Page{}, err
 		}
 	}
