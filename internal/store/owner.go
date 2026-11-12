@@ -150,7 +150,7 @@ func (s *Store) OwnerAnswers(ctx context.Context, id string, limit int) ([]Owner
 	if limit < 1 || limit > 20 {
 		limit = 20
 	}
-	rows, err := s.db.QueryContext(ctx, `SELECT id,agent_id,kind,text,answered_id FROM owner_msgs WHERE agent_id=? AND direction='in' AND kind='answer' ORDER BY id DESC LIMIT ?`, id, limit)
+	rows, err := s.db.QueryContext(ctx, `SELECT id,agent_id,kind,text,COALESCE(answered_id,0) FROM owner_msgs WHERE agent_id=? AND direction='in' AND kind IN ('answer','note') ORDER BY id DESC LIMIT ?`, id, limit)
 	if err != nil {
 		return nil, fmt.Errorf("reading owner answers: %w", err)
 	}
@@ -167,6 +167,31 @@ func (s *Store) OwnerAnswers(ctx context.Context, id string, limit int) ([]Owner
 		return nil, fmt.Errorf("iterating owner answers: %w", err)
 	}
 	return out, nil
+}
+
+// OwnerNote keeps free text from the owner for each agent's next wake. The
+// update key makes redelivery idempotent per agent. Text is never logged.
+func (s *Store) OwnerNote(ctx context.Context, ids []string, key, text string, at time.Time) error {
+	if len(ids) == 0 || key == "" {
+		return errors.New("recording owner note: agent and key required")
+	}
+	if text == "" || len(text) > 12000 {
+		return errors.New("recording owner note: invalid text size")
+	}
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("beginning owner note: %w", err)
+	}
+	defer tx.Rollback()
+	for _, id := range ids {
+		if _, err = tx.ExecContext(ctx, `INSERT INTO owner_msgs(agent_id,direction,text,at,kind,event_key,delivery) VALUES(?,'in',?,?,'note',?,'received') ON CONFLICT(agent_id,event_key) DO NOTHING`, id, text, formatStoreTimestamp(at), key); err != nil {
+			return fmt.Errorf("recording owner note: %w", err)
+		}
+	}
+	if err = tx.Commit(); err != nil {
+		return fmt.Errorf("committing owner note: %w", err)
+	}
+	return nil
 }
 func (s *Store) OwnerOffset(ctx context.Context, agentID, key string) (int64, error) {
 	var n int64

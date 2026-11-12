@@ -9,6 +9,11 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"text/template"
+	"time"
+	// The owner's zone is a template field; embedding zone data keeps it
+	// resolvable on minimal hosts without a system tzdata package.
+	_ "time/tzdata"
 )
 
 // Secret holds a sensitive value that redacts itself when formatted.
@@ -108,7 +113,17 @@ type TelegramConfig struct {
 	BotToken       Secret
 	OwnerChatIDEnv string
 	OwnerChatID    Secret
+	// Timezone is the owner's IANA zone for displayed times; loaded default
+	// Asia/Ho_Chi_Minh. Digest scheduling itself stays UTC.
+	Timezone string
+	// Messages overrides owner-facing copy by message kind. Values are
+	// text/template strings rendered with persona name/language and exact facts,
+	// so a persona's voice lives in its template, never in Go.
+	Messages map[string]string
 }
+
+// TelegramMessageNames is the canonical set a template may override.
+var TelegramMessageNames = []string{"digest", "status", "pause", "resume", "kill", "dnc", "help", "note_ack", "question_hint", "notice"}
 
 // LoadDir loads and validates all *.yaml templates in dir.
 func LoadDir(dir string, getenv func(string) string) ([]Template, error) {
@@ -387,6 +402,40 @@ func loadFile(path string, getenv func(string) string, catalog *Catalog, secrets
 		} else {
 			tmpl.Telegram.DigestHour = hour
 		}
+	}
+	tmpl.Telegram.Timezone = "Asia/Ho_Chi_Minh"
+	if doc.keys["telegram.timezone"] {
+		zone := strings.TrimSpace(doc.scalars["telegram.timezone"])
+		if _, err := time.LoadLocation(zone); err != nil {
+			addErr("telegram.timezone", "must be an IANA timezone name")
+		} else {
+			tmpl.Telegram.Timezone = zone
+		}
+	}
+	tmpl.Telegram.Messages = map[string]string{}
+	knownMessage := map[string]bool{}
+	for _, name := range TelegramMessageNames {
+		knownMessage[name] = true
+	}
+	for key := range doc.keys {
+		if !strings.HasPrefix(key, "telegram.messages.") {
+			continue
+		}
+		name := strings.TrimPrefix(key, "telegram.messages.")
+		if strings.Contains(name, ".") || !knownMessage[name] {
+			addErr(key, "unknown owner message name")
+			continue
+		}
+		value := doc.scalars[key]
+		if strings.TrimSpace(value) == "" {
+			addErr(key, "message template must not be empty")
+			continue
+		}
+		if _, err := template.New(name).Funcs(template.FuncMap{"nl": func() string { return "\n" }}).Parse(value); err != nil {
+			addErr(key, "invalid message template")
+			continue
+		}
+		tmpl.Telegram.Messages[name] = value
 	}
 	if tmpl.Telegram.Enabled {
 		tmpl.Telegram.BotTokenEnv = requireString("telegram.bot_token_env")

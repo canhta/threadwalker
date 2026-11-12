@@ -114,6 +114,7 @@ func TestNoticesAndDigestOncePerEventWithContent(t *testing.T) {
 	now := time.Date(2026, 1, 1, 18, 0, 0, 0, time.UTC)
 	bot := &fakeBot{}
 	tmpl := config.Template{ID: "one", Telegram: config.TelegramConfig{DigestHour: 18}, Limits: config.LimitsConfig{PostsPerDay: 1, RepliesPerDay: 1, MaxUSDPerDay: 1}}
+	tmpl.Persona.Language = "vi"
 	makeService := func() *telegram.Service {
 		svc, err := telegram.NewService(telegram.ServiceOptions{Store: st, Bot: bot, BotKey: "fake", OwnerChatID: 77, Templates: []config.Template{tmpl}, Now: func() time.Time { return now }})
 		if err != nil {
@@ -146,9 +147,9 @@ func TestNoticesAndDigestOncePerEventWithContent(t *testing.T) {
 	}
 	found := false
 	for _, text := range bot.texts {
-		if strings.Contains(text, "Daily digest") {
+		if strings.Contains(text, "hôm nay đăng 1/1 bài") {
 			found = true
-			for _, part := range []string{"posts 1", "replies 0", "spend $1.0000", "views 10, likes 2, replies 3, reposts 4", "playbook changes 1"} {
+			for _, part := range []string{"reply 0/1", "xài $1.00 trên $1.00", "số liệu mới nhất: 10 view, 2 like, 3 reply, 4 repost", "playbook vừa sửa 1 chỗ"} {
 				if !strings.Contains(text, part) {
 					t.Fatalf("digest missing %s: %s", part, text)
 				}
@@ -480,6 +481,133 @@ func (b *menuBot) SetMyCommands(_ context.Context, commands []telegram.BotComman
 	return b.err
 }
 
+func TestOwnerDigestFollowsPersonaAndLanguage(t *testing.T) {
+	ctx := context.Background()
+	st, err := store.Open(ctx, ":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	for _, id := range []string{"one", "two"} {
+		if err = st.EnsureAgent(ctx, id); err != nil {
+			t.Fatal(err)
+		}
+	}
+	now := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	one := config.Template{ID: "one", Persona: config.PersonaConfig{Name: "Kaito", Language: "vi"}, Telegram: config.TelegramConfig{DigestHour: 0, Messages: map[string]string{"digest": "tao là {{.Name}}, đăng {{.Posts}} bài"}}, Limits: config.LimitsConfig{PostsPerDay: 3}}
+	two := config.Template{ID: "two", Persona: config.PersonaConfig{Name: "Professor", Language: "en"}, Telegram: config.TelegramConfig{DigestHour: 0}}
+	bot := &fakeBot{}
+	svc, err := telegram.NewService(telegram.ServiceOptions{Store: st, Bot: bot, BotKey: "fake", OwnerChatID: 77, Templates: []config.Template{one, two}, Now: func() time.Time { return now }})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = svc.Tick(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if err = svc.Flush(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if len(bot.texts) != 2 {
+		t.Fatalf("digests %v", bot.texts)
+	}
+	if bot.texts[0] != "Kaito: tao là Kaito, đăng 0 bài" {
+		t.Fatalf("persona override missing: %q", bot.texts[0])
+	}
+	if !strings.HasPrefix(bot.texts[1], "Professor: today:") {
+		t.Fatalf("second persona not applied: %q", bot.texts[1])
+	}
+}
+
+func TestHelpAndFreeTextNotes(t *testing.T) {
+	ctx := context.Background()
+	st, err := store.Open(ctx, ":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	if err = st.EnsureAgent(ctx, "one"); err != nil {
+		t.Fatal(err)
+	}
+	bot := &fakeBot{updates: []telegram.Update{
+		{UpdateID: 1, Message: &telegram.Message{Chat: telegram.Chat{ID: 77}, Text: "/help"}},
+		{UpdateID: 2, Message: &telegram.Message{Chat: telegram.Chat{ID: 77}, Text: "nhớ giữ giọng cà khịa nha"}},
+		{UpdateID: 3, Message: &telegram.Message{Chat: telegram.Chat{ID: 77}, Text: "/start"}},
+	}}
+	tmpl := config.Template{ID: "one", Persona: config.PersonaConfig{Language: "vi"}}
+	svc, err := telegram.NewService(telegram.ServiceOptions{Store: st, Bot: bot, BotKey: "fake", OwnerChatID: 77, Templates: []config.Template{tmpl}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = svc.Poll(ctx, 0); err != nil {
+		t.Fatal(err)
+	}
+	notes, err := st.OwnerAnswers(ctx, "one", 10)
+	if err != nil || len(notes) != 1 || notes[0].Kind != "note" || notes[0].Text != "nhớ giữ giọng cà khịa nha" {
+		t.Fatalf("owner note %+v %v", notes, err)
+	}
+	state, err := st.AgentState(ctx, "one")
+	if err != nil || state.Status != "running" {
+		t.Fatalf("free text changed state: %+v %v", state, err)
+	}
+	if err = svc.Flush(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if len(bot.texts) != 3 {
+		t.Fatalf("replies %v", bot.texts)
+	}
+	if !strings.Contains(bot.texts[0], "/status") || !strings.Contains(bot.texts[0], "/dnc <username>") {
+		t.Fatalf("help missing commands: %q", bot.texts[0])
+	}
+	if !strings.Contains(bot.texts[1], "ghi lại") {
+		t.Fatalf("note acknowledgement missing: %q", bot.texts[1])
+	}
+	if bot.texts[0] != bot.texts[2] {
+		t.Fatalf("/start differs from /help: %q vs %q", bot.texts[0], bot.texts[2])
+	}
+}
+
+func TestStatusUsesOwnerTimezoneAndRelativeTime(t *testing.T) {
+	ctx := context.Background()
+	st, err := store.Open(ctx, ":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	if err = st.EnsureAgent(ctx, "one"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = st.DB().Exec(`UPDATE agents SET next_wake_at='2026-01-01T07:33:00Z' WHERE id='one'`); err != nil {
+		t.Fatal(err)
+	}
+	now := time.Date(2026, 1, 1, 7, 15, 0, 0, time.UTC)
+	for i, tc := range []struct{ name, zone, want string }{
+		{"default owner zone", "", "14:33 (còn 18 phút)"},
+		{"configured zone", "UTC", "07:33 (còn 18 phút)"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			bot := &fakeBot{}
+			tmpl := config.Template{ID: "one", Persona: config.PersonaConfig{Language: "vi"}, Telegram: config.TelegramConfig{Timezone: tc.zone}, Limits: config.LimitsConfig{MaxUSDPerDay: 0.5}}
+			bot.updates = []telegram.Update{{UpdateID: int64(i + 1), Message: &telegram.Message{Chat: telegram.Chat{ID: 77}, Text: "/status"}}}
+			svc, err := telegram.NewService(telegram.ServiceOptions{Store: st, Bot: bot, BotKey: "fake", OwnerChatID: 77, Templates: []config.Template{tmpl}, Now: func() time.Time { return now }})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err = svc.Poll(ctx, 0); err != nil {
+				t.Fatal(err)
+			}
+			if err = svc.Flush(ctx); err != nil {
+				t.Fatal(err)
+			}
+			if len(bot.texts) != 1 || !strings.Contains(bot.texts[0], tc.want) {
+				t.Fatalf("status %v, want %q", bot.texts, tc.want)
+			}
+			if !strings.Contains(bot.texts[0], "$0.00/$0.50") {
+				t.Fatalf("status omitted budget: %q", bot.texts[0])
+			}
+		})
+	}
+}
+
 func TestServiceRegistersMenuAtStartAndSurvivesFailure(t *testing.T) {
 	for _, tc := range []struct {
 		name   string
@@ -532,15 +660,20 @@ func TestServiceRegistersMenuAtStartAndSurvivesFailure(t *testing.T) {
 			for _, command := range bot.commands {
 				names = append(names, command.Command)
 			}
-			if strings.Join(names, ",") != "status,pause,resume,kill,dnc" {
-				t.Fatalf("menu = %v, want the five handled commands", names)
+			if strings.Join(names, ",") != "help,status,pause,resume,kill,dnc" {
+				t.Fatalf("menu = %v, want the handled commands", names)
 			}
-			description := bot.commands[0].Description
-			if len(tc.ids) > 1 && !strings.Contains(description, "<agent_id>") {
-				t.Fatalf("multi-agent menu omits the agent-id form: %q", description)
+			dnc := ""
+			for _, command := range bot.commands {
+				if command.Command == "dnc" {
+					dnc = command.Description
+				}
 			}
-			if len(tc.ids) == 1 && strings.Contains(description, "<agent_id>") {
-				t.Fatalf("single-agent menu documents an unused agent-id form: %q", description)
+			if len(tc.ids) > 1 && !strings.Contains(dnc, "<agent_id>") {
+				t.Fatalf("multi-agent menu omits the agent-id form: %q", dnc)
+			}
+			if len(tc.ids) == 1 && strings.Contains(dnc, "<agent_id>") {
+				t.Fatalf("single-agent menu documents an unused agent-id form: %q", dnc)
 			}
 		})
 	}

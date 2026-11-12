@@ -230,7 +230,7 @@ func runOwnerCase(ctx context.Context, c Case, p Profile, repeat int, opts Optio
 		}
 		found := false
 		for _, text := range sent {
-			if strings.Contains(text, "Daily digest") && strings.Contains(text, "posts 1") && strings.Contains(text, "spend $1.0000") {
+			if strings.Contains(text, "today: 1/3 posts") && strings.Contains(text, "spent $1.00 of $1.00") {
 				found = true
 			}
 		}

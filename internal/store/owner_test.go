@@ -139,3 +139,33 @@ func TestOwnerUnknownAnswersAndUncertainDeliveryAreNeverReplayed(t *testing.T) {
 		}
 	}
 }
+
+func TestOwnerNoteReachesNextWakeAndDeduplicates(t *testing.T) {
+	ctx := context.Background()
+	st, err := store.Open(ctx, ":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	for _, id := range []string{"one", "two"} {
+		if err = st.EnsureAgent(ctx, id); err != nil {
+			t.Fatal(err)
+		}
+	}
+	now := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	if err = st.OwnerNote(ctx, []string{"one", "two"}, "fake:update:4", "nhớ giữ giọng cà khịa", now); err != nil {
+		t.Fatal(err)
+	}
+	if err = st.OwnerNote(ctx, []string{"one", "two"}, "fake:update:4", "nhớ giữ giọng cà khịa", now); err != nil {
+		t.Fatal(err)
+	}
+	for _, id := range []string{"one", "two"} {
+		notes, err := st.OwnerAnswers(ctx, id, 10)
+		if err != nil || len(notes) != 1 || notes[0].Kind != "note" || notes[0].Text != "nhớ giữ giọng cà khịa" || notes[0].AnsweredID != 0 {
+			t.Fatalf("note %s: %+v %v", id, notes, err)
+		}
+	}
+	if err = st.OwnerNote(ctx, nil, "k", "text", now); err == nil {
+		t.Fatal("empty agent list accepted")
+	}
+}

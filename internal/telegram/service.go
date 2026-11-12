@@ -22,6 +22,8 @@ import (
 	"github.com/canhta/threadwalker/internal/store"
 )
 
+const defaultOwnerTimezone = "Asia/Ho_Chi_Minh"
+
 type BotAPI interface {
 	GetUpdates(context.Context, int64, int) ([]Update, error)
 	SendMessage(context.Context, int64, string, int64) (int64, error)
@@ -44,6 +46,7 @@ type Service struct {
 	mu          sync.Mutex
 	templates   map[string]config.Template
 	ids         []string
+	locations   map[string]*time.Location
 	secrets     []string
 	sequence    atomic.Int64
 	deliveryKey string
@@ -66,11 +69,20 @@ func NewService(opts ServiceOptions) (*Service, error) {
 	// action reservations across independent stores and processes.
 	opts.Store.DB().SetMaxOpenConns(1)
 	scope := sha256.Sum256([]byte(opts.BotKey + "\x00" + strconv.FormatInt(opts.OwnerChatID, 10)))
-	s := &Service{opts: opts, templates: map[string]config.Template{}, deliveryKey: hex.EncodeToString(scope[:])}
+	s := &Service{opts: opts, templates: map[string]config.Template{}, locations: map[string]*time.Location{}, deliveryKey: hex.EncodeToString(scope[:])}
 	for _, t := range opts.Templates {
 		if t.ID == "" || s.templates[t.ID].ID != "" || t.Telegram.DigestHour < 0 || t.Telegram.DigestHour > 23 {
 			return nil, errors.New("configuring Telegram service: invalid agent or digest hour")
 		}
+		zone := strings.TrimSpace(t.Telegram.Timezone)
+		if zone == "" {
+			zone = defaultOwnerTimezone
+		}
+		loc, err := time.LoadLocation(zone)
+		if err != nil {
+			return nil, errors.New("configuring Telegram service: invalid owner timezone")
+		}
+		s.locations[t.ID] = loc
 		s.templates[t.ID] = t
 		s.ids = append(s.ids, t.ID)
 		for _, secret := range []config.Secret{t.LLM.APIKey, t.Telegram.BotToken, t.Telegram.OwnerChatID} {
@@ -165,7 +177,7 @@ func (s *Service) handle(ctx context.Context, u Update) error {
 	key := s.opts.BotKey + ":update:" + strconv.FormatInt(u.UpdateID, 10)
 	if !strings.HasPrefix(m.Text, "/") {
 		if m.ReplyToMessage == nil {
-			return nil
+			return s.handleNote(ctx, m.Text, key)
 		}
 		ok, err := s.opts.Store.AnswerOwner(ctx, s.ids, s.deliveryKey, m.ReplyToMessage.MessageID, key, s.redact(m.Text), s.opts.Now())
 		outcome, reason := "ignored", "unknown_question"
@@ -193,6 +205,8 @@ func (s *Service) handle(ctx context.Context, u Update) error {
 	// Qualified bot command names are not guessed; only the documented surface is
 	// accepted, and arbitrary command text never becomes logging metadata.
 	switch command {
+	case "help", "start":
+		return s.handleHelp(ctx, fields[1:], key)
 	case "pause", "resume", "kill", "dnc", "status":
 	default:
 		s.event(ctx, "", "command", "ignored", "unknown_command", 0)
@@ -223,22 +237,34 @@ func (s *Service) handle(ctx context.Context, u Update) error {
 		s.event(ctx, id, "command", "ignored", "invalid_command", 0)
 		return nil
 	}
-	text := "Agent " + id + ": " + command + " received."
+	username := ""
+	if command == "dnc" {
+		normalized, err := store.NormalizeUsername(args[0])
+		if err != nil {
+			s.event(ctx, id, "dnc", "ignored", "invalid_command", 0)
+			return nil
+		}
+		username = normalized
+		if err = s.opts.Store.MarkDoNotContact(ctx, id, username, "owner_request"); err != nil {
+			s.event(ctx, id, "dnc", "error", "contact_failed", 0)
+			return errors.New("processing owner contact control: invalid or unavailable contact")
+		}
+	}
+	text := ""
 	if command == "status" {
 		summary, err := s.summary(ctx, id)
 		if err != nil {
 			return err
 		}
-		text = summaryText(id, summary, false)
-	}
-	if command == "dnc" {
-		if _, err := store.NormalizeUsername(args[0]); err != nil {
-			s.event(ctx, id, "dnc", "ignored", "invalid_command", 0)
-			return nil
+		text, err = s.summaryText(id, summary, false)
+		if err != nil {
+			return err
 		}
-		if err := s.opts.Store.MarkDoNotContact(ctx, id, args[0], "owner_request"); err != nil {
-			s.event(ctx, id, "dnc", "error", "contact_failed", 0)
-			return errors.New("processing owner contact control: invalid or unavailable contact")
+	} else {
+		var err error
+		text, err = s.receiptText(id, command, username)
+		if err != nil {
+			return err
 		}
 	}
 	if err := s.opts.Store.OwnerControl(ctx, id, command, key, text, s.opts.Now()); err != nil {
@@ -254,6 +280,49 @@ func (s *Service) handle(ctx context.Context, u Update) error {
 		return s.Notice(ctx, id, "killed", "terminal")
 	}
 	return nil
+}
+
+// handleHelp answers /help and /start with the documented command surface. It
+// never changes state, so a repeated delivery only repeats the persisted reply.
+func (s *Service) handleHelp(ctx context.Context, args []string, key string) error {
+	id := s.ids[0]
+	if len(s.ids) > 1 && len(args) > 0 {
+		if _, ok := s.templates[args[0]]; ok {
+			id = args[0]
+		}
+	}
+	text, err := s.helpText(id)
+	if err != nil {
+		return err
+	}
+	n, err := s.opts.Store.QueueOwner(ctx, id, "command", text, key, s.opts.Now())
+	outcome, reason := "success", "help_queued"
+	if err != nil {
+		outcome, reason = "error", "help_failed"
+	}
+	s.event(ctx, id, "help", outcome, reason, n)
+	return err
+}
+
+// handleNote keeps an owner's free text for the next wake without spending a
+// model call. One acknowledgement is queued; the update key makes both the note
+// and the acknowledgement idempotent across redelivery and restarts.
+func (s *Service) handleNote(ctx context.Context, text, key string) error {
+	text = strings.TrimSpace(text)
+	if text == "" {
+		return nil
+	}
+	if err := s.opts.Store.OwnerNote(ctx, s.ids, key, s.redact(text), s.opts.Now()); err != nil {
+		s.event(ctx, "", "note", "error", "note_failed", 0)
+		return err
+	}
+	s.event(ctx, s.ids[0], "note", "success", "note_saved", 0)
+	ack, err := s.noteAck(s.ids[0])
+	if err != nil {
+		return err
+	}
+	_, err = s.opts.Store.QueueOwner(ctx, s.ids[0], "notification", ack, "note-ack:"+key, s.opts.Now())
+	return err
 }
 
 // Flush claims each message before HTTP. Ambiguous outcomes are retained as
@@ -272,7 +341,22 @@ func (s *Service) Flush(ctx context.Context) error {
 		if !ok {
 			continue
 		}
-		messageID, sendErr := s.opts.Bot.SendMessage(ctx, s.opts.OwnerChatID, "["+m.AgentID+"] "+m.Text, 0)
+		text := m.Text
+		if m.Kind == "question" {
+			if hint, hintErr := s.render(m.AgentID, "question_hint", s.ownerData(m.AgentID, store.OwnerSummary{})); hintErr == nil && hint != "" {
+				text += "\n\n" + hint
+			}
+		}
+		// A shared bot names the speaker once; a private one-agent chat reads as
+		// a single teammate and needs no label.
+		if len(s.ids) > 1 {
+			speaker := s.templates[m.AgentID].Persona.Name
+			if speaker == "" {
+				speaker = m.AgentID
+			}
+			text = speaker + ": " + text
+		}
+		messageID, sendErr := s.opts.Bot.SendMessage(ctx, s.opts.OwnerChatID, text, 0)
 		finalCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
 		err = s.opts.Store.FinishOwner(finalCtx, m.ID, messageID, sendErr == nil)
 		cancel()
@@ -298,25 +382,18 @@ func (s *Service) Notice(ctx context.Context, id, kind, event string) error {
 	if _, ok := s.templates[id]; !ok {
 		return errors.New("queueing owner notice: unconfigured agent")
 	}
-	var text string
-	switch kind {
-	case "daily_limit":
-		text = "Daily action limit reached."
-	case "budget_80":
-		text = "Daily budget reached 80%."
-	case "budget_100":
-		text = "Daily budget reached 100%."
-	case "logged_out":
-		text = "Browser logged out; agent paused."
-	case "captcha":
-		text = "Browser captcha detected; agent paused."
-	case "killed":
-		text = "Agent killed."
-	default:
-		return errors.New("queueing owner notice: unknown kind")
-	}
 	if event == "" || len(event) > 200 {
 		return errors.New("queueing owner notice: event identity required")
+	}
+	notice := noticeText(messageLanguage(s.templates[id]), kind)
+	if notice == "" {
+		return errors.New("queueing owner notice: unknown kind")
+	}
+	data := s.ownerData(id, store.OwnerSummary{})
+	data.Notice = notice
+	text, err := s.render(id, "notice", data)
+	if err != nil {
+		return err
 	}
 	n, err := s.opts.Store.QueueOwner(ctx, id, "notice", text, "notice:"+kind+":"+event, s.opts.Now())
 	outcome, reason := "queued", kind
@@ -345,21 +422,6 @@ func (s *Service) summary(ctx context.Context, id string) (store.OwnerSummary, e
 	now := s.opts.Now().UTC()
 	day := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
 	return s.opts.Store.OwnerSummary(ctx, id, day, day.Add(24*time.Hour))
-}
-func summaryText(id string, m store.OwnerSummary, digest bool) string {
-	label := "Status"
-	if digest {
-		label = "Daily digest"
-	}
-	next := "unscheduled"
-	if !m.NextWake.IsZero() {
-		next = m.NextWake.UTC().Format(time.RFC3339)
-	}
-	metrics := "metrics unavailable"
-	if m.MetricSamples > 0 {
-		metrics = fmt.Sprintf("metrics views %d, likes %d, replies %d, reposts %d", m.Views, m.Likes, m.Responses, m.Reposts)
-	}
-	return fmt.Sprintf("%s %s: %s; next wake %s; posts %d; replies %d; spend $%.4f; %s; playbook changes %d.", label, id, m.Status, next, m.Posts, m.Replies, m.CostUSD, metrics, m.PlaybookChanges)
 }
 
 // Tick observes persisted state, thresholds and UTC digest schedule. A pending
@@ -395,7 +457,11 @@ func (s *Service) Tick(ctx context.Context) error {
 			}
 		}
 		if now.Hour() >= tmpl.Telegram.DigestHour {
-			n, err := s.opts.Store.QueueOwner(ctx, id, "digest", summaryText(id, summary, true), "digest:"+day, now)
+			text, renderErr := s.summaryText(id, summary, true)
+			if renderErr != nil {
+				return renderErr
+			}
+			n, err := s.opts.Store.QueueOwner(ctx, id, "digest", text, "digest:"+day, now)
 			outcome, reason := "queued", "daily_digest"
 			if err != nil {
 				outcome, reason = "error", "digest_failed"
@@ -409,25 +475,44 @@ func (s *Service) Tick(ctx context.Context) error {
 	return nil
 }
 
-// ownerCommands is the menu the bot advertises. The Bot API menu has no
-// argument slots, so each description names the accepted form: plain command
-// for one agent, and the agent-ID form when one bot serves several agents.
-func ownerCommands(multiAgent bool) []BotCommand {
+// ownerCommands is the menu the bot advertises. Descriptions stay short; the
+// agent-ID form is named only when one bot serves several agents. Wording is
+// selected from the first agent's persona language.
+func ownerCommands(lang string, multiAgent bool) []BotCommand {
+	vi := strings.HasPrefix(strings.ToLower(lang), "vi")
+	suffix := ""
 	if multiAgent {
-		return []BotCommand{
-			{Command: "status", Description: "Show status and next wake: /status <agent_id>"},
-			{Command: "pause", Description: "Pause an agent: /pause <agent_id>"},
-			{Command: "resume", Description: "Resume a paused agent: /resume <agent_id>"},
-			{Command: "kill", Description: "Kill an agent permanently: /kill <agent_id>"},
-			{Command: "dnc", Description: "Never reply to a username: /dnc <agent_id> <username>"},
+		if vi {
+			suffix = " (kèm agent_id)"
+		} else {
+			suffix = " (with agent_id)"
 		}
 	}
+	if vi {
+		dnc := "né username: /dnc <username>"
+		if multiAgent {
+			dnc = "né username: /dnc <agent_id> <username>"
+		}
+		return []BotCommand{
+			{Command: "help", Description: "xem danh sách lệnh"},
+			{Command: "status", Description: "xem đang làm gì" + suffix},
+			{Command: "pause", Description: "tạm dừng" + suffix},
+			{Command: "resume", Description: "chạy tiếp" + suffix},
+			{Command: "kill", Description: "tắt hẳn, ko bật lại" + suffix},
+			{Command: "dnc", Description: dnc},
+		}
+	}
+	dnc := "ignore username: /dnc <username>"
+	if multiAgent {
+		dnc = "ignore username: /dnc <agent_id> <username>"
+	}
 	return []BotCommand{
-		{Command: "status", Description: "Show status and next wake: /status"},
-		{Command: "pause", Description: "Pause this agent: /pause"},
-		{Command: "resume", Description: "Resume this agent: /resume"},
-		{Command: "kill", Description: "Kill this agent permanently: /kill"},
-		{Command: "dnc", Description: "Never reply to a username: /dnc <username>"},
+		{Command: "help", Description: "list commands"},
+		{Command: "status", Description: "what i'm doing" + suffix},
+		{Command: "pause", Description: "pause" + suffix},
+		{Command: "resume", Description: "resume" + suffix},
+		{Command: "kill", Description: "stop for good" + suffix},
+		{Command: "dnc", Description: dnc},
 	}
 }
 
@@ -435,7 +520,7 @@ func ownerCommands(multiAgent bool) []BotCommand {
 // persists the menu, so a failed registration is logged with a fixed reason and
 // the poller continues; neither owner commands nor wakes depend on it.
 func (s *Service) registerCommands(ctx context.Context) {
-	err := s.opts.Bot.SetMyCommands(ctx, ownerCommands(len(s.ids) > 1))
+	err := s.opts.Bot.SetMyCommands(ctx, ownerCommands(messageLanguage(s.templates[s.ids[0]]), len(s.ids) > 1))
 	outcome, reason := "success", "menu_registered"
 	if err != nil {
 		outcome, reason = "error", "menu_failed"
