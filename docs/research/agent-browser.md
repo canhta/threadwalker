@@ -1,6 +1,6 @@
 # Local agent-browser CLI verification (#22)
 
-Source: the `agent_browser` backend on top of `d61b2fa`, measured locally on
+Source: the `agent_browser` backend in `457e03f`, measured locally on
 2026-11-12 with Go 1.27.3, macOS arm64, Google Chrome for Testing
 157.0.8103.52 and the pinned **agent-browser 0.42.0** CLI. This is synthetic
 local evidence: no Threads account, Telegram, paid provider, VPS or real
@@ -136,7 +136,7 @@ stdin or file-descriptor fill path; do not add `eval` for it.
 AGENT_BROWSER_BIN=/path/to/agent-browser CHROME_BIN=/path/to/chrome \
   go test -tags agent_browser_integration -run TestAgentBrowserLocalIntegration \
   -count=1 -v ./internal/threads/
-# --- PASS: TestAgentBrowserLocalIntegration (25.59s)
+# --- PASS: TestAgentBrowserLocalIntegration (27.96s)
 # PASS
 ```
 
@@ -153,10 +153,12 @@ AGENT_BROWSER_BIN=/path/to/agent-browser CHROME_BIN=/path/to/chrome \
 | Uncertain submit | Server accepted exactly once; transport returned `ErrUnknownOutcome`; no retry; owned daemon cleanup succeeded |
 | Cancellation | A 500 ms deadline during a slow page returned `context.DeadlineExceeded`; close succeeded and submitted nothing |
 
-Offline checks: `go vet ./...` (no output) and `go test -count=1 ./...` passed;
-see `vet.txt` and `tests.txt`. The shared eval suite passed 30/30 offline
-(`default-eval.json`). `go test -race ./internal/agentbrowser ./internal/threads`
-also passed.
+Offline checks: `go vet ./...` (no output) and `go test ./...` passed; the
+uncached `go test -count=1 ./...` run is in `tests.txt`, with `vet.txt`. The
+shared eval suite passed 30/30 offline at revision `457e03f`, seed 8
+(`default-eval.json`, `eval.txt`). `go test -race ./internal/agentbrowser
+./internal/threads` also passed. The pre-existing guard concurrency flake that
+blocked the first full run was fixed separately in #23 (commit `833af26`).
 
 ## Not measured
 

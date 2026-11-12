@@ -1,0 +1,4 @@
+=== RUN   TestAgentBrowserLocalIntegration
+--- PASS: TestAgentBrowserLocalIntegration (27.96s)
+PASS
+ok  	github.com/canhta/threadwalker/internal/threads	28.471s
