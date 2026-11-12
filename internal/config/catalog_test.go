@@ -82,6 +82,60 @@ func TestCatalogMultipleProvidersAndSharedModels(t *testing.T) {
 	}
 }
 
+func TestCatalogReasoningEffort(t *testing.T) {
+	text := `providers:
+  chosen:
+    protocol: openai
+    base_url: https://gateway.example.test/v1
+    api_key_env: CHOSEN_KEY
+  native:
+    protocol: anthropic
+    base_url: https://native.example.test
+    api_key_env: NATIVE_KEY
+models:
+  reasoning:
+    provider: chosen
+    model: arbitrary-model
+    price_per_mtok_in_usd: 0.1
+    price_per_mtok_out_usd: 0.5
+    reasoning_effort: none
+  plain:
+    provider: chosen
+    model: arbitrary-model
+    price_per_mtok_in_usd: 0.1
+    price_per_mtok_out_usd: 0.5
+`
+	c, err := config.LoadCatalog(writeCatalog(t, text))
+	if err != nil {
+		t.Fatal(err)
+	}
+	llm, err := c.Resolve("reasoning", func(string) string { return "secret" })
+	if err != nil || llm.ReasoningEffort != "none" {
+		t.Fatalf("resolved reasoning effort = %q, %v", llm.ReasoningEffort, err)
+	}
+	llm, err = c.Resolve("plain", func(string) string { return "secret" })
+	if err != nil || llm.ReasoningEffort != "" {
+		t.Fatalf("unset reasoning effort = %q, %v", llm.ReasoningEffort, err)
+	}
+
+	native := `providers:
+  native:
+    protocol: anthropic
+    base_url: https://native.example.test
+    api_key_env: NATIVE_KEY
+models:
+  native:
+    provider: native
+    model: arbitrary-model
+    price_per_mtok_in_usd: 0.1
+    price_per_mtok_out_usd: 0.5
+    reasoning_effort: none
+`
+	if _, err := config.LoadCatalog(writeCatalog(t, native)); err == nil || !strings.Contains(err.Error(), "reasoning_effort") {
+		t.Fatalf("anthropic reasoning effort error = %v", err)
+	}
+}
+
 func TestCatalogResolveErrorsDoNotReadUnselectedKeys(t *testing.T) {
 	c, err := config.LoadCatalog(writeCatalog(t, catalogYAML))
 	if err != nil {

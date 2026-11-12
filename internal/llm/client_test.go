@@ -414,6 +414,34 @@ func TestBoundedOutputOptions(t *testing.T) {
 	}
 }
 
+func TestReasoningEffortOmittedWhenUnset(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var request map[string]json.RawMessage
+		if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+			t.Error(err)
+		}
+		if _, present := request["reasoning_effort"]; present {
+			t.Error("reasoning_effort present without configuration")
+		}
+		w.Write([]byte(`{"choices":[{"message":{"role":"assistant","content":"ok"},"finish_reason":"stop"}],"usage":{"prompt_tokens":10,"completion_tokens":2}}`))
+	}))
+	defer server.Close()
+	client, err := llm.New(config.LLMConfig{BaseURL: server.URL, Model: "test", APIKey: config.NewSecret("key")}, config.LimitsConfig{MaxStepsPerWake: 3, MaxUSDPerDay: 1}, &memoryLedger{}, llm.Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := client.Run(context.Background(), "agent", 1, []llm.Message{{Role: "user", Content: "go"}}, nil, nil); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestReasoningEffortRejectedForAnthropic(t *testing.T) {
+	_, err := llm.New(config.LLMConfig{Protocol: "anthropic", BaseURL: "https://fixture.invalid", Model: "test", APIKey: config.NewSecret("key")}, config.LimitsConfig{MaxStepsPerWake: 3, MaxUSDPerDay: 1}, &memoryLedger{}, llm.Options{ReasoningEffort: "none"})
+	if err == nil || !strings.Contains(err.Error(), "reasoning effort") {
+		t.Fatalf("anthropic reasoning effort error = %v", err)
+	}
+}
+
 func TestMissingDispatcherFailsBeforeRequest(t *testing.T) {
 	requests := 0
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { requests++; w.Write([]byte(`{}`)) }))

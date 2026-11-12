@@ -83,6 +83,9 @@ type LLMConfig struct {
 	APIKey             Secret
 	PricePerMTokInUSD  float64
 	PricePerMTokOutUSD float64
+	// ReasoningEffort is an optional provider-specific hint, sent only by the
+	// openai protocol when nonempty. Values are operator inputs, not an allowlist.
+	ReasoningEffort string
 }
 
 type LimitsConfig struct {
@@ -311,6 +314,10 @@ func loadFile(path string, getenv func(string) string, catalog *Catalog, secrets
 		tmpl.LLM.APIKeyEnv = requireString("llm.api_key_env")
 		tmpl.LLM.PricePerMTokInUSD = requireFloat("llm.price_per_mtok_in_usd", true)
 		tmpl.LLM.PricePerMTokOutUSD = requireFloat("llm.price_per_mtok_out_usd", true)
+		tmpl.LLM.ReasoningEffort = strings.TrimSpace(doc.scalars["llm.reasoning_effort"])
+		if tmpl.LLM.ReasoningEffort != "" && tmpl.LLM.Protocol != "openai" {
+			addErr("llm.reasoning_effort", "is only supported by the openai protocol")
+		}
 	}
 
 	tmpl.Limits.PostsPerDay = requirePositiveInt("limits.posts_per_day")

@@ -17,9 +17,10 @@ type Catalog struct {
 }
 
 type catalogModel struct {
-	provider string
-	model    string
-	in, out  float64
+	provider  string
+	model     string
+	in, out   float64
+	reasoning string
 }
 
 // ProviderID returns configured metadata without resolving any credentials.
@@ -83,7 +84,7 @@ func LoadCatalog(path string) (*Catalog, error) {
 	}
 	for _, id := range catalogKeys(models) {
 		node, field := models[id], "models."+id
-		if err := catalogFields(node, field, "provider", "model", "price_per_mtok_in_usd", "price_per_mtok_out_usd"); err != nil {
+		if err := catalogFields(node, field, "provider", "model", "price_per_mtok_in_usd", "price_per_mtok_out_usd", "reasoning_effort"); err != nil {
 			return nil, err
 		}
 		provider, err := catalogString(node.children["provider"], field+".provider")
@@ -105,7 +106,17 @@ func LoadCatalog(path string) (*Catalog, error) {
 		if err != nil {
 			return nil, err
 		}
-		c.models[id] = catalogModel{provider: provider, model: model, in: in, out: out}
+		reasoning := ""
+		if node.children["reasoning_effort"] != nil {
+			reasoning, err = catalogString(node.children["reasoning_effort"], field+".reasoning_effort")
+			if err != nil {
+				return nil, err
+			}
+			if c.providers[provider].Protocol != "openai" {
+				return nil, catalogError(field+".reasoning_effort", "is only supported by the openai protocol")
+			}
+		}
+		c.models[id] = catalogModel{provider: provider, model: model, in: in, out: out, reasoning: reasoning}
 	}
 	return c, nil
 }
@@ -234,6 +245,7 @@ func (c *Catalog) resolve(profile string, getenv func(string) string, secrets bo
 		return LLMConfig{}, fmt.Errorf("catalog field models.%s.provider: unknown provider", profile)
 	}
 	llm.Model, llm.PricePerMTokInUSD, llm.PricePerMTokOutUSD = model.model, model.in, model.out
+	llm.ReasoningEffort = model.reasoning
 	if !secrets {
 		return llm, nil
 	}

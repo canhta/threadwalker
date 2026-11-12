@@ -481,7 +481,7 @@ connection pool; no connection is held during Bot API HTTP. Canonical delivery D
 |---|---|---|
 | Language | Go, single binary | Research read the repos; nothing was run |
 | DB | SQLite via a pure-Go driver (`modernc.org/sqlite`) | Research read the repo; nothing was run |
-| LLM | Optional provider/model catalog ([canonical example](../llms.example.yaml)); templates select a profile or declare inline LLM settings | Standard-library adapters implement `openai` Chat Completions and native `anthropic` Messages, including custom base URLs; two-tool live evidence is in [spike-llm.md](research/spike-llm.md) |
+| LLM | Optional provider/model catalog ([canonical example](../llms.example.yaml)); templates select a profile or declare inline LLM settings | Standard-library adapters implement `openai` Chat Completions and native `anthropic` Messages, including custom base URLs and the optional openai-only `reasoning_effort`; two-tool live evidence is in [spike-llm.md](research/spike-llm.md), and the gpt-6-luna prices and Chat Completions-versus-Responses decision are in [gpt-6-luna.md](research/gpt-6-luna.md) |
 | Browser | Headless Chromium over CDP via `chromedp v0.23.0` (default `browser`), or the pinned `agent-browser 0.42.0` CLI (`agent_browser`) | Local synthetic transport/lifecycle measured for both in [spike-browser.md](research/spike-browser.md) and [agent-browser.md](research/agent-browser.md); measured Threads reads and live post/reply writes in [threads-live-mapping.md](research/threads-live-mapping.md); account survival, captcha/rate-limit banners, production memory and datacenter-IP behavior remain unverified |
 | Deploy | Local process; optional systemd deployment on a chosen Linux host | decision |
 
@@ -598,10 +598,13 @@ Each agent template in `agents/*.yaml` (see [`agents/solo-builder.example.yaml`]
 - `seed_playbook`: initial `testing` hypotheses for the agent's first wakes.
 - `llm`: either a `profile` selecting a model profile in the optional catalog, or the existing
   inline provider/model settings. Inline `protocol` defaults to `openai`; configured protocols
-  are `openai` or `anthropic`. Never combine a profile with an inline LLM field, even an empty one.
+  are `openai` or `anthropic`. Optional `reasoning_effort` is a nonempty provider-specific string
+  sent only by the `openai` protocol and omitted when unset; the `anthropic` protocol rejects it.
+  A catalog `models.<id>` entry may carry the same optional field. Never combine a profile with an
+  inline LLM field, even an empty one.
   Missing catalog/profile/provider references, duplicate IDs and invalid values are errors.
-  Provider and profile IDs, model names, endpoints and key environment-variable names are
-  operator inputs, with no vendor/model allowlist. The canonical catalog shape lives in
+  Provider and profile IDs, model names, endpoints, key environment-variable names and reasoning
+  values are operator inputs, with no vendor/model allowlist. The canonical catalog shape lives in
   [`llms.example.yaml`](../llms.example.yaml); the canonical inline shape lives in
   [`agents/solo-builder.example.yaml`](../agents/solo-builder.example.yaml).
 - `limits` (all positive): `posts_per_day`, `replies_per_day`, `replies_per_user_7d`,

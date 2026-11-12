@@ -5,15 +5,18 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"net/http"
+	"net/http/httptest"
+	"path/filepath"
+	"strings"
+	"testing"
+	"time"
+
 	"github.com/canhta/threadwalker/internal/agent"
 	"github.com/canhta/threadwalker/internal/config"
 	"github.com/canhta/threadwalker/internal/llm"
 	"github.com/canhta/threadwalker/internal/logging"
 	"github.com/canhta/threadwalker/internal/store"
-	"path/filepath"
-	"strings"
-	"testing"
-	"time"
 )
 
 func TestWakeReadsWritesDryRunAndSchedules(t *testing.T) {
@@ -382,5 +385,43 @@ func TestSchedulerOwnerPauseBetweenSelectionAndWake(t *testing.T) {
 	var count int
 	if err = st.DB().QueryRow(`SELECT COUNT(*) FROM wakes`).Scan(&count); err != nil || count != 0 {
 		t.Fatalf("paused wake started %d %v", count, err)
+	}
+}
+
+func TestWakeForwardsConfiguredReasoningEffort(t *testing.T) {
+	ctx := context.Background()
+	st, err := store.Open(ctx, filepath.Join(t.TempDir(), "reasoning.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	var request map[string]json.RawMessage
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/chat/completions" {
+			t.Errorf("unexpected provider path %q", r.URL.Path)
+		}
+		if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+			t.Error(err)
+		}
+		_, _ = w.Write([]byte(`{"choices":[{"message":{"role":"assistant","content":"Synthetic wake completed."},"finish_reason":"stop"}],"usage":{"prompt_tokens":10,"completion_tokens":5}}`))
+	}))
+	defer server.Close()
+	now := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	tmpl := agent.OfflineTemplate()
+	tmpl.LLM.BaseURL = server.URL
+	tmpl.LLM.ReasoningEffort = "none"
+	r, err := agent.New(agent.Options{Store: st, Template: tmpl, Now: func() time.Time { return now }, HTTPClient: &http.Client{}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = r.Start(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = r.Wake(ctx); err != nil {
+		t.Fatal(err)
+	}
+	var effort string
+	if err := json.Unmarshal(request["reasoning_effort"], &effort); err != nil || effort != "none" {
+		t.Fatalf("forwarded reasoning_effort = %q (%v)", effort, err)
 	}
 }

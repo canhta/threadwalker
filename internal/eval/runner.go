@@ -174,7 +174,7 @@ func runCase(ctx context.Context, c Case, p Profile, repeat int, opts Options, l
 		r.DurationMS = float64(time.Since(started).Nanoseconds()) / 1e6
 		return r
 	}
-	client, err := llm.New(cfg, config.LimitsConfig{MaxStepsPerWake: steps, MaxUSDPerDay: usd}, ledger, llm.Options{HTTPClient: &http.Client{Transport: transport}, Now: opts.Now, MaxCompletionTokens: output, RequestTimeout: 30 * time.Second, Sleep: func(ctx context.Context, _ time.Duration) error { return ctx.Err() }, ProfileID: p.ID, ProviderID: p.ProviderID})
+	client, err := llm.New(cfg, config.LimitsConfig{MaxStepsPerWake: steps, MaxUSDPerDay: usd}, ledger, llm.Options{HTTPClient: &http.Client{Transport: transport}, Now: opts.Now, MaxCompletionTokens: output, RequestTimeout: 30 * time.Second, Sleep: func(ctx context.Context, _ time.Duration) error { return ctx.Err() }, ProfileID: p.ID, ProviderID: p.ProviderID, ReasoningEffort: cfg.ReasoningEffort})
 	if err != nil {
 		r.Reason = "invalid_profile"
 		r.EndReason = "provider_error"

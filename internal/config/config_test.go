@@ -118,6 +118,38 @@ func TestLoadFile_ValidExampleTemplate(t *testing.T) {
 	}
 }
 
+func TestLoadFile_ReasoningEffort(t *testing.T) {
+	examplePath := filepath.Join("..", "..", "agents", "solo-builder.example.yaml")
+	raw, err := os.ReadFile(examplePath)
+	if err != nil {
+		t.Fatalf("reading example template: %v", err)
+	}
+	load := func(t *testing.T, text string) (config.Template, error) {
+		t.Helper()
+		path := filepath.Join(t.TempDir(), "agent.yaml")
+		if err := os.WriteFile(path, []byte(text), 0o600); err != nil {
+			t.Fatalf("writing temp template: %v", err)
+		}
+		return config.LoadFile(path, validEnv())
+	}
+
+	tmpl, err := load(t, string(raw))
+	if err != nil || tmpl.LLM.ReasoningEffort != "" {
+		t.Fatalf("unset reasoning effort = %q, %v", tmpl.LLM.ReasoningEffort, err)
+	}
+
+	withEffort := strings.Replace(string(raw), "llm:\n", "llm:\n  reasoning_effort: none\n", 1)
+	tmpl, err = load(t, withEffort)
+	if err != nil || tmpl.LLM.Protocol != "openai" || tmpl.LLM.ReasoningEffort != "none" {
+		t.Fatalf("inline reasoning effort = %q, %v", tmpl.LLM.ReasoningEffort, err)
+	}
+
+	native := strings.Replace(withEffort, "llm:\n", "llm:\n  protocol: anthropic\n", 1)
+	if _, err := load(t, native); err == nil || !strings.Contains(err.Error(), "llm.reasoning_effort") {
+		t.Fatalf("anthropic reasoning effort error = %v", err)
+	}
+}
+
 func TestLoadFile_MissingRequiredFields(t *testing.T) {
 	requiredFields := []struct {
 		field     string

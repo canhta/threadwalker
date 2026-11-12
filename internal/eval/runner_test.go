@@ -440,6 +440,14 @@ func TestLiveUsesConfiguredProtocolAndCapsWithFakeServers(t *testing.T) {
 				if body["model"] != "arbitrary-model" || body[limit] != float64(17) {
 					t.Errorf("wrong model/output cap: %v", body)
 				}
+				if protocol == "openai" && body["reasoning_effort"] != "none" {
+					t.Errorf("openai reasoning_effort not forwarded: %v", body)
+				}
+				if protocol == "anthropic" {
+					if _, present := body["reasoning_effort"]; present {
+						t.Error("anthropic body carried reasoning_effort")
+					}
+				}
 				_, _ = w.Write(finalResponse(protocol, "DONE").Body)
 			}))
 			defer server.Close()
@@ -448,6 +456,9 @@ func TestLiveUsesConfiguredProtocolAndCapsWithFakeServers(t *testing.T) {
 			p.Config.BaseURL = server.URL
 			p.Config.APIKeyEnv = "EVAL_FAKE_KEY"
 			p.Config.APIKey = config.NewSecret("fake-environment-only-key")
+			if protocol == "openai" {
+				p.Config.ReasoningEffort = "none"
+			}
 			s := scripted(t, protocol, []eval.Response{{Error: "transport"}}, eval.Expectation{EndReason: "completed"}, eval.Limits{}, nil)
 			opts := eval.Options{Mode: "live", Profiles: []eval.Profile{p}, CaseIDs: []string{"synthetic"}, MaxUSD: 1, MaxSteps: 3, MaxOutputTokens: 17}
 			report, err := eval.Run(context.Background(), s, opts)

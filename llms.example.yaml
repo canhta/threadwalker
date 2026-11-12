@@ -20,6 +20,7 @@ models:
     model: your-reasoning-model-id
     price_per_mtok_in_usd: 0
     price_per_mtok_out_usd: 0
+    reasoning_effort: none         # optional; openai protocol only, omitted when unset
   backup:
     provider: secondary
     model: your-anthropic-model-id

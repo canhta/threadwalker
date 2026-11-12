@@ -276,7 +276,7 @@ func (r *Runtime) Wake(ctx context.Context) (wake WakeResult, wakeErr error) {
 	if err != nil {
 		return wake, err
 	}
-	client, err := llm.New(r.opts.Template.LLM, r.opts.Template.Limits, r.opts.Store, dispatcher.ConfigureClient(llm.Options{Logger: r.opts.Logger, Now: r.opts.Now, Sleep: r.opts.Wait, HTTPClient: r.opts.HTTPClient}))
+	client, err := llm.New(r.opts.Template.LLM, r.opts.Template.Limits, r.opts.Store, dispatcher.ConfigureClient(llm.Options{Logger: r.opts.Logger, Now: r.opts.Now, Sleep: r.opts.Wait, HTTPClient: r.opts.HTTPClient, ReasoningEffort: r.opts.Template.LLM.ReasoningEffort}))
 	if err != nil {
 		return wake, err
 	}
