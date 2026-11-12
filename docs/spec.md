@@ -185,9 +185,11 @@ zero. The composer dialog, inline reply composer, one-click submit and acknowled
 measured: a success is the status toast's same-origin `View` URL or a new own post block, and the
 guarded backend returns that `/post/<id>` URL. A missing acknowledgement within the deadline is
 `ErrUnknownOutcome` and is never retried. A missing or ambiguous composer is refused before any
-fill or click. Captcha flows, explicit rate-limit/error banners, multi-line `fill`, session
-portability, account survival and real-account operation remain unverified in #2/#18; the live
-profile does not claim a portable VPS session. **(decision, #22/#24/#25)**
+fill or click. Multi-line text is typed line by line and separated with measured `Shift+Enter`
+soft breaks; a plain newline would submit the inline reply composer. Captcha flows, explicit
+rate-limit/error banners, session portability, account survival and real-account operation remain
+unverified in #2/#18; the live profile does not claim a portable VPS session.
+**(decision, #22/#24/#25)**
 
 `dry_run` browser reads execute normally; writes retain a single guarded intent without
 submitting. A configured non-dry-run backend submits only after that intent commits and stores

@@ -35,6 +35,10 @@
       "sha256": "b4719c90040452173ca9ec4f35802b24f5fec47c87a1b5be7870d61051b9252c"
     },
     {
+      "file": "post-live-multiline.ax.txt",
+      "sha256": "6e0d531605f527e2ecf1dabe2ea03b9315c130bedc79525ce397b5fcfef1adfd"
+    },
+    {
       "file": "post-live.ax.txt",
       "sha256": "01538b1e800c542554ed91a24ee76b0ec0b9364a79b84e20df6c214c0a9ed5c9"
     },
@@ -53,6 +57,10 @@
     {
       "file": "reply-live-filled.ax.txt",
       "sha256": "c2354b2ab8bf1025f0a4cf56558f4a17659cf8e15d94616679dbc95fa09b1d54"
+    },
+    {
+      "file": "reply-live-multiline.ax.txt",
+      "sha256": "80526df5e72b774cb6010e05b3831535f107fc256290253dc6b5b858bb8f8d25"
     },
     {
       "file": "reply-live.ax.txt",

@@ -6,7 +6,7 @@ agent-browser profile for the logged-out case. #24 measured reads; #25 measured
 live **posts and replies**, including success acknowledgement, on the owner's
 explicitly authorized throwaway account. This is one account on one host on one
 day. It does not qualify account survival, captcha handling, rate-limit
-behavior, multi-line input or session portability.
+behavior or session portability.
 
 No cookie, storage, token, profile export or raw session data was read or
 written. Page content is treated as untrusted data. The fixtures below replace
@@ -24,9 +24,11 @@ orca exec --page <threads-tab> --command "read" --json
 orca goto --page <threads-tab> --url https://www.threads.com/search?q=...
 orca scroll --page <threads-tab> --direction down --amount 1000 --json
 orca keypress --page <threads-tab> --key Escape --json
-# live write measurement (#25)
+# live write measurement (#25, multi-line follow-up)
 orca click --page <threads-tab> --element <ref> --json
 orca fill --page <threads-tab> --element <ref> --value "<neutral text>" --json
+orca type --page <threads-tab> --input "<line>" --json
+orca exec --page <threads-tab> --command "press Shift+Enter" --json
 ```
 
 The public logged-out check used the pinned agent-browser binary with a new
@@ -83,9 +85,16 @@ exposed.
 - **Failure shape.** An empty `Post` click is a no-op (`page unchanged`). No
   in-page error toast was observed. Missing acknowledgement within the deadline
   is `ErrUnknownOutcome` and the click is never repeated.
+- **Multi-line.** `fill` collapses `\n` into one line. Typing line by line with
+  real keystrokes and `press Shift+Enter` between lines preserves breaks in both
+  the `New thread` dialog and the inline reply composer. Plain Enter in the
+  inline reply composer submits instead of inserting a break. Measured posts
+  with 3 lines (emoji, Vietnamese diacritics) and a multi-line reply re-read with
+  their `\n` breaks intact; a deliberately blank line collapsed on re-read. Lines
+  beginning with `--` are refused before the click because the pinned CLI would
+  parse them as options instead of text.
 - A URL in post text renders as a separate `link` plus a link card; the read
-  mapping keeps the surrounding `StaticText`, not the embedded URL. `fill`
-  collapses `\n` into one line, so multi-line composition was not measured.
+  mapping keeps the surrounding `StaticText`, not the embedded URL.
 
 Logged-out pages show a login dialog and `Continue with Instagram` instead of the
 authenticated navigation.
@@ -104,8 +113,8 @@ the guard uses to decide whether a reserved action may click.
 | `read_post` | Navigate the supplied same-origin post URL; return the root post plus same-author thread continuation posts. A reply permalink returns the measured parent chain plus the reply. |
 | `read_own_metrics` | Navigate `/insights/`; return `ErrMetricsUnavailable` because the measured page lacks all four required counters. |
 | `read_own_metrics` with `action_id` | Same; `ErrMetricsUnavailable`. |
-| `post` | Navigate `/`; open `New thread`; fill the dialog textbox; click the one `Post` control; poll for the status toast `View` URL or a new own post block. Return the acknowledged `/post/<id>` URL. |
-| `reply` | Navigate the target post; fill the inline composer textbox; click its one `Reply` control (or the dialog `Post`); poll for the toast/new own reply block. Return the acknowledged `/post/<id>` URL. |
+| `post` | Navigate `/`; open `New thread`; fill the dialog textbox (single line) or focus it and type line by line with `Shift+Enter` (multi-line); click the one `Post` control; poll for the status toast `View` URL or a new own post block. Return the acknowledged `/post/<id>` URL. |
+| `reply` | Navigate the target post; fill the inline composer textbox (single line) or type line by line with `Shift+Enter` (multi-line); click its one `Reply` control (or the dialog `Post`); poll for the toast/new own reply block. Return the acknowledged `/post/<id>` URL. |
 | Missing acknowledgement | Deadline after the single click is `ErrUnknownOutcome`; the harness retains the intent and stops the wake. No retry. |
 | Compose not found | No dialog and no unambiguous `New thread` button, or no single textbox/submit in the composer: `ErrUnknownPage` / `ErrMalformedPage` before any fill/click. |
 | Logged out | Authenticated navigation is absent and a login dialog/button is present: `ErrLoggedOut`. |
@@ -139,7 +148,10 @@ matched. Post click commands took 0.48-1.48s and the `View` acknowledgement was
 observed about 3s after the click. Reply clicks took 1.07-1.59s; the reply
 permalink or `View` toast appeared about 4-5s after the click. The 470-character
 post, emoji/Vietnamese text, duplicate text and a URL post all acknowledged.
-Empty text was a no-op. No captcha or rate-limit banner appeared. Details are in
+Empty text was a no-op. No captcha or rate-limit banner appeared. Two further
+multi-line posts and one multi-line reply were published with line-by-line
+keystrokes plus `Shift+Enter`; their permalinks re-read with the `\n` breaks
+intact. A deliberately blank line collapsed in the rendered post. Details are in
 [`measurement.txt`](testdata/threads-live/measurement.txt).
 
 The opt-in real-browser check loads public Threads with a fresh profile and
@@ -163,9 +175,8 @@ shared eval suite passed 30/30 offline at revision `8c92054`, seed 8
 ## Not measured
 
 Captcha/challenge flows, explicit in-page error/rate-limit banners, login
-persistence, multi-line composition through `fill`, session portability to
-another host or VPS, account survival, datacenter-IP behavior, headed operation,
-production memory and elapsed soak. Embedded URLs are present in post text but
+persistence, session portability to another host or VPS, account survival,
+datacenter-IP behavior, headed operation, production memory and elapsed soak. Embedded URLs are present in post text but
 the read mapping omits the link node's text. Duplicate text was accepted once;
 no long-run duplicate policy is claimed. The Orca tab is an authorized
 measurement surface, not a portable browser profile for a VPS or unattended

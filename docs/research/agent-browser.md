@@ -40,7 +40,10 @@ or credential command, and no model-supplied flags.
 | Navigate | `open <absolute-url>` |
 | Bounded rendered text | `read` |
 | Interaction refs | `snapshot -c -u` (compact, with link URLs) |
-| Fill | `fill <ref> -- <text>` |
+| Fill (single line) | `fill <ref> -- <text>` |
+| Focus for keystrokes | `focus <ref>` |
+| Type one line | `keyboard type -- <text>` |
+| Soft line break | `press Shift+Enter` |
 | Submit | `click <ref>` |
 | Owned daemon identity | `session info` |
 | Session verification | `session list` |
@@ -58,6 +61,9 @@ the implementation:
   its own 1 MiB stdout bound and kills a process that exceeds it.
 - `--json` must appear before a literal `--`; everything after `--` is the fill
   text. `fill @e1 -- --leading text` therefore needs global flags first.
+- `fill` collapses newlines in Threads' contenteditable composer. Typing real
+  keystrokes (`focus`, `keyboard type`, `press Shift+Enter`) preserves measured
+  line breaks; a plain newline keystroke submits the inline reply composer.
 - `session info --json` exposes the owned daemon `pid`. `session list --json`
   returns `{"sessions":[...]}`.
 - The daemon socket path is limited to 103 bytes. A long session name failed at
@@ -125,10 +131,11 @@ replay, launches one session on about:blank, and closes it on every exit. The
 client kills the CLI process group on cancellation, bounds stdout/stderr and
 every call with a deadline, and removes nothing from the operator profile.
 
-`fill` passes post text as one positional argv value, so the same OS user (or
-root) can see it in the process list while the call runs. It is never logged or
-returned in an error. If that exposure is unacceptable, a future release needs a
-stdin or file-descriptor fill path; do not add `eval` for it.
+`fill` and each `keyboard type` line pass post text as positional argv values,
+so the same OS user (or root) can see it in the process list while the call
+runs. It is never logged or returned in an error. If that exposure is
+unacceptable, a future release needs a stdin or file-descriptor input path; do
+not add `eval` for it.
 
 ## Measured integration
 
@@ -169,7 +176,7 @@ blocked the first full run was fixed separately in #23 (commit `833af26`).
 Live Threads reads and writes are mapped in
 [threads-live-mapping.md](threads-live-mapping.md) from one authenticated
 measurement and an owner-authorized throwaway-account write run. Captcha and
-explicit rate-limit/error banners, multi-line fill, login/session persistence and
+explicit rate-limit/error banners, login/session persistence and
 portability, account survival, headed operation, sandbox-enabled Linux behavior,
 production memory (Chrome + daemon + harness PSS/RSS), launch peaks and elapsed
 soak remain unmeasured. The earlier chromedp memory samples do not predict this

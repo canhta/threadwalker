@@ -95,3 +95,29 @@ empty submit is a no-op. The adapter therefore records a missing acknowledgement
 within the deadline as unknown and never retries the click. Logged-out remains
 the measured login dialog.
 
+Multi-line follow-up (2026-11-12)
+=================================
+
+`orca fill` flattens newlines. `orca inserttext` inserted nothing into the
+Threads contenteditable. `orca type` sends real keystrokes: in the "New thread"
+dialog a typed newline became a LineBreak in the composer; in the inline reply
+composer a plain newline submitted the reply after the first line. The stable
+path for both composers is: focus the textbox, type each line, and run
+`orca exec --command "press Shift+Enter"` between lines.
+
+Live checks:
+  - post 1: 3 lines + emoji + blank line. The composer text held all breaks;
+    the post permalink re-read with the three text lines, but the deliberately
+    blank line collapsed (no empty paragraph in the parsed body).
+  - post 2: 3 lines with Vietnamese diacritics and emoji. Re-read preserved all
+    three lines with \n.
+  - post 3: exact harness-style sequence (type line, Shift+Enter, type line,
+    Shift+Enter, type line) in the New thread dialog. Re-read preserved all
+    three lines with \n.
+  - reply: 2 lines typed with Shift+Enter in the inline composer. Re-read
+    preserved both lines with \n.
+  Each write still showed the same status toast View URL acknowledgement
+  (~2-4s) and no captcha or rate-limit banner. All text was neutral test text.
+
+Sanitized fixtures: post-live-multiline.ax.txt, reply-live-multiline.ax.txt.
+

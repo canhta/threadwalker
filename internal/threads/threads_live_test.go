@@ -62,6 +62,30 @@ func TestThreadsLivePostContext(t *testing.T) {
 	}
 }
 
+func TestThreadsLiveMultilineBodiesPreserveBreaks(t *testing.T) {
+	base := "https://www.threads.com"
+	post, err := parseThreadsPage(liveFixture(t, "post-live-multiline.ax.txt"), base+"/@synthetic_author/post/fixtureMultiPost1", "post", base)
+	if err != nil || len(post.Posts) == 0 {
+		t.Fatalf("multiline post=%+v err=%v", post, err)
+	}
+	if post.Posts[0].Text != "Synthetic multi-line post.\nsecond synthetic line.\nthird synthetic line 🙂" {
+		t.Fatalf("multiline post body=%q", post.Posts[0].Text)
+	}
+	reply, err := parseThreadsPage(liveFixture(t, "reply-live-multiline.ax.txt"), base+"/@synthetic_author/post/fixtureMultiReply1", "post", base)
+	if err != nil || len(reply.Posts) == 0 {
+		t.Fatalf("multiline reply=%+v err=%v", reply, err)
+	}
+	found := ""
+	for _, item := range reply.Posts {
+		if strings.Contains(item.Text, "\n") {
+			found = item.Text
+		}
+	}
+	if found != "Synthetic multi-line reply.\nsecond synthetic reply line." {
+		t.Fatalf("multiline reply body=%q", found)
+	}
+}
+
 func TestThreadsLiveMetricsRemainUnavailable(t *testing.T) {
 	base := "https://www.threads.com"
 	if _, err := parseThreadsPage(liveFixture(t, "insights.ax.txt"), base+"/insights/", "metrics", base); !errors.Is(err, ErrMetricsUnavailable) {
@@ -223,6 +247,71 @@ func TestAgentBrowserThreadsReplyAcknowledgesToast(t *testing.T) {
 	}
 	if cli.clicks != 1 || len(cli.fills) != 1 {
 		t.Fatalf("clicks=%d fills=%v", cli.clicks, cli.fills)
+	}
+}
+
+func TestAgentBrowserThreadsMultilinePostUsesShiftEnter(t *testing.T) {
+	base := "https://www.threads.com"
+	compose := agentbrowser.Snapshot{Origin: base + "/", Text: liveFixture(t, "post-compose.ax.txt")}
+	cli := &fakeAgentCLI{openURL: base + "/", snapshots: []agentbrowser.Snapshot{
+		compose,
+		compose,
+		compose,
+		{Origin: base + "/", Text: liveFixture(t, "post-submitted.ax.txt")},
+	}}
+	b := liveThreadsBrowser(t, cli, nil)
+	got, err := b.Post(context.Background(), "line one\nline two\n\nline four")
+	if err != nil || got != base+"/@synthetic_author/post/fixtureLivePost1" {
+		t.Fatalf("confirmed=%q err=%v", got, err)
+	}
+	if cli.clicks != 1 || len(cli.fills) != 0 {
+		t.Fatalf("clicks=%d fills=%v", cli.clicks, cli.fills)
+	}
+	if len(cli.focusRefs) != 1 || cli.focusRefs[0] != "e898" {
+		t.Fatalf("focus refs=%v", cli.focusRefs)
+	}
+	if strings.Join(cli.types, "|") != "line one|line two|line four" || cli.presses != 3 {
+		t.Fatalf("types=%v presses=%d", cli.types, cli.presses)
+	}
+}
+
+func TestAgentBrowserThreadsMultilineOptionLineRefusedBeforeClick(t *testing.T) {
+	base := "https://www.threads.com"
+	compose := agentbrowser.Snapshot{Origin: base + "/", Text: liveFixture(t, "post-compose.ax.txt")}
+	cli := &fakeAgentCLI{openURL: base + "/", snapshots: []agentbrowser.Snapshot{compose, compose}}
+	b := liveThreadsBrowser(t, cli, nil)
+	if _, err := b.Post(context.Background(), "line one\n--help"); !errors.Is(err, ErrMalformedPage) || errors.Is(err, ErrUnknownOutcome) {
+		t.Fatalf("option-shaped line accepted or marked unknown: %v", err)
+	}
+	if cli.clicks != 0 || len(cli.fills) != 0 || len(cli.focusRefs) != 0 || len(cli.types) != 0 || cli.presses != 0 {
+		t.Fatalf("option-shaped line interacted: clicks=%d fills=%v focus=%v types=%v presses=%d", cli.clicks, cli.fills, cli.focusRefs, cli.types, cli.presses)
+	}
+}
+
+func TestAgentBrowserThreadsMultilineReplyUsesShiftEnter(t *testing.T) {
+	base := "https://www.threads.com"
+	target := base + "/@synthetic_author/post/fixtureLiveReply1"
+	empty := agentbrowser.Snapshot{Origin: target, Text: liveFixture(t, "reply-live.ax.txt")}
+	filled := agentbrowser.Snapshot{Origin: target, Text: liveFixture(t, "reply-live-filled.ax.txt")}
+	cli := &fakeAgentCLI{openURL: target, snapshots: []agentbrowser.Snapshot{
+		empty,
+		filled,
+		filled,
+		{Origin: target, Text: liveFixture(t, "reply-toast.ax.txt")},
+	}}
+	b := liveThreadsBrowser(t, cli, nil)
+	got, err := b.Reply(context.Background(), target, "line one\nline two")
+	if err != nil || got != base+"/@synthetic_author/post/fixtureNestedReply1" {
+		t.Fatalf("confirmed=%q err=%v", got, err)
+	}
+	if cli.clicks != 1 || len(cli.fills) != 0 {
+		t.Fatalf("clicks=%d fills=%v", cli.clicks, cli.fills)
+	}
+	if len(cli.focusRefs) != 1 || cli.focusRefs[0] != "e573" {
+		t.Fatalf("focus refs=%v", cli.focusRefs)
+	}
+	if strings.Join(cli.types, "|") != "line one|line two" || cli.presses != 1 {
+		t.Fatalf("types=%v presses=%d", cli.types, cli.presses)
 	}
 }
 

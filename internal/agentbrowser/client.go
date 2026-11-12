@@ -312,6 +312,39 @@ func (c *Client) Fill(ctx context.Context, ref, text string) error {
 	return err
 }
 
+// Focus moves keyboard focus to one element reference.
+func (c *Client) Focus(ctx context.Context, ref string) error {
+	if !validRef(ref) {
+		return ErrUnsafe
+	}
+	call, cancel := c.call(ctx)
+	defer cancel()
+	_, err := c.run(call, "focus", ref)
+	return err
+}
+
+// Type sends one line of text as real keystrokes to the focused element. It
+// rejects line breaks so a caller must choose where each Shift+Enter goes.
+// Lines beginning with "--" are rejected because the CLI would parse them as
+// options instead of text.
+func (c *Client) Type(ctx context.Context, text string) error {
+	if len(text) > 64<<10 || strings.ContainsRune(text, 0) || strings.ContainsAny(text, "\r\n") || strings.HasPrefix(text, "--") {
+		return ErrUnsafe
+	}
+	call, cancel := c.call(ctx)
+	defer cancel()
+	_, err := c.run(call, "keyboard", "type", text)
+	return err
+}
+
+// PressShiftEnter inserts a measured Threads soft line break at the focus.
+func (c *Client) PressShiftEnter(ctx context.Context) error {
+	call, cancel := c.call(ctx)
+	defer cancel()
+	_, err := c.run(call, "press", "Shift+Enter")
+	return err
+}
+
 // Click activates one element reference.
 func (c *Client) Click(ctx context.Context, ref string) error {
 	if !validRef(ref) {

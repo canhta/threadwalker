@@ -508,7 +508,7 @@ func mustPath(raw string) string {
 func threadsPostText(node *axNode) string {
 	parts := make([]string, 0, 8)
 	for _, child := range node.children {
-		if child.role == "StaticText" && strings.TrimSpace(child.name) != "" {
+		if child.role == "StaticText" && strings.TrimSpace(child.name) != "" && !threadsUIText(child.name) {
 			parts = append(parts, child.name)
 		}
 	}
@@ -521,6 +521,17 @@ func threadsPostText(node *axNode) string {
 		out = append(out, parts[i])
 	}
 	return strings.TrimSpace(strings.Join(out, "\n"))
+}
+
+// threadsUIText filters small measured post-block labels that are not body
+// text. Only exact labels are removed so real prose is never discarded.
+func threadsUIText(value string) bool {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "no replies yet", "translate", "see translation", "view activity", "follow":
+		return true
+	default:
+		return false
+	}
 }
 
 func digitsOnly(value string) bool {

@@ -215,6 +215,9 @@ func TestClientFixedCommandsAndEnvironment(t *testing.T) {
 		"read":         {Stdout: success(`{"content":"visible body","url":"https://fixture.test/feed","finalUrl":"https://fixture.test/feed","source":"active-tab-html","truncated":false}`)},
 		"snapshot":     {Stdout: success(`{"origin":"https://fixture.test/feed","snapshot":"- main","refs":{"e1":{"name":"","role":"textbox"},"e2":{"name":"Post","role":"button"}}}`)},
 		"fill":         {Stdout: success(`{"filled":"@e1"}`)},
+		"focus":        {Stdout: success(`{"focused":"@e1"}`)},
+		"keyboard":     {Stdout: success(`{"typed":true}`)},
+		"press":        {Stdout: success(`{"pressed":"Shift+Enter"}`)},
 		"click":        {Stdout: success(`{"clicked":"@e2"}`)},
 		"close":        {Stdout: success(`{"closed":true}`)},
 		"session list": {Stdout: success(`{"sessions":[]}`)},
@@ -235,6 +238,21 @@ func TestClientFixedCommandsAndEnvironment(t *testing.T) {
 	if err := client.Fill(ctx, "e1", "--leading text"); err != nil {
 		t.Fatal(err)
 	}
+	if err := client.Focus(ctx, "e1"); err != nil {
+		t.Fatal(err)
+	}
+	if err := client.Type(ctx, "line one"); err != nil {
+		t.Fatal(err)
+	}
+	if err := client.PressShiftEnter(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if err := client.Type(ctx, "line\nbreak"); !errors.Is(err, ErrUnsafe) {
+		t.Fatalf("newline accepted by Type: %v", err)
+	}
+	if err := client.Type(ctx, "--help"); !errors.Is(err, ErrUnsafe) {
+		t.Fatalf("option-shaped text accepted by Type: %v", err)
+	}
 	if err := client.Click(ctx, "e2"); err != nil {
 		t.Fatal(err)
 	}
@@ -242,7 +260,7 @@ func TestClientFixedCommandsAndEnvironment(t *testing.T) {
 		t.Fatal(err)
 	}
 	records := readRecords(t, record)
-	var fill, open, snapshot []string
+	var fill, open, snapshot, focus, typed, pressed []string
 	for _, item := range records {
 		env := item.Env
 		if env["PARENT_SECRET_TOKEN"] != "" || env["AGENT_BROWSER_PROFILE"] != "" {
@@ -258,6 +276,12 @@ func TestClientFixedCommandsAndEnvironment(t *testing.T) {
 			fill = item.Argv
 		case "snapshot":
 			snapshot = item.Argv
+		case "focus":
+			focus = item.Argv
+		case "keyboard":
+			typed = item.Argv
+		case "press":
+			pressed = item.Argv
 		}
 	}
 	if !containsSequence(open, "--json") || !containsSequence(open, "--session", "tw-agent") || !containsSequence(open, "--namespace", "tw-ns") || !containsSequence(open, "--no-auto-connect") || !containsSequence(open, "--no-webmcp") {
@@ -274,6 +298,15 @@ func TestClientFixedCommandsAndEnvironment(t *testing.T) {
 	}
 	if !containsSequence(snapshot, "snapshot", "-c", "-u") {
 		t.Fatalf("snapshot argv missing compact URL flags: %v", snapshot)
+	}
+	if !containsSequence(focus, "focus", "e1") {
+		t.Fatalf("focus argv: %v", focus)
+	}
+	if !containsSequence(typed, "keyboard", "type", "line one") || typed[len(typed)-1] != "line one" {
+		t.Fatalf("keyboard type argv: %v", typed)
+	}
+	if !containsSequence(pressed, "press", "Shift+Enter") {
+		t.Fatalf("press argv: %v", pressed)
 	}
 }
 

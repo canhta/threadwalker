@@ -41,6 +41,9 @@ type agentBrowserCLI interface {
 	Read(context.Context) (agentbrowser.Document, error)
 	Snapshot(context.Context) (agentbrowser.Snapshot, error)
 	Fill(context.Context, string, string) error
+	Focus(context.Context, string) error
+	Type(context.Context, string) error
+	PressShiftEnter(context.Context) error
 	Click(context.Context, string) error
 	Close(context.Context) error
 }
@@ -312,7 +315,11 @@ func (d *agentBrowserDriver) threadsSubmitLive(ctx context.Context, text string)
 	if !ok || !validAgentBrowserRef(textbox.ref) {
 		return refuse(ErrMalformedPage)
 	}
-	if err = d.cli.Fill(ctx, textbox.ref, text); err != nil {
+	if strings.ContainsAny(text, "\r\n") {
+		if err = d.threadsTypeMultiline(ctx, textbox.ref, text); err != nil {
+			return refuse(err)
+		}
+	} else if err = d.cli.Fill(ctx, textbox.ref, text); err != nil {
 		return refuse(err)
 	}
 	var submit *axNode
@@ -351,6 +358,41 @@ func (d *agentBrowserDriver) threadsSubmitLive(ctx context.Context, text string)
 		return false, err
 	}
 	return true, nil
+}
+
+// threadsTypeMultiline reproduces the measured multi-line input path: focus the
+// composer, type each line, and press Shift+Enter between lines. A plain newline
+// keystroke submits the inline reply composer instead of inserting a break.
+func (d *agentBrowserDriver) threadsTypeMultiline(ctx context.Context, ref, text string) error {
+	normalized := strings.ReplaceAll(text, "\r\n", "\n")
+	normalized = strings.ReplaceAll(normalized, "\r", "\n")
+	if !validAgentBrowserRef(ref) || strings.TrimSpace(normalized) == "" {
+		return ErrMalformedPage
+	}
+	lines := strings.Split(normalized, "\n")
+	for _, line := range lines {
+		if strings.HasPrefix(line, "--") {
+			// The pinned CLI would parse this as an option, not text. Refuse
+			// before the click instead of publishing altered content.
+			return ErrMalformedPage
+		}
+	}
+	if err := d.cli.Focus(ctx, ref); err != nil {
+		return err
+	}
+	for i, line := range lines {
+		if line != "" {
+			if err := d.cli.Type(ctx, line); err != nil {
+				return err
+			}
+		}
+		if i < len(lines)-1 {
+			if err := d.cli.PressShiftEnter(ctx); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
 
 // threadsAcknowledgement polls the measured acknowledgement shapes after one

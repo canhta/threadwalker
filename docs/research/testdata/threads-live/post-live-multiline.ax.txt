@@ -1,0 +1,60 @@
+- generic [ref=e1078] clickable [onclick]
+  - navigation
+    - link "Threads" [ref=e1080, url=https://www.threads.com/]
+      - image "Threads"
+    - link "Home" [ref=e1081, url=https://www.threads.com/]
+      - image "Home"
+    - button "New thread" [ref=e1082]
+      - image "New thread"
+    - link "Search" [ref=e1083, url=https://www.threads.com/search]
+      - image "Search"
+    - link "Messages" [ref=e1111, url=https://www.threads.com/messages/]
+      - image "Messages"
+    - link "Notifications" [ref=e1085, url=https://www.threads.com/activity]
+      - image "Notifications"
+    - link "Profile" [ref=e1086, url=https://www.threads.com/@synthetic_author]
+      - image "Profile"
+    - link "Insights" [ref=e1087, url=https://www.threads.com/insights/]
+      - image "Insights"
+  - generic
+    - generic
+      - generic
+        - button "Back" [ref=e1089]
+          - image "Back"
+        - generic
+          - link "Column title" [ref=e1090, url=https://www.threads.com/@synthetic_author/post/fixtureMultiPost1]
+            - heading "Thread" [level=1, ref=e1094]
+          - generic
+            - button "Notification settings" [ref=e1095]
+            - button "More" [expanded=false, ref=e1096]
+      - region "Column body" [ref=e1088] focusable [tabindex]
+        - generic
+          - generic [ref=e1097] clickable [cursor:pointer, onclick]
+            - link "synthetic_author's profile picture" [ref=e1110, url=https://www.threads.com/@synthetic_author]
+            - link "synthetic_author" [ref=e1106, url=https://www.threads.com/@synthetic_author]
+            - link "a few seconds ago" [ref=e1107, url=https://www.threads.com/@synthetic_author/post/fixtureMultiPost1]
+            - button "More" [expanded=false, ref=e1108]
+            - StaticText "Synthetic multi-line post.\nsecond synthetic line.\nthird synthetic line 🙂"
+            - button "Like" [ref=e1098]
+            - button "Reply" [ref=e1099]
+            - button "Repost" [expanded=false, ref=e1100]
+            - button "Share" [ref=e1101]
+            - link "View insights" [ref=e1102, url=https://www.threads.com/insights/post/fixtureMultiPost1]
+            - StaticText "No replies yet"
+            - image "synthetic_author's profile picture"
+            - generic
+              - textbox "Empty text field. Type to compose a new post." [ref=e1109]: 
+
+            - button "Attach media" [ref=e1103]
+            - button "Add a GIF" [ref=e1104]
+            - button "Expand composer" [ref=e1105]
+      - contentinfo
+        - list
+          - listitem [level=1]
+          - listitem [level=1]
+            - link "Threads Terms" [ref=e1091, url=https://help.instagram.com/769983657850450]
+          - listitem [level=1]
+            - link "Privacy Policy" [ref=e1092, url=https://help.instagram.com/515230437301944]
+          - listitem [level=1]
+            - link "Cookies Policy" [ref=e1093, url=https://help.instagram.com/1896641480634370/]
+  - button "Create" [expanded=false, ref=e1079]

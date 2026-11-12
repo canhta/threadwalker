@@ -139,8 +139,9 @@ submission and acknowledgement. Own metrics remain unavailable because the measu
 overview lacks all four counters. Keep `dry_run: true` to read without publishing; `dry_run: false`
 publishes with `page_profile: threads`, and every write still goes through the Go guard's audit
 row, reserved intent and limits before the click. An unacknowledged click is recorded as unknown and
-never retried. Multi-line fill, captcha, rate-limit banners and account survival remain unmeasured
-in [#18](https://github.com/canhta/threadwalker/issues/18). The authorized Orca Browser session is a
+never retried. Multi-line text is typed line by line with `Shift+Enter`; captcha, rate-limit banners
+and account survival remain unmeasured in
+[#18](https://github.com/canhta/threadwalker/issues/18). The authorized Orca Browser session is a
 measurement surface, not a portable VPS profile.
 
 **The default fixture profile supports saved synthetic contracts, not the current Threads site.**

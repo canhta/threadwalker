@@ -45,6 +45,9 @@ type fakeAgentCLI struct {
 	openErr   error
 	fills     []string
 	fillRefs  []string
+	focusRefs []string
+	types     []string
+	presses   int
 	clicks    int
 	clickErr  error
 	closed    int
@@ -74,6 +77,18 @@ func (f *fakeAgentCLI) Snapshot(context.Context) (agentbrowser.Snapshot, error) 
 func (f *fakeAgentCLI) Fill(_ context.Context, ref, text string) error {
 	f.fillRefs = append(f.fillRefs, ref)
 	f.fills = append(f.fills, text)
+	return nil
+}
+func (f *fakeAgentCLI) Focus(_ context.Context, ref string) error {
+	f.focusRefs = append(f.focusRefs, ref)
+	return nil
+}
+func (f *fakeAgentCLI) Type(_ context.Context, text string) error {
+	f.types = append(f.types, text)
+	return nil
+}
+func (f *fakeAgentCLI) PressShiftEnter(context.Context) error {
+	f.presses++
 	return nil
 }
 func (f *fakeAgentCLI) Click(context.Context, string) error {
