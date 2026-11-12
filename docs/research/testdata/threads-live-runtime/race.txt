@@ -1,0 +1,2 @@
+ok  	github.com/canhta/threadwalker/internal/threads	1.437s
+ok  	github.com/canhta/threadwalker/internal/agentbrowser	51.683s

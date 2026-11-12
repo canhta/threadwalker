@@ -111,7 +111,12 @@ AGENT_BROWSER_BIN=/path/to/agent-browser CHROME_BIN=/path/to/chrome \
 ```
 
 The existing fixture integration test remains green after adding `-u` to the
-snapshot command. `go vet ./... && go test ./...` passes.
+snapshot command. `go vet ./...` (no output) and `go test -count=1 ./...` pass;
+outputs are in
+[`testdata/threads-live-runtime`](testdata/threads-live-runtime/tests.txt). The
+shared eval suite passed 30/30 offline at revision `8c92054`, seed 8
+([report](testdata/threads-live-runtime/default-eval.json)); `go test -race
+./internal/threads ./internal/agentbrowser` passed.
 
 ## Not measured
 

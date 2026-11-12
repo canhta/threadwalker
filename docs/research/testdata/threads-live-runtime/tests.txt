@@ -1,0 +1,15 @@
+ok  	github.com/canhta/threadwalker/cmd/threadwalker	3.199s
+ok  	github.com/canhta/threadwalker/internal/agent	2.922s
+ok  	github.com/canhta/threadwalker/internal/agentbrowser	6.382s
+ok  	github.com/canhta/threadwalker/internal/config	0.491s
+ok  	github.com/canhta/threadwalker/internal/dashboard	1.258s
+ok  	github.com/canhta/threadwalker/internal/eval	39.040s
+ok  	github.com/canhta/threadwalker/internal/guard	1.973s
+ok  	github.com/canhta/threadwalker/internal/llm	1.349s
+ok  	github.com/canhta/threadwalker/internal/logging	0.133s
+ok  	github.com/canhta/threadwalker/internal/metrics	1.043s
+ok  	github.com/canhta/threadwalker/internal/playbook	20.067s
+ok  	github.com/canhta/threadwalker/internal/store	3.784s
+ok  	github.com/canhta/threadwalker/internal/telegram	0.877s
+ok  	github.com/canhta/threadwalker/internal/threads	0.140s
+ok  	github.com/canhta/threadwalker/internal/tools	1.770s
