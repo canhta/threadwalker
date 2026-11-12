@@ -180,8 +180,9 @@ func (c *Client) GetUpdates(ctx context.Context, offset int64, waitSeconds int) 
 	defer cancel()
 
 	result, err := c.post(requestCtx, "getUpdates", getUpdatesPayload{
-		Offset:  offset,
-		Timeout: wait,
+		Offset:         offset,
+		Timeout:        wait,
+		AllowedUpdates: []string{"message"},
 	}, operation)
 	if err != nil {
 		return nil, err
@@ -248,6 +249,9 @@ func (c *Client) SendMessage(ctx context.Context, chatID int64, text string, rep
 type getUpdatesPayload struct {
 	Offset  int64 `json:"offset"`
 	Timeout int   `json:"timeout"`
+	// Telegram persists the last allowed_updates filter per bot; sending it on
+	// every call stops a stale filter from silently hiding owner commands.
+	AllowedUpdates []string `json:"allowed_updates"`
 }
 
 type sendMessagePayload struct {

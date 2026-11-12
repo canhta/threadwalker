@@ -187,8 +187,11 @@ func TestGetUpdates_Success(t *testing.T) {
 	if err := json.Unmarshal(request.body, &payload); err != nil {
 		t.Fatalf("decode request body: %v", err)
 	}
-	if len(payload) != 2 {
-		t.Errorf("payload keys = %v, want only offset and timeout", payload)
+	if len(payload) != 3 {
+		t.Errorf("payload keys = %v, want only offset, timeout and allowed_updates", payload)
+	}
+	if got, ok := payload["allowed_updates"].([]any); !ok || len(got) != 1 || got[0] != "message" {
+		t.Errorf("allowed_updates = %v, want [message]", payload["allowed_updates"])
 	}
 	if payload["offset"] != float64(1000) {
 		t.Errorf("offset = %v, want 1000", payload["offset"])
