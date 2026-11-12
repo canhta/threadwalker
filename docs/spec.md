@@ -457,6 +457,17 @@ selected agent's latest ten answers enter its next wake context, with configured
 raw bot updates and chat identifiers never enter that context. Disabled integrations expose neither
 owner tool and create no Bot API client. **(decision)**
 
+On every service start the bot replaces its default-scope command menu with the handled commands
+(`help`, `status`, `pause`, `resume`, `kill`, `dnc`); registration failure is logged as
+`menu_failed` and never stops polling. Each long poll sends `allowed_updates: ["message"]` because
+Telegram persists that filter per bot. Displayed times use `telegram.timezone` (IANA name, loaded
+default `Asia/Ho_Chi_Minh`); `telegram.digest_hour` scheduling stays UTC. Owner-facing copy is plain
+text assembled from code-owned facts plus `persona.name`/`persona.language` and optional
+`telegram.messages` templates in the agent template, so a persona's voice lives in its template and
+the model never writes counts, limits or times. Free text from the owner that is neither a command
+nor a reply becomes an owner note for the next wake with one acknowledgement and no extra model
+call. `/help` and `/start` list the commands. **(decision, #26)**
+
 Daily notices use UTC day identities for action limits and 80%/100% budget thresholds; killed
 notices use the terminal state identity. The browser's `BrowserStopped` seam accepts only
 `logged_out`/`captcha` plus an internal event ID, pauses that agent, and deduplicates its notice.

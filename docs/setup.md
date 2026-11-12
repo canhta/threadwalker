@@ -160,12 +160,28 @@ AGENT_BROWSER_BIN=/path/to/agent-browser CHROME_BIN=/path/to/chrome \
 
 Telegram stays disabled unless `telegram.enabled: true`. When enabled, set `bot_token_env` and
 `owner_chat_id_env` to the variable names containing the bot token and owner's numeric chat ID.
-The owner must message the bot first. Optional `digest_hour` defaults to 18 UTC.
+The owner must message the bot first. Optional `digest_hour` defaults to 18 UTC. Displayed times
+use `telegram.timezone`, an IANA zone defaulting to `Asia/Ho_Chi_Minh`; the digest schedule itself
+stays UTC. Every `getUpdates` sends `allowed_updates: ["message"]`; Telegram persists that filter
+per bot, so omitting it can leave a stale filter that hides owner messages.
+
+On service start the bot replaces its command menu with `/help`, `/status`, `/pause`, `/resume`,
+`/kill` and `/dnc` (single-agent forms; agent-ID forms when one bot covers several agents). A
+failed menu registration is logged as `menu_failed` and never stops polling.
+
+Owner-facing text is plain text built from code-owned facts and the template persona. The speaker
+name comes from `persona.name`, menu and fallback copy follow `persona.language`, and a persona's
+own voice belongs in `telegram.messages` in the agent template: text/template strings rendered
+with the documented fields (see `internal/telegram/copy.go`), where `{{nl}}` inserts a line break.
+Missing kinds fall back to neutral vi/en copy. Counts, limits, spend and next-wake times are never
+written by the model. Free text from the owner that is neither a command nor a reply is stored as
+an owner note for the next wake and acknowledged once, with no extra model call.
 
 With several agents, owner commands include the agent ID: `/status <agent_id>`,
 `/pause <agent_id>`, `/resume <agent_id>`, `/kill <agent_id>` and `/dnc <agent_id> <username>`.
-Kill is terminal. Reply directly to a delivered question to answer it. Delivery and recovery
-behavior are documented in [Telegram verification](research/telegram-local.md).
+`/help` and `/start` list the commands. Kill is terminal. Reply directly to a delivered question
+to answer it. Delivery, recovery and live evidence are documented in
+[Telegram verification](research/telegram-local.md) and [live bot qualification](research/telegram-live.md).
 
 ## Dashboard, logs and evals
 
