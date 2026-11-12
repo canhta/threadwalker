@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/canhta/threadwalker/internal/guard"
+	"github.com/canhta/threadwalker/internal/store"
 )
 
 func TestPolicyReservesQuotaBeforeEffect(t *testing.T) {
@@ -40,18 +41,24 @@ func TestPolicyReservesQuotaBeforeEffect(t *testing.T) {
 }
 
 func TestConcurrentGuardsCannotSpendLastSlotTwice(t *testing.T) {
-	st, opts := setup(t)
+	st, path, opts := setupPath(t)
 	opts.Template.Limits.PostsPerDay = 1
 	opts.Template.Limits.RepliesPerDay = 20
 	opts.Template.Limits.RepliesPerUser7d = 2
 	opts.Template.Limits.MinSecondsBetweenActions = 1
+	stores := make([]*store.Store, 12)
+	for i := range stores {
+		stores[i] = concurrentStore(t, path)
+	}
 	var effects atomic.Int32
 	var wg sync.WaitGroup
 	for i := 0; i < 12; i++ {
+		candidate := opts
+		candidate.Store = stores[i]
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			g, err := guard.New(opts)
+			g, err := guard.New(candidate)
 			if err != nil {
 				t.Error(err)
 				return

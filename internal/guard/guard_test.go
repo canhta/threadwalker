@@ -13,8 +13,16 @@ import (
 )
 
 func setup(t *testing.T) (*store.Store, guard.Options) {
+	st, _, opts := setupPath(t)
+	return st, opts
+}
+
+// setupPath also returns the database path so concurrency tests can give each
+// goroutine an independent connection instead of contending on one pool.
+func setupPath(t *testing.T) (*store.Store, string, guard.Options) {
 	t.Helper()
-	st, err := store.Open(context.Background(), filepath.Join(t.TempDir(), "guard.db"))
+	path := filepath.Join(t.TempDir(), "guard.db")
+	st, err := store.Open(context.Background(), path)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -23,7 +31,25 @@ func setup(t *testing.T) (*store.Store, guard.Options) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	return st, guard.Options{Store: st, Template: config.Template{ID: "agent", DryRun: true}, WakeID: 1, Now: func() time.Time { return time.Date(2026, 11, 11, 0, 0, 0, 0, time.UTC) }}
+	return st, path, guard.Options{Store: st, Template: config.Template{ID: "agent", DryRun: true}, WakeID: 1, Now: func() time.Time { return time.Date(2026, 11, 11, 0, 0, 0, 0, time.UTC) }}
+}
+
+// concurrentStore opens an independent handle on the same temporary database.
+// One connection plus a bounded busy timeout makes write contention wait rather
+// than fail immediately with SQLITE_BUSY; the test still runs real concurrent
+// guards over separate connections.
+func concurrentStore(t *testing.T, path string) *store.Store {
+	t.Helper()
+	st, err := store.Open(context.Background(), path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = st.Close() })
+	st.DB().SetMaxOpenConns(1)
+	if _, err = st.DB().Exec(`PRAGMA busy_timeout=5000`); err != nil {
+		t.Fatal(err)
+	}
+	return st
 }
 func TestGuardAuditsBeforeEffectAndKeepsPayloadsOut(t *testing.T) {
 	st, opts := setup(t)

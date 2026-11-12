@@ -1,0 +1,51 @@
+Pre-existing failure, not caused by #22
+======================================
+
+Host: same local macOS machine used for #22 evidence, 2026-11-12.
+Base worktree: d61b2fa (no #22 changes), created with `git worktree add`.
+
+  go test -count=1 ./...
+  --- FAIL: TestConcurrentGuardsCannotSpendLastSlotTwice (0.02s)
+  --- FAIL: TestConcurrentAgentsReserveSharedPromotionOnce (0.02s)
+  FAIL github.com/canhta/threadwalker/internal/guard
+
+The same tests pass when the guard package runs alone:
+
+  go test -count=1 ./internal/guard/ -run TestConcurrentAgentsReserveSharedPromotionOnce -v
+  --- PASS (0.02s)
+
+With the #22 worktree:
+
+  go test -count=1 ./...        -> FAIL internal/guard (same two tests)
+  go test -count=1 -p 1 ./...   -> PASS all packages
+
+The failure is a SQLite write-contention race in the guard tests under a loaded
+host. It reproduces on the unmodified base commit, so it is not introduced by the
+agent-browser adapter. It is recorded here rather than hidden or "fixed" by
+weakening a guard test.
+
+Fix and verification (#23)
+=========================
+
+The concurrency tests now open one independent store handle per goroutine on the
+same temporary database. Each handle is limited to one connection and sets
+`PRAGMA busy_timeout=5000` before any goroutine starts. The tests keep their
+existing concurrency, reservation and effect-count assertions; no production
+guard or store code changed.
+
+  go test -count=100 -run \
+    'TestConcurrentGuardsCannotSpendLastSlotTwice|TestConcurrentAgentsReserveSharedPromotionOnce' \
+    ./internal/guard/
+  ok github.com/canhta/threadwalker/internal/guard 39.234s
+
+Under eight busy-loop CPU loaders:
+
+  go test -count=30 -run \
+    'TestConcurrentGuardsCannotSpendLastSlotTwice|TestConcurrentAgentsReserveSharedPromotionOnce' \
+    ./internal/guard/
+  ok github.com/canhta/threadwalker/internal/guard 6.810s
+
+Three consecutive exact checks:
+
+  go vet ./... && go test -count=1 ./...
+  ok github.com/canhta/threadwalker/internal/guard (1.664s, 2.129s, 2.298s)

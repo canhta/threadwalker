@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/canhta/threadwalker/internal/guard"
+	"github.com/canhta/threadwalker/internal/store"
 )
 
 func TestSharedPromotionUsesCommittedIntentAndCanonicalURL(t *testing.T) {
@@ -62,7 +63,7 @@ func TestSharedPromotionUsesCommittedIntentAndCanonicalURL(t *testing.T) {
 }
 
 func TestConcurrentAgentsReserveSharedPromotionOnce(t *testing.T) {
-	st, opts := setup(t)
+	st, path, opts := setupPath(t)
 	if _, err := st.DB().Exec(`INSERT INTO agents(id,status) VALUES('other','running'); INSERT INTO wakes(id,agent_id,started_at) VALUES(2,'other','2026-11-11T00:00:00Z')`); err != nil {
 		t.Fatal(err)
 	}
@@ -70,10 +71,12 @@ func TestConcurrentAgentsReserveSharedPromotionOnce(t *testing.T) {
 	opts.Template.Limits.RepliesPerDay = 10
 	opts.Template.Limits.RepliesPerUser7d = 2
 	opts.Template.Limits.MinSecondsBetweenActions = 1
+	stores := []*store.Store{concurrentStore(t, path), concurrentStore(t, path)}
 	var effects atomic.Int32
 	var wg sync.WaitGroup
 	for i := 0; i < 2; i++ {
 		candidate := opts
+		candidate.Store = stores[i]
 		if i == 1 {
 			candidate.Template.ID = "other"
 			candidate.WakeID = 2
