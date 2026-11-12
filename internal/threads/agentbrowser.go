@@ -28,6 +28,9 @@ type AgentBrowserOptions struct {
 	Logger           *slog.Logger
 	Now              func() time.Time
 	NoSandbox        bool
+	// PageProfile selects the measured page contract: "fixture" (default) or
+	// "threads" for read-only live Threads accessibility mapping.
+	PageProfile string
 }
 
 // agentBrowserCLI is the bounded surface the transport may use. It deliberately
@@ -51,7 +54,7 @@ func NewAgentBrowser(ctx context.Context, opts AgentBrowserOptions) (result *Bro
 		opts.Now = time.Now
 	}
 	start := opts.Now()
-	b := &Browser{timeout: opts.Timeout, agentID: opts.AgentID, logger: opts.Logger, now: opts.Now, gate: make(chan struct{}, 1)}
+	b := &Browser{timeout: opts.Timeout, agentID: opts.AgentID, logger: opts.Logger, now: opts.Now, gate: make(chan struct{}, 1), feedPath: "/feed", metricsPath: "/metrics", postPath: "/compose"}
 	defer func() { err = operationError("launch", err); b.record(ctx, "launch", start, err) }()
 	if opts.Timeout == 0 {
 		b.timeout = 10 * time.Second
@@ -61,6 +64,21 @@ func NewAgentBrowser(ctx context.Context, opts AgentBrowserOptions) (result *Bro
 	}
 	base, parseErr := url.Parse(opts.BaseURL)
 	if parseErr != nil || base == nil || base.User != nil || base.Hostname() == "" || (base.Scheme != "https" && base.Scheme != "http") || base.RawQuery != "" || base.Fragment != "" || (base.Path != "" && base.Path != "/") || strings.ContainsAny(opts.BaseURL, "\\\r\n\t") || opts.ProfileDir == "" || opts.ExecutablePath == "" || opts.AgentBrowserPath == "" || opts.AgentID == "" || b.timeout <= 0 || opts.StartupTimeout <= 0 {
+		return nil, ErrMalformedPage
+	}
+	if opts.PageProfile == "" {
+		opts.PageProfile = pageProfileFixture
+	}
+	switch opts.PageProfile {
+	case pageProfileFixture:
+	case pageProfileThreads:
+		if !isThreadsHost(base) {
+			return nil, ErrMalformedPage
+		}
+		b.feedPath = "/"
+		b.metricsPath = "/insights/"
+		b.postPath = "/"
+	default:
 		return nil, ErrMalformedPage
 	}
 	b.base = base
@@ -86,7 +104,7 @@ func NewAgentBrowser(ctx context.Context, opts AgentBrowserOptions) (result *Bro
 		release.close()
 		return nil, err
 	}
-	d := &agentBrowserDriver{cli: client, base: base, timeout: b.timeout, release: release.close, sleep: sleepContext}
+	d := &agentBrowserDriver{cli: client, base: base, timeout: b.timeout, release: release.close, sleep: sleepContext, profile: opts.PageProfile}
 	b.driver = d
 	startup, cancel := context.WithTimeout(ctx, opts.StartupTimeout)
 	defer cancel()
@@ -126,6 +144,7 @@ type agentBrowserDriver struct {
 	timeout  time.Duration
 	release  func()
 	sleep    func(context.Context, time.Duration) error
+	profile  string
 	once     sync.Once
 	closeErr error
 }
@@ -145,6 +164,9 @@ func (d *agentBrowserDriver) navigate(ctx context.Context, dest string) error {
 }
 
 func (d *agentBrowserDriver) page(ctx context.Context, kind string) (Page, error) {
+	if d.profile == pageProfileThreads {
+		return d.threadsPage(ctx, kind)
+	}
 	document, err := d.cli.Read(ctx)
 	if err != nil {
 		return Page{}, err
@@ -163,10 +185,41 @@ func (d *agentBrowserDriver) page(ctx context.Context, kind string) (Page, error
 	return parseAgentBrowserDocument(document.Content, kind, d.base.String())
 }
 
+// threadsPage uses the full compact accessibility tree, not an interactive-only
+// snapshot, so post bodies are present. Live writes are refused before a click.
+func (d *agentBrowserDriver) threadsPage(ctx context.Context, kind string) (Page, error) {
+	if kind == "compose" {
+		return Page{}, ErrLiveWriteUnqualified
+	}
+	for {
+		snapshot, err := d.cli.Snapshot(ctx)
+		if err != nil {
+			return Page{}, err
+		}
+		u, parseErr := url.Parse(snapshot.Origin)
+		if parseErr != nil || !sameOrigin(d.base, u) {
+			return Page{}, ErrMalformedPage
+		}
+		page, parseErr := parseThreadsPage(snapshot.Text, snapshot.Origin, kind, d.base.String())
+		if parseErr != nil {
+			return Page{}, parseErr
+		}
+		if len(page.Posts) > 0 || kind == "metrics" || kind == "action_metrics" || !threadsLoadingText(snapshot.Text) {
+			return page, nil
+		}
+		if err = d.sleep(ctx, 150*time.Millisecond); err != nil {
+			return Page{}, err
+		}
+	}
+}
+
 // submit uses the compact accessibility snapshot only for interaction refs. It
 // requires exactly one textbox and one button, so a page cannot redirect the
 // click to an unrelated control.
 func (d *agentBrowserDriver) submit(ctx context.Context, text string) (bool, error) {
+	if d.profile == pageProfileThreads {
+		return false, ErrLiveWriteUnqualified
+	}
 	snapshot, err := d.cli.Snapshot(ctx)
 	if err != nil {
 		return false, err

@@ -40,6 +40,7 @@ func feedDoc(t *testing.T) string {
 type fakeAgentCLI struct {
 	reads     func(context.Context) (agentbrowser.Document, error)
 	snapshot  agentbrowser.Snapshot
+	snapshots []agentbrowser.Snapshot
 	openURL   string
 	openErr   error
 	fills     []string
@@ -63,6 +64,11 @@ func (f *fakeAgentCLI) Read(ctx context.Context) (agentbrowser.Document, error) 
 	return f.reads(ctx)
 }
 func (f *fakeAgentCLI) Snapshot(context.Context) (agentbrowser.Snapshot, error) {
+	if len(f.snapshots) > 0 {
+		next := f.snapshots[0]
+		f.snapshots = f.snapshots[1:]
+		return next, nil
+	}
 	return f.snapshot, nil
 }
 func (f *fakeAgentCLI) Fill(_ context.Context, ref, text string) error {

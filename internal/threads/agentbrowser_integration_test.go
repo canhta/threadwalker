@@ -297,7 +297,7 @@ func TestAgentBrowserLocalIntegration(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	uncertainCtx, uncertainCancel := context.WithTimeout(ctx, 3*time.Second)
+	uncertainCtx, uncertainCancel := context.WithTimeout(ctx, 6*time.Second)
 	defer uncertainCancel()
 	if _, err = uncertain.Post(uncertainCtx, "Synthetic local submission"); !errors.Is(err, threads.ErrUnknownOutcome) {
 		t.Fatalf("uncertain outcome=%v", err)
@@ -334,5 +334,32 @@ func TestAgentBrowserLocalIntegration(t *testing.T) {
 	site.setMode("")
 	if got := site.submissionCount(); got != 6 {
 		t.Fatalf("cancellation submitted: %d", got)
+	}
+}
+
+func TestAgentBrowserThreadsLiveLoggedOutFailsClosed(t *testing.T) {
+	binary, chrome := agentBrowserBinary(t)
+	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
+	defer cancel()
+	browser, err := threads.NewAgentBrowser(ctx, threads.AgentBrowserOptions{
+		AgentID:          "live-logged-out",
+		BaseURL:          "https://www.threads.com",
+		ProfileDir:       t.TempDir(),
+		ExecutablePath:   chrome,
+		AgentBrowserPath: binary,
+		PageProfile:      "threads",
+		Timeout:          20 * time.Second,
+		StartupTimeout:   30 * time.Second,
+		NoSandbox:        os.Getenv("AGENT_BROWSER_NO_SANDBOX") == "1",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer browser.Close(context.Background())
+	if _, err = browser.ReadFeed(ctx); !errors.Is(err, threads.ErrLoggedOut) {
+		t.Fatalf("public Threads page did not fail closed as logged out: %v", err)
+	}
+	if _, err = browser.Post(ctx, "must not submit"); !errors.Is(err, threads.ErrLiveWriteUnqualified) {
+		t.Fatalf("live write was not refused: %v", err)
 	}
 }

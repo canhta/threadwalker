@@ -285,7 +285,7 @@ func (c *Client) Read(ctx context.Context) (Document, error) {
 func (c *Client) Snapshot(ctx context.Context) (Snapshot, error) {
 	call, cancel := c.call(ctx)
 	defer cancel()
-	raw, err := c.run(call, "snapshot", "-c")
+	raw, err := c.run(call, "snapshot", "-c", "-u")
 	if err != nil {
 		return Snapshot{}, err
 	}

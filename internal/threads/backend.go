@@ -38,6 +38,10 @@ type ActionMetricsReader interface {
 
 var ErrMetricsUnavailable = errors.New("action metrics unavailable")
 
+// ErrLiveWriteUnqualified means the measured live Threads profile can read but
+// has no measured submit acknowledgement. It is refused before any fill/click.
+var ErrLiveWriteUnqualified = errors.New("live Threads write unqualified")
+
 type Options struct {
 	AgentID        string
 	BaseURL        string
@@ -60,17 +64,20 @@ type transport interface {
 
 // Browser serializes its page operations; closing interrupts an active call.
 type Browser struct {
-	base      *url.URL
-	driver    transport
-	timeout   time.Duration
-	agentID   string
-	logger    *slog.Logger
-	now       func() time.Time
-	gate      chan struct{}
-	mu        sync.Mutex
-	closed    bool
-	closeOnce sync.Once
-	closeErr  error
+	base        *url.URL
+	feedPath    string
+	metricsPath string
+	postPath    string
+	driver      transport
+	timeout     time.Duration
+	agentID     string
+	logger      *slog.Logger
+	now         func() time.Time
+	gate        chan struct{}
+	mu          sync.Mutex
+	closed      bool
+	closeOnce   sync.Once
+	closeErr    error
 }
 
 var _ Backend = (*Browser)(nil)
@@ -81,7 +88,7 @@ func operationError(op string, err error) error {
 		return nil
 	}
 	cause := errors.New("transport_failure")
-	for _, sentinel := range []error{ErrUnknownOutcome, ErrLoggedOut, ErrCaptcha, ErrUnknownPage, ErrMalformedPage, context.Canceled, context.DeadlineExceeded} {
+	for _, sentinel := range []error{ErrUnknownOutcome, ErrLoggedOut, ErrCaptcha, ErrUnknownPage, ErrMalformedPage, ErrLiveWriteUnqualified, ErrMetricsUnavailable, context.Canceled, context.DeadlineExceeded} {
 		if errors.Is(err, sentinel) {
 			cause = sentinel
 			break
@@ -184,7 +191,7 @@ func (b *Browser) read(ctx context.Context, op, path, kind string) (page Page, e
 	return page, err
 }
 func (b *Browser) ReadFeed(ctx context.Context) (Page, error) {
-	return b.read(ctx, "read_feed", "/feed", "feed")
+	return b.read(ctx, "read_feed", pathOr(b.feedPath, "/feed"), "feed")
 }
 func (b *Browser) Search(ctx context.Context, q string) (Page, error) {
 	return b.read(ctx, "search", "/search?q="+url.QueryEscape(q), "search")
@@ -193,7 +200,7 @@ func (b *Browser) ReadPost(ctx context.Context, target string) (Page, error) {
 	return b.read(ctx, "read_post", target, "post")
 }
 func (b *Browser) ReadOwnMetrics(ctx context.Context) (Metrics, error) {
-	p, err := b.read(ctx, "read_own_metrics", "/metrics", "metrics")
+	p, err := b.read(ctx, "read_own_metrics", pathOr(b.metricsPath, "/metrics"), "metrics")
 	if err != nil {
 		return Metrics{}, err
 	}
@@ -217,7 +224,7 @@ func (b *Browser) ReadActionMetrics(ctx context.Context, threadURL string) (Metr
 	return *p.Metrics, nil
 }
 func (b *Browser) Post(ctx context.Context, text string) (string, error) {
-	return b.write(ctx, "post", "/compose", "compose", text)
+	return b.write(ctx, "post", pathOr(b.postPath, "/compose"), "compose", text)
 }
 func (b *Browser) Reply(ctx context.Context, target, text string) (string, error) {
 	return b.write(ctx, "reply", target, "post", text)
@@ -249,6 +256,9 @@ func (b *Browser) write(ctx context.Context, op, path, kind, text string) (threa
 	}
 	attempted, err := b.driver.submit(call, text)
 	if err != nil {
+		if errors.Is(err, ErrLiveWriteUnqualified) {
+			return "", err
+		}
 		return "", errors.Join(ErrUnknownOutcome, err)
 	}
 	if !attempted {
@@ -263,6 +273,13 @@ func (b *Browser) write(ctx context.Context, op, path, kind, text string) (threa
 
 // Close always initiates cleanup even if its caller has already been canceled.
 // It never removes the configured profile or any operator data.
+func pathOr(configured, fallback string) string {
+	if configured != "" {
+		return configured
+	}
+	return fallback
+}
+
 func (b *Browser) Close(ctx context.Context) (err error) {
 	start := b.now()
 	defer func() { err = operationError("close", err); b.record(ctx, "close", start, err) }()

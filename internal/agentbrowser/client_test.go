@@ -242,7 +242,7 @@ func TestClientFixedCommandsAndEnvironment(t *testing.T) {
 		t.Fatal(err)
 	}
 	records := readRecords(t, record)
-	var fill, open []string
+	var fill, open, snapshot []string
 	for _, item := range records {
 		env := item.Env
 		if env["PARENT_SECRET_TOKEN"] != "" || env["AGENT_BROWSER_PROFILE"] != "" {
@@ -256,6 +256,8 @@ func TestClientFixedCommandsAndEnvironment(t *testing.T) {
 			open = item.Argv
 		case "fill":
 			fill = item.Argv
+		case "snapshot":
+			snapshot = item.Argv
 		}
 	}
 	if !containsSequence(open, "--json") || !containsSequence(open, "--session", "tw-agent") || !containsSequence(open, "--namespace", "tw-ns") || !containsSequence(open, "--no-auto-connect") || !containsSequence(open, "--no-webmcp") {
@@ -269,6 +271,9 @@ func TestClientFixedCommandsAndEnvironment(t *testing.T) {
 	}
 	if separator < 0 || separator != len(fill)-2 || fill[len(fill)-1] != "--leading text" {
 		t.Fatalf("fill argv does not isolate text: %v", fill)
+	}
+	if !containsSequence(snapshot, "snapshot", "-c", "-u") {
+		t.Fatalf("snapshot argv missing compact URL flags: %v", snapshot)
 	}
 }
 

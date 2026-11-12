@@ -1,0 +1,42 @@
+{
+  "contract": "threads-accessibility-v1",
+  "source": "https://www.threads.com/ measured in the owner-authorized authenticated Orca Browser tab",
+  "measured_at": "2026-11-12",
+  "auth_state": "authenticated for feed/search/post/insights/compose/reply; logged-out for logged-out fixture",
+  "replacements": "usernames, post text, post IDs, media alt text and profile data replaced with synthetic content; roles, nesting, control labels and URL patterns preserved",
+  "limits": "one account, one host, one day; external replies, captcha, submit acknowledgement and session portability were not measured",
+  "fixtures": [
+    {
+      "file": "compose.ax.txt",
+      "sha256": "29fbb1db4fe7bcf7569ca78ea535e4de932e1dab76d7161787d401d0ff3f8753"
+    },
+    {
+      "file": "feed.ax.txt",
+      "sha256": "da50df934a53b571329338bcd24fc77a3a142c09e67444e79ffb0d06f753f8c7"
+    },
+    {
+      "file": "insights.ax.txt",
+      "sha256": "e553798b981d335a11fd777fa1cffcb52ea87c6a074ff46348424a3d766387fa"
+    },
+    {
+      "file": "logged-out.ax.txt",
+      "sha256": "b6cf50ce672ec10f165153a1f203bc21cab3c7f544ed143658d1e7afbe04b4d5"
+    },
+    {
+      "file": "post.ax.txt",
+      "sha256": "b33094264339f4ccb7e86810a1e89a7418ff9ed28fe79476c3b38a4a9817ff2b"
+    },
+    {
+      "file": "reply.ax.txt",
+      "sha256": "0ba36d74febd4ed81a1d39be6cc2ee8ba8a3f60a0e53eedb37b0067d8d46282f"
+    },
+    {
+      "file": "search.ax.txt",
+      "sha256": "8741daa7195986e2787086cb291b0314d0938d3601f60c0917225175ce0fa785"
+    },
+    {
+      "file": "unknown.ax.txt",
+      "sha256": "0b3d9a8f5da0738d8f6df21a87117a55bd9ea8c73adb077c711007b9c0b5fa0f"
+    }
+  ]
+}

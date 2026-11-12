@@ -1,0 +1,3 @@
+- generic
+  - heading "Unrecognised synthetic structure" [level=1, ref=e1]
+  - StaticText "No authenticated navigation and no known region."

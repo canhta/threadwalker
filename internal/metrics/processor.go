@@ -80,7 +80,7 @@ func New(opts Options) (*Processor, error) {
 			}
 		case "agent_browser":
 			opts.ThreadsFactory = func(ctx context.Context, tmpl config.Template) (threads.Backend, error) {
-				b, err := threads.NewAgentBrowser(ctx, threads.AgentBrowserOptions{AgentID: tmpl.ID, BaseURL: tmpl.Threads.BaseURL, ProfileDir: tmpl.Threads.ProfileDir, ExecutablePath: tmpl.Threads.ExecutablePath, AgentBrowserPath: tmpl.Threads.AgentBrowserPath, Timeout: 15 * time.Second, StartupTimeout: 30 * time.Second, Logger: opts.Logger, Now: opts.Now, NoSandbox: tmpl.Threads.NoSandbox})
+				b, err := threads.NewAgentBrowser(ctx, threads.AgentBrowserOptions{AgentID: tmpl.ID, BaseURL: tmpl.Threads.BaseURL, ProfileDir: tmpl.Threads.ProfileDir, ExecutablePath: tmpl.Threads.ExecutablePath, AgentBrowserPath: tmpl.Threads.AgentBrowserPath, PageProfile: tmpl.Threads.PageProfile, Timeout: 15 * time.Second, StartupTimeout: 30 * time.Second, Logger: opts.Logger, Now: opts.Now, NoSandbox: tmpl.Threads.NoSandbox})
 				if b == nil {
 					return nil, err
 				}

@@ -1,0 +1,10 @@
+- generic
+  - navigation
+    - link "Threads" [ref=e1, url=https://www.threads.com/]
+    - button "Create" [ref=e2]
+    - link "Search" [ref=e3, url=https://www.threads.com/search]
+  - generic
+    - dialog
+      - StaticText "Say more with Threads"
+      - StaticText "Join Threads to share thoughts, find out what's going on, follow your people and more."
+      - button "Instagram Continue with Instagram Log in" [ref=e4]

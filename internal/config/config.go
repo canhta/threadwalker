@@ -96,6 +96,7 @@ type ThreadsConfig struct {
 	BaseURL          string
 	ExecutablePath   string // Chrome executable for either browser backend.
 	AgentBrowserPath string // Pinned agent-browser CLI binary; agent_browser only.
+	PageProfile      string // fixture (default) or threads for live read mapping.
 	ProfileDir       string
 	NoSandbox        bool // Explicit operator choice for constrained local hosts.
 }
@@ -340,6 +341,27 @@ func loadFile(path string, getenv func(string) string, catalog *Catalog, secrets
 	default:
 		addErr("threads.backend", "must be stub, browser or agent_browser")
 	}
+	tmpl.Threads.PageProfile = "fixture"
+	if doc.keys["threads.page_profile"] {
+		tmpl.Threads.PageProfile = requireString("threads.page_profile")
+	}
+	switch tmpl.Threads.PageProfile {
+	case "fixture":
+	case "threads":
+		if tmpl.Threads.Backend != "agent_browser" {
+			addErr("threads.page_profile", "threads requires backend agent_browser")
+		}
+		u, err := url.Parse(tmpl.Threads.BaseURL)
+		host := ""
+		if err == nil && u != nil {
+			host = strings.TrimPrefix(strings.ToLower(u.Hostname()), "www.")
+		}
+		if err != nil || u == nil || u.Scheme != "https" || (host != "threads.com" && host != "threads.net") {
+			addErr("threads.page_profile", "threads requires an HTTPS threads.com or threads.net base_url")
+		}
+	default:
+		addErr("threads.page_profile", "must be fixture or threads")
+	}
 	if doc.keys["threads.no_sandbox"] {
 		value, err := strconv.ParseBool(doc.scalars["threads.no_sandbox"])
 		if err != nil {
@@ -380,6 +402,9 @@ func loadFile(path string, getenv func(string) string, catalog *Catalog, secrets
 		} else {
 			tmpl.DryRun = b
 		}
+	}
+	if tmpl.Threads.PageProfile == "threads" && !tmpl.DryRun {
+		addErr("threads.page_profile", "threads live reads require dry_run true until write qualification")
 	}
 
 	resolveSecret := func(field, envName string) Secret {

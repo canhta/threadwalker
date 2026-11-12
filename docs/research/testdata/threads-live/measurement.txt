@@ -1,0 +1,43 @@
+Threads live read mapping measurement
+=====================================
+
+Date: 2026-11-12
+Surface: owner-authorized authenticated Orca Browser tab, https://www.threads.com/
+Tab title observed: (4) Home • Threads
+Logged-out check: pinned agent-browser 0.42.0 with a fresh temporary profile
+
+Commands (read-only; no cookie/storage access):
+  orca tab list --json
+  orca snapshot --page <tab> --compact --urls --json
+  orca exec --page <tab> --command "read" --json
+  orca goto --page <tab> --url https://www.threads.com/search?q=agent%20browser
+  orca scroll --page <tab> --direction down --amount 1000 --json
+  orca keypress --page <tab> --key Escape --json
+
+Observed structure (no usernames or post text retained here):
+  - authenticated navigation: link "Profile Profile" (url /@<user>) and
+    link "Insights Insights" (url /insights/)
+  - region "Column body"
+  - post blocks: clickable generic with direct author link (/@<user>),
+    permalink link (/@<user>/post/<id>), StaticText body paragraphs,
+    Like/Reply/Repost/Share buttons
+  - thread continuation posts are sibling blocks with N / M counters
+  - post page: root post plus same-author thread continuation; external replies
+    were not rendered in the measured page
+  - Insights overview: Views, Viewers, Net followers, Interactions only
+  - New thread / Reply: dialog with heading, textbox and Post button; no form
+    action URL and no submit performed
+  - logged-out: login dialog and Continue with Instagram; no authenticated nav
+
+Validation against the saved full measured snapshots (content not logged):
+  feed: 4 parsed posts
+  search: 3 parsed posts
+  post: 6 parsed posts (root + same-author thread continuation)
+  The first feed snapshot was still showing status "Loading..." and parsed 0
+  posts; after the page settled it parsed 4. The adapter now polls the snapshot
+  while a Loading status is present and no posts exist, bounded by the operation
+  deadline.
+
+Sanitized fixtures: docs/research/testdata/threads-live/*.ax.txt
+No cookies, storage, tokens, profile export or raw personal content were read
+or written. All fixture usernames, text, IDs and media alt text are synthetic.

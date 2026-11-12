@@ -1,0 +1,13 @@
+- navigation
+  - link "Threads" [ref=e1, url=https://www.threads.com/]
+  - link "Profile Profile" [ref=e2, url=https://www.threads.com/@synthetic_author]
+  - link "Insights Insights" [ref=e3, url=https://www.threads.com/insights/]
+- generic
+  - dialog
+    - button "Cancel" [ref=e4]
+    - heading "Reply" [level=1, ref=e5]
+    - link "synthetic_replier" [ref=e6, url=https://www.threads.com/@synthetic_replier]
+    - StaticText "Synthetic root post body."
+    - textbox "Empty text field. Type to compose a new post." [ref=e7]
+    - button "Attach media" [ref=e8]
+    - button "Post" [ref=e9]

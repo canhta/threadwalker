@@ -1,0 +1,16 @@
+- navigation
+  - link "Threads" [ref=e1, url=https://www.threads.com/]
+  - link "Profile Profile" [ref=e2, url=https://www.threads.com/@synthetic_author]
+  - link "Insights Insights" [ref=e3, url=https://www.threads.com/insights/]
+- generic
+  - generic
+    - StaticText "Insights"
+    - link "Overview Profile, viewer, and follower insights" [ref=e4, url=https://www.threads.com/insights/]
+    - button "Last 30 days" [ref=e5]
+    - region "Column body" [ref=e6] focusable [tabindex]
+      - generic
+        - StaticText "Summary"
+        - button "Views: 19" [ref=e7]
+        - button "Viewers: 19" [ref=e8]
+        - button "Net followers: +0" [ref=e9]
+        - button "Interactions: 0" [ref=e10]

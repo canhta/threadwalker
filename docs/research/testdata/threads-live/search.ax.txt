@@ -1,0 +1,31 @@
+- generic [ref=e1] clickable [onclick]
+  - navigation
+    - link "Threads" [ref=e2, url=https://www.threads.com/]
+    - link "For you" [ref=e3, url=https://www.threads.com/]
+    - button "New thread" [ref=e4]
+    - link "Search Search" [ref=e5, url=https://www.threads.com/search]
+    - link "Profile Profile" [ref=e6, url=https://www.threads.com/@synthetic_author]
+    - link "Insights Insights" [ref=e7, url=https://www.threads.com/insights/]
+  - generic
+    - generic
+      - searchbox "Search" [ref=e8]: synthetic query
+      - button "Filter" [ref=e9]
+    - region "Column body" [ref=e10] focusable [tabindex]
+      - generic
+        - link "Top" [ref=e11, url=https://www.threads.com/search?exact_match=false&q=synthetic%20query]
+        - link "Recent" [ref=e12, url=https://www.threads.com/search?exact_match=false&q=synthetic%20query&filter=recent]
+        - generic [ref=e13] clickable [cursor:pointer, onclick]
+          - button "synthetic_builder's profile picture Follow" [ref=e14]
+          - link "synthetic_builder" [ref=e15, url=https://www.threads.com/@synthetic_builder]
+          - link "1 day ago" [ref=e16, url=https://www.threads.com/@synthetic_builder/post/fixtureSearch1]
+            - time
+          - button "More" [ref=e17]
+          - StaticText "Synthetic search result body"
+          - StaticText "1"
+          - StaticText "/"
+          - StaticText "2"
+          - button "Like 5" [ref=e18]
+          - button "Reply 1" [ref=e19]
+          - button "Repost" [ref=e20]
+          - button "Share" [ref=e21]
+        - status "Loading..." [ref=e22]

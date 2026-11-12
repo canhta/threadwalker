@@ -108,11 +108,31 @@ threads:
   profile_dir: /path/to/agent-profile
 ```
 
-**Both browser backends support the saved synthetic fixture contracts, not the current Threads
-site.** Real selectors, login/session behavior and action-bound insights remain to be qualified in
-[#2](https://github.com/canhta/threadwalker/issues/2) and
+For measured **read-only** Threads pages, add `page_profile: threads` and keep `dry_run: true`:
+
+```yaml
+threads:
+  backend: agent_browser
+  page_profile: threads
+  base_url: https://www.threads.com
+  executable_path: /path/to/chrome
+  agent_browser_path: /path/to/agent-browser
+  profile_dir: /path/to/agent-profile
+```
+
+The live profile requires `agent_browser`, an HTTPS `threads.com`/`threads.net` origin and dry run.
+It maps feed, search and post reads from the measured accessibility tree. Own metrics remain
+unavailable because the measured Insights overview lacks all four counters. Post/reply submission
+is refused before any click with `live_write_unqualified`; non-dry-run live templates are rejected
+until [#18](https://github.com/canhta/threadwalker/issues/18) measures acknowledgement. The
+authorized Orca Browser session is a measurement surface, not a portable VPS profile.
+
+**The default fixture profile supports saved synthetic contracts, not the current Threads site.**
+Real selectors, login/session behavior, reply acknowledgement and action-bound insights remain to
+be qualified in [#2](https://github.com/canhta/threadwalker/issues/2) and
 [#18](https://github.com/canhta/threadwalker/issues/18). Local reproduction commands are in
-[browser evidence](research/browser-local.md) and [agent-browser evidence](research/agent-browser.md).
+[browser evidence](research/browser-local.md), [agent-browser evidence](research/agent-browser.md)
+and [Threads live mapping](research/threads-live-mapping.md).
 
 Run the opt-in local CLI integration (needs the pinned binary and Chrome; every page is a
 loopback fixture):

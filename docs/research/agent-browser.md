@@ -3,10 +3,12 @@
 Source: the `agent_browser` backend in `457e03f`, measured locally on
 2026-11-12 with Go 1.27.3, macOS arm64, Google Chrome for Testing
 157.0.8103.52 and the pinned **agent-browser 0.42.0** CLI. This is synthetic
-local evidence: no Threads account, Telegram, paid provider, VPS or real
-credentials were used. The owner selected
+local evidence for the fixture transport. The separate read-only live mapping
+used the owner-authorized authenticated Orca Browser tab and is recorded in
+[threads-live-mapping.md](threads-live-mapping.md); no Telegram, paid provider,
+VPS or credential export was used. The owner selected
 [`vercel-labs/agent-browser`](https://github.com/vercel-labs/agent-browser); this
-issue implements that choice locally and does not qualify live Threads.
+issue implements that choice locally and does not qualify live Threads writes or operations.
 
 ## Pinned release and installation
 
@@ -37,7 +39,7 @@ or credential command, and no model-supplied flags.
 | Launch only | `open` (about:blank) |
 | Navigate | `open <absolute-url>` |
 | Bounded rendered text | `read` |
-| Interaction refs | `snapshot -c` |
+| Interaction refs | `snapshot -c -u` (compact, with link URLs) |
 | Fill | `fill <ref> -- <text>` |
 | Submit | `click <ref>` |
 | Owned daemon identity | `session info` |
@@ -74,9 +76,8 @@ the implementation:
 
 ## Page document decision
 
-Live Threads DOM is **not** parsed by this adapter. The transport accepts only a
-versioned, invented rendered-text document, `agent-browser-v1`, served by the
-canonical fixtures in
+The default `fixture` profile accepts only a versioned, invented rendered-text
+document, `agent-browser-v1`, served by the canonical fixtures in
 [`testdata/agent-browser`](testdata/agent-browser/manifest.json). The leading
 block consists of marker lines:
 
@@ -108,9 +109,12 @@ Rules enforced by the parser:
   exactly four metrics, exact same-origin thread URL for `action_metrics`.
 
 This is deliberately text-first: it demonstrates that feed reads return the
-noninteractive post body, not just accessibility refs. A live Threads profile
-still needs measured selectors or a measured accessibility-tree mapping, and
-belongs to #2/#18. No compatibility is claimed.
+noninteractive post body, not just accessibility refs. The optional live
+`threads` profile now parses the measured accessibility tree by roles, nesting,
+link URLs and visible text; see
+[threads-live-mapping.md](threads-live-mapping.md). It is a read mapping only:
+live post/reply submission is refused before any click, and replies, captcha,
+session portability and acknowledgement remain unmeasured in #2/#18.
 
 ## Lifecycle
 
@@ -162,10 +166,13 @@ blocked the first full run was fixed separately in #23 (commit `833af26`).
 
 ## Not measured
 
-Live Threads DOM/selectors, login/session persistence, account survival,
-challenge avoidance, headed operation, sandbox-enabled Linux behavior,
-production memory (Chrome + daemon + harness PSS/RSS), launch peaks and elapsed
-soak. The earlier chromedp memory samples do not predict this stack and do not
+Live Threads **read** structure is mapped in
+[threads-live-mapping.md](threads-live-mapping.md) from one authenticated
+measurement. Live write submission/acknowledgement, external replies,
+login/session persistence and portability, account survival, challenge
+avoidance, headed operation, sandbox-enabled Linux behavior, production memory
+(Chrome + daemon + harness PSS/RSS), launch peaks and elapsed soak remain
+unmeasured. The earlier chromedp memory samples do not predict this stack and do not
 prove a 3,659 MiB host can run live Threads reliably. Those remain #2, #18, #21
 and #9. This change does not post, reply, access Threads or Telegram, or change
 the VPS.

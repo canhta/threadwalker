@@ -31,7 +31,7 @@ func New(ctx context.Context, opts Options) (result *Browser, err error) {
 		opts.Now = time.Now
 	}
 	start := opts.Now()
-	b := &Browser{timeout: opts.Timeout, agentID: opts.AgentID, logger: opts.Logger, now: opts.Now, gate: make(chan struct{}, 1)}
+	b := &Browser{timeout: opts.Timeout, agentID: opts.AgentID, logger: opts.Logger, now: opts.Now, gate: make(chan struct{}, 1), feedPath: "/feed", metricsPath: "/metrics", postPath: "/compose"}
 	defer func() { err = operationError("launch", err); b.record(ctx, "launch", start, err) }()
 	if opts.Timeout == 0 {
 		b.timeout = 10 * time.Second
