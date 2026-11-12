@@ -82,6 +82,34 @@ avoided:
 	if len(tmpl.Persona.ForbiddenPhrases) < 10 {
 		t.Errorf("len(ForbiddenPhrases) = %d, want at least 10", len(tmpl.Persona.ForbiddenPhrases))
 	}
+	if len(tmpl.Persona.GoodReplies) == 0 {
+		t.Fatal("GoodReplies is empty")
+	}
+	for _, reply := range tmpl.Persona.GoodReplies {
+		if n := len([]rune(reply)); n > 120 {
+			t.Errorf("GoodReplies entry is %d chars, want <= 120: %q", n, reply)
+		}
+	}
+	for _, post := range tmpl.Persona.GoodPosts {
+		if n := len([]rune(post)); n > 500 {
+			t.Errorf("GoodPosts entry is %d chars, want <= 500: %q", n, post)
+		}
+		if lines := strings.Count(post, "\n") + 1; lines > 3 {
+			t.Errorf("GoodPosts entry has %d lines, want 1-3: %q", lines, post)
+		}
+	}
+	preachy := strings.Join(tmpl.Persona.BadExamples, "\n")
+	for _, marker := range []string{"chưa phải", "Ai chịu trách nhiệm"} {
+		if !strings.Contains(preachy, marker) {
+			t.Errorf("BadExamples do not keep the rejected preachy draft marker %q", marker)
+		}
+	}
+	forbidden := strings.Join(tmpl.Persona.ForbiddenPhrases, "\n")
+	for _, marker := range []string{"chưa phải", "ai chịu trách nhiệm", "chỉ là"} {
+		if !strings.Contains(forbidden, marker) {
+			t.Errorf("ForbiddenPhrases do not block the lecture marker %q", marker)
+		}
+	}
 	if len(tmpl.SeedPlaybook) != 3 {
 		t.Errorf("len(SeedPlaybook) = %d, want 3", len(tmpl.SeedPlaybook))
 	}
