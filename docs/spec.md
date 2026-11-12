@@ -24,7 +24,7 @@ Weekly measures on the agent's own account: followers, views, replies received, 
 | Template | Declares goal, persona and limits; the agent plans its own tactics | decision |
 | Self-editing | The agent edits its playbook and notes in the DB, never code or its template | decision |
 | Account | A disposable side account whose bio states it is an AI experiment | decision (AI label: author's condition, owner has not objected) |
-| Threads access | Browser automation; the official API needs Business Verification the owner does not have | decision |
+| Threads access | Browser automation (`chromedp` or the pinned `agent-browser` CLI); the official API needs Business Verification the owner does not have | decision (agent-browser: owner instruction, #22) |
 | LLM | Configurable named providers and model profiles; provider IDs, model IDs and key environment-variable names are chosen by the operator | decision |
 | Language | Go | proposed |
 | Host | Local development and verification; a VPS is an optional deployment target | decision |
@@ -162,14 +162,25 @@ No future component is considered instrumented until its issue implements and te
 | Contacts | `mark_do_not_contact` | The agent can add to the list, never remove |
 | Scheduling | `schedule_next_wake` | Clamped to the allowed range |
 
-The browser backend implements the measured `synthetic-v1` contract in
-[`docs/research/testdata/browser/manifest.json`](research/testdata/browser/manifest.json), using
-`chromedp v0.23.0`. It starts at most one browser per wake, closes it on every exit (including
-cancellation), and retains an agent-owned operator profile. Only configured-origin navigation
-and form submissions are allowed; page scripts are disabled for this synthetic contract.
-Unknown or malformed pages return operation-specific safe errors without guessed selectors.
-Current Threads DOM, login/session behavior and real-account operation remain unverified in
-#2/#18; these fixtures do not claim live compatibility. **(decision)**
+Two browser backends implement the same six domain tools and `threads.Backend` contract.
+`browser` implements the measured `synthetic-v1` contract in
+[`docs/research/testdata/browser/manifest.json`](research/testdata/browser/manifest.json) with
+`chromedp v0.23.0`; page scripts are disabled for that synthetic contract. `agent_browser` uses
+the pinned `vercel-labs/agent-browser 0.42.0` CLI through a harness-owned client: fixed verbs
+only, no `eval`, `batch`, CDP attach, cookie, storage, credential or generic browser command;
+per-agent session, daemon namespace and operator profile; bounded JSON output; context deadlines;
+process-group kill; and owned-daemon cleanup. It reads bounded rendered page text, never an
+interactive-only snapshot, and a compact noninteractive accessibility snapshot for interaction
+refs. It accepts only the invented `agent-browser-v1` fixture document in
+[`docs/research/testdata/agent-browser/manifest.json`](research/testdata/agent-browser/manifest.json).
+Both backends start at most one browser per wake, close it on every exit (including cancellation),
+and allow only configured-origin navigation and submissions. Unknown or malformed pages return
+operation-specific safe errors without guessed selectors. **Neither backend parses live Threads
+DOM.** A live profile needs selectors or an accessibility profile measured against the current
+site; until one exists, a page without the versioned fixture contract fails closed as
+`unknown_page`. Current Threads DOM, login/session behavior, account survival and real-account
+operation remain unverified in #2/#18; these fixtures do not claim live compatibility.
+**(decision, #22)**
 
 `dry_run` browser reads execute normally; writes retain a single guarded intent without
 submitting. A configured non-dry-run backend submits only after that intent commits and stores
@@ -464,7 +475,7 @@ connection pool; no connection is held during Bot API HTTP. Canonical delivery D
 | Language | Go, single binary | Research read the repos; nothing was run |
 | DB | SQLite via a pure-Go driver (`modernc.org/sqlite`) | Research read the repo; nothing was run |
 | LLM | Optional provider/model catalog ([canonical example](../llms.example.yaml)); templates select a profile or declare inline LLM settings | Standard-library adapters implement `openai` Chat Completions and native `anthropic` Messages, including custom base URLs; two-tool live evidence is in [spike-llm.md](research/spike-llm.md) |
-| Browser | Headless Chromium over CDP via `chromedp v0.23.0` | Local synthetic transport/lifecycle and sampled process memory measured in [spike-browser.md](research/spike-browser.md); current Threads selectors, account survival, production memory and datacenter-IP behavior remain unverified |
+| Browser | Headless Chromium over CDP via `chromedp v0.23.0` (default `browser`), or the pinned `agent-browser 0.42.0` CLI (`agent_browser`) | Local synthetic transport/lifecycle measured for both in [spike-browser.md](research/spike-browser.md) and [agent-browser.md](research/agent-browser.md); current Threads selectors, account survival, production memory and datacenter-IP behavior remain unverified |
 | Deploy | Local process; optional systemd deployment on a chosen Linux host | decision |
 
 ## 11. Non-goals for v0
@@ -494,8 +505,11 @@ three-day observation, a 48-hour single-agent dry run, real-bot controls, six re
 operations, the seven-day live experiment, and the two-agent 48-hour memory observation remain
 open until actually measured. These may run on a local machine or an operator-chosen deployment
 host; a VPS is optional. A datacenter-IP conclusion still requires measurement from that IP.
-Synthetic DOM fixtures do not establish that selectors work on the current Threads site, and
-simulated time does not count as elapsed soak/live time. Live posting still requires the named
+The `agent_browser` CLI adapter is implemented and tested only against local fixtures; its pinned
+version, verified flags and limits are in [agent-browser.md](research/agent-browser.md). Live
+Threads compatibility, host memory and elapsed soak remain #2/#18. Synthetic DOM fixtures do not
+establish that selectors work on the current Threads site, and simulated time does not count as
+elapsed soak/live time. Live posting still requires the named
 issue scope, owner-provided account/session and explicit live-run approval. **(decision)**
 
 ## 13. Unknowns
@@ -583,9 +597,10 @@ Each agent template in `agents/*.yaml` (see [`agents/solo-builder.example.yaml`]
   `min_seconds_between_actions`, `max_steps_per_wake`, `max_usd_per_day`,
   `min_minutes_between_wakes`.
 - `guard`: optional nonempty `stop_phrases` list; omission selects the code defaults.
-- `threads`: `profile_dir`, `username` (operator-declared own account, required for several agents), optional `backend` (`stub` by default, or `browser`). Browser mode
-  requires an explicit HTTP(S) origin `base_url` and installed Chromium `executable_path`.
-  Optional `no_sandbox` defaults to false and is an operator host choice, never a model field.
+- `threads`: `profile_dir`, `username` (operator-declared own account, required for several agents), optional `backend` (`stub` by default, `browser`, or `agent_browser`). Browser modes
+  require an explicit HTTP(S) origin `base_url` and installed Chromium `executable_path`;
+  `agent_browser` also requires an absolute `agent_browser_path` to the pinned CLI. Optional
+  `no_sandbox` defaults to false and is an operator host choice, never a model field.
 - `telegram`: optional `enabled` (defaults to `false`); `bot_token_env` and `owner_chat_id_env` are required and resolved only when enabled. Optional `digest_hour` is 0..23 UTC and defaults to 18. The canonical example keeps this optional integration disabled for local operation without a bot.
 
 Secrets live only in environment variables named by `*_env`, never in a template, catalog, log

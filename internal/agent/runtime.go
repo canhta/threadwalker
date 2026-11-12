@@ -55,13 +55,24 @@ func New(opts Options) (*Runtime, error) {
 		return nil, errors.New("configuring runtime: store and agent required")
 	}
 	opts.OwnUsernames = append([]string(nil), opts.OwnUsernames...)
-	if opts.ThreadsFactory == nil && opts.Template.Threads.Backend == "browser" {
-		opts.ThreadsFactory = func(ctx context.Context, tmpl config.Template) (threads.Backend, error) {
-			browser, err := threads.New(ctx, threads.Options{AgentID: tmpl.ID, BaseURL: tmpl.Threads.BaseURL, ProfileDir: tmpl.Threads.ProfileDir, ExecutablePath: tmpl.Threads.ExecutablePath, Timeout: 15 * time.Second, StartupTimeout: 30 * time.Second, Logger: opts.Logger, Now: opts.Now, NoSandbox: tmpl.Threads.NoSandbox})
-			if browser == nil {
-				return nil, err
+	if opts.ThreadsFactory == nil {
+		switch opts.Template.Threads.Backend {
+		case "browser":
+			opts.ThreadsFactory = func(ctx context.Context, tmpl config.Template) (threads.Backend, error) {
+				browser, err := threads.New(ctx, threads.Options{AgentID: tmpl.ID, BaseURL: tmpl.Threads.BaseURL, ProfileDir: tmpl.Threads.ProfileDir, ExecutablePath: tmpl.Threads.ExecutablePath, Timeout: 15 * time.Second, StartupTimeout: 30 * time.Second, Logger: opts.Logger, Now: opts.Now, NoSandbox: tmpl.Threads.NoSandbox})
+				if browser == nil {
+					return nil, err
+				}
+				return browser, err
 			}
-			return browser, err
+		case "agent_browser":
+			opts.ThreadsFactory = func(ctx context.Context, tmpl config.Template) (threads.Backend, error) {
+				browser, err := threads.NewAgentBrowser(ctx, threads.AgentBrowserOptions{AgentID: tmpl.ID, BaseURL: tmpl.Threads.BaseURL, ProfileDir: tmpl.Threads.ProfileDir, ExecutablePath: tmpl.Threads.ExecutablePath, AgentBrowserPath: tmpl.Threads.AgentBrowserPath, Timeout: 15 * time.Second, StartupTimeout: 30 * time.Second, Logger: opts.Logger, Now: opts.Now, NoSandbox: tmpl.Threads.NoSandbox})
+				if browser == nil {
+					return nil, err
+				}
+				return browser, err
+			}
 		}
 	}
 	if !opts.Template.DryRun && opts.ThreadsFactory == nil {

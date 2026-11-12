@@ -26,13 +26,20 @@ func (f *fakeDriver) navigate(ctx context.Context, dest string) error {
 	f.destinations = append(f.destinations, dest)
 	return ctx.Err()
 }
-func (f *fakeDriver) snapshot(context.Context) ([]byte, error) { return f.raw, nil }
+func (f *fakeDriver) page(_ context.Context, kind string) (Page, error) {
+	return ParseSnapshot(f.raw, kind, "https://fixture.test")
+}
 func (f *fakeDriver) submit(context.Context, string) (bool, error) {
 	f.submits++
 	return true, f.submitErr
 }
-func (f *fakeDriver) acknowledgement(context.Context) ([]byte, error) { return f.ack, f.ackErr }
-func (f *fakeDriver) close(context.Context) error                     { return nil }
+func (f *fakeDriver) acknowledgement(context.Context) (Page, error) {
+	if f.ackErr != nil {
+		return Page{}, f.ackErr
+	}
+	return ParseSnapshot(f.ack, "submitted", "https://fixture.test")
+}
+func (f *fakeDriver) close(context.Context) error { return nil }
 func testBrowser(f *fakeDriver) *Browser {
 	return &Browser{base: mustBase("https://fixture.test"), driver: f, timeout: time.Second, now: time.Now, gate: make(chan struct{}, 1)}
 }

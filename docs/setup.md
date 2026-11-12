@@ -93,14 +93,34 @@ runs the same scheduler on a chosen host; a VPS is optional.
 ## Browser and Telegram
 
 The default Threads backend is `stub`, which requires dry run. Browser configuration lives under
-`threads`: `backend: browser`, `base_url`, `executable_path` and an agent-specific `profile_dir`.
-Chromium must already be installed; `no_sandbox` defaults to false.
+`threads`: `backend: browser` or `backend: agent_browser`, `base_url`, `executable_path` (Chrome)
+and an agent-specific `profile_dir`. Chromium must already be installed; `no_sandbox` defaults to
+false. `agent_browser` additionally requires an absolute `agent_browser_path` to the pinned
+**agent-browser 0.42.0** CLI; install it with the upstream instructions or `npm install
+agent-browser@0.42.0`. The adapter rejects any other version.
 
-**The current browser supports the saved synthetic DOM contract, not the current Threads site.**
-Real selectors, login/session behavior and action-bound insights remain to be qualified in
+```yaml
+threads:
+  backend: agent_browser
+  base_url: http://127.0.0.1:18080
+  executable_path: /path/to/chrome
+  agent_browser_path: /path/to/agent-browser
+  profile_dir: /path/to/agent-profile
+```
+
+**Both browser backends support the saved synthetic fixture contracts, not the current Threads
+site.** Real selectors, login/session behavior and action-bound insights remain to be qualified in
 [#2](https://github.com/canhta/threadwalker/issues/2) and
-[#18](https://github.com/canhta/threadwalker/issues/18). Local browser reproduction commands are
-in [browser evidence](research/browser-local.md).
+[#18](https://github.com/canhta/threadwalker/issues/18). Local reproduction commands are in
+[browser evidence](research/browser-local.md) and [agent-browser evidence](research/agent-browser.md).
+
+Run the opt-in local CLI integration (needs the pinned binary and Chrome; every page is a
+loopback fixture):
+
+```sh
+AGENT_BROWSER_BIN=/path/to/agent-browser CHROME_BIN=/path/to/chrome \
+  go test -tags agent_browser_integration -run TestAgentBrowserLocalIntegration ./internal/threads/
+```
 
 Telegram stays disabled unless `telegram.enabled: true`. When enabled, set `bot_token_env` and
 `owner_chat_id_env` to the variable names containing the bot token and owner's numeric chat ID.

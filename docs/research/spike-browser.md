@@ -174,3 +174,79 @@ memory and elapsed soak. Real account/IP observation remains in #2, operational
 checks in #18, two-agent observation in #21 and the live experiment in #9. None is
 established by synthetic markup or simulated time. #8 is now free to implement
 against this local contract while preserving those qualification limits.
+
+## Agent-friendly browser interfaces (documentation review, 2026-11-12)
+
+**Recommendation for a new spike: `vercel-labs/agent-browser`, using Chrome.** It
+provides the agent-facing layer the question asks for: compact accessibility
+snapshots with element references, followed by commands such as `click @e1` and
+`fill @e2 ...`. Headless describes how Chrome displays its window; it does not
+describe the interface an agent gets. These tools improve that interface while
+still using a browser underneath. This is a proposal, **not a replacement of the
+chromedp decision or evidence of Threads compatibility**.
+
+This review used Context7 documentation retrieved by the coordinating researcher
+and the current primary sources linked below. Nothing was installed or executed,
+and no SSH connection, account session or paid API was used. The supplied target
+is SSH alias `vps`, Ubuntu 24.04 x64, 3,659 MiB RAM; these are input facts, not
+host measurements from this review. Documentation can change; pin the selected
+release before any implementation and verify its own help/source.
+
+| Candidate | Documented agent interface and session support | Runtime / deployment implications | Fit for ThreadWalker (assessment) |
+|---|---|---|---|
+| **agent-browser** | Accessibility refs, compact snapshots, JSON output; named live sessions, persistent profile paths, headless and headed operation, CDP attachment. | Current docs describe native Rust CLI **and daemon**, direct CDP, Linux x64 binaries, Chrome for Testing and Linux browser libraries (`install --with-deps`). npm is an installation route; the documented current architecture has no Node daemon. | Best first interface spike: a Go adapter can invoke a fixed executable with validated arguments, without a second LLM loop. Its daemon lifecycle still needs explicit cleanup per wake. [Introduction](https://agent-browser.dev/), [installation](https://agent-browser.dev/installation), [sessions](https://agent-browser.dev/sessions), [commands](https://agent-browser.dev/commands). |
+| **Playwright CLI** | Snapshot refs, commands, named sessions; headless default, `--headed`, `--persistent` or `--profile` for disk persistence. | Node.js 20+, Playwright/browser installation and browser system libraries. | Strong comparison candidate with similar Go subprocess integration. Microsoft's CLI recommendation targets coding agents; it does not establish better fit for this production loop. [Official README](https://github.com/microsoft/playwright-cli#readme). |
+| **Playwright MCP** | Structured accessibility tools, no vision requirement; persistent or isolated profiles; headed default, `--headless` for a server. | Node.js 18+, browser dependencies and an MCP client/transport. | Can sit behind a Go adapter, but adds protocol integration. Directly exposing generic click/evaluate tools to the LLM would bypass the meaning of ThreadWalker's post/reply guards. Upstream explicitly says MCP is not a security boundary. [Official README](https://github.com/microsoft/playwright-mcp#readme). |
+| **browser-use** | Python agent library **and** independently usable CLI/browser controls. Current 1.0 CLI executes supplied Python through Browser Harness/CDP; an inner `Agent` loop is optional. Local library browser supports persistent `user_data_dir`, headed/headless and CDP. | Python 3.11+; Chrome and Linux browser libraries for local mode. Current library `Browser()` defaults to cloud; local must be selected explicitly. Current CLI defaults to attaching existing Chrome. | Feasible as a lower-level adapter; more Python execution surface to constrain. Do not nest its autonomous `Agent` under the Go loop or silently select cloud defaults. [Quickstart](https://docs.browser-use.com/open-source/quickstart), [CLI](https://docs.browser-use.com/open-source/browser-use-cli), [browser parameters](https://docs.browser-use.com/open-source/all-parameters). |
+| **Stagehand** | Natural-language `act`, structured `extract`, action discovery `observe`, plus deterministic page APIs. Current v4 docs include Go, Python and TypeScript. Local browser supports profile persistence and headed/headless. | Current Go SDK requires Go 1.26+; local Chrome; AI primitives add model requests. Browserbase cloud is an alternative, not required for local browsing. | Worth reconsidering if semantic extraction is the bottleneck. Model calls would need integration with the existing ledger, budget, redaction and guard boundaries. Not the first spike for a compact browser command interface. [Introduction](https://docs.stagehand.dev/v4/first-steps/introduction), [installation](https://docs.stagehand.dev/v4/first-steps/installation), [browser configuration](https://docs.stagehand.dev/v4/configuration/browser). |
+
+### Integration conditions and what the spike must prove
+
+The recommended boundary remains `LLM -> internal/guard -> existing Threads
+tool -> adapter -> agent-browser -> Chrome`. Keep the six domain tools from the
+spec. Do not give the model a shell, arbitrary JavaScript, unrestricted CLI
+arguments, CDP connection or direct generic browser tools. A compact snapshot
+helps only if a bounded, untrusted representation is actually needed in model
+context; changing the backend alone does not make the existing fixed parser
+understand live Threads. A richer model-controlled navigation interface would
+require an explicit design/spec decision first.
+
+In particular, `snapshot -i` selects interactive elements: it can omit post body
+text. Feed reading needs a bounded full/compact or appropriately scoped snapshot,
+not an assumption that interactive-only output contains the feed. See the
+[snapshot reference](https://agent-browser.dev/snapshots). The current backend
+also disables page scripts and accepts the invented `synthetic-v1` markers;
+profile configuration alone cannot turn it into a live Threads implementation
+([browser backend](../../internal/threads/browser.go)).
+
+The harness must own executable/config/profile/session selection, origin limits,
+timeouts, process shutdown and output limits. Profiles remain separate per agent;
+browser state, cookies and storage must never enter tool results, logs or model
+context. Do not add plaintext auth export files or password vault files as part of
+this proposal. Page text and refs remain untrusted data, never instructions.
+
+Before a submit, preserve the existing durable guarded intent and accounting.
+After an ambiguous acknowledgement, crash or timeout, record unknown/assumed sent
+and stop: **never retry the post/reply**, including through a batch, automatic
+recovery or a new browser session. A library's actionability wait is not evidence
+of durable publication semantics.
+
+A scoped offline spike should compare agent-browser with the existing backend on
+the same fixtures: six operations, malformed/unknown pages, logged-out/captcha
+pause, cancellation, profile isolation, three launch/close cycles, and uncertain
+submit accepted exactly once. Confirm the actual release's sandbox/launch flags,
+daemon cleanup on cancellation and bounded output before considering integration.
+Measure browser plus daemon plus Go process PSS/RSS, launch peaks and elapsed
+soak on the intended host. The earlier chromedp samples do not predict this
+stack's memory or prove a 3,659 MiB host can run live Threads reliably.
+
+For the supplied VPS, headless Chrome is a sensible initial mode; headed use
+requires a display arrangement and is mainly useful for operator diagnosis.
+Neither headed mode, a compact agent interface, nor vendor stealth claims prove
+Threads login persistence, account survival, challenge avoidance or selectors.
+Those remain separately scoped live qualification. This review was the input to
+[#22](https://github.com/canhta/threadwalker/issues/22), which implements the
+local adapter, the `agent_browser` backend and the matching spec decision. The
+pinned version, verified flags and measured local integration are in
+[agent-browser.md](agent-browser.md); live Threads compatibility, host memory and
+elapsed soak remain unverified.

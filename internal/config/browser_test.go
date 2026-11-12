@@ -19,6 +19,10 @@ func TestBrowserConfigurationExplicitAndFailClosed(t *testing.T) {
 	}{
 		{"default", "", true},
 		{"browser", "  backend: browser\n  base_url: http://127.0.0.1:1234\n  executable_path: /synthetic/chrome\n", true},
+		{"agent_browser", "  backend: agent_browser\n  base_url: http://127.0.0.1:1234\n  executable_path: /synthetic/chrome\n  agent_browser_path: /synthetic/agent-browser\n", true},
+		{"agent_browser_missing_cli", "  backend: agent_browser\n  base_url: http://127.0.0.1:1234\n  executable_path: /synthetic/chrome\n", false},
+		{"agent_browser_relative_cli", "  backend: agent_browser\n  base_url: http://127.0.0.1:1234\n  executable_path: /synthetic/chrome\n  agent_browser_path: agent-browser\n", false},
+		{"agent_browser_missing_chrome", "  backend: agent_browser\n  base_url: http://127.0.0.1:1234\n  agent_browser_path: /synthetic/agent-browser\n", false},
 		{"unknown", "  backend: auto\n", false},
 		{"missing_origin", "  backend: browser\n  executable_path: /synthetic/chrome\n", false},
 		{"credentials", "  backend: browser\n  base_url: https://private:secret@fixture.invalid\n  executable_path: /synthetic/chrome\n", false},
@@ -46,6 +50,9 @@ func TestBrowserConfigurationExplicitAndFailClosed(t *testing.T) {
 			}
 			if err == nil && tc.name == "browser" && (tmpl.Threads.Backend != "browser" || tmpl.Threads.BaseURL != "http://127.0.0.1:1234" || tmpl.Threads.ExecutablePath != "/synthetic/chrome") {
 				t.Fatalf("config lost: %+v", tmpl.Threads)
+			}
+			if err == nil && tc.name == "agent_browser" && (tmpl.Threads.Backend != "agent_browser" || tmpl.Threads.AgentBrowserPath != "/synthetic/agent-browser" || tmpl.Threads.ExecutablePath != "/synthetic/chrome") {
+				t.Fatalf("agent-browser config lost: %+v", tmpl.Threads)
 			}
 			if err != nil && strings.Contains(err.Error(), "private:secret") {
 				t.Fatal("origin credentials leaked")

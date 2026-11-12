@@ -196,6 +196,14 @@ func (d *cdpDriver) snapshot(ctx context.Context) ([]byte, error) {
 	return []byte(raw), nil
 }
 
+func (d *cdpDriver) page(ctx context.Context, kind string) (Page, error) {
+	raw, err := d.snapshot(ctx)
+	if err != nil {
+		return Page{}, err
+	}
+	return ParseSnapshot(raw, kind, d.base.String())
+}
+
 // Only the single write armed immediately before requestSubmit can issue POST.
 // Redirects that would resend the body cannot consume another allowance.
 func (d *cdpDriver) allowRequest(method, raw string) bool {
@@ -248,14 +256,18 @@ func (d *cdpDriver) submit(ctx context.Context, text string) (bool, error) {
 	return attempted, err
 }
 func (d *cdpDriver) disarmSubmit() { d.requestMu.Lock(); d.submitAllowed = false; d.requestMu.Unlock() }
-func (d *cdpDriver) acknowledgement(ctx context.Context) ([]byte, error) {
+func (d *cdpDriver) acknowledgement(ctx context.Context) (Page, error) {
 	defer d.disarmSubmit()
 	call, cancel := d.call(ctx)
 	defer cancel()
 	if err := chromedp.Do(call, chromedp.WaitVisible(chromedp.CSS("[data-tw-thread-url], [data-tw-page='captcha'], [data-tw-page='logged_out']"))); err != nil {
-		return nil, err
+		return Page{}, err
 	}
-	return d.snapshot(call)
+	raw, err := d.snapshot(call)
+	if err != nil {
+		return Page{}, err
+	}
+	return ParseSnapshot(raw, "submitted", d.base.String())
 }
 func (d *cdpDriver) close(ctx context.Context) error {
 	d.once.Do(func() {

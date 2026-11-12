@@ -91,12 +91,13 @@ type LimitsConfig struct {
 }
 
 type ThreadsConfig struct {
-	Username       string // Operator-declared own account identity, never inferred.
-	Backend        string // stub (default) or explicitly configured browser
-	BaseURL        string
-	ExecutablePath string
-	ProfileDir     string
-	NoSandbox      bool // Explicit operator choice for constrained local hosts.
+	Username         string // Operator-declared own account identity, never inferred.
+	Backend          string // stub (default), browser or agent_browser
+	BaseURL          string
+	ExecutablePath   string // Chrome executable for either browser backend.
+	AgentBrowserPath string // Pinned agent-browser CLI binary; agent_browser only.
+	ProfileDir       string
+	NoSandbox        bool // Explicit operator choice for constrained local hosts.
 }
 
 type TelegramConfig struct {
@@ -321,16 +322,23 @@ func loadFile(path string, getenv func(string) string, catalog *Catalog, secrets
 	if doc.keys["threads.backend"] {
 		tmpl.Threads.Backend = requireString("threads.backend")
 	}
-	if tmpl.Threads.Backend != "stub" && tmpl.Threads.Backend != "browser" {
-		addErr("threads.backend", "must be stub or browser")
-	}
-	if tmpl.Threads.Backend == "browser" {
+	switch tmpl.Threads.Backend {
+	case "stub":
+	case "browser", "agent_browser":
 		tmpl.Threads.BaseURL = requireString("threads.base_url")
 		tmpl.Threads.ExecutablePath = requireString("threads.executable_path")
 		u, err := url.Parse(tmpl.Threads.BaseURL)
 		if err != nil || u == nil || (u.Scheme != "http" && u.Scheme != "https") || u.Hostname() == "" || u.User != nil || u.Opaque != "" || (u.Path != "" && u.Path != "/") || u.RawQuery != "" || u.Fragment != "" || u.ForceQuery {
 			addErr("threads.base_url", "must be an HTTP(S) origin without credentials, path, query or fragment")
 		}
+		if tmpl.Threads.Backend == "agent_browser" {
+			tmpl.Threads.AgentBrowserPath = requireString("threads.agent_browser_path")
+			if !filepath.IsAbs(tmpl.Threads.AgentBrowserPath) || strings.ContainsAny(tmpl.Threads.AgentBrowserPath, "\x00\r\n") {
+				addErr("threads.agent_browser_path", "must be an absolute executable path")
+			}
+		}
+	default:
+		addErr("threads.backend", "must be stub, browser or agent_browser")
 	}
 	if doc.keys["threads.no_sandbox"] {
 		value, err := strconv.ParseBool(doc.scalars["threads.no_sandbox"])

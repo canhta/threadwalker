@@ -1,0 +1,76 @@
+{
+  "contract": "agent-browser-v1",
+  "evidence_kind": "synthetic-local-only",
+  "pinned_cli": "agent-browser 0.42.0",
+  "description": "Invented rendered-text contract for the agent-browser CLI transport. Not measured against live Threads.",
+  "fixtures": [
+    {
+      "file": "feed.html",
+      "sha256": "7f3e7fe19773c901ecad57e47c053aa96aa28e5b2b448c94785ecd36753257b8"
+    },
+    {
+      "file": "search.html",
+      "sha256": "a774cfb13d80319b1b20cf8ce0e2dd5e94f3dcf362421bfd680fed90ce4266c7"
+    },
+    {
+      "file": "post.html",
+      "sha256": "2ad8865d15c36d7098fceb0d86decf4333b73e3bbb31151acf97b3e916461f95"
+    },
+    {
+      "file": "metrics.html",
+      "sha256": "f5daf6f04efccb64829b04cb1191a6896bdfbe1afddda5b219b4781a68900bf8"
+    },
+    {
+      "file": "action-metrics.html",
+      "sha256": "b59032429d957a77c16fed7ebb7855eaa6207f5482bdf2a923a852a7d7fa2116"
+    },
+    {
+      "file": "compose.html",
+      "sha256": "ce5e79ed0b03e38abf7252f3a569ba6a905799eb0b9d1e79ccf352c20a7206a8"
+    },
+    {
+      "file": "submitted.html",
+      "sha256": "8d22342be8a7f5d11803a4870c33105a0f74d0904e616d5405ca7c4b33dde25e"
+    },
+    {
+      "file": "uncertain.html",
+      "sha256": "bed9c7a2d2c0561b8c7cfe350629f7d50434579802c6a0b732595dbfbe0bf775"
+    },
+    {
+      "file": "logged-out.html",
+      "sha256": "d70668d941e00e4beb49d83039061b914208d6f8a798f0cd57098c2c168eadf9"
+    },
+    {
+      "file": "captcha.html",
+      "sha256": "2afcc7b277f1bfbe2881048d63c8f130bfdc329e5ebb9aa048d50a9573182983"
+    },
+    {
+      "file": "unknown.html",
+      "sha256": "49cf00bd63a345c0cebd88df578e0a42f87af0afbafcf72a9ad39af80686c528"
+    },
+    {
+      "file": "malformed.html",
+      "sha256": "851422c6c3148661f38b0a4884485f6dfa00031f3567330a0e5c7e86660b8902"
+    }
+  ],
+  "expected_metrics": {
+    "views": 123,
+    "likes": 7,
+    "replies": 3,
+    "reposts": 1
+  },
+  "submit": {
+    "method": "POST",
+    "text_field": "text",
+    "success_url": "/submitted",
+    "success_thread_url": "/post",
+    "uncertain_behavior": "Increment server acceptance once, then wait for request cancellation without replying; the transport must report an unknown outcome and never retry."
+  },
+  "states": {
+    "logged_out": "pause and notify in the guarded tool boundary",
+    "captcha": "pause and notify in the guarded tool boundary",
+    "unknown_page": "operation error, never guess",
+    "malformed": "operation error, never guess"
+  },
+  "injection_fixture": "feed.html contains an instruction-shaped post body; it must be returned literally as untrusted data."
+}

@@ -52,9 +52,9 @@ type Options struct {
 
 type transport interface {
 	navigate(context.Context, string) error
-	snapshot(context.Context) ([]byte, error)
+	page(context.Context, string) (Page, error)
 	submit(context.Context, string) (bool, error)
-	acknowledgement(context.Context) ([]byte, error)
+	acknowledgement(context.Context) (Page, error)
 	close(context.Context) error
 }
 
@@ -177,11 +177,7 @@ func (b *Browser) read(ctx context.Context, op, path, kind string) (page Page, e
 	if err = b.driver.navigate(call, dest); err != nil {
 		return Page{}, err
 	}
-	raw, err := b.driver.snapshot(call)
-	if err != nil {
-		return Page{}, err
-	}
-	page, err = ParseSnapshot(raw, kind, b.base.String())
+	page, err = b.driver.page(call, kind)
 	if err == nil && kind == "action_metrics" && page.ThreadURL != dest {
 		return Page{}, ErrMalformedPage
 	}
@@ -241,11 +237,7 @@ func (b *Browser) write(ctx context.Context, op, path, kind, text string) (threa
 	if err = b.driver.navigate(call, dest); err != nil {
 		return "", err
 	}
-	raw, err := b.driver.snapshot(call)
-	if err != nil {
-		return "", err
-	}
-	page, err := ParseSnapshot(raw, kind, b.base.String())
+	page, err := b.driver.page(call, kind)
 	if err != nil {
 		return "", err
 	}
@@ -262,11 +254,7 @@ func (b *Browser) write(ctx context.Context, op, path, kind, text string) (threa
 	if !attempted {
 		return "", ErrMalformedPage
 	}
-	raw, err = b.driver.acknowledgement(call)
-	if err != nil {
-		return "", errors.Join(ErrUnknownOutcome, err)
-	}
-	page, err = ParseSnapshot(raw, "submitted", b.base.String())
+	page, err = b.driver.acknowledgement(call)
 	if err != nil {
 		return "", errors.Join(ErrUnknownOutcome, err)
 	}

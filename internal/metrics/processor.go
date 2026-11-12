@@ -68,13 +68,24 @@ func New(opts Options) (*Processor, error) {
 	if opts.LeaseDuration < 0 || opts.RetryDelay < 0 || opts.BatchSize < 1 || opts.BatchSize > 1000 {
 		return nil, errors.New("configuring metrics: positive lease, retry and bounded batch required")
 	}
-	if opts.ThreadsFactory == nil && opts.Template.Threads.Backend == "browser" {
-		opts.ThreadsFactory = func(ctx context.Context, tmpl config.Template) (threads.Backend, error) {
-			b, err := threads.New(ctx, threads.Options{AgentID: tmpl.ID, BaseURL: tmpl.Threads.BaseURL, ProfileDir: tmpl.Threads.ProfileDir, ExecutablePath: tmpl.Threads.ExecutablePath, Timeout: 15 * time.Second, StartupTimeout: 30 * time.Second, Logger: opts.Logger, Now: opts.Now, NoSandbox: tmpl.Threads.NoSandbox})
-			if b == nil {
-				return nil, err
+	if opts.ThreadsFactory == nil {
+		switch opts.Template.Threads.Backend {
+		case "browser":
+			opts.ThreadsFactory = func(ctx context.Context, tmpl config.Template) (threads.Backend, error) {
+				b, err := threads.New(ctx, threads.Options{AgentID: tmpl.ID, BaseURL: tmpl.Threads.BaseURL, ProfileDir: tmpl.Threads.ProfileDir, ExecutablePath: tmpl.Threads.ExecutablePath, Timeout: 15 * time.Second, StartupTimeout: 30 * time.Second, Logger: opts.Logger, Now: opts.Now, NoSandbox: tmpl.Threads.NoSandbox})
+				if b == nil {
+					return nil, err
+				}
+				return b, err
 			}
-			return b, err
+		case "agent_browser":
+			opts.ThreadsFactory = func(ctx context.Context, tmpl config.Template) (threads.Backend, error) {
+				b, err := threads.NewAgentBrowser(ctx, threads.AgentBrowserOptions{AgentID: tmpl.ID, BaseURL: tmpl.Threads.BaseURL, ProfileDir: tmpl.Threads.ProfileDir, ExecutablePath: tmpl.Threads.ExecutablePath, AgentBrowserPath: tmpl.Threads.AgentBrowserPath, Timeout: 15 * time.Second, StartupTimeout: 30 * time.Second, Logger: opts.Logger, Now: opts.Now, NoSandbox: tmpl.Threads.NoSandbox})
+				if b == nil {
+					return nil, err
+				}
+				return b, err
+			}
 		}
 	}
 	return &Processor{opts: opts}, nil
