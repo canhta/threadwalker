@@ -14,9 +14,10 @@ import (
 )
 
 type fakeBot struct {
-	pollErr, sendErr error
-	updates          []telegram.Update
-	texts            []string
+	pollErr, sendErr, commandsErr error
+	updates                       []telegram.Update
+	texts                         []string
+	commands                      []telegram.BotCommand
 }
 
 func (b *fakeBot) GetUpdates(context.Context, int64, int) ([]telegram.Update, error) {
@@ -30,6 +31,10 @@ func (b *fakeBot) GetUpdates(context.Context, int64, int) ([]telegram.Update, er
 func (b *fakeBot) SendMessage(_ context.Context, _ int64, text string, _ int64) (int64, error) {
 	b.texts = append(b.texts, text)
 	return int64(len(b.texts)), b.sendErr
+}
+func (b *fakeBot) SetMyCommands(_ context.Context, commands []telegram.BotCommand) error {
+	b.commands = append([]telegram.BotCommand(nil), commands...)
+	return b.commandsErr
 }
 func TestOwnerOnlyCommandState(t *testing.T) {
 	ctx := context.Background()
@@ -453,6 +458,93 @@ func (b *cancelBot) GetUpdates(context.Context, int64, int) ([]telegram.Update, 
 	return nil, context.Canceled
 }
 func (b *cancelBot) SendMessage(context.Context, int64, string, int64) (int64, error) { return 1, nil }
+func (b *cancelBot) SetMyCommands(context.Context, []telegram.BotCommand) error       { return nil }
+
+type menuBot struct {
+	commands []telegram.BotCommand
+	err      error
+	calls    int
+	polls    int
+	cancel   context.CancelFunc
+}
+
+func (b *menuBot) GetUpdates(context.Context, int64, int) ([]telegram.Update, error) {
+	b.polls++
+	b.cancel()
+	return nil, context.Canceled
+}
+func (b *menuBot) SendMessage(context.Context, int64, string, int64) (int64, error) { return 1, nil }
+func (b *menuBot) SetMyCommands(_ context.Context, commands []telegram.BotCommand) error {
+	b.calls++
+	b.commands = append([]telegram.BotCommand(nil), commands...)
+	return b.err
+}
+
+func TestServiceRegistersMenuAtStartAndSurvivesFailure(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		err    error
+		ids    []string
+		reason string
+	}{
+		{"single_agent", nil, []string{"one"}, "menu_registered"},
+		{"registration_failure", errors.New("synthetic private failure"), []string{"one"}, "menu_failed"},
+		{"multi_agent", nil, []string{"one", "two"}, "menu_registered"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			st, err := store.Open(ctx, ":memory:")
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer st.Close()
+			templates := []config.Template{}
+			for _, id := range tc.ids {
+				templates = append(templates, config.Template{ID: id, Telegram: config.TelegramConfig{DigestHour: 18}})
+				if err = st.EnsureAgent(ctx, id); err != nil {
+					t.Fatal(err)
+				}
+			}
+			var logs bytes.Buffer
+			logger, _ := logging.New(&logs, "debug", "json")
+			bot := &menuBot{err: tc.err, cancel: cancel}
+			svc, err := telegram.NewService(telegram.ServiceOptions{Store: st, Bot: bot, BotKey: "fake", OwnerChatID: 77, Templates: templates, Now: func() time.Time { return time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC) }, Logger: logger})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err = svc.Run(ctx); !errors.Is(err, context.Canceled) {
+				t.Fatalf("service cancellation %v", err)
+			}
+			if bot.calls != 1 {
+				t.Fatalf("menu registrations = %d, want one per start", bot.calls)
+			}
+			if bot.polls != 1 {
+				t.Fatal("menu outcome stopped the owner poller")
+			}
+			if !strings.Contains(logs.String(), tc.reason) {
+				t.Fatalf("missing reason %s", tc.reason)
+			}
+			if strings.Contains(logs.String(), "synthetic private failure") {
+				t.Fatal("menu failure text leaked into logs")
+			}
+			names := []string{}
+			for _, command := range bot.commands {
+				names = append(names, command.Command)
+			}
+			if strings.Join(names, ",") != "status,pause,resume,kill,dnc" {
+				t.Fatalf("menu = %v, want the five handled commands", names)
+			}
+			description := bot.commands[0].Description
+			if len(tc.ids) > 1 && !strings.Contains(description, "<agent_id>") {
+				t.Fatalf("multi-agent menu omits the agent-id form: %q", description)
+			}
+			if len(tc.ids) == 1 && strings.Contains(description, "<agent_id>") {
+				t.Fatalf("single-agent menu documents an unused agent-id form: %q", description)
+			}
+		})
+	}
+}
 
 func TestQuestionCorrelationIncludesConfiguredOwnerChat(t *testing.T) {
 	ctx := context.Background()

@@ -1,8 +1,8 @@
 // Package telegram is the owner-contact integration (spec section 9).
 //
 // client.go is the minimal Bot API transport used by the service layer. It
-// implements only getUpdates and sendMessage, makes exactly one HTTP request
-// per call, and never retries: retry and outbox scheduling belong to the
+// implements getUpdates, sendMessage and setMyCommands, makes exactly one HTTP
+// request per call, and never retries: retry and outbox scheduling belong to the
 // service. The client decodes only the fields in the shared DTOs, so usernames,
 // names, photos and other profile fields never reach the agent context.
 package telegram
@@ -43,6 +43,11 @@ const (
 	// maxMessageRunes is the Bot API limit on sendMessage text after entity
 	// parsing.
 	maxMessageRunes = 4096
+
+	// Bot API limits for one command menu entry and for the menu itself.
+	maxCommandNameRunes   = 32
+	maxCommandDescRunes   = 256
+	maxBotCommandsPerMenu = 100
 )
 
 // ClientOptions configures a Client. Zero values select the official Bot API
@@ -252,6 +257,77 @@ type getUpdatesPayload struct {
 	// Telegram persists the last allowed_updates filter per bot; sending it on
 	// every call stops a stale filter from silently hiding owner commands.
 	AllowedUpdates []string `json:"allowed_updates"`
+}
+
+// BotCommand is one entry in the bot's command menu. The menu carries no
+// argument slots, so any accepted arguments are named in Description.
+type BotCommand struct {
+	Command     string `json:"command"`
+	Description string `json:"description"`
+}
+
+// SetMyCommands replaces the default-scope command menu the owner sees in
+// Telegram. It validates the documented Bot API limits locally, making no
+// network call for an invalid menu, and reports only a stable failure class.
+func (c *Client) SetMyCommands(ctx context.Context, commands []BotCommand) error {
+	const operation = "telegram set my commands"
+	if ctx == nil {
+		return fmt.Errorf("%s: nil context", operation)
+	}
+	if len(commands) == 0 || len(commands) > maxBotCommandsPerMenu {
+		return fmt.Errorf("%s: between 1 and %d commands are required", operation, maxBotCommandsPerMenu)
+	}
+	seen := make(map[string]bool, len(commands))
+	for _, command := range commands {
+		if !validCommandName(command.Command) {
+			return fmt.Errorf("%s: command name is invalid", operation)
+		}
+		if seen[command.Command] {
+			return fmt.Errorf("%s: duplicate command name", operation)
+		}
+		seen[command.Command] = true
+		if n := utf8.RuneCountInString(command.Description); n == 0 || n > maxCommandDescRunes {
+			return fmt.Errorf("%s: command description must be 1..%d characters", operation, maxCommandDescRunes)
+		}
+	}
+
+	requestCtx, cancel := context.WithTimeout(ctx, c.timeout)
+	defer cancel()
+
+	result, err := c.post(requestCtx, "setMyCommands", setMyCommandsPayload{Commands: commands}, operation)
+	if err != nil {
+		return err
+	}
+	if !hasResult(result) {
+		return fmt.Errorf("%s: missing result", operation)
+	}
+
+	var accepted bool
+	if err := json.Unmarshal(result, &accepted); err != nil {
+		return fmt.Errorf("%s: decode result", operation)
+	}
+	if !accepted {
+		return fmt.Errorf("%s: api returned false", operation)
+	}
+	return nil
+}
+
+// validCommandName enforces the Bot API spelling: 1..32 lowercase ASCII
+// letters, digits or underscores.
+func validCommandName(name string) bool {
+	if name == "" || utf8.RuneCountInString(name) > maxCommandNameRunes {
+		return false
+	}
+	for _, r := range name {
+		if (r < 'a' || r > 'z') && (r < '0' || r > '9') && r != '_' {
+			return false
+		}
+	}
+	return true
+}
+
+type setMyCommandsPayload struct {
+	Commands []BotCommand `json:"commands"`
 }
 
 type sendMessagePayload struct {

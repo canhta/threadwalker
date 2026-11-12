@@ -570,6 +570,126 @@ func TestSendMessage_APIErrorIsSanitized(t *testing.T) {
 	}
 }
 
+func TestSetMyCommands_Success(t *testing.T) {
+	server, requests := newFixtureServer(t, http.StatusOK, readFixture(t, "set_my_commands_ok.json"))
+	client := newClientForServer(t, server, nil)
+
+	commands := []BotCommand{
+		{Command: "status", Description: "Show status: /status"},
+		{Command: "dnc", Description: "Never reply to a username: /dnc <username>"},
+	}
+	if err := client.SetMyCommands(context.Background(), commands); err != nil {
+		t.Fatalf("SetMyCommands: %v", err)
+	}
+
+	request := <-requests
+	if request.method != http.MethodPost {
+		t.Errorf("method = %q, want POST", request.method)
+	}
+	if request.path != "/bot"+fakeToken+"/setMyCommands" {
+		t.Errorf("path = %q, want Bot API setMyCommands path", request.path)
+	}
+	if !strings.HasPrefix(request.contentType, "application/json") {
+		t.Errorf("content type = %q, want application/json", request.contentType)
+	}
+
+	var payload struct {
+		Commands []BotCommand `json:"commands"`
+		Scope    any          `json:"scope"`
+	}
+	if err := json.Unmarshal(request.body, &payload); err != nil {
+		t.Fatalf("decode request body: %v", err)
+	}
+	if len(payload.Commands) != len(commands) || payload.Commands[0] != commands[0] || payload.Commands[1] != commands[1] {
+		t.Errorf("commands = %+v, want %+v", payload.Commands, commands)
+	}
+	if payload.Scope != nil {
+		t.Errorf("scope = %v, want the Bot API default scope", payload.Scope)
+	}
+	if strings.Contains(string(request.body), fakeToken) {
+		t.Errorf("request body leaks the token: %s", request.body)
+	}
+}
+
+func TestSetMyCommands_Validation(t *testing.T) {
+	server, requests := newFixtureServer(t, http.StatusOK, readFixture(t, "set_my_commands_ok.json"))
+	client := newClientForServer(t, server, nil)
+
+	valid := []BotCommand{{Command: "status", Description: "Show status"}}
+	tooMany := make([]BotCommand, maxBotCommandsPerMenu+1)
+	for i := range tooMany {
+		tooMany[i] = BotCommand{Command: fmt.Sprintf("cmd_%d", i), Description: "Synthetic"}
+	}
+	cases := []struct {
+		name     string
+		ctx      context.Context
+		commands []BotCommand
+		want     string
+	}{
+		{"nil context", nil, valid, "nil context"},
+		{"empty menu", context.Background(), nil, "between 1 and 100 commands"},
+		{"too many", context.Background(), tooMany, "between 1 and 100 commands"},
+		{"empty name", context.Background(), []BotCommand{{Command: "", Description: "Show"}}, "command name is invalid"},
+		{"uppercase name", context.Background(), []BotCommand{{Command: "Status", Description: "Show"}}, "command name is invalid"},
+		{"hyphen name", context.Background(), []BotCommand{{Command: "do-nc", Description: "Show"}}, "command name is invalid"},
+		{"long name", context.Background(), []BotCommand{{Command: strings.Repeat("a", maxCommandNameRunes+1), Description: "Show"}}, "command name is invalid"},
+		{"duplicate", context.Background(), []BotCommand{{Command: "status", Description: "One"}, {Command: "status", Description: "Two"}}, "duplicate command name"},
+		{"empty description", context.Background(), []BotCommand{{Command: "status", Description: ""}}, "command description"},
+		{"long description", context.Background(), []BotCommand{{Command: "status", Description: strings.Repeat("x", maxCommandDescRunes+1)}}, "command description"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			err := client.SetMyCommands(tc.ctx, tc.commands)
+			if err == nil || !strings.Contains(err.Error(), tc.want) {
+				t.Fatalf("error = %v, want %q", err, tc.want)
+			}
+			if strings.Contains(err.Error(), fakeToken) {
+				t.Errorf("error leaks the token: %v", err)
+			}
+		})
+	}
+
+	select {
+	case request := <-requests:
+		t.Fatalf("validation sent an HTTP request: %+v", request)
+	default:
+	}
+}
+
+func TestSetMyCommands_ResultAndErrors(t *testing.T) {
+	t.Run("api accepted false", func(t *testing.T) {
+		server, _ := newFixtureServer(t, http.StatusOK, []byte(`{"ok":true,"result":false}`))
+		client := newClientForServer(t, server, nil)
+		err := client.SetMyCommands(context.Background(), []BotCommand{{Command: "status", Description: "Show status"}})
+		if err == nil || !strings.Contains(err.Error(), "api returned false") {
+			t.Fatalf("error = %v, want rejected menu", err)
+		}
+	})
+
+	t.Run("malformed result", func(t *testing.T) {
+		server, _ := newFixtureServer(t, http.StatusOK, []byte(`{"ok":true,"result":"yes"}`))
+		client := newClientForServer(t, server, nil)
+		err := client.SetMyCommands(context.Background(), []BotCommand{{Command: "status", Description: "Show status"}})
+		if err == nil || !strings.Contains(err.Error(), "decode result") {
+			t.Fatalf("error = %v, want decode failure", err)
+		}
+	})
+
+	t.Run("api error is sanitized", func(t *testing.T) {
+		server, _ := newFixtureServer(t, http.StatusOK, readFixture(t, "api_error.json"))
+		client := newClientForServer(t, server, nil)
+		err := client.SetMyCommands(context.Background(), []BotCommand{{Command: "status", Description: "Show status"}})
+		if err == nil || !strings.Contains(err.Error(), "api error code 429") {
+			t.Fatalf("error = %v, want numeric API error code", err)
+		}
+		for _, forbidden := range []string{"Too Many Requests", fakeToken, "api.telegram.org"} {
+			if strings.Contains(err.Error(), forbidden) {
+				t.Errorf("error leaks %q: %v", forbidden, err)
+			}
+		}
+	})
+}
+
 func TestEnvelopeFailures(t *testing.T) {
 	cases := []struct {
 		name     string

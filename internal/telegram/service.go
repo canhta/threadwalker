@@ -25,6 +25,7 @@ import (
 type BotAPI interface {
 	GetUpdates(context.Context, int64, int) ([]Update, error)
 	SendMessage(context.Context, int64, string, int64) (int64, error)
+	SetMyCommands(context.Context, []BotCommand) error
 }
 type ServiceOptions struct {
 	Secrets []config.Secret
@@ -407,7 +408,43 @@ func (s *Service) Tick(ctx context.Context) error {
 	}
 	return nil
 }
+
+// ownerCommands is the menu the bot advertises. The Bot API menu has no
+// argument slots, so each description names the accepted form: plain command
+// for one agent, and the agent-ID form when one bot serves several agents.
+func ownerCommands(multiAgent bool) []BotCommand {
+	if multiAgent {
+		return []BotCommand{
+			{Command: "status", Description: "Show status and next wake: /status <agent_id>"},
+			{Command: "pause", Description: "Pause an agent: /pause <agent_id>"},
+			{Command: "resume", Description: "Resume a paused agent: /resume <agent_id>"},
+			{Command: "kill", Description: "Kill an agent permanently: /kill <agent_id>"},
+			{Command: "dnc", Description: "Never reply to a username: /dnc <agent_id> <username>"},
+		}
+	}
+	return []BotCommand{
+		{Command: "status", Description: "Show status and next wake: /status"},
+		{Command: "pause", Description: "Pause this agent: /pause"},
+		{Command: "resume", Description: "Resume this agent: /resume"},
+		{Command: "kill", Description: "Kill this agent permanently: /kill"},
+		{Command: "dnc", Description: "Never reply to a username: /dnc <username>"},
+	}
+}
+
+// registerCommands replaces the bot menu once per service start. Telegram
+// persists the menu, so a failed registration is logged with a fixed reason and
+// the poller continues; neither owner commands nor wakes depend on it.
+func (s *Service) registerCommands(ctx context.Context) {
+	err := s.opts.Bot.SetMyCommands(ctx, ownerCommands(len(s.ids) > 1))
+	outcome, reason := "success", "menu_registered"
+	if err != nil {
+		outcome, reason = "error", "menu_failed"
+	}
+	s.event(ctx, "", "commands", outcome, reason, 0)
+}
+
 func (s *Service) Run(ctx context.Context) error {
+	s.registerCommands(ctx)
 	for {
 		if err := ctx.Err(); err != nil {
 			return err

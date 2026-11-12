@@ -461,6 +461,7 @@ func (b *isolationFakeBot) GetUpdates(context.Context, int64, int) ([]telegram.U
 func (b *isolationFakeBot) SendMessage(context.Context, int64, string, int64) (int64, error) {
 	return 1, nil
 }
+func (b *isolationFakeBot) SetMyCommands(context.Context, []telegram.BotCommand) error { return nil }
 
 func TestIsolationAcceptanceOwnerCommandSelectsAgent(t *testing.T) {
 	ctx := context.Background()
