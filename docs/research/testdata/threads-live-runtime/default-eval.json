@@ -3,7 +3,7 @@
   "suite_version": "v1",
   "suite_digest": "7e1ef6eaad60828c98f498c6ae58be7f218bec1f23cb2a695c75c4e206e80561",
   "mode": "offline",
-  "revision": "3141579",
+  "revision": "bce0782",
   "seed": 8,
   "repeat": 1,
   "config_fingerprint": "eb126ecbf7e4f906ae4d6cd230fa3324dcb4b203d6eab96c8fe505f42169cbb7",
@@ -27,7 +27,7 @@
       "tokens_in": 100,
       "tokens_out": 20,
       "cost_usd": 0.00014000000000000001,
-      "duration_ms": 0.016292
+      "duration_ms": 0.02525
     },
     {
       "case_id": "budget_stop",
@@ -46,7 +46,7 @@
       "tokens_in": 100,
       "tokens_out": 20,
       "cost_usd": 0.00014000000000000001,
-      "duration_ms": 0.013791
+      "duration_ms": 0.022042
     },
     {
       "case_id": "cancelled_request",
@@ -63,7 +63,7 @@
       "tokens_in": 0,
       "tokens_out": 0,
       "cost_usd": 0,
-      "duration_ms": 0.019958
+      "duration_ms": 0.061875
     },
     {
       "case_id": "cancelled_request",
@@ -80,7 +80,7 @@
       "tokens_in": 0,
       "tokens_out": 0,
       "cost_usd": 0,
-      "duration_ms": 0.003208
+      "duration_ms": 0.007834
     },
     {
       "case_id": "deterministic_quality_rubric",
@@ -97,7 +97,7 @@
       "tokens_in": 8,
       "tokens_out": 8,
       "cost_usd": 0.000024,
-      "duration_ms": 0.010791
+      "duration_ms": 0.012167
     },
     {
       "case_id": "deterministic_quality_rubric",
@@ -114,7 +114,7 @@
       "tokens_in": 30,
       "tokens_out": 9,
       "cost_usd": 0.000048,
-      "duration_ms": 0.007917
+      "duration_ms": 0.01075
     },
     {
       "case_id": "incomplete_usage",
@@ -131,7 +131,7 @@
       "tokens_in": 0,
       "tokens_out": 0,
       "cost_usd": 0,
-      "duration_ms": 0.008208
+      "duration_ms": 0.009166
     },
     {
       "case_id": "incomplete_usage",
@@ -148,7 +148,7 @@
       "tokens_in": 0,
       "tokens_out": 0,
       "cost_usd": 0,
-      "duration_ms": 0.003917
+      "duration_ms": 0.007125
     },
     {
       "case_id": "malformed_response",
@@ -165,7 +165,7 @@
       "tokens_in": 0,
       "tokens_out": 0,
       "cost_usd": 0,
-      "duration_ms": 0.006042
+      "duration_ms": 0.008875
     },
     {
       "case_id": "malformed_response",
@@ -182,7 +182,7 @@
       "tokens_in": 0,
       "tokens_out": 0,
       "cost_usd": 0,
-      "duration_ms": 0.004625
+      "duration_ms": 0.009666
     },
     {
       "case_id": "missing_usage",
@@ -199,7 +199,7 @@
       "tokens_in": 0,
       "tokens_out": 0,
       "cost_usd": 0,
-      "duration_ms": 0.0055
+      "duration_ms": 0.009542
     },
     {
       "case_id": "missing_usage",
@@ -216,7 +216,7 @@
       "tokens_in": 0,
       "tokens_out": 0,
       "cost_usd": 0,
-      "duration_ms": 0.005583
+      "duration_ms": 0.008416
     },
     {
       "case_id": "native_cache_usage_normalization",
@@ -233,7 +233,7 @@
       "tokens_in": 12,
       "tokens_out": 2,
       "cost_usd": 0.000016,
-      "duration_ms": 0.011334
+      "duration_ms": 0.012917
     },
     {
       "case_id": "native_cache_usage_normalization",
@@ -250,7 +250,7 @@
       "tokens_in": 12,
       "tokens_out": 2,
       "cost_usd": 0.000016,
-      "duration_ms": 0.005125
+      "duration_ms": 0.008417
     },
     {
       "case_id": "negative_usage",
@@ -267,7 +267,7 @@
       "tokens_in": 0,
       "tokens_out": 0,
       "cost_usd": 0,
-      "duration_ms": 0.005666
+      "duration_ms": 0.008584
     },
     {
       "case_id": "negative_usage",
@@ -284,7 +284,7 @@
       "tokens_in": 0,
       "tokens_out": 0,
       "cost_usd": 0,
-      "duration_ms": 0.004791
+      "duration_ms": 0.006375
     },
     {
       "case_id": "output_bound",
@@ -301,7 +301,7 @@
       "tokens_in": 12,
       "tokens_out": 2,
       "cost_usd": 0.000016,
-      "duration_ms": 0.006667
+      "duration_ms": 0.009208
     },
     {
       "case_id": "output_bound",
@@ -318,7 +318,7 @@
       "tokens_in": 12,
       "tokens_out": 2,
       "cost_usd": 0.000016,
-      "duration_ms": 0.006666
+      "duration_ms": 0.007208
     },
     {
       "case_id": "request_timeout",
@@ -335,7 +335,7 @@
       "tokens_in": 0,
       "tokens_out": 0,
       "cost_usd": 0,
-      "duration_ms": 0.004333
+      "duration_ms": 0.006208
     },
     {
       "case_id": "request_timeout",
@@ -352,7 +352,7 @@
       "tokens_in": 0,
       "tokens_out": 0,
       "cost_usd": 0,
-      "duration_ms": 0.003042
+      "duration_ms": 0.004541
     },
     {
       "case_id": "retry_exhaustion",
@@ -369,7 +369,7 @@
       "tokens_in": 0,
       "tokens_out": 0,
       "cost_usd": 0,
-      "duration_ms": 0.017125
+      "duration_ms": 0.020083
     },
     {
       "case_id": "retry_exhaustion",
@@ -386,7 +386,7 @@
       "tokens_in": 0,
       "tokens_out": 0,
       "cost_usd": 0,
-      "duration_ms": 0.010166
+      "duration_ms": 0.015209
     },
     {
       "case_id": "retry_then_success",
@@ -405,7 +405,7 @@
       "tokens_in": 20,
       "tokens_out": 4,
       "cost_usd": 0.000028,
-      "duration_ms": 0.029459
+      "duration_ms": 0.044375
     },
     {
       "case_id": "retry_then_success",
@@ -424,7 +424,7 @@
       "tokens_in": 200,
       "tokens_out": 24,
       "cost_usd": 0.000248,
-      "duration_ms": 0.021333
+      "duration_ms": 0.02775
     },
     {
       "case_id": "step_stop",
@@ -443,7 +443,7 @@
       "tokens_in": 20,
       "tokens_out": 5,
       "cost_usd": 0.000030000000000000004,
-      "duration_ms": 0.011625
+      "duration_ms": 0.021875
     },
     {
       "case_id": "step_stop",
@@ -462,7 +462,7 @@
       "tokens_in": 20,
       "tokens_out": 5,
       "cost_usd": 0.000030000000000000004,
-      "duration_ms": 0.011125
+      "duration_ms": 0.01325
     },
     {
       "case_id": "unknown_and_invalid_arguments_recover",
@@ -479,7 +479,7 @@
       "tokens_in": 10,
       "tokens_out": 3,
       "cost_usd": 0.000016,
-      "duration_ms": 0.053
+      "duration_ms": 0.0815
     },
     {
       "case_id": "unknown_and_invalid_arguments_recover",
@@ -496,7 +496,7 @@
       "tokens_in": 100,
       "tokens_out": 14,
       "cost_usd": 0.00012800000000000002,
-      "duration_ms": 0.021417
+      "duration_ms": 0.032625
     },
     {
       "case_id": "valid_two_tool_loop",
@@ -516,7 +516,7 @@
       "tokens_in": 60,
       "tokens_out": 12,
       "cost_usd": 0.00008400000000000001,
-      "duration_ms": 0.252667
+      "duration_ms": 0.343708
     },
     {
       "case_id": "valid_two_tool_loop",
@@ -536,7 +536,7 @@
       "tokens_in": 360,
       "tokens_out": 35,
       "cost_usd": 0.00043000000000000004,
-      "duration_ms": 0.041917
+      "duration_ms": 0.093542
     }
   ]
 }
