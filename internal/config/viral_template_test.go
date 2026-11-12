@@ -102,6 +102,26 @@ avoided:
 	}
 }
 
+// TestViralOwnerMessagesAvoidSchoolMetaphor enforces the owner's rejection of
+// class/school wording in owner-facing bot copy. Persona posts may still joke
+// about a professor's class; scheduled work is "chạy" or a "lần chạy".
+func TestViralOwnerMessagesAvoidSchoolMetaphor(t *testing.T) {
+	tmpl, err := config.LoadFile(viralTemplatePath(), viralEnv())
+	if err != nil {
+		t.Fatalf("LoadFile returned unexpected error: %v", err)
+	}
+	if len(tmpl.Telegram.Messages) == 0 {
+		t.Fatal("viral template has no telegram.messages")
+	}
+	for kind, text := range tmpl.Telegram.Messages {
+		for _, banned := range []string{"lớp", "đi học", "học sinh", "giảng"} {
+			if strings.Contains(strings.ToLower(text), banned) {
+				t.Errorf("telegram.messages.%s contains %q: %q", kind, banned, text)
+			}
+		}
+	}
+}
+
 func TestLoadDirPicksUpAgentYAMLTemplates(t *testing.T) {
 	raw, err := os.ReadFile(viralTemplatePath())
 	if err != nil {
