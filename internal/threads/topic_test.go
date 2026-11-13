@@ -30,7 +30,7 @@ func TestThreadsLiveTopicPage(t *testing.T) {
 		t.Fatalf("page=%+v err=%v", page, err)
 	}
 	first := page.Posts[0]
-	if first.Username != "synthetic_viet" || first.URL != base+"/@synthetic_viet/post/fixtureTopic1" || first.ID != "" || first.Text != "Bài mẫu tổng hợp bằng tiếng Việt về chủ đề một" {
+	if first.Username != "synthetic_viet" || first.URL != base+"/@synthetic_viet/post/fixtureTopic1" || first.ID != "" || first.Text != "Bài mẫu tổng hợp bằng tiếng Việt về chủ đề một" || first.Topic != "synthetic_tag" || page.Posts[1].Topic != "" {
 		t.Fatalf("first=%+v", first)
 	}
 	if _, err = parseThreadsPage(liveFixture(t, "topic.ax.txt"), base+"/", "topic", base); !errors.Is(err, ErrUnknownPage) {

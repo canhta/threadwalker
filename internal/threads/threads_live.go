@@ -406,7 +406,7 @@ func threadsPost(node *axNode, base *url.URL) (Post, bool) {
 	if node.role != "generic" || len(node.children) == 0 {
 		return Post{}, false
 	}
-	author, permalink := "", ""
+	author, permalink, topic := "", "", ""
 	var permalinkURL string
 	var stamp *axNode
 	links := threadsPostLinks(node)
@@ -425,6 +425,10 @@ func threadsPost(node *axNode, base *url.URL) (Post, bool) {
 	for _, child := range links {
 		u, err := url.Parse(child.url)
 		if err != nil || !sameOrigin(base, u) {
+			continue
+		}
+		if u.Path == "/search" && u.Query().Get("serp_type") == "tags" && topic == "" {
+			topic = strings.TrimSpace(child.name)
 			continue
 		}
 		if user, _, ok := threadsPostPathParts(u.Path); ok {
@@ -451,7 +455,7 @@ func threadsPost(node *axNode, base *url.URL) (Post, bool) {
 	if len(text) > threadsTextMax {
 		return Post{}, false
 	}
-	post := Post{Username: author, Text: text, URL: permalinkURL, AgeMinutes: threadsAge(stamp)}
+	post := Post{Username: author, Text: text, URL: permalinkURL, Topic: topic, AgeMinutes: threadsAge(stamp)}
 	post.Likes, post.Replies, post.Reposts = threadsCounters(node)
 	return post, true
 }

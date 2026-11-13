@@ -119,7 +119,7 @@ func searchWeb(ctx context.Context, client *http.Client, req WebSearchRequest) (
 	}
 	defer response.Body.Close()
 	if response.StatusCode != http.StatusOK {
-		return WebSearchResult{}, fmt.Errorf("web search: unexpected HTTP status %d", response.StatusCode)
+		return WebSearchResult{}, fmt.Errorf("web search: unexpected HTTP status %d: %w", response.StatusCode, &httpStatusError{response.StatusCode})
 	}
 	raw, err := io.ReadAll(io.LimitReader(response.Body, webSearchMaxResponseBytes+1))
 	if err != nil {
@@ -181,4 +181,25 @@ func searchWeb(ctx context.Context, client *http.Client, req WebSearchRequest) (
 	}
 	result.Usage = store.LLMUsage{TokensIn: *decoded.Usage.InputTokens, TokensOut: *decoded.Usage.OutputTokens}
 	return result, nil
+}
+
+type httpStatusError struct{ code int }
+
+func (e *httpStatusError) Error() string { return fmt.Sprintf("HTTP %d", e.code) }
+
+// WebSearchReason is a fixed log code for a SearchWeb error. Every message
+// SearchWeb builds is a code constant, so the code never carries query text.
+func WebSearchReason(err error) string {
+	var status *httpStatusError
+	switch {
+	case err == nil:
+		return "completed"
+	case errors.Is(err, context.DeadlineExceeded):
+		return "timeout"
+	case errors.Is(err, context.Canceled):
+		return "cancelled"
+	case errors.As(err, &status):
+		return fmt.Sprintf("http_%d", status.code)
+	}
+	return strings.ReplaceAll(strings.TrimPrefix(err.Error(), "web search: "), " ", "_")
 }

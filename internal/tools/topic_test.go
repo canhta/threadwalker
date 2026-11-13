@@ -63,3 +63,20 @@ func TestReadTopicAfterTrendingPanel(t *testing.T) {
 		t.Fatalf("cap not enforced: %v", err)
 	}
 }
+
+// A news link is not a topic page: it is refused before the browser and does
+// not use up one of the wake's topic reads.
+func TestReadTopicRefusesANewsLinkWithoutSpendingARead(t *testing.T) {
+	h := newBrowserHarness(t, true)
+	h.backend.Pages[threads.OpReadFeed] = threads.Page{Kind: "feed", Trends: []threads.Trend{{Title: "Synthetic news", Summary: "Synthetic summary", URL: "https://vnexpress.net/synthetic-story.html"}}}
+	h.backend.Pages[threads.OpReadTopic] = threads.Page{Kind: "topic"}
+	h.mustCall("read_feed", `{}`)
+	h.next()
+	if _, err := h.call("read_topic", `{"url":"r1"}`); err == nil || !strings.Contains(err.Error(), "topic_args") {
+		t.Fatalf("a news link was accepted: %v", err)
+	}
+	for i := 0; i < tools.MaxTopicReadsPerWake; i++ {
+		h.next()
+		h.mustCall("read_topic", `{"query":"synthetic words"}`)
+	}
+}

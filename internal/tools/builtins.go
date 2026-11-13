@@ -201,7 +201,7 @@ func (d *Dispatcher) executors() map[string]executor {
 					}
 				}
 			}
-			d.event(ctx, logging.WebSearchFinished, outcome(err), reason(err), "web_search", time.Time{})
+			d.event(ctx, logging.WebSearchFinished, outcome(err), trends.WebSearchReason(err), "web_search", time.Time{})
 			if err != nil {
 				return nil, errors.New("searching the web: failed")
 			}

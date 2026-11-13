@@ -35,6 +35,8 @@ type Post struct {
 	Username string `json:"username"`
 	Text     string `json:"text"`
 	URL      string `json:"url"`
+	// Topic is the Threads topic (community) the post is filed under, from a browser read.
+	Topic string `json:"topic,omitempty"`
 	// Timestamp is the API's publish time (RFC 3339); empty for a feed post.
 	Timestamp        string `json:"timestamp,omitempty"`
 	IsReply          bool   `json:"is_reply,omitempty"`

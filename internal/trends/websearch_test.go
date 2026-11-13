@@ -59,12 +59,12 @@ func TestSearchWebParsesBoundedAnswerSourcesAndUsage(t *testing.T) {
 
 func TestSearchWebFailsClosed(t *testing.T) {
 	server := webSearchServer(t, http.StatusInternalServerError, `{"error":"nope"}`)
-	if _, err := trends.NewWebSearcher(server.Client())(context.Background(), trends.WebSearchRequest{BaseURL: server.URL, Model: "search-model", APIKey: "key", Query: "q", MaxOutput: 256, Timeout: time.Second}); err == nil {
-		t.Fatal("HTTP 500 accepted")
+	if _, err := trends.NewWebSearcher(server.Client())(context.Background(), trends.WebSearchRequest{BaseURL: server.URL, Model: "search-model", APIKey: "key", Query: "q", MaxOutput: 256, Timeout: time.Second}); trends.WebSearchReason(err) != "http_500" {
+		t.Fatalf("HTTP 500: %v", err)
 	}
 	missingUsage := webSearchServer(t, http.StatusOK, `{"output":[{"content":[{"type":"output_text","text":"answer"}]}]}`)
-	if _, err := trends.NewWebSearcher(missingUsage.Client())(context.Background(), trends.WebSearchRequest{BaseURL: missingUsage.URL, Model: "search-model", APIKey: "key", Query: "q", MaxOutput: 256, Timeout: time.Second}); err == nil {
-		t.Fatal("missing usage accepted")
+	if _, err := trends.NewWebSearcher(missingUsage.Client())(context.Background(), trends.WebSearchRequest{BaseURL: missingUsage.URL, Model: "search-model", APIKey: "key", Query: "q", MaxOutput: 256, Timeout: time.Second}); trends.WebSearchReason(err) != "missing_usage" {
+		t.Fatalf("missing usage: %v", err)
 	}
 	empty := webSearchServer(t, http.StatusOK, `{"output":[],"usage":{"input_tokens":1,"output_tokens":1}}`)
 	if _, err := trends.NewWebSearcher(empty.Client())(context.Background(), trends.WebSearchRequest{BaseURL: empty.URL, Model: "search-model", APIKey: "key", Query: "q", MaxOutput: 256, Timeout: time.Second}); err == nil {

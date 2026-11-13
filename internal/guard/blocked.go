@@ -66,7 +66,7 @@ var hints = map[string]string{
 	"min_seconds_between_actions": "next action allowed at %s",
 	"min_minutes_between_posts":   "your last post is too recent; the next post is allowed at %s; reply to someone instead, or post in a later wake",
 	"limit_per_wake":              "%s is used up for this wake; do not call it again, work with what you already read",
-	"topic_args":                  "pass exactly one of url (a short ref such as \"r3\" from read_feed or fetch_trends this wake) and query",
+	"topic_args":                  "pass exactly one of url or query; url is only the short ref (such as \"r3\") of a Threads trend that read_feed returned this wake; for a news story or anything else, pass a few words as query",
 }
 
 // Hint returns the fixed text for reason with detail filled in.
