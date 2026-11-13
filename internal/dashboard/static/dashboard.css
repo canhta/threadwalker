@@ -956,33 +956,69 @@ rect.dream {
   color: var(--tint);
 }
 
+/* Label left, count right: Held back and the detail of a run. */
+.tally li {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--s3);
+  padding: var(--s2) 0;
+  border-top: 1px solid var(--hair);
+}
+
+.tally li:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.tally b {
+  color: var(--tint);
+}
+
+.tally span:last-child {
+  text-align: right;
+}
+
+.lead {
+  margin-bottom: var(--s3);
+}
+
+.fb h3 + .items,
+.fb h3 + .note {
+  margin-top: var(--s2);
+}
+
+.fb .items + h3,
+.fb .more + h3 {
+  margin-top: var(--s4);
+}
+
 /* Tools */
-table.tools {
+table.calls {
   width: 100%;
   border-collapse: collapse;
 }
 
-table.tools th,
-table.tools td {
+table.calls th,
+table.calls td {
   padding: var(--s2) 0 var(--s2) var(--s3);
   border-top: 1px solid var(--hair);
   text-align: right;
   font-weight: 400;
 }
 
-table.tools th:first-child {
+table.calls th:first-child {
   padding-left: 0;
   text-align: left;
 }
 
-table.tools thead th {
+table.calls thead th {
   border-top: 0;
   padding-top: 0;
   color: var(--dim);
   font-size: var(--t-sm);
 }
 
-table.tools td.bad {
+table.calls td.bad {
   color: var(--bad);
 }
 
@@ -994,37 +1030,40 @@ table.tools td.bad {
 
 .trends li {
   display: grid;
-  grid-template-columns: 2.5rem minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas: "n n" "s d" "m m";
   gap: var(--s1) var(--s3);
   align-items: baseline;
 }
 
 .src {
+  grid-area: s;
   color: var(--dim);
   font-size: var(--t-sm);
+  overflow-wrap: anywhere;
 }
 
 .name {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  grid-area: n;
+  overflow-wrap: anywhere;
 }
 
 .seen {
+  grid-area: d;
   color: var(--on-dark);
   font-size: var(--t-sm);
   white-space: nowrap;
 }
 
 .trends .meter {
-  grid-column: 2 / -1;
+  grid-area: m;
 }
 
 /* Runs: two lines on a phone, one row with headings from 640 px */
 .run {
   display: grid;
-  grid-template-columns: auto 1fr auto;
-  grid-template-areas: "t t k" "s c x" "e e e";
+  grid-template-columns: auto auto minmax(0, 1fr) auto;
+  grid-template-areas: "t t t k" "s c e x";
   gap: var(--s1) var(--s3);
   align-items: baseline;
   padding: var(--s2) 0;
@@ -1058,10 +1097,12 @@ summary.run::-webkit-details-marker {
 
 .run .s::before {
   content: "Steps ";
+  color: var(--dim);
 }
 
 .run .c::before {
   content: "Cost ";
+  color: var(--dim);
 }
 
 .run .x {
@@ -1285,7 +1326,7 @@ footer a:hover {
   }
 
   .run {
-    grid-template-columns: 5.5rem 5.5rem 3rem 4.5rem minmax(0, 1fr) 1rem;
+    grid-template-columns: 7rem 6rem 3rem 4.5rem minmax(0, 1fr) 1rem;
     grid-template-areas: "t k s c e x";
     gap: var(--s3);
   }

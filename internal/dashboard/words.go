@@ -16,15 +16,15 @@ var toolLabels = map[string]string{
 	"playbook_propose":    "Lessons",
 	"knowledge_read":      "Craft notes",
 	"knowledge_candidate": "Technique",
-	"memory_add":          "Memory add",
-	"memory_supersede":    "Memory replace",
+	"memory_add":          "Add memory",
+	"memory_supersede":    "Replace memory",
 	"strategy_write":      "Strategy",
 	"read_replies":        "Read replies",
-	"note_write":          "Note write",
+	"note_write":          "Write note",
 	"note_search":         "Note search",
 	"note_read":           "Note read",
 	"read_post":           "Read post",
-	"profile":             "Profile lookup",
+	"profile":             "Look up profile",
 	"post":                "Post",
 	"reply":               "Reply",
 	"web_search":          "Web search",
@@ -43,8 +43,8 @@ func toolLabel(raw string) string {
 var kindLabels = map[string]string{
 	"agent":   "Run",
 	"metrics": "Stats",
-	"dream":   "Plan",
-	"study":   "Study",
+	"dream":   "Planning",
+	"study":   "Research",
 }
 
 func kindLabel(raw string) string {

@@ -129,27 +129,27 @@
         <div class="fb">
         {{if .Learned.Posteriors}}<ul class="items">{{range .Learned.Posteriors}}<li><p>{{.Text}}</p><p class="sub">{{.Standing}}</p></li>{{end}}</ul>{{end}}
         {{if .Content}}
-          {{if .Learned.Hypotheses}}<h3>Hypotheses</h3><ul class="items">{{range .Learned.Hypotheses}}<li><p>{{.Text}}</p><p class="sub">{{ideaStatus .Status}}, tried {{.Tried}}{{if .Evidence}}. {{.Evidence}}{{end}}</p></li>{{end}}</ul>{{end}}
-          {{if .Learned.OlderHypotheses}}<details class="more"><summary>Older hypotheses</summary><ul class="items">{{range .Learned.OlderHypotheses}}<li><p>{{.Text}}</p><p class="sub">{{ideaStatus .Status}}, tried {{.Tried}}{{if .Evidence}}. {{.Evidence}}{{end}}</p></li>{{end}}</ul></details>{{end}}
+          {{if .Learned.Hypotheses}}<h3>Ideas</h3><ul class="items">{{range .Learned.Hypotheses}}<li><p>{{.Text}}</p><p class="sub">{{ideaStatus .Status}}, tried {{.Tried}}{{if .Evidence}}. {{.Evidence}}{{end}}</p></li>{{end}}</ul>{{end}}
+          {{if .Learned.OlderHypotheses}}<details class="more"><summary>Older ideas ({{len .Learned.OlderHypotheses}})</summary><ul class="items">{{range .Learned.OlderHypotheses}}<li><p>{{.Text}}</p><p class="sub">{{ideaStatus .Status}}, tried {{.Tried}}{{if .Evidence}}. {{.Evidence}}{{end}}</p></li>{{end}}</ul></details>{{end}}
           {{if .Learned.Candidates}}<h3>Techniques</h3><ul class="items">{{range .Learned.Candidates}}<li><p class="note">{{.Text}}</p><p class="sub">Unverified. <a href="{{.Source}}" rel="noreferrer noopener">{{.Source}}</a>, {{tm "day" .At .When}}</p></li>{{end}}</ul>{{end}}
-          {{if .Learned.Penalties}}<h3>Demotion risks</h3><ul class="items">{{range .Learned.Penalties}}<li><p class="note">{{.Risk}}: {{.Claim}}</p><p class="sub"><a href="{{.Source}}" rel="noreferrer noopener">Source</a></p></li>{{end}}</ul>{{end}}
-          {{if .Learned.MemoryIndex}}<h3>Memory index</h3><p class="note">{{.Learned.MemoryIndex}}</p>{{end}}
-          {{if .Learned.MemoryJournal}}<h3>Memory journal</h3><p class="note">{{.Learned.MemoryJournal}}</p>{{end}}
-          {{if .Learned.Strategy}}<h3>Strategy</h3><ul class="items">{{range .Learned.Strategy}}<li><p class="sub">v{{.Version}}, {{tm "stamp" .At .When}}{{if .Citations}}. {{.Citations}}{{end}}</p><div class="diff">{{range .Diff}}<p class="note">{{.Mark}} {{.Text}}</p>{{end}}</div></li>{{end}}</ul>{{end}}
-          {{if .Learned.NotesRows}}<h3>Journal</h3><ul class="items">{{range .Learned.NotesRows}}<li><p class="note">{{.Text}}</p><p class="sub">{{tm "stamp" .At .When}}</p></li>{{end}}</ul>{{end}}
-          {{if .Learned.OlderNotes}}<details class="more"><summary>Older notes</summary><ul class="items">{{range .Learned.OlderNotes}}<li><p class="note">{{.Text}}</p><p class="sub">{{tm "stamp" .At .When}}</p></li>{{end}}</ul></details>{{end}}
+          {{if .Learned.Penalties}}<h3>Could cost reach</h3><ul class="items">{{range .Learned.Penalties}}<li><p class="note">{{.Risk}}: {{.Claim}}</p><p class="sub"><a href="{{.Source}}" rel="noreferrer noopener">Source</a></p></li>{{end}}</ul>{{end}}
+          {{if .Learned.MemoryIndex}}<h3>Memory</h3><p class="note">{{.Learned.MemoryIndex}}</p>{{end}}
+          {{if .Learned.MemoryJournal}}<h3>Recent memory</h3><p class="note">{{.Learned.MemoryJournal}}</p>{{end}}
+          {{if .Learned.Strategy}}<h3>Strategy changes</h3><ul class="items">{{range .Learned.Strategy}}<li><p class="sub">v{{.Version}}, {{tm "stamp" .At .When}}{{if .Citations}}. {{.Citations}}{{end}}</p><div class="diff">{{range .Diff}}<p class="note">{{.Mark}} {{.Text}}</p>{{end}}</div></li>{{end}}</ul>{{end}}
+          {{if .Learned.NotesRows}}<h3>Notes</h3><ul class="items">{{range .Learned.NotesRows}}<li><p class="note">{{.Text}}</p><p class="sub">{{tm "stamp" .At .When}}</p></li>{{end}}</ul>{{end}}
+          {{if .Learned.OlderNotes}}<details class="more"><summary>Older notes ({{len .Learned.OlderNotes}})</summary><ul class="items">{{range .Learned.OlderNotes}}<li><p class="note">{{.Text}}</p><p class="sub">{{tm "stamp" .At .When}}</p></li>{{end}}</ul></details>{{end}}
         {{end}}
         </div></details>
       {{end}}
 
-      {{if .Blocked.Total}}<details class="fold"><summary><span class="ft">Held back</span><span class="fs">{{.Blocked.Total}} blocked, mostly {{(index .Blocked.Rows 0).Code}}</span></summary>
-        <div class="fb"><ul class="plain">{{range $i, $r := .Blocked.Rows}}{{if lt $i 3}}<li title="{{$r.Raw}}"><b>{{$r.Count}}</b> {{$r.Code}}</li>{{end}}{{end}}</ul>
-        {{if gt (len .Blocked.Rows) 3}}<details class="more"><summary>All reasons</summary><ul class="plain">{{range $i, $r := .Blocked.Rows}}{{if ge $i 3}}<li title="{{$r.Raw}}"><b>{{$r.Count}}</b> {{$r.Code}}</li>{{end}}{{end}}</ul></details>{{end}}</div></details>{{end}}
+      {{if .Blocked.Total}}<details class="fold"><summary><span class="ft">Held back</span><span class="fs">{{.Blocked.Total}} {{plural .Blocked.Total "attempt" "attempts"}} refused by its rules</span></summary>
+        <div class="fb"><ul class="tally">{{range $i, $r := .Blocked.Rows}}{{if lt $i 5}}<li title="{{$r.Raw}}"><span>{{$r.Code}}</span><b>{{$r.Count}}</b></li>{{end}}{{end}}</ul>
+        {{if gt (len .Blocked.Rows) 5}}<details class="more"><summary>Other reasons</summary><ul class="tally">{{range $i, $r := .Blocked.Rows}}{{if ge $i 5}}<li title="{{$r.Raw}}"><span>{{$r.Code}}</span><b>{{$r.Count}}</b></li>{{end}}{{end}}</ul></details>{{end}}</div></details>{{end}}
 
       {{if or .Burn.HasRows (not .Return.Empty)}}<details class="fold"><summary><span class="ft">Cost</span><span class="fs">{{(index .KPIs 5).Value}} today</span></summary>
         <div class="fb split">
         <div>
-          <h3>{{if .Burn.MultiDay}}{{.Burn.RangeLabel}}{{else}}Today{{end}}</h3>
+          <h3>{{if .Burn.MultiDay}}Per day, {{.Burn.RangeLabel}}{{else}}Today{{end}}</h3>
           {{if not .Burn.HasRows}}<p class="empty">No spend yet.</p>
           {{else if .Burn.MultiDay}}
             {{template "chart" .Burn.Chart}}
@@ -160,11 +160,11 @@
           {{end}}
         </div>
         <div>
-          <h3>Unit cost</h3>
+          <h3>All time</h3>
           {{if .Return.Empty}}<p class="empty">No data yet.</p>
           {{else}}
           <dl class="rows">
-            <div><dt>Total spent</dt><dd>{{.Return.SpentTotal}}</dd></div>
+            <div><dt>Spent</dt><dd>{{.Return.SpentTotal}}</dd></div>
             <div><dt>Per post</dt><dd>{{.Return.CostPerPost}}</dd></div>
             <div><dt>Per follower</dt><dd>{{.Return.CostPerFollow}}</dd></div>
             {{if .Growth.HasMetrics}}<div><dt>Per 1,000 views</dt><dd>{{.Return.CostPer1000}}</dd></div>{{end}}
@@ -175,21 +175,21 @@
 
       {{if .Wakes.Rows}}<details class="fold"><summary><span class="ft">Runs</span><span class="fs">{{.Wakes.RangeLabel}}</span></summary>
         <div class="fb">
-        <div class="run runs-head" aria-hidden="true"><span>Time</span><span>Type</span><span>Steps</span><span>Cost</span><span>Result</span><span></span></div>
+        <div class="run runs-head" aria-hidden="true"><span>Time</span><span>Kind</span><span>Steps</span><span>Cost</span><span>Result</span><span></span></div>
         <ul class="runs">{{range .Wakes.Rows}}{{template "run" .}}{{end}}</ul>
-        {{if .Wakes.Older}}<details class="more"><summary>Older runs</summary><ul class="runs">{{range .Wakes.Older}}{{template "run" .}}{{end}}</ul></details>{{end}}
+        {{if .Wakes.Older}}<details class="more"><summary>Older runs ({{len .Wakes.Older}})</summary><ul class="runs">{{range .Wakes.Older}}{{template "run" .}}{{end}}</ul></details>{{end}}
         </div></details>
       {{else}}<div class="fold flat"><span class="ft">Runs</span><span class="fs">None yet.</span></div>{{end}}
 
       {{if .ToolCalls.Rows}}<details class="fold"><summary><span class="ft">Tools</span><span class="fs">{{.ToolCalls.RangeLabel}}</span></summary>
-        <div class="fb"><table class="tools"><thead><tr><th>Tool</th><th>OK</th><th>Failed</th><th>Blocked</th></tr></thead>
-        <tbody>{{range .ToolCalls.Rows}}<tr><th>{{.Name}}</th><td>{{if .OK}}{{.OK}}{{end}}</td><td{{if .Failed}} class="bad"{{end}}>{{if .Failed}}{{.Failed}}{{end}}</td><td>{{if .Blocked}}{{.Blocked}}{{end}}</td></tr>{{end}}</tbody></table></div></details>
+        <div class="fb"><p class="sub lead">Calls the agent made.</p><table class="calls"><thead><tr><th scope="col">Tool</th><th>OK</th><th>Failed</th><th>Blocked</th></tr></thead>
+        <tbody>{{range .ToolCalls.Rows}}<tr><th scope="row">{{.Name}}</th><td>{{if .OK}}{{.OK}}{{end}}</td><td{{if .Failed}} class="bad"{{end}}>{{if .Failed}}{{.Failed}}{{end}}</td><td>{{if .Blocked}}{{.Blocked}}{{end}}</td></tr>{{end}}</tbody></table></div></details>
       {{else}}<div class="fold flat"><span class="ft">Tools</span><span class="fs">None yet.</span></div>{{end}}
 
       {{if .Trending.Rows}}<details class="fold"><summary><span class="ft">Trends</span><span class="fs">{{.Trending.RangeLabel}}</span></summary>
         <div class="fb"><ul class="trends">{{range .Trending.Rows}}<li>
-          <span class="src" title="{{.SourceName}}">{{.Source}}</span>
-          <span class="name" title="{{.Title}}">{{.Title}}</span>
+          <span class="name">{{.Title}}</span>
+          <span class="src">{{.SourceName}}</span>
           <span class="seen">{{.Seen}}</span>
           <svg class="meter" viewBox="0 0 100 8" preserveAspectRatio="none" aria-hidden="true" focusable="false"><rect class="ok" x="0" y="0" width="{{printf "%.2f" .Pct}}" height="8"/></svg>
         </li>{{end}}</ul></div></details>
@@ -210,8 +210,8 @@
 {{define "run"}}{{if or .ToolSummary .Blocked}}<li><details>
   <summary class="run">{{template "runrow" .}}<span class="x" aria-hidden="true">{{template "i-chevron"}}</span></summary>
   <div class="run-more">
-    {{if .ToolSummary}}<ul class="plain">{{range .ToolSummary}}<li>{{.Name}}: {{if .Failed}}{{.Failed}} failed{{if .Why}} ({{.Why}}){{end}}{{end}}{{if and .Failed .Blocked}}, {{end}}{{if .Blocked}}{{.Blocked}} blocked{{end}}</li>{{end}}</ul>{{end}}
-    {{if .Blocked}}<ul class="plain">{{range .Blocked}}<li title="{{.Raw}}">{{.Code}}: {{.Count}}</li>{{end}}</ul>{{end}}
+    {{if .ToolSummary}}<ul class="tally">{{range .ToolSummary}}<li><span>{{.Name}}</span><span>{{if .Failed}}{{.Failed}} failed{{if .Why}} ({{.Why}}){{end}}{{end}}{{if and .Failed .Blocked}}, {{end}}{{if .Blocked}}{{.Blocked}} blocked{{end}}</span></li>{{end}}</ul>{{end}}
+    {{if .Blocked}}<ul class="tally">{{range .Blocked}}<li title="{{.Raw}}"><span>Reason: {{.Code}}</span><b>{{.Count}}</b></li>{{end}}</ul>{{end}}
   </div>
 </details></li>{{else}}<li><div class="run">{{template "runrow" .}}<span></span></div></li>{{end}}{{end}}
 

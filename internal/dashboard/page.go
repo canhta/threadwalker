@@ -353,7 +353,7 @@ func buildTools(tools []rawTool, days int, hasPosts bool) ToolPanel {
 	if len(rows) > maxToolRows {
 		rows = rows[:maxToolRows]
 	}
-	return ToolPanel{Rows: rows, RangeLabel: countText(days, "day", "days")}
+	return ToolPanel{Rows: rows, RangeLabel: "last " + countText(days, "day", "days")}
 }
 
 func buildWakes(wakes []rawWake, tools []rawTool, now time.Time, loc *time.Location, days int) WakesPanel {

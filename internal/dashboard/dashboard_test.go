@@ -244,7 +244,7 @@ func TestBoundsAndPlainEnumLabels(t *testing.T) {
 	if rr.Code != 200 {
 		t.Fatalf("status %d", rr.Code)
 	}
-	if !strings.Contains(rr.Body.String(), "Older runs") || !strings.Contains(rr.Body.String(), "Older hypotheses") || !strings.Contains(rr.Body.String(), "Older notes") {
+	if !strings.Contains(rr.Body.String(), "Older runs") || !strings.Contains(rr.Body.String(), "Older ideas") || !strings.Contains(rr.Body.String(), "Older notes") {
 		t.Fatal("older bounded rows not present")
 	}
 	page := mustPage(t, newHandler(newSource(snap)))
@@ -624,7 +624,7 @@ func TestGuardRefusalIsCountedAsBlockedNotFailed(t *testing.T) {
 	}
 	body := get(h, "/").Body.String()
 	visible := pageText(body)
-	if !strings.Contains(visible, "Write in read-only phase: 1") {
+	if !strings.Contains(visible, "Reason: Write in read-only phase 1") {
 		t.Fatalf("page does not label the refusal as blocked: %q", visible)
 	}
 	if strings.Contains(visible, "phase_read_only") || strings.Contains(visible, "failed") {
@@ -739,7 +739,7 @@ func TestContentModeShowsCandidatesAndPenaltyKnowledge(t *testing.T) {
 	snap.Candidates = []store.KnowledgeCandidate{{Technique: "friday recap threads", SourceURL: "https://x.test/recap", CreatedAt: time.Date(2026, 11, 12, 0, 0, 0, 0, time.UTC)}}
 	h := newHandler(newSource(snap), func(o *dashboard.Options) { o.Content = true; o.ContentToken = "token-123456789" })
 	body := getWithAuth(h, "/", "token-123456789").Body.String()
-	for _, want := range []string{"friday recap threads", "https://x.test/recap", "Asking for comments or shares", "Demotion risks"} {
+	for _, want := range []string{"friday recap threads", "https://x.test/recap", "Asking for comments or shares", "Could cost reach"} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("content page missing %q", want)
 		}
@@ -782,7 +782,7 @@ func TestFailedStepsShowReasonCodes(t *testing.T) {
 	if wt := wakeTool(page.Wakes.Rows[0].ToolSummary, "Search"); wt == nil || wt.Failed != 3 || wt.Why != "timeout 2, failed 1" {
 		t.Fatalf("failed search reasons: %+v", page.Wakes.Rows[0].ToolSummary)
 	}
-	if row := toolRow(page.ToolCalls.Rows, "Memory add"); row == nil || row.Failed != 0 || row.Blocked != 1 {
+	if row := toolRow(page.ToolCalls.Rows, "Add memory"); row == nil || row.Failed != 0 || row.Blocked != 1 {
 		t.Fatalf("a lesson refusal is a block, not a failure: %+v", row)
 	}
 }

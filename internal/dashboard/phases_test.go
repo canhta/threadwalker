@@ -36,7 +36,7 @@ func TestDashboardShowsSpendAndPlainPhaseWords(t *testing.T) {
 	if page.Burn.PhaseText != "Runs $0.40, Research $0.20, Planning $0.10" {
 		t.Fatalf("phases=%q", page.Burn.PhaseText)
 	}
-	if len(page.Wakes.Rows) != 1 || page.Wakes.Rows[0].Kind != "Plan" {
+	if len(page.Wakes.Rows) != 1 || page.Wakes.Rows[0].Kind != "Planning" {
 		t.Fatalf("wake kind=%+v", page.Wakes.Rows)
 	}
 }
