@@ -47,7 +47,8 @@ type Backend interface {
 	// ReadActionMetrics returns the insights of the own post with a media id.
 	ReadActionMetrics(context.Context, string) (Metrics, error)
 	PublishingLimit(context.Context) (Quota, error)
-	Post(context.Context, string) (Published, error)
+	// Post publishes a post under an optional topic tag (text, topic).
+	Post(context.Context, string, string) (Published, error)
 	// Reply publishes a reply to the numeric post id.
 	Reply(context.Context, string, string) (Published, error)
 	Close(context.Context) error

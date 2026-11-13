@@ -190,8 +190,8 @@ func (m *Memory) ReadActionMetrics(ctx context.Context, id string) (Metrics, err
 	}
 	return v, nil
 }
-func (m *Memory) Post(ctx context.Context, text string) (Published, error) {
-	if err := m.serve(ctx, Call{Op: OpPost, Text: text}); err != nil {
+func (m *Memory) Post(ctx context.Context, text, topic string) (Published, error) {
+	if err := m.serve(ctx, Call{Op: OpPost, Arg: topic, Text: text}); err != nil {
 		return Published{}, err
 	}
 	return m.published(OpPost), nil

@@ -190,7 +190,7 @@ func (d *Dispatcher) executors() map[string]executor {
 			if d.opts.Phase == guard.PhaseAgent {
 				d.webSearches++ // Dispatch already holds d.mu
 				if d.webSearches > MaxWebSearchesPerWake {
-					return nil, errors.New("searching the web: limit per wake reached")
+					return nil, &guard.BlockedError{Reason: "limit_per_wake", Detail: "web_search"}
 				}
 			}
 			result, err := d.webSearch(ctx, a.Text("query"))

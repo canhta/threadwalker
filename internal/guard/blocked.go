@@ -64,6 +64,8 @@ var hints = map[string]string{
 	"critic_unavailable":          "the editor could not review the draft; do not write more this wake",
 	"ungrounded_number":           "%s is not a number on your facts sheet; quote a value from facts or drop the number",
 	"min_seconds_between_actions": "next action allowed at %s",
+	"limit_per_wake":              "%s is used up for this wake; do not call it again, work with what you already read",
+	"topic_args":                  "pass exactly one of url (a short ref such as \"r3\" from read_feed or fetch_trends this wake) and query",
 }
 
 // Hint returns the fixed text for reason with detail filled in.

@@ -36,7 +36,7 @@ func TestMemoryServesConfiguredPagesAndRecordsCalls(t *testing.T) {
 	if _, err := m.ReadActionMetrics(ctx, "other"); !errors.Is(err, ErrMetricsUnavailable) {
 		t.Fatalf("unknown action url err=%v", err)
 	}
-	if u, err := m.Post(ctx, "hello"); err != nil || u != (Published{URL: "https://t.test/new", ID: "new"}) {
+	if u, err := m.Post(ctx, "hello", ""); err != nil || u != (Published{URL: "https://t.test/new", ID: "new"}) {
 		t.Fatalf("post=%+v err=%v", u, err)
 	}
 	if u, err := m.Reply(ctx, "https://t.test/p", "re"); err != nil || u != (Published{URL: "https://t.test/reply", ID: "reply"}) {
@@ -78,7 +78,7 @@ func TestMemoryErrorsAndHookFailOperations(t *testing.T) {
 	if _, err := m.ReadActionMetrics(ctx, ""); !errors.Is(err, boom) {
 		t.Fatal(err)
 	}
-	if _, err := m.Post(ctx, ""); !errors.Is(err, boom) {
+	if _, err := m.Post(ctx, "", ""); !errors.Is(err, boom) {
 		t.Fatal(err)
 	}
 	if _, err := m.Reply(ctx, "", ""); !errors.Is(err, boom) {
@@ -115,7 +115,7 @@ func TestStubBackendServesMemoryAndCannotPublish(t *testing.T) {
 	if _, ok := b.(*Memory); !ok {
 		t.Fatalf("stub backend is %T", b)
 	}
-	if u, err := b.Post(context.Background(), "x"); err != nil || u != (Published{}) {
+	if u, err := b.Post(context.Background(), "x", ""); err != nil || u != (Published{}) {
 		t.Fatalf("stub write=%+v err=%v", u, err)
 	}
 }

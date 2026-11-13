@@ -15,7 +15,7 @@ func TestReadTopicAfterTrendingPanel(t *testing.T) {
 	h.backend.Pages[threads.OpReadFeed] = threads.Page{Kind: "feed", Trends: []threads.Trend{{Title: "Synthetic topic one", Summary: "Synthetic summary", Posts: "2K posts", URL: topic}}}
 	h.backend.Pages[threads.OpReadTopic] = threads.Page{Kind: "topic", Posts: []threads.Post{{Username: "synthetic_viet", Text: "Bài mẫu", URL: permalink}}}
 
-	if _, err := h.call("read_topic", `{"url":"`+topic+`"}`); err == nil || !strings.Contains(err.Error(), "read_feed") {
+	if _, err := h.call("read_topic", `{"url":"`+topic+`"}`); err == nil || !strings.Contains(err.Error(), "topic_args") {
 		t.Fatalf("a topic url not returned this wake was accepted: %v", err)
 	}
 	h.next()
@@ -30,7 +30,7 @@ func TestReadTopicAfterTrendingPanel(t *testing.T) {
 		t.Fatalf("trend not registered for ideas: %+v", h.guard.Seen())
 	}
 	h.next()
-	if _, err := h.call("read_topic", `{"url":"r9"}`); err == nil || !strings.Contains(err.Error(), "read_feed") {
+	if _, err := h.call("read_topic", `{"url":"r9"}`); err == nil || !strings.Contains(err.Error(), "topic_args") {
 		t.Fatalf("an unknown ref was accepted: %v", err)
 	}
 	h.next()
@@ -50,7 +50,7 @@ func TestReadTopicAfterTrendingPanel(t *testing.T) {
 
 	for _, args := range []string{`{}`, `{"url":"` + topic + `","query":"x"}`} {
 		h.next()
-		if _, err := h.call("read_topic", args); err == nil || !strings.Contains(err.Error(), "exactly one") {
+		if _, err := h.call("read_topic", args); err == nil || !strings.Contains(err.Error(), "topic_args") {
 			t.Fatalf("args %s: %v", args, err)
 		}
 	}
@@ -59,7 +59,7 @@ func TestReadTopicAfterTrendingPanel(t *testing.T) {
 		_, _ = h.call("read_topic", `{"query":"more"}`)
 	}
 	h.next()
-	if _, err := h.call("read_topic", `{"query":"over"}`); err == nil || !strings.Contains(err.Error(), "limit per wake") {
+	if _, err := h.call("read_topic", `{"query":"over"}`); err == nil || !strings.Contains(err.Error(), "limit_per_wake") {
 		t.Fatalf("cap not enforced: %v", err)
 	}
 }

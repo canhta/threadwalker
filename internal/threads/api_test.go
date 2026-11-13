@@ -214,14 +214,14 @@ func TestAPIPostPublishesAfterContainerFinishes(t *testing.T) {
 	f.route("GET", "/3000000000000001", "status_in_progress.json", "status_finished.json")
 	f.route("POST", "/1000000000000001/threads_publish", "publish.json")
 	f.route("GET", "/2000000000000001", "post_permalink.json")
-	pub, err := api.Post(context.Background(), "hello")
+	pub, err := api.Post(context.Background(), "hello", " #AI Threads & Node.js\n")
 	if err != nil || pub != (Published{URL: "https://www.threads.com/@tester_account/post/SYNTH0001", ID: "2000000000000001"}) {
 		t.Fatalf("published=%+v err=%v", pub, err)
 	}
 	if *waits != 1 || f.count("POST /1000000000000001/threads_publish") != 1 {
 		t.Fatalf("waits=%d publishes=%d", *waits, f.count("POST /1000000000000001/threads_publish"))
 	}
-	if q := f.queries["POST /1000000000000001/threads"]; q["media_type"] != "TEXT" || q["text"] != "hello" || q["reply_to_id"] != "" {
+	if q := f.queries["POST /1000000000000001/threads"]; q["media_type"] != "TEXT" || q["text"] != "hello" || q["reply_to_id"] != "" || q["topic_tag"] != "AI Threads Nodejs" {
 		t.Fatalf("container query=%v", q)
 	}
 	if f.queries["POST /1000000000000001/threads_publish"]["creation_id"] != "3000000000000001" {
@@ -254,7 +254,7 @@ func TestAPIPostFailuresBeforePublishAreRefusedAndNeverPublish(t *testing.T) {
 			f.route("POST", "/1000000000000001/threads", "container.json")
 			f.route("GET", "/3000000000000001", "status_finished.json")
 			setup(f)
-			_, err := api.Post(context.Background(), "x")
+			_, err := api.Post(context.Background(), "x", "")
 			if err == nil || errors.Is(err, ErrUnknownOutcome) {
 				t.Fatalf("err=%v must fail without an unknown outcome", err)
 			}
@@ -277,7 +277,7 @@ func TestAPIFailureAfterPublishCallIsUnknownAndNotRetried(t *testing.T) {
 			f.route("GET", "/3000000000000001", "status_finished.json")
 			f.route("POST", "/1000000000000001/threads_publish", "publish.json")
 			setup(f)
-			_, err := api.Post(context.Background(), "x")
+			_, err := api.Post(context.Background(), "x", "")
 			if !errors.Is(err, ErrUnknownOutcome) || Reason(err) != ReasonUnknownOutcome {
 				t.Fatalf("err=%v want unknown outcome", err)
 			}
@@ -303,7 +303,7 @@ func TestAPITimeoutDuringPublishIsUnknown(t *testing.T) {
 	defer srv.Close()
 	defer close(block)
 	api, _ := NewAPI(APIOptions{BaseURL: srv.URL, UserID: "1000000000000001", Tokens: staticToken{}, HTTP: srv.Client(), Timeout: 50 * time.Millisecond, Wait: func(context.Context, time.Duration) error { return nil }})
-	_, err := api.Post(context.Background(), "x")
+	_, err := api.Post(context.Background(), "x", "")
 	if !errors.Is(err, ErrUnknownOutcome) || !errors.Is(err, context.DeadlineExceeded) {
 		t.Fatalf("err=%v", err)
 	}
@@ -358,7 +358,7 @@ func TestAPISeriesPartRepliesToThePreviousPart(t *testing.T) {
 	f.route("GET", "/3000000000000001", "status_finished.json")
 	f.route("POST", "/1000000000000001/threads_publish", "publish.json")
 	f.route("GET", "/2000000000000001", "post_permalink.json")
-	first, err := api.Post(context.Background(), "hook")
+	first, err := api.Post(context.Background(), "hook", "")
 	if err != nil {
 		t.Fatal(err)
 	}

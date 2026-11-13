@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
 
 	"github.com/canhta/threadz/internal/config"
 )
@@ -366,9 +367,29 @@ func (a *API) PublishingLimit(ctx context.Context) (Quota, error) {
 	return Quota{d.QuotaUsage, d.Config.Total, d.ReplyUsage, d.ReplyConfig.Total}, nil
 }
 
-// Post publishes a text post.
-func (a *API) Post(ctx context.Context, text string) (Published, error) {
-	return a.publish(ctx, "post", url.Values{"media_type": {"TEXT"}, "text": {text}})
+// Post publishes a text post, filed under topic when it survives TopicTag.
+func (a *API) Post(ctx context.Context, text, topic string) (Published, error) {
+	q := url.Values{"media_type": {"TEXT"}, "text": {text}}
+	if t := TopicTag(topic); t != "" {
+		q.Set("topic_tag", t)
+	}
+	return a.publish(ctx, "post", q)
+}
+
+// TopicTag fits a model-chosen topic to the API rule (1-50 characters, no
+// periods or ampersands) instead of failing the post over it.
+func TopicTag(s string) string {
+	s = strings.Map(func(r rune) rune {
+		if r == '.' || r == '&' || r == '#' || unicode.IsControl(r) {
+			return -1
+		}
+		return r
+	}, s)
+	s = strings.Join(strings.Fields(s), " ")
+	if r := []rune(s); len(r) > 50 {
+		s = strings.TrimSpace(string(r[:50]))
+	}
+	return s
 }
 
 // Reply publishes a reply to the media id replyTo.

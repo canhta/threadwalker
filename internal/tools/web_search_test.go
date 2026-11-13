@@ -80,7 +80,7 @@ func TestWebSearchToolIsStudyOnlyAndRecordsStudySpend(t *testing.T) {
 	}
 	for i := 1; i <= tools.MaxWebSearchesPerWake+1; i++ {
 		out, err := agentDispatcher.Dispatch(ctx, llm.ToolCall{ID: fmt.Sprintf("a%d", i), Type: "function", Function: llm.CallFunction{Name: "web_search", Arguments: fmt.Sprintf(`{"query":"q%d"}`, i)}})
-		if limited := err != nil && strings.Contains(err.Error(), "limit per wake"); limited != (i > tools.MaxWebSearchesPerWake) {
+		if limited := err != nil && strings.Contains(err.Error(), "limit_per_wake"); limited != (i > tools.MaxWebSearchesPerWake) {
 			t.Fatalf("call %d: out=%s err=%v", i, out, err)
 		}
 	}

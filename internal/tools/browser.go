@@ -69,24 +69,24 @@ func (d *Dispatcher) browserRead(ctx context.Context, operation string, a argume
 }
 
 // checkTopic refuses a read_topic call that names both or neither argument, a
-// url the wake has not read, or a fourth read in a normal wake. Its messages
-// reach the model, unlike a browser failure's.
+// url the wake has not read, or a fourth read in a normal wake. Its refusals
+// reach the model as blocked hints, unlike a browser failure's generic error.
 func (d *Dispatcher) checkTopic(a *arguments) error {
 	topicURL, query := a.Text("url"), a.Text("query")
 	if (topicURL == "") == (query == "") {
-		return errors.New("reading topic: pass exactly one of url and query")
+		return &guard.BlockedError{Reason: "topic_args"}
 	}
 	if topicURL != "" {
 		seen, ok := d.guard.Trend(topicURL)
 		if !ok {
-			return errors.New("reading topic: url was not returned by read_feed this wake; pass its ref (e.g. \"r3\")")
+			return &guard.BlockedError{Reason: "topic_args"}
 		}
 		a.Args = a.Args.WithText("url", seen)
 	}
 	if d.opts.Phase == guard.PhaseAgent {
 		d.topicReads++ // Dispatch already holds d.mu
 		if d.topicReads > MaxTopicReadsPerWake {
-			return errors.New("reading topic: limit per wake reached")
+			return &guard.BlockedError{Reason: "limit_per_wake", Detail: "read_topic"}
 		}
 	}
 	return nil
@@ -162,7 +162,7 @@ func (d *Dispatcher) browserAction(ctx context.Context, operation string, a argu
 	defer func() { err = d.browserResult(ctx, operation, started, err) }()
 	var published threads.Published
 	if operation == "post" {
-		published, err = d.opts.Threads.Post(ctx, a.Text("text"))
+		published, err = d.opts.Threads.Post(ctx, a.Text("text"), a.Text("topic_tag"))
 	} else {
 		// An empty target_id is a feed post, replied to through the browser by permalink.
 		target := a.Text("target_id")
