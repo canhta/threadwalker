@@ -99,11 +99,15 @@ func lessonReason(err error) string {
 var (
 	urlPattern    = regexp.MustCompile(`https?://[^\s)\]>"']+`)
 	numberPattern = regexp.MustCompile(`\d+(?:[.,]\d+)*`)
+	// refPattern is what a lesson may name without it being a claimed counter:
+	// an ISO date, an action or note id, and a short ref such as r69.
+	refPattern    = regexp.MustCompile(`(?i)\b\d{4}-\d{2}-\d{2}\b|\b(?:action|note)(?:_id)?[\s:#]*\d+|\br\d+\b`)
 	secretPattern = regexp.MustCompile(`sk-[A-Za-z0-9_-]{16,}|(?i:bearer\s+[A-Za-z0-9._~+/=-]{16,})|[A-Za-z0-9_-]{40,}|-----BEGIN`)
 )
 
 // checkLesson accepts text only when every URL is one of the agent's own
 // action URLs and every number equals a counter measured on the cited action.
+// Dates, action and note ids and short refs are names, not counters.
 func checkLesson(text string, ev store.ActionEvidence) error {
 	if secretPattern.MatchString(text) {
 		return errLessonSecret
@@ -113,7 +117,7 @@ func checkLesson(text string, ev store.ActionEvidence) error {
 			return errLessonURL
 		}
 	}
-	for _, n := range numberPattern.FindAllString(urlPattern.ReplaceAllString(text, " "), -1) {
+	for _, n := range numberPattern.FindAllString(refPattern.ReplaceAllString(urlPattern.ReplaceAllString(text, " "), " "), -1) {
 		v, err := strconv.ParseInt(strings.ReplaceAll(n, ",", ""), 10, 64)
 		if err != nil || strings.Contains(n, ".") || !ev.Counters[v] {
 			return errLessonNumber

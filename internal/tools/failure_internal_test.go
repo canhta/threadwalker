@@ -25,3 +25,18 @@ func TestModelFacingFailures(t *testing.T) {
 		t.Fatalf("other: %v", other)
 	}
 }
+
+// The dream's second try on 2026-11-14 dropped every metric but was still
+// refused for its date and ids; those are names, a counter claim is not.
+func TestLessonNumbersIgnoreDatesIdsAndRefs(t *testing.T) {
+	ev := store.ActionEvidence{Counters: map[int64]bool{3: true, 273: true}, URLs: map[string]bool{}}
+	if err := checkLesson("2026-11-14 wake: action 43 reply r69/r68 chưa gán lift; chi tiết ở note:43.", ev); err != nil {
+		t.Fatalf("names refused: %v", err)
+	}
+	if err := checkLesson("action 43 có 273 view, 3 like", ev); err != nil {
+		t.Fatalf("measured counters refused: %v", err)
+	}
+	if err := checkLesson("action 43 có 22,959 view", ev); !errors.Is(err, errLessonNumber) {
+		t.Fatalf("an unmeasured number passed: %v", err)
+	}
+}
