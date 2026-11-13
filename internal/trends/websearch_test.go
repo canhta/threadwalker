@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -68,5 +69,50 @@ func TestSearchWebFailsClosed(t *testing.T) {
 	empty := webSearchServer(t, http.StatusOK, `{"output":[],"usage":{"input_tokens":1,"output_tokens":1}}`)
 	if _, err := trends.NewWebSearcher(empty.Client())(context.Background(), trends.WebSearchRequest{BaseURL: empty.URL, Model: "search-model", APIKey: "key", Query: "q", MaxOutput: 256, Timeout: time.Second}); err == nil {
 		t.Fatal("empty answer accepted")
+	}
+}
+
+// The search is a fact check before a post, so it asks for the small context the
+// API documents for that, and says where its readers are instead of taking the
+// United States default. A query long enough to be a pasted URL is refused
+// before the call, which is what used to run into the timeout.
+func TestSearchWebSendsLowContextAndLocationAndRefusesALongQuery(t *testing.T) {
+	var tool struct {
+		Type         string `json:"type"`
+		ContextSize  string `json:"search_context_size"`
+		UserLocation struct {
+			Type    string `json:"type"`
+			Country string `json:"country"`
+		} `json:"user_location"`
+	}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var request struct {
+			Tools []json.RawMessage `json:"tools"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&request); err != nil || len(request.Tools) != 1 {
+			t.Errorf("tools=%v err=%v", request.Tools, err)
+			return
+		}
+		if err := json.Unmarshal(request.Tools[0], &tool); err != nil {
+			t.Error(err)
+		}
+		_, _ = w.Write([]byte(`{"output":[{"type":"message","content":[{"type":"output_text","text":"ok"}]}],"usage":{"input_tokens":10,"output_tokens":5}}`))
+	}))
+	t.Cleanup(server.Close)
+
+	search := trends.NewWebSearcher(server.Client())
+	if _, err := search(context.Background(), trends.WebSearchRequest{BaseURL: server.URL, Model: "m", APIKey: "key", Query: "who won", MaxOutput: 64, Country: "VN", Timeout: 3 * time.Second}); err != nil {
+		t.Fatal(err)
+	}
+	if tool.Type != "web_search" || tool.ContextSize != "low" {
+		t.Fatalf("tool=%+v", tool)
+	}
+	if tool.UserLocation.Type != "approximate" || tool.UserLocation.Country != "VN" {
+		t.Fatalf("location=%+v", tool.UserLocation)
+	}
+
+	long := strings.Repeat("a", 201)
+	if _, err := search(context.Background(), trends.WebSearchRequest{BaseURL: server.URL, Model: "m", APIKey: "key", Query: long, MaxOutput: 64, Timeout: 3 * time.Second}); err == nil {
+		t.Fatal("a query past the cap was sent")
 	}
 }

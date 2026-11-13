@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/canhta/threadz/internal/guard"
@@ -237,6 +238,18 @@ func (d *Dispatcher) recordStories(ctx context.Context, phase string, stories []
 	d.event(ctx, logging.TrendsRecorded, outcome(err), reason(err), "fetch_trends", time.Time{})
 }
 
+// searchCountry maps the persona's language to where its readers are, so a
+// search is localised instead of falling back to the United States.
+func searchCountry(language string) string {
+	switch strings.ToLower(strings.TrimSpace(language)) {
+	case "vi":
+		return "VN"
+	case "en":
+		return "US"
+	}
+	return ""
+}
+
 // webSearch checks the shared daily cap before the call and records the actual
 // reported usage to the study phase ledger, so a search is bounded like any
 // other study spend.
@@ -257,6 +270,7 @@ func (d *Dispatcher) webSearch(ctx context.Context, query string) (trends.WebSea
 		Query:      query,
 		MaxOutput:  d.opts.Template.Study.WebSearchMaxOutput,
 		MaxResults: d.opts.Template.Study.WebSearchMaxResults,
+		Country:    searchCountry(d.opts.Template.Persona.Language),
 	})
 	if err != nil {
 		return trends.WebSearchResult{}, err

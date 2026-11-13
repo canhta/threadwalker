@@ -24,6 +24,10 @@ type WebSearchRequest struct {
 	MaxOutput  int
 	MaxResults int
 	Timeout    time.Duration
+	// Country is an ISO 3166-1 alpha-2 code. The API localises results to the
+	// United States when no location is sent, which is wrong for an agent that
+	// writes about one country's news.
+	Country string
 }
 
 // WebSource is one cited URL returned by the search provider.
@@ -41,6 +45,11 @@ type WebSearchResult struct {
 }
 
 const webSearchMaxResponseBytes = 2 << 20
+
+// webSearchMaxQueryRunes bounds the query. A long one is the agent pasting a
+// whole URL into a site: filter, which the search has to interpret and which is
+// what timed out; the tool's own filters are the way to narrow a search.
+const webSearchMaxQueryRunes = 200
 
 // WebSearcher runs one web-search request.
 type WebSearcher func(context.Context, WebSearchRequest) (WebSearchResult, error)
@@ -69,16 +78,26 @@ func searchWeb(ctx context.Context, client *http.Client, req WebSearchRequest) (
 	if req.MaxResults <= 0 || req.MaxResults > 10 {
 		req.MaxResults = 5
 	}
+	if len([]rune(req.Query)) > webSearchMaxQueryRunes {
+		return WebSearchResult{}, errors.New("web search: query too long")
+	}
 	timeout := req.Timeout
 	if timeout <= 0 {
-		timeout = 20 * time.Second
+		timeout = 40 * time.Second
 	}
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
+	// search_context_size "low" is the documented setting for a lookup that
+	// needs a few details, which is all a fact check before a post needs, and it
+	// is the difference between an answer and a timeout.
+	tool := map[string]any{"type": "web_search", "search_context_size": "low"}
+	if req.Country != "" {
+		tool["user_location"] = map[string]any{"type": "approximate", "country": req.Country}
+	}
 	body, err := json.Marshal(map[string]any{
 		"model":             req.Model,
 		"input":             req.Query,
-		"tools":             []map[string]string{{"type": "web_search"}},
+		"tools":             []map[string]any{tool},
 		"max_output_tokens": req.MaxOutput,
 		"store":             false,
 	})
