@@ -52,6 +52,7 @@
 <link rel="icon" href="/favicon.ico?v=2" sizes="any">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png?v=2">
 <link rel="stylesheet" href="{{cssHref}}">
+<script src="{{jsHref}}" defer></script>
 </head>
 <body>
 <a class="skip" href="#main">Skip to content</a>
@@ -91,7 +92,7 @@
         {{with index .KPIs 3}}<div><dt>Posts</dt><dd>{{.Value}}</dd></div>{{end}}
         {{with index .KPIs 4}}<div><dt>Replies sent</dt><dd>{{.Value}}</dd></div>{{end}}
       </dl>
-      <p class="foot">Stats read {{.Growth.LastMeasured}}{{if .Outcomes.HasData}}. Scored {{.Outcomes.Scored}}: {{.Outcomes.Viral}} viral, {{.Outcomes.Flop}} flop{{end}}</p>
+      <p class="foot">Stats read {{tm "clock" .Growth.MeasuredAt .Growth.LastMeasured}}{{if .Outcomes.HasData}}. Scored {{.Outcomes.Scored}}: {{.Outcomes.Viral}} viral, {{.Outcomes.Flop}} flop{{end}}</p>
       {{else}}
       <p class="empty">{{.Growth.EmptyText}}</p>
       {{end}}
@@ -131,13 +132,13 @@
         {{if .Content}}
           {{if .Learned.Hypotheses}}<h3>Hypotheses</h3><ul class="items">{{range .Learned.Hypotheses}}<li><p>{{.Text}}</p><p class="sub">{{ideaStatus .Status}}, tried {{.Tried}}{{if .Evidence}}. {{.Evidence}}{{end}}</p></li>{{end}}</ul>{{end}}
           {{if .Learned.OlderHypotheses}}<details class="more"><summary>Older hypotheses</summary><ul class="items">{{range .Learned.OlderHypotheses}}<li><p>{{.Text}}</p><p class="sub">{{ideaStatus .Status}}, tried {{.Tried}}{{if .Evidence}}. {{.Evidence}}{{end}}</p></li>{{end}}</ul></details>{{end}}
-          {{if .Learned.Candidates}}<h3>Techniques</h3><ul class="items">{{range .Learned.Candidates}}<li><p class="note">{{.Text}}</p><p class="sub">Unverified. <a href="{{.Source}}" rel="noreferrer noopener">{{.Source}}</a>, {{.When}}</p></li>{{end}}</ul>{{end}}
+          {{if .Learned.Candidates}}<h3>Techniques</h3><ul class="items">{{range .Learned.Candidates}}<li><p class="note">{{.Text}}</p><p class="sub">Unverified. <a href="{{.Source}}" rel="noreferrer noopener">{{.Source}}</a>, {{tm "day" .At .When}}</p></li>{{end}}</ul>{{end}}
           {{if .Learned.Penalties}}<h3>Demotion risks</h3><ul class="items">{{range .Learned.Penalties}}<li><p class="note">{{.Risk}}: {{.Claim}}</p><p class="sub"><a href="{{.Source}}" rel="noreferrer noopener">Source</a></p></li>{{end}}</ul>{{end}}
           {{if .Learned.MemoryIndex}}<h3>Memory index</h3><p class="note">{{.Learned.MemoryIndex}}</p>{{end}}
           {{if .Learned.MemoryJournal}}<h3>Memory journal</h3><p class="note">{{.Learned.MemoryJournal}}</p>{{end}}
-          {{if .Learned.Strategy}}<h3>Strategy</h3><ul class="items">{{range .Learned.Strategy}}<li><p class="sub">v{{.Version}}, {{.When}}{{if .Citations}}. {{.Citations}}{{end}}</p><div class="diff">{{range .Diff}}<p class="note">{{.Mark}} {{.Text}}</p>{{end}}</div></li>{{end}}</ul>{{end}}
-          {{if .Learned.NotesRows}}<h3>Journal</h3><ul class="items">{{range .Learned.NotesRows}}<li><p class="note">{{.Text}}</p><p class="sub">{{.When}}</p></li>{{end}}</ul>{{end}}
-          {{if .Learned.OlderNotes}}<details class="more"><summary>Older notes</summary><ul class="items">{{range .Learned.OlderNotes}}<li><p class="note">{{.Text}}</p><p class="sub">{{.When}}</p></li>{{end}}</ul></details>{{end}}
+          {{if .Learned.Strategy}}<h3>Strategy</h3><ul class="items">{{range .Learned.Strategy}}<li><p class="sub">v{{.Version}}, {{tm "stamp" .At .When}}{{if .Citations}}. {{.Citations}}{{end}}</p><div class="diff">{{range .Diff}}<p class="note">{{.Mark}} {{.Text}}</p>{{end}}</div></li>{{end}}</ul>{{end}}
+          {{if .Learned.NotesRows}}<h3>Journal</h3><ul class="items">{{range .Learned.NotesRows}}<li><p class="note">{{.Text}}</p><p class="sub">{{tm "stamp" .At .When}}</p></li>{{end}}</ul>{{end}}
+          {{if .Learned.OlderNotes}}<details class="more"><summary>Older notes</summary><ul class="items">{{range .Learned.OlderNotes}}<li><p class="note">{{.Text}}</p><p class="sub">{{tm "stamp" .At .When}}</p></li>{{end}}</ul></details>{{end}}
         {{end}}
         </div></details>
       {{end}}
@@ -215,10 +216,10 @@
   </div>
 </details></li>{{else}}<li><div class="run">{{template "runrow" .}}<span></span></div></li>{{end}}{{end}}
 
-{{define "runrow"}}<span class="t" title="{{.WhenTitle}}">{{.When}}</span><span class="k">{{.Kind}}</span><span class="s">{{.Steps}}</span><span class="c">{{.Cost}}</span><span class="e{{if .Bad}} er{{end}}" title="{{.EndCode}}">{{.EndReason}}</span>{{end}}
+{{define "runrow"}}{{if .At.IsZero}}<span class="t">{{.When}}</span>{{else}}<time class="t" datetime="{{iso .At}}" data-fmt="clock" data-title="full"{{if not .EndAt.IsZero}} data-end="{{iso .EndAt}}"{{end}} title="{{.WhenTitle}}">{{.When}}</time>{{end}}<span class="k">{{.Kind}}</span><span class="s">{{.Steps}}</span><span class="c">{{.Cost}}</span><span class="e{{if .Bad}} er{{end}}" title="{{.EndCode}}">{{.EndReason}}</span>{{end}}
 
 {{define "post"}}<li class="post">
-  <p class="pmeta"><span class="kind">{{.Kind}}</span>{{if .Age}}<span title="{{.AgeTitle}}">{{.Age}} ago</span>{{end}}{{if .Mark}}<span class="tag {{.Mark}}">{{.Mark}}</span>{{end}}{{if .Label}}<span class="tag">{{.Label}}</span>{{end}}</p>
+  <p class="pmeta"><span class="kind">{{.Kind}}</span>{{if .Age}}<time datetime="{{iso .PostedAt}}" data-title="full" title="{{.AgeTitle}}">{{.Age}} ago</time>{{end}}{{if .Mark}}<span class="tag {{.Mark}}">{{.Mark}}</span>{{end}}{{if .Label}}<span class="tag">{{.Label}}</span>{{end}}</p>
   <a class="ptext" href="{{.URL}}" rel="noreferrer noopener">{{.Link}}</a>
   {{if .HasSample}}<p class="pstats">{{template "stats" .}}</p>{{else}}<p class="sub">No stats yet</p>{{end}}
   {{if .Why}}<p class="sub">{{range $i, $w := .Why}}{{if $i}}; {{end}}{{$w}}{{end}}</p>{{end}}

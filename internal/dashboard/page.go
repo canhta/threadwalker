@@ -367,8 +367,10 @@ func buildWakes(wakes []rawWake, tools []rawTool, now time.Time, loc *time.Locat
 		if !w.StartedAt.IsZero() {
 			row.When = formatClock(w.StartedAt, now, loc)
 			row.WhenTitle = formatFullDay(w.StartedAt, loc)
+			row.At = w.StartedAt
 			if !w.EndedAt.IsZero() {
 				row.WhenTitle += " to " + w.EndedAt.In(loc).Format("15:04")
+				row.EndAt = w.EndedAt
 			}
 		}
 		type tc struct {
@@ -612,6 +614,7 @@ func learnedFrom(snap store.DashboardSnapshot, content bool) LearnedPanel {
 			row := StrategyRow{Version: s.Version, Citations: strings.Join(s.Citations, ", "), Diff: lineDiff(prev, s.Text)}
 			if !s.CreatedAt.IsZero() {
 				row.When = s.CreatedAt.Format("2 Jan 15:04")
+				row.At = s.CreatedAt
 			}
 			l.Strategy = append(l.Strategy, row)
 		}
@@ -619,6 +622,7 @@ func learnedFrom(snap store.DashboardSnapshot, content bool) LearnedPanel {
 			row := NoteRow{Text: n.Text}
 			if !n.CreatedAt.IsZero() {
 				row.When = n.CreatedAt.Format("2 Jan 15:04")
+				row.At = n.CreatedAt
 			}
 			l.NotesRows = append(l.NotesRows, row)
 		}
@@ -639,6 +643,7 @@ func learnedFrom(snap store.DashboardSnapshot, content bool) LearnedPanel {
 			row := CandidateRow{Text: c.Technique, Source: c.SourceURL}
 			if !c.CreatedAt.IsZero() {
 				row.When = c.CreatedAt.Format("2 Jan")
+				row.At = c.CreatedAt
 			}
 			l.Candidates = append(l.Candidates, row)
 		}
@@ -851,6 +856,7 @@ func buildGrowth(ms metricSet, days int, daysList []time.Time, currentStart, pri
 			return []*float64{&v}, []string{formatPercent(r)}
 		}, func(v float64) string { return formatValue(v) + "%" }, a.Location, 4)
 		g.LastMeasured = formatClock(ms.last, now, a.Location)
+		g.MeasuredAt = ms.last
 	}
 
 	rows := buildPosts(ms, now, a.Location)
@@ -948,6 +954,7 @@ func buildPosts(ms metricSet, now time.Time, loc *time.Location) []PostRow {
 		if !p.PostedAt.IsZero() {
 			row.Age = formatAge(p.PostedAt, now)
 			row.AgeTitle = formatFullDay(p.PostedAt, loc)
+			row.PostedAt = p.PostedAt
 		}
 		samples := ms.all[p.ID]
 		if len(samples) == 0 {

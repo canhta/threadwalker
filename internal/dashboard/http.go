@@ -21,7 +21,7 @@ import (
 	"github.com/canhta/threadz/internal/logging"
 )
 
-//go:embed templates/index.html static/dashboard.css static/fonts/* static/brand/*
+//go:embed templates/index.html static/dashboard.css static/local-time.js static/fonts/* static/brand/*
 var assets embed.FS
 
 var pageTemplate = template.Must(template.New("index.html").Funcs(template.FuncMap{
@@ -32,8 +32,22 @@ var pageTemplate = template.Must(template.New("index.html").Funcs(template.FuncM
 	"formatUSD":   formatUSD,
 	"plural":      plural,
 	"cssHref":     func() string { return cssHref },
+	"jsHref":      func() string { return jsHref },
+	"iso":         func(t time.Time) string { return t.UTC().Format(time.RFC3339) },
+	"tm":          tm,
 }).ParseFS(assets, "templates/index.html"))
 var stylesheet = mustAsset("static/dashboard.css")
+var localTimeJS = mustAsset("static/local-time.js")
+var jsHref = "/local-time.js?v=" + strings.Trim(strings.TrimPrefix(etagFor(localTimeJS), "W/"), `"`)
+
+// tm marks a displayed moment: the server text stays as the no-script
+// fallback and local-time.js rewrites it in the viewer's zone.
+func tm(format string, t time.Time, text string) template.HTML {
+	if t.IsZero() {
+		return template.HTML(template.HTMLEscapeString(text))
+	}
+	return template.HTML(`<time datetime="` + t.UTC().Format(time.RFC3339) + `" data-fmt="` + format + `">` + template.HTMLEscapeString(text) + `</time>`)
+}
 
 // cssHref carries the stylesheet's content hash, so a deploy that changes it
 // never pairs new markup with a cached old stylesheet.
@@ -159,7 +173,7 @@ func (h *Handler) authorized(r *http.Request) bool {
 }
 
 func securityHeaders(w http.ResponseWriter) {
-	w.Header().Set("Content-Security-Policy", "default-src 'none'; style-src 'self'; font-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'")
+	w.Header().Set("Content-Security-Policy", "default-src 'none'; script-src 'self'; style-src 'self'; font-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'")
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.Header().Set("Referrer-Policy", "no-referrer")
 	w.Header().Set("X-Frame-Options", "DENY")
@@ -181,6 +195,8 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		h.servePage(w, r)
 	case path == "/dashboard.css":
 		h.serveStatic(w, r, "style", "text/css; charset=utf-8", stylesheet)
+	case path == "/local-time.js":
+		h.serveStatic(w, r, "script", "text/javascript; charset=utf-8", localTimeJS)
 	case fontAssets[path] != "":
 		h.serveStatic(w, r, "font", "font/woff2", mustAsset(fontAssets[path]))
 	case brandAssets[path].file != "":

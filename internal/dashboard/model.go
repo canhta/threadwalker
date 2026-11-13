@@ -1,5 +1,7 @@
 package dashboard
 
+import "time"
+
 // Page is the canonical public view model for the single dashboard route.
 // It carries operator metadata, bounded rows, numeric aggregates and fixed
 // reason codes only. No post text, notes, prompts, tool payloads, credentials
@@ -93,6 +95,7 @@ type WakeRow struct {
 	ID          int64
 	When        string
 	WhenTitle   string
+	At, EndAt   time.Time // UTC moments the browser reformats
 	Kind        string
 	Steps       int
 	Cost        string
@@ -149,6 +152,7 @@ type GrowthPanel struct {
 	Total        int
 	Top          []PostRow
 	LastMeasured string
+	MeasuredAt   time.Time
 	Unmeasured   int
 	RangeLabel   string
 }
@@ -172,6 +176,7 @@ type PostRow struct {
 	Kind      string
 	Age       string
 	AgeTitle  string
+	PostedAt  time.Time
 	Views     string
 	Likes     string
 	Replies   string
@@ -239,6 +244,7 @@ type LearnedPanel struct {
 type StrategyRow struct {
 	Version   int64
 	When      string
+	At        time.Time
 	Citations string
 	Diff      []DiffLine
 }
@@ -259,6 +265,7 @@ type CandidateRow struct {
 	Text   string
 	Source string
 	When   string
+	At     time.Time
 }
 
 // Tried reads "2 times".
@@ -277,6 +284,7 @@ type HypothesisRow struct {
 type NoteRow struct {
 	Text string
 	When string
+	At   time.Time
 }
 
 type TrendRow struct {
