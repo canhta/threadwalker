@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 	// The owner's zone is a template field; embedding zone data keeps it
 	// resolvable on minimal hosts without a system tzdata package.
 	_ "time/tzdata"
@@ -257,6 +258,8 @@ type LLMReview struct {
 }
 
 type LimitsConfig struct {
+	// Timezone is schedule.timezone: the zone whose calendar day counts spend. Empty is UTC.
+	Timezone         string
 	PostsPerDay      int
 	RepliesPerDay    int
 	RepliesPerUser7d int
@@ -277,6 +280,24 @@ type LimitsConfig struct {
 	// CriticRejectionsPerWake is how many drafts the critic may reject in one
 	// wake before further writes are refused (critic_limit).
 	CriticRejectionsPerWake int
+}
+
+// SpendDayBounds is the half-open local calendar day containing at, in the
+// zone that counts spend. Day is its date, the ledger's day key.
+func (l LimitsConfig) SpendDayBounds(at time.Time) (start, end time.Time, day string) {
+	loc, err := time.LoadLocation(l.Timezone)
+	if err != nil {
+		loc = time.UTC
+	}
+	local := at.In(loc)
+	start = time.Date(local.Year(), local.Month(), local.Day(), 0, 0, 0, 0, loc)
+	return start, start.AddDate(0, 0, 1), start.Format(time.DateOnly)
+}
+
+// SpendDay is the ledger day key of at.
+func (l LimitsConfig) SpendDay(at time.Time) string {
+	_, _, day := l.SpendDayBounds(at)
+	return day
 }
 
 type ThreadsConfig struct {

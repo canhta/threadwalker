@@ -97,7 +97,7 @@ func TestMetricCoreCatchUpOneActualSampleAndFencedRecovery(t *testing.T) {
 	if ok, err := s.CompleteMetricJobs(ctx, fresh, measured.Add(time.Hour), store.MetricValues{Views: 999}); err != nil || ok {
 		t.Fatalf("idempotent %v %v", ok, err)
 	}
-	summary, err := s.OwnerSummary(ctx, "a", false, at, at.Add(48*time.Hour))
+	summary, err := s.OwnerSummary(ctx, "a", false, at, at.Add(48*time.Hour), "")
 	if err != nil || summary.MetricSamples != 1 || summary.Views != 42 {
 		t.Fatalf("sample %+v %v", summary, err)
 	}
@@ -209,7 +209,7 @@ func TestMetricCorePersistenceFailureRollsBackSampleAndAllCheckpoints(t *testing
 	if ok, err := s.CompleteMetricJobs(ctx, jobs, now, store.MetricValues{Views: 42}); err == nil || ok {
 		t.Fatalf("failure hidden %v %v", ok, err)
 	}
-	summary, err := s.OwnerSummary(ctx, "a", false, now.Add(-26*time.Hour), now.Add(time.Hour))
+	summary, err := s.OwnerSummary(ctx, "a", false, now.Add(-26*time.Hour), now.Add(time.Hour), "")
 	if err != nil || summary.MetricSamples != 0 {
 		t.Fatalf("partial sample %+v %v", summary, err)
 	}
@@ -382,7 +382,7 @@ func TestMetricCoreConcurrentClaimsAndCompletions(t *testing.T) {
 	if count != 1 {
 		t.Fatalf("committed %d samples", count)
 	}
-	summary, err := s.OwnerSummary(ctx, "a", false, at, at.Add(72*time.Hour))
+	summary, err := s.OwnerSummary(ctx, "a", false, at, at.Add(72*time.Hour), "")
 	if err != nil || summary.MetricSamples != 1 || summary.Views != 10 {
 		t.Fatalf("samples %+v %v", summary, err)
 	}

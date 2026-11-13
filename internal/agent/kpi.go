@@ -28,7 +28,8 @@ type scoreboard struct {
 
 func (r *Runtime) scoreboard(ctx context.Context, now time.Time) (scoreboard, error) {
 	t := r.opts.Template
-	stats, err := r.opts.Store.KPIStats(ctx, t.ID, t.DryRun, now)
+	dayStart, _, _ := t.Limits.SpendDayBounds(now)
+	stats, err := r.opts.Store.KPIStats(ctx, t.ID, t.DryRun, now, dayStart)
 	b := scoreboard{KPIStats: stats, KPI: t.KPI, Now: now, Loc: time.UTC}
 	if err != nil {
 		return b, err
@@ -147,8 +148,8 @@ func (s scoreboard) stopCheck(hidden []string, open func() []string, usdLeft flo
 const minUSDToContinue = 0.05
 
 // nextWake is when code wakes the agent again: the template minimum when
-// behind, the on-target interval when not, and the start of the next UTC day
-// when the day is capped (see dayCapped).
+// behind, the on-target interval when not, and the end of the capped day
+// when the day is capped (see capReset).
 func (r *Runtime) nextWake(ctx context.Context, now time.Time) (time.Time, error) {
 	t := r.opts.Template
 	s, err := r.scoreboard(ctx, now)
@@ -164,13 +165,13 @@ func (r *Runtime) nextWake(ctx context.Context, now time.Time) (time.Time, error
 		next = now.Add(time.Duration(minutes) * time.Minute)
 	}
 	// A capped day cannot be worked: a wake would burn tokens on reads and ideas
-	// and publish nothing. Wait for the next UTC day, when the caps reset.
-	capped, err := r.dayCapped(ctx, now)
+	// and publish nothing. Wait until the caps reset.
+	reset, err := r.capReset(ctx, now)
 	if err != nil {
 		return time.Time{}, err
 	}
-	if tomorrow := nextUTCDay(now); capped && next.Before(tomorrow) {
-		next = tomorrow
+	if next.Before(reset) {
+		next = reset
 	}
 	// Nobody reads at 3am: a night wake spends tokens for posts that sink.
 	return r.schedule.AfterQuiet(next), nil
@@ -180,18 +181,28 @@ func nextUTCDay(now time.Time) time.Time {
 	return now.UTC().Truncate(24 * time.Hour).Add(24 * time.Hour)
 }
 
-// dayCapped: today's USD spend has reached the daily cap, or both the post and
-// the reply caps are used. Actions count in the template's mode, as the guard does.
-func (r *Runtime) dayCapped(ctx context.Context, now time.Time) (bool, error) {
+// capReset is when a capped day ends, or the zero time when it is not capped.
+// Spend resets at the next local midnight; both the post and the reply caps
+// used (in the template's mode, as the guard counts) reset at the next UTC
+// midnight. When both hold, the later one wins.
+func (r *Runtime) capReset(ctx context.Context, now time.Time) (time.Time, error) {
 	t := r.opts.Template
-	day := now.UTC().Truncate(24 * time.Hour)
-	spent, err := r.opts.Store.LLMUsageForDayPhases(ctx, t.ID, day.Format(time.DateOnly), "agent", "study")
+	_, spendEnd, day := t.Limits.SpendDayBounds(now)
+	spent, err := r.opts.Store.LLMUsageForDayPhases(ctx, t.ID, day, "agent", "study")
 	if err != nil {
-		return false, err
+		return time.Time{}, err
 	}
-	done, err := r.opts.Store.CountActions(ctx, t.ID, t.DryRun, day, day.Add(24*time.Hour))
+	utcDay := now.UTC().Truncate(24 * time.Hour)
+	done, err := r.opts.Store.CountActions(ctx, t.ID, t.DryRun, utcDay, utcDay.Add(24*time.Hour))
 	if err != nil {
-		return false, err
+		return time.Time{}, err
 	}
-	return spent.CostUSD >= t.Limits.MaxUSDPerDay || done.Posts >= t.Limits.PostsPerDay && done.Replies >= t.Limits.RepliesPerDay, nil
+	var reset time.Time
+	if spent.CostUSD >= t.Limits.MaxUSDPerDay {
+		reset = spendEnd
+	}
+	if done.Posts >= t.Limits.PostsPerDay && done.Replies >= t.Limits.RepliesPerDay && nextUTCDay(now).After(reset) {
+		reset = nextUTCDay(now)
+	}
+	return reset, nil
 }

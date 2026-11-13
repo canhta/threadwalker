@@ -148,6 +148,9 @@ func TestSectionStudyScheduleTrendsGuard(t *testing.T) {
 			if tmpl.Schedule.Timezone != "Asia/Ho_Chi_Minh" {
 				t.Fatalf("timezone = %q", tmpl.Schedule.Timezone)
 			}
+			if tmpl.Limits.Timezone != tmpl.Schedule.Timezone {
+				t.Fatalf("limits timezone = %q", tmpl.Limits.Timezone)
+			}
 		}},
 		{name: "unknown source", new: "study:\n  sources:\n    - nowhere", wantErr: "unknown source nowhere"},
 		{name: "sources deduplicated", new: "study:\n  sources:\n    - hacker_news\n    - hacker_news", check: func(t *testing.T, tmpl config.Template) {

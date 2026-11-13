@@ -152,7 +152,7 @@ func (r *Runtime) wakeContext(ctx context.Context, phase string, wakeID int64) (
 		return nil, err
 	}
 
-	day := now.UTC().Format("2006-01-02")
+	day := t.Limits.SpendDay(now)
 	var spent store.LLMUsage
 	budget := t.Limits.MaxUSDPerDay
 	switch phase {

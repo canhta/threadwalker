@@ -247,7 +247,7 @@ func TestNoticesAndDigestOncePerEventWithContent(t *testing.T) {
 	for _, text := range bot.texts {
 		if strings.HasPrefix(text, "Daily report, 2 Jan 2026\n") {
 			found = true
-			for _, part := range []string{"Posts: 1\n", "Replies: 0\n", "Spend since 07:00 UTC+07: $1.00 of $1.00 (100%)", "Metrics (1 measured): 10 views, 2 likes, 3 replies, 4 reposts", "Playbook changes: 1"} {
+			for _, part := range []string{"Posts: 1\n", "Replies: 0\n", "Spend today (resets at 00:00 local): $1.00 of $1.00 (100%)", "Metrics (1 measured): 10 views, 2 likes, 3 replies, 4 reposts", "Playbook changes: 1"} {
 				if !strings.Contains(text, part) {
 					t.Fatalf("digest missing %s: %s", part, text)
 				}
@@ -744,7 +744,7 @@ func TestStatusUsesOwnerTimezoneAndRelativeTime(t *testing.T) {
 			if len(bot.texts) != 1 || !strings.Contains(bot.texts[0], tc.want) {
 				t.Fatalf("status %v, want %q", bot.texts, tc.want)
 			}
-			if !strings.Contains(bot.texts[0], "Spend today: $0.00 of $0.50") {
+			if !strings.Contains(bot.texts[0], "Spend today (resets at 00:00 local): $0.00 of $0.50") {
 				t.Fatalf("status omitted budget: %q", bot.texts[0])
 			}
 		})

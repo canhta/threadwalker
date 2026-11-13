@@ -37,7 +37,7 @@ func TestKPIStatsCountsOwnRecentActionsAndSpend(t *testing.T) {
  ('a','2026-01-08T01:00:00Z','2026-01-08T01:01:00Z','agent'),('a','2026-01-08T06:00:00Z','2026-01-08T06:01:00Z','agent'),
  ('a','2026-01-08T07:00:00Z','2026-01-08T07:01:00Z','dream'),('a','2026-01-07T23:00:00Z','2026-01-07T23:01:00Z','agent')`)
 
-	got, err := st.KPIStats(ctx, "a", false, now)
+	got, err := st.KPIStats(ctx, "a", false, now, time.Date(2026, 1, 8, 0, 0, 0, 0, time.UTC))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -46,9 +46,33 @@ func TestKPIStatsCountsOwnRecentActionsAndSpend(t *testing.T) {
 		abs(got.SpendToday-want.SpendToday) > 1e-9 || abs(got.Spend7d-want.Spend7d) > 1e-9 {
 		t.Fatalf("got %+v\nwant %+v", got, want)
 	}
-	dry, err := st.KPIStats(ctx, "a", true, now)
+	dry, err := st.KPIStats(ctx, "a", true, now, time.Date(2026, 1, 8, 0, 0, 0, 0, time.UTC))
 	if err != nil || dry.Engagements != 0 || !dry.LastPublish.Equal(time.Date(2026, 1, 8, 11, 30, 0, 0, time.UTC)) {
 		t.Fatalf("dry-run stats %+v err %v", dry, err)
+	}
+}
+
+// A local day starts at local midnight: 16:30Z and 17:30Z on the same UTC day
+// are 23:30 and 00:30 local at UTC+7, on different local days.
+func TestKPIStatsLocalDay(t *testing.T) {
+	ctx := context.Background()
+	st, err := Open(ctx, filepath.Join(t.TempDir(), "kpi.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	if _, err := st.db.ExecContext(ctx, `INSERT INTO ledger_phases(agent_id,day,phase,cost_usd) VALUES ('a','2026-01-07','agent',0.25),('a','2026-01-08','agent',0.5)`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := st.db.ExecContext(ctx, `INSERT INTO wakes(agent_id,started_at,ended_at,kind) VALUES
+ ('a','2026-01-07T16:30:00Z','2026-01-07T16:31:00Z','agent'),('a','2026-01-07T17:30:00Z','2026-01-07T17:31:00Z','agent')`); err != nil {
+		t.Fatal(err)
+	}
+	vn := time.FixedZone("UTC+7", 7*3600)
+	now := time.Date(2026, 1, 7, 18, 0, 0, 0, time.UTC)
+	got, err := st.KPIStats(ctx, "a", false, now, time.Date(2026, 1, 8, 0, 0, 0, 0, vn))
+	if err != nil || got.SpendToday != 0.5 || got.WakesToday != 1 || got.Spend7d != 0.75 {
+		t.Fatalf("local day 8 Jan: %+v err %v", got, err)
 	}
 }
 

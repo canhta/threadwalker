@@ -31,7 +31,7 @@ The whole schema is [`internal/store/schema.sql`](../internal/store/schema.sql);
 | `embeddings` | One float32 vector per embedded note or action, keyed by source, row id and text hash; deleted with its row or when text changes; holds no text | Embedder |
 | `knowledge_candidates` | Study techniques, always `practitioner`, never part of the curated file | `knowledge_candidate` |
 | `contacts` | Username, `reply_count_7d`, `do_not_contact`, `reason`. Rate limiting only; no description of the person | Guard |
-| `ledger_phases` | The only spend record: per agent, UTC day and phase (`agent`, `study`, `dream`, `critic`), token and USD totals. A daily total is a SUM over phases | LLM client |
+| `ledger_phases` | The only spend record: per agent, local day (date in `schedule.timezone`) and phase (`agent`, `study`, `dream`, `critic`), token and USD totals. A daily total is a SUM over phases | LLM client |
 | `trend_stories` | Ranked external stories per phase (`agent`, `study`) | Trends |
 | `threads_observations` | Bounded public Threads sampling for deterministic trend analysis | Study |
 | `refused_tools` | Read tools that returned `limited_access`, hidden for 24 hours | Dispatcher |

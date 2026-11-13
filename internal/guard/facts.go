@@ -26,7 +26,7 @@ const factMetricSamples = 20
 func FactSheet(ctx context.Context, st *store.Store, t config.Template, now time.Time) ([]Fact, error) {
 	u := now.UTC()
 	dayStart := time.Date(u.Year(), u.Month(), u.Day(), 0, 0, 0, 0, time.UTC)
-	spent, err := st.LLMUsageForDayPhases(ctx, t.ID, dayStart.Format("2006-01-02"), "agent", "study")
+	spent, err := st.LLMUsageForDayPhases(ctx, t.ID, t.Limits.SpendDay(now), "agent", "study")
 	if err != nil {
 		return nil, fmt.Errorf("building fact sheet: %w", err)
 	}

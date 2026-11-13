@@ -71,7 +71,7 @@ func TestOwnerSummaryFailuresAndSilence(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	sum, err := st.OwnerSummary(ctx, "a", false, day, day.Add(24*time.Hour))
+	sum, err := st.OwnerSummary(ctx, "a", false, day, day.Add(24*time.Hour), day.Format(time.DateOnly))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -101,7 +101,7 @@ func TestOwnerSummaryTopPostAndFollowers(t *testing.T) {
 		t.Fatal(err)
 	}
 	day := time.Date(2026, 11, 2, 0, 0, 0, 0, time.UTC)
-	sum, err := st.OwnerSummary(ctx, "a", false, day, day.Add(24*time.Hour))
+	sum, err := st.OwnerSummary(ctx, "a", false, day, day.Add(24*time.Hour), day.Format(time.DateOnly))
 	if err != nil || sum.Top.ActionID != 0 || sum.Followers != nil || sum.FollowersBefore != nil {
 		t.Fatalf("empty: %+v %v", sum, err)
 	}
@@ -129,7 +129,7 @@ func TestOwnerSummaryTopPostAndFollowers(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	sum, err = st.OwnerSummary(ctx, "a", false, day, day.Add(24*time.Hour))
+	sum, err = st.OwnerSummary(ctx, "a", false, day, day.Add(24*time.Hour), day.Format(time.DateOnly))
 	if err != nil {
 		t.Fatal(err)
 	}

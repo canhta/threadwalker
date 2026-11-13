@@ -262,14 +262,15 @@ func RunIsolationSoak(ctx context.Context, dbPath string, hours int, logger *slo
 			if err != nil {
 				return e, err
 			}
-			usage, err := st.LLMUsageForDay(ctx, t.ID, now.Format("2006-01-02"))
+			_, dayEnd, day := t.Limits.SpendDayBounds(now)
+			usage, err := st.LLMUsageForDay(ctx, t.ID, day)
 			if err != nil {
 				return e, err
 			}
-			if agentUsage, err := st.LLMUsageForDayPhases(ctx, t.ID, now.Format(time.DateOnly), "agent", "study"); err != nil {
+			if agentUsage, err := st.LLMUsageForDayPhases(ctx, t.ID, day, "agent", "study"); err != nil {
 				return e, err
 			} else if state.Status == "running" && agentUsage.CostUSD >= t.Limits.MaxUSDPerDay {
-				if state.NextWake.Before(nextUTCDay(now)) {
+				if state.NextWake.Before(dayEnd) {
 					e.BudgetIsolated = false
 				}
 				e.Agents[idx(templates, t.ID)].BudgetDeferrals++

@@ -41,6 +41,15 @@ type Agent struct {
 	DailyBudgetUSD float64
 	Timezone       string
 	Location       *time.Location
+	// SpendDay maps an instant to its ledger day key; nil is the UTC date.
+	SpendDay func(time.Time) string
+}
+
+func (a Agent) spendDay(now time.Time) string {
+	if a.SpendDay != nil {
+		return a.SpendDay(now)
+	}
+	return now.UTC().Format("2006-01-02")
 }
 
 // Source reads the stored facts one page needs. The store implements it.

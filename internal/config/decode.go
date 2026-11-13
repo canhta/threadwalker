@@ -285,6 +285,7 @@ func (d *decoder) clock(field, raw string) string {
 
 func (d *decoder) schedule(t *Template) {
 	t.Schedule.Timezone = d.timezone("schedule.timezone", "Asia/Ho_Chi_Minh")
+	t.Limits.Timezone = t.Schedule.Timezone
 	if d.has("schedule.dream_at") {
 		t.Schedule.DreamAt = d.clock("schedule.dream_at", d.doc.scalars["schedule.dream_at"])
 	}

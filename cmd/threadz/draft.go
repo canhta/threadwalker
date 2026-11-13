@@ -137,7 +137,7 @@ func ctlDraft(ctx context.Context, getenv func(string) string, args []string, st
 			}
 		}
 	})
-	if usage, uerr := st.LLMUsageForDay(ctx, tmpl.ID, now.UTC().Format(time.DateOnly)); uerr == nil && !*f.json {
+	if usage, uerr := st.LLMUsageForDay(ctx, tmpl.ID, tmpl.Limits.SpendDay(now)); uerr == nil && !*f.json {
 		fmt.Fprintf(stdout, "spend: $%.4f, %d tokens in, %d out\n", usage.CostUSD, usage.TokensIn, usage.TokensOut)
 	}
 	if failed {

@@ -48,7 +48,7 @@ Top post: 1234 views, 56 engagements
 https://www.threads.com/@a/post/x
 Followers: 1034 (+12)
 Playbook changes: 1
-Spend since 07:00 UTC+07: $0.42 of $0.50 (84%); wake $0.30, study $0.10, dream $0.02
+Spend today (resets at 00:00 local): $0.42 of $0.50 (84%); wake $0.30, study $0.10, dream $0.02
 
 Failed runs: 1 (step_limit ×1)
 Blocked actions: blocked_phrase ×3, quota ×1`
@@ -70,7 +70,7 @@ Blocked actions: blocked_phrase ×3, quota ×1`
 func TestStatusText(t *testing.T) {
 	s := copyService(config.Template{ID: "one", Limits: config.LimitsConfig{PostsPerDay: 3}})
 	got := s.statusText("one", store.OwnerSummary{Status: "running", Posts: 1, CostUSD: 0.1})
-	want := "Status\nState: Running\nNext run: none scheduled\nPosts today: 1 of 3\nReplies today: 0\nSpend today: $0.10"
+	want := "Status\nState: Running\nNext run: none scheduled\nPosts today: 1 of 3\nReplies today: 0\nSpend today (resets at 00:00 local): $0.10"
 	if got != want {
 		t.Fatalf("status:\n%s", got)
 	}
@@ -106,11 +106,11 @@ func TestCommandMenuAndHelpShareOneTable(t *testing.T) {
 
 func TestNoticeKindsHaveCopy(t *testing.T) {
 	for _, kind := range []string{"daily_limit", "budget_80", "budget_100", "logged_out", "logged_in", "captcha", "killed"} {
-		if noticeText(kind, "07:00 UTC+07") == "" {
+		if noticeText(kind, "07:00 UTC+07", "00:00 UTC+07") == "" {
 			t.Fatalf("no copy for %s", kind)
 		}
 	}
-	if noticeText("other", "07:00 UTC+07") != "" {
+	if noticeText("other", "07:00 UTC+07", "00:00 UTC+07") != "" {
 		t.Fatal("unknown notice kind has copy")
 	}
 }

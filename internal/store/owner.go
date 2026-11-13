@@ -388,7 +388,9 @@ func (s *Store) ResumePausedAgent(ctx context.Context, id string) error {
 	return nil
 }
 
-func (s *Store) OwnerSummary(ctx context.Context, id string, dryRun bool, from, to time.Time) (OwnerSummary, error) {
+// OwnerSummary counts actions and metrics in [from, to) and reads spend from the
+// ledger's spendDay key.
+func (s *Store) OwnerSummary(ctx context.Context, id string, dryRun bool, from, to time.Time, spendDay string) (OwnerSummary, error) {
 	var out OwnerSummary
 	state, err := s.AgentState(ctx, id)
 	if err != nil {
@@ -396,12 +398,12 @@ func (s *Store) OwnerSummary(ctx context.Context, id string, dryRun bool, from, 
 	}
 	out.Status = state.Status
 	out.NextWake = state.NextWake
-	usage, err := s.LLMUsageForDay(ctx, id, from.UTC().Format("2006-01-02"))
+	usage, err := s.LLMUsageForDay(ctx, id, spendDay)
 	if err != nil {
 		return out, err
 	}
 	out.CostUSD = usage.CostUSD
-	phases, err := s.LLMUsageByPhaseForDay(ctx, id, from.UTC().Format("2006-01-02"))
+	phases, err := s.LLMUsageByPhaseForDay(ctx, id, spendDay)
 	if err != nil {
 		return out, err
 	}

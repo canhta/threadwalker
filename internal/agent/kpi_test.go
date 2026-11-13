@@ -24,6 +24,17 @@ func kpiRuntime(t *testing.T, publishedAgo time.Duration, engagements int) (*age
 
 func kpiRuntimeSpaced(t *testing.T, publishedAgo time.Duration, engagements, minMinutesBetweenPosts int) (*agent.Runtime, *store.Store, *agent.OfflineFixture) {
 	t.Helper()
+	return kpiRuntimeFull(t, "", publishedAgo, engagements, minMinutesBetweenPosts)
+}
+
+// kpiRuntimeIn is kpiRuntime with the spend day counted in zone (empty is UTC).
+func kpiRuntimeIn(t *testing.T, zone string, publishedAgo time.Duration, engagements int) (*agent.Runtime, *store.Store, *agent.OfflineFixture) {
+	t.Helper()
+	return kpiRuntimeFull(t, zone, publishedAgo, engagements, 0)
+}
+
+func kpiRuntimeFull(t *testing.T, zone string, publishedAgo time.Duration, engagements, minMinutesBetweenPosts int) (*agent.Runtime, *store.Store, *agent.OfflineFixture) {
+	t.Helper()
 	ctx := context.Background()
 	st, err := store.Open(ctx, filepath.Join(t.TempDir(), "kpi.db"))
 	if err != nil {
@@ -32,6 +43,7 @@ func kpiRuntimeSpaced(t *testing.T, publishedAgo time.Duration, engagements, min
 	t.Cleanup(func() { st.Close() })
 	tmpl := agent.OfflineTemplate()
 	tmpl.Limits.MinMinutesBetweenPosts = minMinutesBetweenPosts
+	tmpl.Limits.Timezone = zone
 	tmpl.KPI = config.KPIConfig{EngagementsPerDay: 10, FollowersPerWeek: 5, MaxHoursWithoutPublish: 8, OnTargetMinutes: 180}
 	if err = st.EnsureAgent(ctx, tmpl.ID); err != nil {
 		t.Fatal(err)
@@ -197,7 +209,7 @@ func TestNextWakeComesFromTheGap(t *testing.T) {
 	}
 }
 
-func TestCappedDayWaitsForTheNextUTCDay(t *testing.T) {
+func TestCappedDayWaitsForTheNextUTCDayWithoutAZone(t *testing.T) {
 	tomorrow := time.Date(2026, 1, 2, 0, 0, 0, 0, time.UTC)
 	for _, tc := range []struct {
 		name  string
@@ -226,6 +238,50 @@ func TestCappedDayWaitsForTheNextUTCDay(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			r, st, fixture := kpiRuntime(t, 9*time.Hour, 3) // one seeded post at 03:00 counts toward posts_per_day 3
+			fixture.Calls = []llm.ToolCall{agent.SyntheticCall("read_feed", `{}`)}
+			tc.setup(t, st)
+			if _, err := r.Wake(context.Background()); err != nil {
+				t.Fatal(err)
+			}
+			state, err := st.AgentState(context.Background(), "synthetic-offline")
+			if err != nil || !state.NextWake.Equal(tc.want) {
+				t.Fatalf("next wake %v, want %v (err %v)", state.NextWake, tc.want, err)
+			}
+		})
+	}
+}
+
+// Spend resets at the next local midnight (17:00Z at UTC+7), the post and
+// reply caps at the next UTC midnight; a day capped by both waits for the later.
+func TestCappedSpendWaitsForLocalMidnight(t *testing.T) {
+	localMidnight := time.Date(2026, 1, 1, 17, 0, 0, 0, time.UTC)
+	utcMidnight := time.Date(2026, 1, 2, 0, 0, 0, 0, time.UTC)
+	spend := func(day string) func(t *testing.T, st *store.Store) {
+		return func(t *testing.T, st *store.Store) {
+			if _, err := st.DB().Exec(`INSERT INTO ledger_phases(agent_id,day,phase,cost_usd) VALUES('synthetic-offline',?,'study',0.9)`, day); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	for _, tc := range []struct {
+		name  string
+		setup func(t *testing.T, st *store.Store)
+		want  time.Time
+	}{
+		{"spend", spend("2026-01-01"), localMidnight},
+		{"spend of the previous local day does not cap", spend("2025-12-31"), kpiNow.Add(20 * time.Minute)},
+		{"spend and action caps", func(t *testing.T, st *store.Store) {
+			spend("2026-01-01")(t, st)
+			for i := 0; i < 15; i++ {
+				seedToday(t, st, "reply", i)
+			}
+			for i := 0; i < 2; i++ {
+				seedToday(t, st, "post", 100+i)
+			}
+		}, utcMidnight},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			r, st, fixture := kpiRuntimeIn(t, "Asia/Ho_Chi_Minh", 9*time.Hour, 3)
 			fixture.Calls = []llm.ToolCall{agent.SyntheticCall("read_feed", `{}`)}
 			tc.setup(t, st)
 			if _, err := r.Wake(context.Background()); err != nil {

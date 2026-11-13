@@ -61,7 +61,7 @@ func runDashboard(ctx context.Context, args []string, getenv func(string) string
 		if tz == "" {
 			tz = t.Schedule.Timezone
 		}
-		selected = append(selected, dashboard.Agent{ID: t.ID, Username: t.Threads.Username, DryRun: t.DryRun, DailyBudgetUSD: t.Limits.MaxUSDPerDay, Timezone: tz})
+		selected = append(selected, dashboard.Agent{ID: t.ID, Username: t.Threads.Username, DryRun: t.DryRun, DailyBudgetUSD: t.Limits.MaxUSDPerDay, Timezone: tz, SpendDay: t.Limits.SpendDay})
 	}
 	var token string
 	if *content {
