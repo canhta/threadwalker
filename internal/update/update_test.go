@@ -153,7 +153,7 @@ func TestRun(t *testing.T) {
 		if prev, _ := os.ReadFile(f.u.Binary + ".prev"); string(prev) != "old" {
 			t.Fatalf(".prev = %q", prev)
 		}
-		if len(f.notes) != 1 || f.notes[0] != "updated v0.2.3→v0.2.4" {
+		if len(f.notes) != 1 || f.notes[0] != "Updated from v0.2.3 to v0.2.4." {
 			t.Fatalf("notes = %v", f.notes)
 		}
 	})
@@ -214,7 +214,7 @@ func TestRun(t *testing.T) {
 		if f.binary() != "old" || f.restarts != 2 {
 			t.Fatalf("binary %q restarts %d", f.binary(), f.restarts)
 		}
-		if len(f.notes) != 1 || f.notes[0] != "update to v0.2.4 failed, rolled back" {
+		if len(f.notes) != 1 || f.notes[0] != "Update to v0.2.4 failed and was rolled back." {
 			t.Fatalf("notes = %v", f.notes)
 		}
 	})

@@ -170,11 +170,11 @@ func (u *Updater) Run(ctx context.Context, o Options) (string, error) {
 			return "", u.fail(StepRollback, "rollback_restart_failed", rsErr)
 		}
 		u.event(StepRollback, OutcomeOK, "rolled_back")
-		u.notify(ctx, fmt.Sprintf("update to %s failed, rolled back", rel.Tag))
+		u.notify(ctx, fmt.Sprintf("Update to %s failed and was rolled back.", rel.Tag))
 		return "", ErrRolledBack
 	}
 	u.event(StepHealth, OutcomeOK, "healthy")
-	u.notify(ctx, fmt.Sprintf("updated v%s→%s", strings.TrimPrefix(u.Current, "v"), rel.Tag))
+	u.notify(ctx, fmt.Sprintf("Updated from v%s to %s.", strings.TrimPrefix(u.Current, "v"), rel.Tag))
 	return rel.Tag, nil
 }
 

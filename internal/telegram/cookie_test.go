@@ -96,7 +96,7 @@ func TestCookieCommandImportsDeletesAndAnswersOnce(t *testing.T) {
 	if len(r.gotRaw) != 1 || r.gotRaw[0] != "sessionid="+syntheticSession+"; ds_user_id=1" {
 		t.Fatalf("import got %q", r.gotRaw)
 	}
-	if state.Status != "running" || len(r.bot.texts) != 1 || !strings.Contains(r.bot.texts[0], "logged back in") {
+	if state.Status != "running" || len(r.bot.texts) != 1 || !strings.Contains(r.bot.texts[0], "signed in again. The agent has resumed.") {
 		t.Fatalf("state %s texts %q", state.Status, r.bot.texts)
 	}
 	r.nothingKept(t)
@@ -120,7 +120,7 @@ func TestCookieExportWithoutThePrefixIsStillACookieImport(t *testing.T) {
 }
 
 func TestFailedCookieImportIsDeletedAndAnsweredOnce(t *testing.T) {
-	for status, want := range map[string]string{"missing_sessionid": "missing sessionid", "logged_out": "still shows logged out", "busy": "using the browser"} {
+	for status, want := range map[string]string{"missing_sessionid": "missing sessionid", "logged_out": "still shows the session as logged out", "busy": "using the browser"} {
 		r := newCookieRig(t, nil, "/cookie sessionid="+syntheticSession)
 		r.status = status
 		r.run(t)
@@ -201,7 +201,7 @@ func TestBrowserRestoredResumesAndTellsOnce(t *testing.T) {
 		t.Fatal(err)
 	}
 	state, err := st.AgentState(ctx, "one")
-	if err != nil || state.Status != "running" || len(bot.texts) != 1 || !strings.Contains(bot.texts[0], "đăng nhập lại xong") {
+	if err != nil || state.Status != "running" || len(bot.texts) != 1 || !strings.Contains(bot.texts[0], "signed in again") {
 		t.Fatalf("state %+v texts %q", state, bot.texts)
 	}
 }

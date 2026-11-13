@@ -90,7 +90,7 @@ func TestServiceTransientPollFailureRetriesWithoutLosingUpdates(t *testing.T) {
 	waits := 0
 	svc, err := telegram.NewService(telegram.ServiceOptions{
 		Store: st, Bot: bot, BotKey: "fake", OwnerChatID: 77,
-		Templates: []config.Template{{ID: "one", Telegram: config.TelegramConfig{DigestHour: 23}}},
+		Templates: []config.Template{{ID: "one", Telegram: config.TelegramConfig{ReportHour: 23}}},
 		Now:       func() time.Time { return now },
 		Logger:    logger,
 		Wait: func(context.Context, time.Duration) error {
@@ -211,8 +211,8 @@ func TestNoticesAndDigestOncePerEventWithContent(t *testing.T) {
 	st.EnsureAgent(ctx, "one")
 	now := time.Date(2026, 1, 1, 18, 0, 0, 0, time.UTC)
 	bot := &fakeBot{}
-	tmpl := config.Template{ID: "one", Telegram: config.TelegramConfig{DigestHour: 18}, Limits: config.LimitsConfig{PostsPerDay: 1, RepliesPerDay: 1, MaxUSDPerDay: 1}}
-	tmpl.Persona.Language = "vi"
+	// 18:00 UTC is 01:00 the next day in the default owner zone, past report hour 0.
+	tmpl := config.Template{ID: "one", Telegram: config.TelegramConfig{ReportHour: 0}, Limits: config.LimitsConfig{PostsPerDay: 1, RepliesPerDay: 1, MaxUSDPerDay: 1}}
 	makeService := func() *telegram.Service {
 		svc, err := telegram.NewService(telegram.ServiceOptions{Store: st, Bot: bot, BotKey: "fake", OwnerChatID: 77, Templates: []config.Template{tmpl}, Now: func() time.Time { return now }})
 		if err != nil {
@@ -245,9 +245,9 @@ func TestNoticesAndDigestOncePerEventWithContent(t *testing.T) {
 	}
 	found := false
 	for _, text := range bot.texts {
-		if strings.Contains(text, "hôm nay đăng 1/1 bài") {
+		if strings.HasPrefix(text, "Daily report, 2 Jan 2026\n") {
 			found = true
-			for _, part := range []string{"reply 0/1", "xài $1.00 trên $1.00", "số liệu mới nhất: 10 view, 2 like, 3 reply, 4 repost", "playbook vừa sửa 1 chỗ"} {
+			for _, part := range []string{"Posts: 1 of 1", "Replies: 0 of 1", "Spend: $1.00 of $1.00 (100%)", "Metrics (1 measured today): 10 views, 2 likes, 3 replies, 4 reposts", "Playbook changes: 1"} {
 				if !strings.Contains(text, part) {
 					t.Fatalf("digest missing %s: %s", part, text)
 				}
@@ -400,7 +400,7 @@ func TestServiceConfigurationAndInvalidMessages(t *testing.T) {
 	bot := &fakeBot{}
 	valid := telegram.ServiceOptions{Store: st, Bot: bot, BotKey: "fake", OwnerChatID: 77, Templates: []config.Template{{ID: "one"}}}
 	for _, change := range []func(*telegram.ServiceOptions){func(o *telegram.ServiceOptions) { o.Store = nil }, func(o *telegram.ServiceOptions) { o.Bot = nil }, func(o *telegram.ServiceOptions) { o.BotKey = "" }, func(o *telegram.ServiceOptions) { o.OwnerChatID = 0 }, func(o *telegram.ServiceOptions) { o.Templates = nil }, func(o *telegram.ServiceOptions) { o.Templates = []config.Template{{ID: ""}} }, func(o *telegram.ServiceOptions) { o.Templates = []config.Template{{ID: "one"}, {ID: "one"}} }, func(o *telegram.ServiceOptions) {
-		o.Templates = []config.Template{{ID: "one", Telegram: config.TelegramConfig{DigestHour: 24}}}
+		o.Templates = []config.Template{{ID: "one", Telegram: config.TelegramConfig{ReportHour: 24}}}
 	}} {
 		o := valid
 		change(&o)
@@ -579,7 +579,7 @@ func (b *menuBot) SetMyCommands(_ context.Context, commands []telegram.BotComman
 	return b.err
 }
 
-func TestOwnerDigestFollowsPersonaAndLanguage(t *testing.T) {
+func TestDailyReportOncePerLocalDayNamesEachAgent(t *testing.T) {
 	ctx := context.Background()
 	st, err := store.Open(ctx, ":memory:")
 	if err != nil {
@@ -591,28 +591,73 @@ func TestOwnerDigestFollowsPersonaAndLanguage(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	now := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
-	one := config.Template{ID: "one", Persona: config.PersonaConfig{Name: "Kaito", Language: "vi"}, Telegram: config.TelegramConfig{DigestHour: 0, Messages: map[string]string{"digest": "tao là {{.Name}}, đăng {{.Posts}} bài"}}, Limits: config.LimitsConfig{PostsPerDay: 3}}
-	two := config.Template{ID: "two", Persona: config.PersonaConfig{Name: "Professor", Language: "en"}, Telegram: config.TelegramConfig{DigestHour: 0}}
+	// 06:00 local in UTC+7 is 23:00 UTC the day before: the report is due by
+	// the local clock and keyed by the local date, so it is sent once.
+	now := time.Date(2025, 12, 31, 22, 0, 0, 0, time.UTC)
+	one := config.Template{ID: "one", Persona: config.PersonaConfig{Name: "Kaito", Language: "vi"}, Telegram: config.TelegramConfig{ReportHour: 6, Timezone: "Asia/Ho_Chi_Minh"}, Limits: config.LimitsConfig{PostsPerDay: 3}}
+	two := config.Template{ID: "two", Persona: config.PersonaConfig{Name: "Professor"}, Telegram: config.TelegramConfig{ReportHour: 23, Timezone: "UTC"}}
 	bot := &fakeBot{}
 	svc, err := telegram.NewService(telegram.ServiceOptions{Store: st, Bot: bot, BotKey: "fake", OwnerChatID: 77, Templates: []config.Template{one, two}, Now: func() time.Time { return now }})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err = svc.Tick(ctx); err != nil {
+	tick := func() {
+		t.Helper()
+		if err = svc.Tick(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if err = svc.Flush(ctx); err != nil {
+			t.Fatal(err)
+		}
+	}
+	tick()
+	if len(bot.texts) != 0 {
+		t.Fatalf("report before 06:00 local: %v", bot.texts)
+	}
+	now = now.Add(time.Hour)
+	tick()
+	if len(bot.texts) != 2 || !strings.HasPrefix(bot.texts[0], "Kaito · Daily report, 1 Jan 2026\n") || !strings.Contains(bot.texts[0], "Posts: 0 of 3") || !strings.HasPrefix(bot.texts[1], "Professor · Daily report, 31 Dec 2025\n") {
+		t.Fatalf("reports %q", bot.texts)
+	}
+	now = now.Add(2 * time.Hour)
+	tick()
+	if len(bot.texts) != 2 {
+		t.Fatalf("report repeated after UTC midnight: %v", bot.texts)
+	}
+}
+
+func TestReportCommandAnswersEachRequest(t *testing.T) {
+	ctx := context.Background()
+	st, err := store.Open(ctx, ":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	if err = st.EnsureAgent(ctx, "one"); err != nil {
+		t.Fatal(err)
+	}
+	bot := &fakeBot{updates: []telegram.Update{
+		{UpdateID: 1, Message: &telegram.Message{Chat: telegram.Chat{ID: 77}, Text: "/report"}},
+		{UpdateID: 2, Message: &telegram.Message{Chat: telegram.Chat{ID: 77}, Text: "/report one"}},
+		{UpdateID: 3, Message: &telegram.Message{Chat: telegram.Chat{ID: 77}, Text: "/report one extra"}},
+	}}
+	now := time.Date(2026, 1, 1, 3, 0, 0, 0, time.UTC)
+	tmpl := config.Template{ID: "one", Telegram: config.TelegramConfig{ReportHour: 21}}
+	svc, err := telegram.NewService(telegram.ServiceOptions{Store: st, Bot: bot, BotKey: "fake", OwnerChatID: 77, Templates: []config.Template{tmpl}, Now: func() time.Time { return now }})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = svc.Poll(ctx, 0); err != nil {
 		t.Fatal(err)
 	}
 	if err = svc.Flush(ctx); err != nil {
 		t.Fatal(err)
 	}
-	if len(bot.texts) != 2 {
-		t.Fatalf("digests %v", bot.texts)
+	if len(bot.texts) != 2 || bot.texts[0] != bot.texts[1] || !strings.HasPrefix(bot.texts[0], "Daily report, 1 Jan 2026\nPeriod: 1 Jan 07:00 to 1 Jan 10:00 UTC+07") {
+		t.Fatalf("report replies %q", bot.texts)
 	}
-	if bot.texts[0] != "Kaito: tao là Kaito, đăng 0 bài" {
-		t.Fatalf("persona override missing: %q", bot.texts[0])
-	}
-	if !strings.HasPrefix(bot.texts[1], "Professor: today:") {
-		t.Fatalf("second persona not applied: %q", bot.texts[1])
+	if state, err := st.AgentState(ctx, "one"); err != nil || state.Status != "running" {
+		t.Fatalf("/report changed state: %+v %v", state, err)
 	}
 }
 
@@ -656,10 +701,10 @@ func TestHelpAndFreeTextNotes(t *testing.T) {
 	if !strings.Contains(bot.texts[0], "/status") || !strings.Contains(bot.texts[0], "/dnc <username>") {
 		t.Fatalf("help missing commands: %q", bot.texts[0])
 	}
-	if !strings.Contains(bot.texts[1], "ghi lại") {
+	if bot.texts[1] != "Note saved\nThe agent reads it on its next run." {
 		t.Fatalf("note acknowledgement missing: %q", bot.texts[1])
 	}
-	if bot.texts[0] != bot.texts[2] {
+	if !strings.HasPrefix(bot.texts[2], "Threadz owner console\n") || !strings.HasSuffix(bot.texts[2], bot.texts[0]) {
 		t.Fatalf("/start differs from /help: %q vs %q", bot.texts[0], bot.texts[2])
 	}
 }
@@ -679,8 +724,8 @@ func TestStatusUsesOwnerTimezoneAndRelativeTime(t *testing.T) {
 	}
 	now := time.Date(2026, 1, 1, 7, 15, 0, 0, time.UTC)
 	for i, tc := range []struct{ name, zone, want string }{
-		{"default owner zone", "", "14:33 (còn 18 phút)"},
-		{"configured zone", "UTC", "07:33 (còn 18 phút)"},
+		{"default owner zone", "", "Next run: 14:33 (in 18 min)"},
+		{"configured zone", "UTC", "Next run: 07:33 (in 18 min)"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			bot := &fakeBot{}
@@ -699,7 +744,7 @@ func TestStatusUsesOwnerTimezoneAndRelativeTime(t *testing.T) {
 			if len(bot.texts) != 1 || !strings.Contains(bot.texts[0], tc.want) {
 				t.Fatalf("status %v, want %q", bot.texts, tc.want)
 			}
-			if !strings.Contains(bot.texts[0], "$0.00/$0.50") {
+			if !strings.Contains(bot.texts[0], "Spend today: $0.00 of $0.50") {
 				t.Fatalf("status omitted budget: %q", bot.texts[0])
 			}
 		})
@@ -727,7 +772,7 @@ func TestServiceRegistersMenuAtStartAndSurvivesFailure(t *testing.T) {
 			defer st.Close()
 			templates := []config.Template{}
 			for _, id := range tc.ids {
-				templates = append(templates, config.Template{ID: id, Telegram: config.TelegramConfig{DigestHour: 18}})
+				templates = append(templates, config.Template{ID: id, Telegram: config.TelegramConfig{ReportHour: 18}})
 				if err = st.EnsureAgent(ctx, id); err != nil {
 					t.Fatal(err)
 				}
@@ -758,7 +803,7 @@ func TestServiceRegistersMenuAtStartAndSurvivesFailure(t *testing.T) {
 			for _, command := range bot.commands {
 				names = append(names, command.Command)
 			}
-			if strings.Join(names, ",") != "help,status,pause,resume,kill,dnc,restore,cookie,update" {
+			if strings.Join(names, ",") != "status,report,pause,resume,kill,dnc,restore,cookie,update,help,start" {
 				t.Fatalf("menu = %v, want the handled commands", names)
 			}
 			dnc := ""
@@ -767,10 +812,10 @@ func TestServiceRegistersMenuAtStartAndSurvivesFailure(t *testing.T) {
 					dnc = command.Description
 				}
 			}
-			if len(tc.ids) > 1 && !strings.Contains(dnc, "<agent_id>") {
+			if len(tc.ids) > 1 && !strings.Contains(dnc, "agent ID") {
 				t.Fatalf("multi-agent menu omits the agent-id form: %q", dnc)
 			}
-			if len(tc.ids) == 1 && strings.Contains(dnc, "<agent_id>") {
+			if len(tc.ids) == 1 && strings.Contains(dnc, "agent ID") {
 				t.Fatalf("single-agent menu documents an unused agent-id form: %q", dnc)
 			}
 		})

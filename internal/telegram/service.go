@@ -80,8 +80,8 @@ func NewService(opts ServiceOptions) (*Service, error) {
 	scope := sha256.Sum256([]byte(opts.BotKey + "\x00" + strconv.FormatInt(opts.OwnerChatID, 10)))
 	s := &Service{opts: opts, templates: map[string]config.Template{}, locations: map[string]*time.Location{}, deliveryKey: hex.EncodeToString(scope[:])}
 	for _, t := range opts.Templates {
-		if t.ID == "" || s.templates[t.ID].ID != "" || t.Telegram.DigestHour < 0 || t.Telegram.DigestHour > 23 {
-			return nil, errors.New("configuring Telegram service: invalid agent or digest hour")
+		if t.ID == "" || s.templates[t.ID].ID != "" || t.Telegram.ReportHour < 0 || t.Telegram.ReportHour > 23 {
+			return nil, errors.New("configuring Telegram service: invalid agent or report hour")
 		}
 		zone := strings.TrimSpace(t.Telegram.Timezone)
 		if zone == "" {
@@ -206,7 +206,7 @@ func (s *Service) handle(ctx context.Context, u Update) error {
 	// accepted, and arbitrary command text never becomes logging metadata.
 	switch command {
 	case "help", "start":
-		return s.handleHelp(ctx, fields[1:], key)
+		return s.handleHelp(ctx, command, fields[1:], key)
 	case "update":
 		outcome, reason := "success", "update_requested"
 		if err := s.opts.RequestUpdate(); err != nil {
@@ -216,7 +216,7 @@ func (s *Service) handle(ctx context.Context, u Update) error {
 		return nil
 	case "restore":
 		return s.handleRestore(ctx, fields[1:], key)
-	case "pause", "resume", "kill", "dnc", "status":
+	case "pause", "resume", "kill", "dnc", "status", "report":
 	default:
 		s.event(ctx, "", "command", "ignored", "unknown_command", 0)
 		return nil
@@ -259,21 +259,14 @@ func (s *Service) handle(ctx context.Context, u Update) error {
 			return errors.New("processing owner contact control: invalid or unavailable contact")
 		}
 	}
-	text := ""
-	if command == "status" {
-		summary, err := s.summary(ctx, id)
+	text := receiptText(command, username)
+	if command == "status" || command == "report" {
+		summary, dayStart, err := s.summary(ctx, id)
 		if err != nil {
 			return err
 		}
-		text, err = s.summaryText(id, summary, false)
-		if err != nil {
-			return err
-		}
-	} else {
-		var err error
-		text, err = s.receiptText(id, command, username)
-		if err != nil {
-			return err
+		if text = s.statusText(id, summary); command == "report" {
+			text = s.reportText(id, summary, dayStart)
 		}
 	}
 	if err := s.opts.Store.OwnerControl(ctx, id, command, key, text, s.opts.Now()); err != nil {
@@ -291,18 +284,20 @@ func (s *Service) handle(ctx context.Context, u Update) error {
 	return nil
 }
 
-// handleHelp answers /help and /start with the documented command surface. It
-// never changes state, so a repeated delivery only repeats the persisted reply.
-func (s *Service) handleHelp(ctx context.Context, args []string, key string) error {
+// handleHelp answers /help with the command list and /start with a short
+// introduction before it. It never changes state, so a repeated delivery only
+// repeats the persisted reply.
+func (s *Service) handleHelp(ctx context.Context, command string, args []string, key string) error {
 	id := s.ids[0]
 	if len(s.ids) > 1 && len(args) > 0 {
 		if _, ok := s.templates[args[0]]; ok {
 			id = args[0]
 		}
 	}
-	text, err := s.helpText(id)
-	if err != nil {
-		return err
+	multi := len(s.ids) > 1
+	text := helpText(multi)
+	if command == "start" {
+		text = startText(s.templates[id].Persona.Name, s.templates[id].Telegram.ReportHour, s.location(id), s.opts.Now(), multi)
 	}
 	n, err := s.opts.Store.QueueOwner(ctx, id, "command", text, key, s.opts.Now())
 	outcome, reason := "success", "help_queued"
@@ -324,7 +319,7 @@ func (s *Service) handleRestore(ctx context.Context, args []string, key string) 
 			id, args = args[0], args[1:]
 		}
 	}
-	lang, now := messageLanguage(s.templates[id]), s.opts.Now()
+	now := s.opts.Now()
 	reply := func(reason, text string) error {
 		n, err := s.opts.Store.QueueOwner(ctx, id, "command", text, "restore:"+key, now)
 		outcome := "success"
@@ -352,14 +347,14 @@ func (s *Service) handleRestore(ctx context.Context, args []string, key string) 
 		for i, n := len(history)-2, 0; i >= 0 && n < 5; i, n = i-1, n+1 {
 			lines = append(lines, fmt.Sprintf("s%d %s", history[i].Version, snippet(history[i].Text)))
 		}
-		return reply("restore_listed", restoreListText(lang, lines))
+		return reply("restore_listed", restoreListText(lines))
 	}
 	if len(args) != 1 || len(args[0]) < 2 || (args[0][0] != 'm' && args[0][0] != 's') {
-		return reply("restore_invalid", restoreResultText(lang, "invalid"))
+		return reply("restore_invalid", restoreResultText("invalid"))
 	}
 	n, err := strconv.ParseInt(args[0][1:], 10, 64)
 	if err != nil || n < 1 {
-		return reply("restore_invalid", restoreResultText(lang, "invalid"))
+		return reply("restore_invalid", restoreResultText("invalid"))
 	}
 	if args[0][0] == 'm' {
 		err = s.opts.Store.RestoreMemory(ctx, id, n, now)
@@ -367,9 +362,9 @@ func (s *Service) handleRestore(ctx context.Context, args []string, key string) 
 		_, err = s.opts.Store.RevertStrategy(ctx, id, n, now)
 	}
 	if err != nil {
-		return reply("restore_refused", restoreResultText(lang, "failed"))
+		return reply("restore_refused", restoreResultText("failed"))
 	}
-	return reply("restore_done", restoreResultText(lang, "ok"))
+	return reply("restore_done", restoreResultText("ok"))
 }
 
 // handleNote keeps an owner's free text for the next wake without spending a
@@ -382,7 +377,7 @@ func (s *Service) handleNote(ctx context.Context, text, key string) error {
 	}
 	if s.redactor.Contains(text) {
 		s.event(ctx, s.ids[0], "note", "ignored", "credential_refused", 0)
-		_, err := s.opts.Store.QueueOwner(ctx, s.ids[0], "notification", credentialRefused, "note-refused:"+key, s.opts.Now())
+		_, err := s.opts.Store.QueueOwner(ctx, s.ids[0], "command", credentialRefused, "note-refused:"+key, s.opts.Now())
 		return err
 	}
 	if err := s.opts.Store.OwnerNote(ctx, s.ids, key, s.redact(text), s.opts.Now()); err != nil {
@@ -390,11 +385,7 @@ func (s *Service) handleNote(ctx context.Context, text, key string) error {
 		return err
 	}
 	s.event(ctx, s.ids[0], "note", "success", "note_saved", 0)
-	ack, err := s.noteAck(s.ids[0])
-	if err != nil {
-		return err
-	}
-	_, err = s.opts.Store.QueueOwner(ctx, s.ids[0], "notification", ack, "note-ack:"+key, s.opts.Now())
+	_, err := s.opts.Store.QueueOwner(ctx, s.ids[0], "command", noteAckText, "note-ack:"+key, s.opts.Now())
 	return err
 }
 
@@ -415,19 +406,20 @@ func (s *Service) Flush(ctx context.Context) error {
 			continue
 		}
 		text := m.Text
-		if m.Kind == "question" {
-			if hint, hintErr := s.render(m.AgentID, "question_hint", s.ownerData(m.AgentID, store.OwnerSummary{})); hintErr == nil && hint != "" {
-				text += "\n\n" + hint
-			}
+		if title := messageTitle(m.Kind); title != "" {
+			text = title + "\n" + text
 		}
-		// A shared bot names the speaker once; a private one-agent chat reads as
-		// a single teammate and needs no label.
+		if m.Kind == "question" {
+			text += "\n\n" + questionHint
+		}
+		// A shared bot names the agent on the title line; a one-agent chat needs
+		// no label.
 		if len(s.ids) > 1 {
 			speaker := s.templates[m.AgentID].Persona.Name
 			if speaker == "" {
 				speaker = m.AgentID
 			}
-			text = speaker + ": " + text
+			text = speaker + " · " + text
 		}
 		messageID, sendErr := s.opts.Bot.SendMessage(ctx, s.opts.OwnerChatID, text, 0)
 		finalCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
@@ -462,7 +454,7 @@ func (s *Service) notice(ctx context.Context, id, kind, event, extra string) err
 	if event == "" || len(event) > 200 {
 		return errors.New("queueing owner notice: event identity required")
 	}
-	notice := noticeText(messageLanguage(s.templates[id]), kind)
+	notice := noticeText(kind)
 	if notice == "" {
 		return errors.New("queueing owner notice: unknown kind")
 	}
@@ -470,13 +462,7 @@ func (s *Service) notice(ctx context.Context, id, kind, event, extra string) err
 }
 
 func (s *Service) queueNotice(ctx context.Context, id, kind, event, notice string) error {
-	data := s.ownerData(id, store.OwnerSummary{})
-	data.Notice = notice
-	text, err := s.render(id, "notice", data)
-	if err != nil {
-		return err
-	}
-	n, err := s.opts.Store.QueueOwner(ctx, id, "notice", text, "notice:"+kind+":"+event, s.opts.Now())
+	n, err := s.opts.Store.QueueOwner(ctx, id, "notice", notice, "notice:"+kind+":"+event, s.opts.Now())
 	outcome, reason := "queued", kind
 	if err != nil {
 		outcome, reason = "error", "notice_failed"
@@ -497,7 +483,7 @@ func (s *Service) BrowserStopped(ctx context.Context, id, kind, event string) er
 	if err := s.opts.Store.PauseOwnerAgent(ctx, id); err != nil {
 		return err
 	}
-	return s.notice(ctx, id, kind, event, "\n"+CookieHowTo(messageLanguage(s.templates[id])))
+	return s.notice(ctx, id, kind, event, "\n\n"+CookieHowTo())
 }
 
 // BrowserRestored resumes an agent whose profile is logged in again after a
@@ -512,21 +498,27 @@ func (s *Service) BrowserRestored(ctx context.Context, id, event string) error {
 	return s.notice(ctx, id, "logged_in", event, "")
 }
 
-func (s *Service) summary(ctx context.Context, id string) (store.OwnerSummary, error) {
+// summary reads the limits day so far, which starts at 00:00 UTC like the
+// caps and the spend ledger, and returns that start.
+func (s *Service) summary(ctx context.Context, id string) (store.OwnerSummary, time.Time, error) {
 	now := s.opts.Now().UTC()
 	day := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
-	return s.opts.Store.OwnerSummary(ctx, id, s.templates[id].DryRun, day, day.Add(24*time.Hour))
+	summary, err := s.opts.Store.OwnerSummary(ctx, id, s.templates[id].DryRun, day, day.Add(24*time.Hour))
+	return summary, day, err
 }
 
-// Tick observes persisted state, thresholds and UTC digest schedule. A pending
-// outbox item is its durable event marker, so even a failed delivery is not
-// repeated for the same event. Metrics use each action's latest daily sample.
+// Tick observes persisted state, thresholds and the daily report hour. A
+// pending outbox item is its durable event marker, so even a failed delivery
+// is not repeated for the same event. Metrics use each action's latest daily
+// sample. The report is due once per owner-local date from telegram.report_hour
+// in telegram.timezone; hour and date are read in the same zone so a report
+// hour that falls on the previous UTC date is not sent twice.
 func (s *Service) Tick(ctx context.Context) error {
 	now := s.opts.Now().UTC()
 	day := now.Format("2006-01-02")
 	for _, id := range s.ids {
 		tmpl := s.templates[id]
-		summary, err := s.summary(ctx, id)
+		summary, dayStart, err := s.summary(ctx, id)
 		if err != nil {
 			return err
 		}
@@ -553,20 +545,13 @@ func (s *Service) Tick(ctx context.Context) error {
 		if err = s.silentAgent(ctx, id, summary, now); err != nil {
 			return err
 		}
-		if now.Hour() >= tmpl.Telegram.DigestHour {
-			text, renderErr := s.summaryText(id, summary, true)
-			if renderErr != nil {
-				return renderErr
-			}
-			if line := failureLine(messageLanguage(tmpl), summary); line != "" {
-				text += "\n" + line
-			}
-			n, err := s.opts.Store.QueueOwner(ctx, id, "digest", text, "digest:"+day, now)
-			outcome, reason := "queued", "daily_digest"
+		if local := now.In(s.location(id)); local.Hour() >= tmpl.Telegram.ReportHour {
+			n, err := s.opts.Store.QueueOwner(ctx, id, "report", s.reportText(id, summary, dayStart), "report:"+local.Format(time.DateOnly), now)
+			outcome, reason := "queued", "daily_report"
 			if err != nil {
-				outcome, reason = "error", "digest_failed"
+				outcome, reason = "error", "report_failed"
 			}
-			s.event(ctx, id, "digest", outcome, reason, n)
+			s.event(ctx, id, "report", outcome, reason, n)
 			if err != nil {
 				return err
 			}
@@ -588,62 +573,15 @@ func (s *Service) silentAgent(ctx context.Context, id string, summary store.Owne
 	if err != nil || since.IsZero() || now.Sub(since) <= limit {
 		return err
 	}
-	text := silentText(messageLanguage(tmpl), int(now.Sub(since).Hours()), lastReason, summary.Refusals)
+	text := silentText(int(now.Sub(since).Hours()), lastReason, summary.Blocked)
 	return s.queueNotice(ctx, id, "no_publish", now.In(s.location(id)).Format(time.DateOnly), text)
-}
-
-// ownerCommands is the menu the bot advertises. Descriptions stay short; the
-// agent-ID form is named only when one bot serves several agents. Wording is
-// selected from the first agent's persona language.
-func ownerCommands(lang string, multiAgent bool) []BotCommand {
-	vi := strings.HasPrefix(strings.ToLower(lang), "vi")
-	suffix := ""
-	if multiAgent {
-		if vi {
-			suffix = " (kèm agent_id)"
-		} else {
-			suffix = " (with agent_id)"
-		}
-	}
-	if vi {
-		dnc := "né username: /dnc <username>"
-		if multiAgent {
-			dnc = "né username: /dnc <agent_id> <username>"
-		}
-		return []BotCommand{
-			{Command: "help", Description: "xem danh sách lệnh"},
-			{Command: "status", Description: "xem đang làm gì" + suffix},
-			{Command: "pause", Description: "tạm dừng" + suffix},
-			{Command: "resume", Description: "chạy tiếp" + suffix},
-			{Command: "kill", Description: "tắt hẳn, ko bật lại" + suffix},
-			{Command: "dnc", Description: dnc},
-			{Command: "restore", Description: "xem và khôi phục thứ agent đã xóa hoặc sửa"},
-			{Command: "cookie", Description: "đăng nhập lại Threads bằng cookie"},
-			{Command: "update", Description: "kiểm tra bản mới và cập nhật"},
-		}
-	}
-	dnc := "ignore username: /dnc <username>"
-	if multiAgent {
-		dnc = "ignore username: /dnc <agent_id> <username>"
-	}
-	return []BotCommand{
-		{Command: "help", Description: "list commands"},
-		{Command: "status", Description: "what i'm doing" + suffix},
-		{Command: "pause", Description: "pause" + suffix},
-		{Command: "resume", Description: "resume" + suffix},
-		{Command: "kill", Description: "stop for good" + suffix},
-		{Command: "dnc", Description: dnc},
-		{Command: "restore", Description: "list and restore what the agent archived or replaced"},
-		{Command: "cookie", Description: "log in to Threads again with cookies"},
-		{Command: "update", Description: "check for a release and update"},
-	}
 }
 
 // registerCommands replaces the bot menu once per service start. Telegram
 // persists the menu, so a failed registration is logged with a fixed reason and
 // the poller continues; neither owner commands nor wakes depend on it.
 func (s *Service) registerCommands(ctx context.Context) {
-	err := s.opts.Bot.SetMyCommands(ctx, ownerCommands(messageLanguage(s.templates[s.ids[0]]), len(s.ids) > 1))
+	err := s.opts.Bot.SetMyCommands(ctx, ownerCommands(len(s.ids) > 1))
 	outcome, reason := "success", "menu_registered"
 	if err != nil {
 		outcome, reason = "error", "menu_failed"
@@ -735,12 +673,11 @@ func (s *Service) handleCookies(ctx context.Context, m *Message, raw, key string
 	}
 	if id == "" {
 		s.event(ctx, "", "cookie", "ignored", "ambiguous_agent", 0)
-		return reply("", "send /cookie <agent_id> <cookies>")
+		return reply("", "Send /cookie <agent_id> <cookies>.")
 	}
-	lang := messageLanguage(s.templates[id])
 	if s.cookieImport == nil {
 		s.event(ctx, id, "cookie", "ignored", "unavailable", 0)
-		return reply(id, CookieResultText(lang, "failed"))
+		return reply(id, CookieResultText("failed"))
 	}
 	status := s.cookieImport(ctx, id, raw)
 	raw = ""
@@ -753,5 +690,5 @@ func (s *Service) handleCookies(ctx context.Context, m *Message, raw, key string
 		// BrowserRestored resumes the agent and sends the one confirmation.
 		return s.BrowserRestored(ctx, id, key)
 	}
-	return reply(id, CookieResultText(lang, status))
+	return reply(id, CookieResultText(status))
 }

@@ -121,19 +121,18 @@ func TestSectionThreads(t *testing.T) {
 
 func TestSectionTelegram(t *testing.T) {
 	runSection(t, []sectionCase{
-		{name: "digest hour out of range", old: "digest_hour: 18", new: "digest_hour: 24", wantErr: "telegram.digest_hour"},
+		{name: "report hour out of range", old: "report_hour: 21", new: "report_hour: 24", wantErr: "telegram.report_hour"},
 		{name: "enabled not boolean", old: "enabled: false", new: "enabled: maybe", wantErr: "telegram.enabled"},
 		{name: "enabled needs env", old: "enabled: false", new: "enabled: true", check: func(t *testing.T, tmpl config.Template) {
 			if tmpl.Telegram.BotToken.Expose() != "secret-tg-token-value" {
 				t.Fatalf("token not resolved")
 			}
 		}},
-		{name: "bad timezone", old: "digest_hour: 18", new: "timezone: Mars/Base\n  digest_hour: 18", wantErr: "telegram.timezone"},
-		{name: "unknown message", old: "digest_hour: 18", new: "messages:\n    bogus: hi\n  digest_hour: 18", wantErr: "unknown owner message name"},
-		{name: "broken message template", old: "digest_hour: 18", new: "messages:\n    help: \"{{\"\n  digest_hour: 18", wantErr: "invalid message template"},
-		{name: "message override", old: "digest_hour: 18", new: "messages:\n    help: hello\n  digest_hour: 18", check: func(t *testing.T, tmpl config.Template) {
-			if tmpl.Telegram.Messages["help"] != "hello" {
-				t.Fatalf("messages = %v", tmpl.Telegram.Messages)
+		{name: "bad timezone", old: "report_hour: 21", new: "timezone: Mars/Base\n  report_hour: 21", wantErr: "telegram.timezone"},
+		// Unknown keys are ignored.
+		{name: "unknown keys ignored", old: "report_hour: 21", new: "digest_hour: 18\n  messages:\n    help: hello\n  report_hour: 21", check: func(t *testing.T, tmpl config.Template) {
+			if tmpl.Telegram.ReportHour != 21 {
+				t.Fatalf("report hour %d", tmpl.Telegram.ReportHour)
 			}
 		}},
 	})

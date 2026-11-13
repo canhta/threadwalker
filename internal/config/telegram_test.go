@@ -57,7 +57,7 @@ func TestTelegramOptionalAndExplicitlyEnabled(t *testing.T) {
 	}
 }
 
-func TestTelegramDigestHourUTC(t *testing.T) {
+func TestTelegramReportHour(t *testing.T) {
 	raw, err := os.ReadFile("testdata/fixture.agent.yaml")
 	if err != nil {
 		t.Fatal(err)
@@ -67,11 +67,11 @@ func TestTelegramDigestHourUTC(t *testing.T) {
 		hour    string
 		want    int
 		invalid bool
-	}{{"", 18, false}, {"0", 0, false}, {"23", 23, false}, {"24", 0, true}, {"-1", 0, true}, {"noon", 0, true}, {"null", 0, true}} {
+	}{{"", 21, false}, {"0", 0, false}, {"23", 23, false}, {"24", 0, true}, {"-1", 0, true}, {"noon", 0, true}, {"null", 0, true}} {
 		t.Run(tc.hour, func(t *testing.T) {
 			text := base + "\ntelegram:\n  enabled: false\n"
 			if tc.hour != "" {
-				text += "  digest_hour: " + tc.hour + "\n"
+				text += "  report_hour: " + tc.hour + "\n"
 			}
 			path := filepath.Join(t.TempDir(), "agent.yaml")
 			if err = os.WriteFile(path, []byte(text), 0600); err != nil {
@@ -81,14 +81,14 @@ func TestTelegramDigestHourUTC(t *testing.T) {
 			if (err != nil) != tc.invalid {
 				t.Fatalf("hour %q error %v", tc.hour, err)
 			}
-			if err == nil && tmpl.Telegram.DigestHour != tc.want {
-				t.Fatalf("hour %d want %d", tmpl.Telegram.DigestHour, tc.want)
+			if err == nil && tmpl.Telegram.ReportHour != tc.want {
+				t.Fatalf("hour %d want %d", tmpl.Telegram.ReportHour, tc.want)
 			}
 		})
 	}
 }
 
-func TestTelegramOwnerTimezoneAndMessages(t *testing.T) {
+func TestTelegramOwnerTimezone(t *testing.T) {
 	raw, err := os.ReadFile("testdata/fixture.agent.yaml")
 	if err != nil {
 		t.Fatal(err)
@@ -98,14 +98,11 @@ func TestTelegramOwnerTimezoneAndMessages(t *testing.T) {
 		name    string
 		extra   string
 		zone    string
-		digest  string
 		invalid bool
 	}{
 		{name: "defaults", zone: "Asia/Ho_Chi_Minh"},
-		{name: "configured zone and copy", extra: "  timezone: UTC\n  messages:\n    digest: \"tao là {{.Name}}\"\n", zone: "UTC", digest: "tao là {{.Name}}"},
+		{name: "configured zone", extra: "  timezone: UTC\n", zone: "UTC"},
 		{name: "invalid zone", extra: "  timezone: Mars/Base\n", invalid: true},
-		{name: "unknown message", extra: "  messages:\n    nope: \"hi\"\n", invalid: true},
-		{name: "invalid message template", extra: "  messages:\n    digest: \"{{\"\n", invalid: true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			text := base + "\ntelegram:\n  enabled: false\n" + tc.extra
@@ -122,9 +119,6 @@ func TestTelegramOwnerTimezoneAndMessages(t *testing.T) {
 			}
 			if tmpl.Telegram.Timezone != tc.zone {
 				t.Fatalf("zone %q want %q", tmpl.Telegram.Timezone, tc.zone)
-			}
-			if tmpl.Telegram.Messages["digest"] != tc.digest {
-				t.Fatalf("digest copy %q want %q", tmpl.Telegram.Messages["digest"], tc.digest)
 			}
 		})
 	}

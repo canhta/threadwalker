@@ -147,13 +147,13 @@ func runUpdate(ctx context.Context, args []string, getenv func(string) string, s
 	case err != nil:
 		fmt.Fprintln(stderr, err)
 		if requested {
-			notify(ctx, "update failed: "+err.Error())
+			notify(ctx, "Update failed: "+err.Error())
 		}
 		return exitFailure
 	case tag == "":
 		fmt.Fprintln(stdout, "up to date: "+versionText())
 		if requested {
-			notify(ctx, "already up to date: "+versionText())
+			notify(ctx, "Already up to date: "+versionText())
 		}
 	case *check:
 		fmt.Fprintln(stdout, "update available: "+tag)

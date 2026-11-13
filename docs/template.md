@@ -34,7 +34,7 @@ All required unless noted. A phrase in both `guard.blocked_phrases` and `persona
 | Key | Type | Owner | Effect |
 |---|---|---|---|
 | `persona.name` | string | template | Display name; also used in owner-facing copy |
-| `persona.language` | string | template | Language of the account; used in the system prompt and owner copy |
+| `persona.language` | string | template | Language of the account; used in the system prompt. Owner copy on Telegram is always English |
 | `persona.bio_must_include` | string | template | The AI label the live bio must carry (the account states it is an AI experiment) |
 | `persona.identity` | string | template | Who the account is; read by the agent, writer and `ideas` |
 | `persona.voice` | string | template | Starting voice; the agent evolves it through `strategy_write` |
@@ -168,6 +168,5 @@ The sealing key is `THREADZ_SECRET_KEY` ([threads.md](threads.md)).
 |---|---|---|---|---|
 | `telegram.enabled` | bool | false | ops | Enables the owner integration; when false neither owner tool exists |
 | `telegram.bot_token_env`, `telegram.owner_chat_id_env` | string | required when enabled | ops | Environment variable names, resolved only when enabled |
-| `telegram.digest_hour` | int 0..23 | 18 | ops | Daily digest hour, UTC |
-| `telegram.timezone` | IANA name | `Asia/Ho_Chi_Minh` | ops | Zone of displayed times; digest scheduling stays UTC |
-| `telegram.messages.<kind>` | `text/template` string | neutral vi/en copy | template | Overrides owner-facing copy. Kinds: `digest`, `status`, `pause`, `resume`, `kill`, `dnc`, `help`, `note_ack`, `question_hint`, `notice`. Fields are in `internal/telegram/copy.go`; `{{nl}}` is a line break |
+| `telegram.report_hour` | int 0..23 | 21 | ops | Local hour of the daily report, in `telegram.timezone` |
+| `telegram.timezone` | IANA name | `Asia/Ho_Chi_Minh` | ops | Owner's zone for displayed times and the report hour |

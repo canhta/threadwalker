@@ -258,7 +258,7 @@ go run ./cmd/threadz eval --suite internal/eval/testdata/owner.json --seed 7 --r
 These offline scenarios use the real Bot API client against `httptest`, persisted owner commands,
 guarded `ask_owner`/`notify_owner`, wake context and an injected clock. They cover owner-only
 controls, pause, resume and killed state, permanent do-not-contact, questions answered in the next
-wake, per-event notices, the daily digest and failed delivery without replay. They cannot run live.
+wake, per-event notices, the daily report and failed delivery without replay. They cannot run live.
 
 ## Browser component cases
 

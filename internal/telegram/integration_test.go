@@ -31,7 +31,7 @@ func TestFakeBotPauseResumeWakeAndRedactedTrace(t *testing.T) {
 	now := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 	clock := func() time.Time { return now }
 	tmpl := agent.OfflineTemplate()
-	tmpl.Telegram = config.TelegramConfig{DigestHour: 18, BotToken: config.NewSecret("synthetic-private-bot"), OwnerChatID: config.NewSecret("700007")}
+	tmpl.Telegram = config.TelegramConfig{ReportHour: 18, BotToken: config.NewSecret("synthetic-private-bot"), OwnerChatID: config.NewSecret("700007")}
 	var mu sync.Mutex
 	var updates []telegram.Update
 	sent := []string{}

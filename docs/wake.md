@@ -52,7 +52,7 @@ Measured on the VPS dry-run database: 9 wakes of 9 to 15 steps carry 9,883 to 75
 | `dream` | `schedule.dream_at`, once per local day | Reads, memory, notes, playbook, strategy, `memory_supersede` | None to Threads or owner | `limits.max_usd_per_dream` (default 0.30), `limits.max_steps_per_dream` (default 20), excluded from the daily cap |
 | `metrics` | Due metric targets | None (no model call) | Metric samples only | None |
 
-Study and dream wakes use `wakes.kind` and a durable `phase_key`; a partial unique index makes one dream per local day and one run per study slot unrepeatable, restarts included. A dream missed while the process was down runs once on the next start. Study and dream do not move `next_wake_at`. Spend rows carry the phase, so the dashboard and digest show wake, study and dream spend separately. `critic` is a fourth ledger phase for the pre-publish review ([content.md](content.md)).
+Study and dream wakes use `wakes.kind` and a durable `phase_key`; a partial unique index makes one dream per local day and one run per study slot unrepeatable, restarts included. A dream missed while the process was down runs once on the next start. Study and dream do not move `next_wake_at`. Spend rows carry the phase, so the dashboard and the daily report show wake, study and dream spend separately. `critic` is a fourth ledger phase for the pre-publish review ([content.md](content.md)).
 
 Phase keys: `schedule.timezone` (IANA, default `Asia/Ho_Chi_Minh`), `schedule.dream_at`, `schedule.study_slots`. Full list: [template.md](template.md).
 

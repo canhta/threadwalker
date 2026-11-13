@@ -136,9 +136,9 @@ func (a *adminService) Handle(ctx context.Context, req admin.Request) (any, erro
 		}
 		status := a.cookies.Import(ctx, t.ID, req.Cookies)
 		if status != threads.CookiesOK {
-			return nil, errors.New(telegram.CookieResultText("en", status))
+			return nil, errors.New(telegram.CookieResultText(status))
 		}
-		return cookiesOutcome{Agent: t.ID, Message: telegram.CookieResultText("en", status)}, nil
+		return cookiesOutcome{Agent: t.ID, Message: telegram.CookieResultText(status)}, nil
 	case admin.Context:
 		phase := req.Phase
 		if phase == "" {

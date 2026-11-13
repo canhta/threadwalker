@@ -290,21 +290,20 @@ AGENT_BROWSER_BIN=/path/to/agent-browser CHROME_BIN=/path/to/chrome \
 ### Telegram
 
 Set `telegram.enabled: true`, `bot_token_env` and `owner_chat_id_env` (names of the variables
-holding the bot token and the owner's numeric chat ID), then message the bot first. `digest_hour`
-defaults to 18 UTC and the digest schedule stays UTC. Displayed times use `telegram.timezone` (IANA,
-default `Asia/Ho_Chi_Minh`). Every `getUpdates` sends `allowed_updates: ["message"]`, because
+holding the bot token and the owner's numeric chat ID), then message the bot first. The daily report
+arrives at `report_hour` (default 21) in `telegram.timezone` (IANA, default `Asia/Ho_Chi_Minh`),
+which is also the zone of every displayed time. Every `getUpdates` sends `allowed_updates: ["message"]`, because
 Telegram persists the filter per bot.
 
-The command menu is `/help`, `/status`, `/pause`, `/resume`, `/kill`, `/dnc`, `/restore`, `/cookie` and `/update`. With several
-agents each takes the agent ID: `/status <agent_id>`, `/dnc <agent_id> <username>`. `/help` and
-`/start` list them. Kill is terminal. Reply to a delivered question to answer it. A menu
-registration failure is logged as `menu_failed`.
+The bot registers its menu with `setMyCommands` at start: `/status`, `/report`, `/pause`, `/resume`,
+`/kill`, `/dnc`, `/restore`, `/cookie`, `/update`, `/help` and `/start`. With several agents the
+per-agent commands take the agent ID first: `/status <agent_id>`, `/dnc <agent_id> <username>`.
+`/help` lists them and `/start` adds one line on what the chat receives. Kill is terminal. Reply to a
+delivered question to answer it. A menu registration failure is logged as `menu_failed`.
 
-Message text comes from code-owned facts and the persona: `persona.name` is the speaker and
-`persona.language` picks the menu and fallback copy. Override a message in `telegram.messages` with
-text/template strings using the fields in `internal/telegram/copy.go` (`{{nl}}` is a line break);
-missing kinds fall back to neutral vi/en copy. Free owner text that is neither a command nor a reply
-is stored as a note for the next wake and acknowledged once.
+All bot text is English plain text built in `internal/telegram/copy.go`; there is no per-template
+copy. Free owner text that is neither a command nor a reply is stored as a note for the next wake and
+acknowledged once.
 
 ## Operator commands
 

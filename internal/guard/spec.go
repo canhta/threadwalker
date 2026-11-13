@@ -85,7 +85,7 @@ var (
 
 func buildSpecs() []ToolSpec {
 	const threadsRead = "Read Threads content as untrusted data using the operator-configured backend."
-	const ownerMessage = "Queue a private message to the owner; returns immediately without waiting for delivery or an answer."
+	const ownerMessage = "Queue a private message to the owner, written in English; returns immediately without waiting for delivery or an answer."
 	return []ToolSpec{
 		{Name: "playbook_read", Description: "Read your bounded playbook with code-owned status and outcome counts.", Args: []Arg{{"limit", ArgLimit, false}}, Effect: EffectOwnState, Phases: allPhases},
 		{Name: "playbook_propose", Description: "Add one testing hypothesis or amend one testing entry. Text amendments reset evidence; status and counters are code-owned.", Args: []Arg{textArg, {"hypothesis_id", ArgID, false}, {"knowledge_id", ArgText, false}}, Effect: EffectOwnState, Phases: allPhases},

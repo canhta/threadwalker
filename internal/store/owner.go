@@ -17,7 +17,7 @@ type OwnerMessage struct {
 	AnsweredID int64  `json:"answered_id,omitempty"`
 }
 
-// QueueOwner is local-only. Event keys make control replies, notices and digests
+// QueueOwner is local-only. Event keys make control replies, notices and reports
 // idempotent across restarts; ordinary tool messages use a NULL event key.
 func (s *Store) QueueOwner(ctx context.Context, agentID, kind, text, key string, at time.Time) (int64, error) {
 	if text == "" || len(text) > 12000 {
@@ -288,10 +288,25 @@ type OwnerSummary struct {
 	// cap, dreaming has its own cap.
 	WakeCostUSD, StudyCostUSD, DreamCostUSD float64
 	// FailedWakes counts the day's wakes that ended for any reason but
-	// completing; Refusals are the day's most common guard refusals
-	// (tool_calls.blocked_by) and failed wake end reasons, at most three.
+	// completing, FailReasons their most common end reasons (at most three).
+	// Blocked holds the day's most common guard refusals (tool_calls.blocked_by),
+	// at most five.
 	FailedWakes int
-	Refusals    []Refusal
+	FailReasons []Refusal
+	Blocked     []Refusal
+	// Followers is the newest account follower count measured in [from,to) and
+	// FollowersBefore the newest before from; nil when not measured.
+	Followers, FollowersBefore *int64
+	// Top is the post with the most views among the day's metric samples; zero
+	// ActionID when none.
+	Top TopPost
+}
+
+// TopPost identifies a post by its id, permalink and counts, never its text.
+type TopPost struct {
+	ActionID           int64
+	URL                string
+	Views, Engagements int
 }
 
 // Refusal is one reason code and how often it occurred.
@@ -322,28 +337,36 @@ func (s *Store) OwnerSilence(ctx context.Context, id string, dryRun bool) (since
 
 const failedWakeFilter = `end_reason NOT IN ('','completed','already_ran')`
 
-// dayFailures fills FailedWakes and the top three refusal reasons for [from,to).
+// dayFailures fills FailedWakes, their top three end reasons and the top
+// five guard refusals for [from,to).
 func (s *Store) dayFailures(ctx context.Context, id string, from, to time.Time, out *OwnerSummary) error {
 	f, t := formatStoreTimestamp(from), formatStoreTimestamp(to)
 	if err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM wakes WHERE agent_id=? AND `+failedWakeFilter+` AND julianday(started_at)>=julianday(?) AND julianday(started_at)<julianday(?)`, id, f, t).Scan(&out.FailedWakes); err != nil {
 		return fmt.Errorf("counting failed wakes: %w", err)
 	}
-	rows, err := s.db.QueryContext(ctx, `SELECT reason,COUNT(*) n FROM (
-		SELECT blocked_by reason FROM tool_calls WHERE agent_id=?1 AND blocked_by<>'' AND julianday(at)>=julianday(?2) AND julianday(at)<julianday(?3)
-		UNION ALL SELECT end_reason FROM wakes WHERE agent_id=?1 AND `+failedWakeFilter+` AND julianday(started_at)>=julianday(?2) AND julianday(started_at)<julianday(?3))
-		GROUP BY reason ORDER BY n DESC, reason LIMIT 3`, id, f, t)
+	var err error
+	if out.FailReasons, err = s.reasonCounts(ctx, `SELECT end_reason,COUNT(*) n FROM wakes WHERE agent_id=?1 AND `+failedWakeFilter+` AND julianday(started_at)>=julianday(?2) AND julianday(started_at)<julianday(?3) GROUP BY end_reason ORDER BY n DESC,end_reason LIMIT 3`, id, f, t); err != nil {
+		return err
+	}
+	out.Blocked, err = s.reasonCounts(ctx, `SELECT blocked_by,COUNT(*) n FROM tool_calls WHERE agent_id=?1 AND blocked_by<>'' AND julianday(at)>=julianday(?2) AND julianday(at)<julianday(?3) GROUP BY blocked_by ORDER BY n DESC,blocked_by LIMIT 5`, id, f, t)
+	return err
+}
+
+func (s *Store) reasonCounts(ctx context.Context, query string, args ...any) ([]Refusal, error) {
+	rows, err := s.db.QueryContext(ctx, query, args...)
 	if err != nil {
-		return fmt.Errorf("counting refusals: %w", err)
+		return nil, fmt.Errorf("counting reasons: %w", err)
 	}
 	defer rows.Close()
+	var out []Refusal
 	for rows.Next() {
 		var r Refusal
 		if err = rows.Scan(&r.Reason, &r.Count); err != nil {
-			return fmt.Errorf("counting refusals: %w", err)
+			return nil, fmt.Errorf("counting reasons: %w", err)
 		}
-		out.Refusals = append(out.Refusals, r)
+		out = append(out, r)
 	}
-	return rows.Err()
+	return out, rows.Err()
 }
 
 // PauseOwnerAgent is an automatic harness control, independent of the model
@@ -401,7 +424,31 @@ func (s *Store) OwnerSummary(ctx context.Context, id string, dryRun bool, from, 
 	if err != nil {
 		return out, fmt.Errorf("counting owner playbook changes: %w", err)
 	}
+	err = s.db.QueryRowContext(ctx, `SELECT a.id,COALESCE(a.thread_url,''),m.views,m.likes+m.replies+m.reposts+COALESCE(m.quotes,0) FROM metrics m JOIN actions a ON a.id=m.action_id AND a.agent_id=m.agent_id WHERE m.agent_id=? AND a.dry_run=? AND a.kind='post' AND julianday(m.measured_at)>=julianday(?) AND julianday(m.measured_at)<julianday(?) AND m.measured_at=(SELECT MAX(m2.measured_at) FROM metrics m2 WHERE m2.agent_id=m.agent_id AND m2.action_id=m.action_id AND julianday(m2.measured_at)<julianday(?)) ORDER BY m.views DESC,a.id DESC LIMIT 1`, id, dryRun, formatStoreTimestamp(from), formatStoreTimestamp(to), formatStoreTimestamp(to)).Scan(&out.Top.ActionID, &out.Top.URL, &out.Top.Views, &out.Top.Engagements)
+	if err != nil && err != sql.ErrNoRows {
+		return out, fmt.Errorf("reading top post: %w", err)
+	}
+	if out.Followers, err = s.followerCount(ctx, id, from, to); err != nil {
+		return out, err
+	}
+	if out.FollowersBefore, err = s.followerCount(ctx, id, time.Time{}, from); err != nil {
+		return out, err
+	}
 	return out, s.dayFailures(ctx, id, from, to, &out)
+}
+
+// followerCount is the newest account follower count measured in [from,to),
+// nil when none was.
+func (s *Store) followerCount(ctx context.Context, id string, from, to time.Time) (*int64, error) {
+	var n sql.NullInt64
+	err := s.db.QueryRowContext(ctx, `SELECT followers FROM metrics WHERE agent_id=? AND followers IS NOT NULL AND julianday(measured_at)>=julianday(?) AND julianday(measured_at)<julianday(?) ORDER BY julianday(measured_at) DESC LIMIT 1`, id, formatStoreTimestamp(from), formatStoreTimestamp(to)).Scan(&n)
+	if err != nil && err != sql.ErrNoRows {
+		return nil, fmt.Errorf("reading follower count: %w", err)
+	}
+	if !n.Valid {
+		return nil, nil
+	}
+	return &n.Int64, nil
 }
 
 func (s *Store) OwnerEventID(ctx context.Context, id, key string) (int64, error) {

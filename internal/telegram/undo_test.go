@@ -27,7 +27,7 @@ func TestSilentAgentNoticeOncePerDayAndDigestFailureLine(t *testing.T) {
 		INSERT INTO tool_calls(agent_id,wake_id,tool,args_json,blocked_by,at) VALUES('one',1,'post','{}','blocked_phrase','2026-01-02T08:00:30Z')`); err != nil {
 		t.Fatal(err)
 	}
-	tmpl := config.Template{ID: "one", Telegram: config.TelegramConfig{DigestHour: 23}, KPI: config.KPIConfig{EngagementsPerDay: 1, MaxHoursWithoutPublish: 8}}
+	tmpl := config.Template{ID: "one", Telegram: config.TelegramConfig{ReportHour: 23}, KPI: config.KPIConfig{EngagementsPerDay: 1, MaxHoursWithoutPublish: 8}}
 	bot := &fakeBot{}
 	svc, err := telegram.NewService(telegram.ServiceOptions{Store: st, Bot: bot, BotKey: "fake", OwnerChatID: 77, Templates: []config.Template{tmpl}, Now: func() time.Time { return now }})
 	if err != nil {
@@ -41,7 +41,7 @@ func TestSilentAgentNoticeOncePerDayAndDigestFailureLine(t *testing.T) {
 	if err = svc.Flush(ctx); err != nil {
 		t.Fatal(err)
 	}
-	if len(bot.texts) != 1 || bot.texts[0] != "no post or reply for 10 hours; last wake ended step_limit; top refusal reasons today: blocked_phrase ×1, step_limit ×1" {
+	if len(bot.texts) != 1 || bot.texts[0] != "Notice\nNo post or reply for 10 hours.\nLast run ended: step_limit\nBlocked actions today: blocked_phrase ×1" {
 		t.Fatalf("texts=%q", bot.texts)
 	}
 	now = now.Add(24 * time.Hour)
@@ -71,13 +71,13 @@ func TestSilentAgentNoticeOncePerDayAndDigestFailureLine(t *testing.T) {
 		}
 	}
 
-	digestTmpl := config.Template{ID: "one", Telegram: config.TelegramConfig{DigestHour: 0}}
+	digestTmpl := config.Template{ID: "one", Telegram: config.TelegramConfig{ReportHour: 0}}
 	now = time.Date(2026, 1, 2, 12, 0, 0, 0, time.UTC)
 	digest, _ := telegram.NewService(telegram.ServiceOptions{Store: st, Bot: bot, BotKey: "fake", OwnerChatID: 77, Templates: []config.Template{digestTmpl}, Now: func() time.Time { return now }})
 	if err = digest.Tick(ctx); err != nil {
 		t.Fatal(err)
 	}
-	if err = digest.Flush(ctx); err != nil || !strings.Contains(bot.texts[len(bot.texts)-1], "failed wakes: 1 · top refusal reasons: blocked_phrase ×1, step_limit ×1") {
+	if err = digest.Flush(ctx); err != nil || !strings.Contains(bot.texts[len(bot.texts)-1], "Failed runs: 1 (step_limit ×1)\nBlocked actions: blocked_phrase ×1") {
 		t.Fatalf("digest=%q err=%v", bot.texts[len(bot.texts)-1], err)
 	}
 }
@@ -133,20 +133,20 @@ func TestRestoreListsAndRestoresMemoryAndStrategy(t *testing.T) {
 	if got := send(66, 2, "/restore s1"); got != "" {
 		t.Fatalf("stranger answered: %s", got)
 	}
-	if got := send(77, 3, "/restore m1"); got != "restored" {
+	if got := send(77, 3, "/restore m1"); got != "Restored" {
 		t.Fatalf("memory: %s", got)
 	}
 	if mem, err := st.MemoryIndex(ctx, "one"); err != nil || len(mem) != 1 || mem[0].Text != "old fact" {
 		t.Fatalf("memory=%+v err=%v", mem, err)
 	}
-	if got := send(77, 4, "/restore s1"); got != "restored" {
+	if got := send(77, 4, "/restore s1"); got != "Restored" {
 		t.Fatalf("strategy: %s", got)
 	}
 	if h, err := st.StrategyHistory(ctx, "one"); err != nil || len(h) != 4 || h[3].Text != "first" {
 		t.Fatalf("history=%+v err=%v", h, err)
 	}
 	for i, bad := range []string{"/restore x1", "/restore m", "/restore m0", "/restore s9", "/restore m99", "/restore s1 s2"} {
-		if got := send(77, int64(10+i), bad); !strings.HasPrefix(got, "could not") && !strings.HasPrefix(got, "send /restore") {
+		if got := send(77, int64(10+i), bad); !strings.HasPrefix(got, "Could not") && !strings.HasPrefix(got, "Send /restore") {
 			t.Fatalf("%s: %s", bad, got)
 		}
 	}

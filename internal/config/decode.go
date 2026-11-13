@@ -6,7 +6,6 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-	"text/template"
 	"time"
 )
 
@@ -542,41 +541,16 @@ func (d *decoder) threads(t *Template) {
 func (d *decoder) telegram(t *Template) {
 	tg := &t.Telegram
 	tg.Enabled = d.boolean("telegram.enabled")
-	tg.DigestHour = 18
-	if d.has("telegram.digest_hour") {
-		hour, err := strconv.Atoi(d.doc.scalars["telegram.digest_hour"])
+	tg.ReportHour = 21
+	if d.has("telegram.report_hour") {
+		hour, err := strconv.Atoi(d.doc.scalars["telegram.report_hour"])
 		if err != nil || hour < 0 || hour > 23 {
-			d.fail("telegram.digest_hour", "must be an integer within 0..23 UTC")
+			d.fail("telegram.report_hour", "must be an integer within 0..23")
 		} else {
-			tg.DigestHour = hour
+			tg.ReportHour = hour
 		}
 	}
 	tg.Timezone = d.timezone("telegram.timezone", "Asia/Ho_Chi_Minh")
-	tg.Messages = map[string]string{}
-	known := map[string]bool{}
-	for _, name := range TelegramMessageNames {
-		known[name] = true
-	}
-	for key := range d.doc.keys {
-		if !strings.HasPrefix(key, "telegram.messages.") {
-			continue
-		}
-		name := strings.TrimPrefix(key, "telegram.messages.")
-		if strings.Contains(name, ".") || !known[name] {
-			d.fail(key, "unknown owner message name")
-			continue
-		}
-		value := d.doc.scalars[key]
-		if strings.TrimSpace(value) == "" {
-			d.fail(key, "message template must not be empty")
-			continue
-		}
-		if _, err := template.New(name).Funcs(template.FuncMap{"nl": func() string { return "\n" }}).Parse(value); err != nil {
-			d.fail(key, "invalid message template")
-			continue
-		}
-		tg.Messages[name] = value
-	}
 	if tg.Enabled {
 		tg.BotTokenEnv = d.str("telegram.bot_token_env")
 		tg.OwnerChatIDEnv = d.str("telegram.owner_chat_id_env")

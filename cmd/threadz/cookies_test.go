@@ -31,7 +31,7 @@ func TestCtlThreadsCookiesReadsStdinAndSharesTheImporter(t *testing.T) {
 	s.service.cookies = imp
 	s.deps.stdin = strings.NewReader("sessionid=" + cookieSecret + "; ds_user_id=1\n")
 	code, out, errOut := s.ctl("threads", "cookies", "--agent", s.id)
-	if code != exitOK || !strings.Contains(out, "logged in") || strings.Contains(out+errOut, cookieSecret) {
+	if code != exitOK || !strings.Contains(out, "Signed in") || strings.Contains(out+errOut, cookieSecret) {
 		t.Fatalf("code %d out %q err %q", code, out, errOut)
 	}
 	if gotAgent != s.id || !strings.Contains(gotRaw, cookieSecret) || resumed != 1 {

@@ -113,7 +113,7 @@ threads:
   backend: stub # api additionally requires base_url, executable_path and agent_browser_path.
   profile_dir: data/profiles/fixture
 telegram:
-  digest_hour: 18 # UTC, once per agent/day
+  report_hour: 21 # local hour in telegram.timezone
   enabled: false # Local default; set true to require the owner integration credentials.
   bot_token_env: TELEGRAM_BOT_TOKEN
   owner_chat_id_env: TELEGRAM_OWNER_CHAT_ID

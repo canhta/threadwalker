@@ -59,7 +59,7 @@ Code picks up to 3 of the account's own live posts (or replies, by kind) of the 
 | Writer | Role, JSON shape, series limit, untrusted-data rule | `persona.audience`, identity, voice, `style_rules`, good examples, `style_avoid`, model and `reasoning_effort` |
 | Critic | Role, JSON shape and score axes, the repeated-image rule, untrusted-data rule | `persona.audience`, numbered `persona.critic_rules`, model and `reasoning_effort` |
 | Post-mortem judge | Rubric `post_mortem_instructions` and axes ([learning.md](learning.md)) | Persona voice and rules; `review.llm` model |
-| Owner-facing copy | Counts, limits, times (the model never writes them) | `persona.name`, `persona.language`, optional `telegram.messages` |
+| Owner-facing copy | All of it: English plain text with counts, limits and times (the model never writes them) | `persona.name` names the agent in a shared bot and in `/start` |
 
 The role prompts say nothing about the audience, the language or the style: those come from the template. The viral template carries the Vietnamese GenZ text and the research rules of `.research/viral-threads-vn.md`.
 

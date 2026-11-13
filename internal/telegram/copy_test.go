@@ -1,161 +1,139 @@
 package telegram
 
 import (
+	"regexp"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/canhta/threadz/internal/config"
+	"github.com/canhta/threadz/internal/store"
 )
 
 func copyService(templates ...config.Template) *Service {
 	s := &Service{
-		opts:      ServiceOptions{Now: func() time.Time { return time.Date(2026, 1, 1, 7, 15, 0, 0, time.UTC) }},
+		opts:      ServiceOptions{Now: func() time.Time { return time.Date(2026, 1, 1, 14, 15, 0, 0, time.UTC) }},
 		templates: map[string]config.Template{},
 		locations: map[string]*time.Location{},
 	}
 	for _, tmpl := range templates {
 		s.templates[tmpl.ID] = tmpl
 		s.ids = append(s.ids, tmpl.ID)
-		s.locations[tmpl.ID] = time.FixedZone("ICT", 7*60*60)
+		s.locations[tmpl.ID] = time.FixedZone("", 7*60*60)
 	}
 	return s
 }
 
-func sampleData() OwnerMessageData {
-	return OwnerMessageData{
-		Name: "Kaito", Language: "vi", AgentID: "one", Status: "running", StatusText: "đang chạy",
-		NextWake: "14:33", NextIn: "còn 18 phút",
-		Posts: 1, PostsLimit: 3, Replies: 0, RepliesLimit: 15,
-		Cost: "$0.00", Budget: "$0.50", HasMetrics: true,
-		Views: 10, Likes: 2, Responses: 3, Reposts: 4, Playbook: 3, Username: "someone", Notice: "tạm nghỉ nha",
+func TestReportText(t *testing.T) {
+	s := copyService(config.Template{ID: "one", Limits: config.LimitsConfig{PostsPerDay: 3, RepliesPerDay: 15, MaxUSDPerDay: 0.5}})
+	day := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	followers, before := int64(1034), int64(1022)
+	full := store.OwnerSummary{
+		Status: "running", NextWake: day.Add(14*time.Hour + 45*time.Minute),
+		Posts: 2, Replies: 5, CostUSD: 0.42, WakeCostUSD: 0.3, StudyCostUSD: 0.1, DreamCostUSD: 0.02,
+		MetricSamples: 4, Views: 3400, Likes: 120, Responses: 30, Reposts: 8, PlaybookChanges: 1,
+		Top:       store.TopPost{ActionID: 7, URL: "https://www.threads.com/@a/post/x", Views: 1234, Engagements: 56},
+		Followers: &followers, FollowersBefore: &before,
+		FailedWakes: 1, FailReasons: []store.Refusal{{Reason: "step_limit", Count: 1}},
+		Blocked: []store.Refusal{{Reason: "blocked_phrase", Count: 3}, {Reason: "quota", Count: 1}},
+	}
+	want := `Daily report, 1 Jan 2026
+Period: 1 Jan 07:00 to 1 Jan 21:15 UTC+07 (limits day from 00:00 UTC)
+State: Running, next run 21:45 (in 30 min)
+
+Posts: 2 of 3
+Replies: 5 of 15
+Metrics (4 measured today): 3400 views, 120 likes, 30 replies, 8 reposts
+Top post: 1234 views, 56 engagements
+https://www.threads.com/@a/post/x
+Followers: 1034 (+12)
+Playbook changes: 1
+Spend: $0.42 of $0.50 (84%); wake $0.30, study $0.10, dream $0.02
+
+Failed runs: 1 (step_limit ×1)
+Blocked actions: blocked_phrase ×3, quota ×1`
+	if got := s.reportText("one", full, day); got != want {
+		t.Fatalf("report:\n%s\nwant:\n%s", got, want)
+	}
+	// Missing measurements say so instead of showing zero.
+	empty := s.reportText("one", store.OwnerSummary{Status: "paused"}, day)
+	for _, part := range []string{"State: Paused, next run none scheduled", "Metrics: none measured today", "Followers: not measured today", "Failed runs: 0", "Blocked actions: none"} {
+		if !strings.Contains(empty, part) {
+			t.Fatalf("empty report missing %q:\n%s", part, empty)
+		}
+	}
+	if strings.Contains(empty, "Top post") || strings.Contains(empty, "Playbook") {
+		t.Fatalf("empty report shows absent facts:\n%s", empty)
 	}
 }
 
-func TestDefaultOwnerMessagesRenderForEveryKind(t *testing.T) {
-	kinds := []string{"digest", "status", "pause", "resume", "kill", "dnc", "help", "note_ack", "question_hint", "notice"}
-	parts := map[string][]string{
-		"digest":        {"1/3", "0/15", "$0.00", "$0.50", "14:33", "còn 18 phút"},
-		"status":        {"đang chạy", "14:33", "còn 18 phút", "$0.00/$0.50"},
-		"pause":         {"/resume"},
-		"resume":        {},
-		"kill":          {"/resume"},
-		"dnc":           {"@someone"},
-		"help":          {"/status", "/pause", "/resume", "/kill", "/dnc <username>"},
-		"note_ack":      {},
-		"question_hint": {"trả lời"},
-		"notice":        {"tạm nghỉ nha"},
+func TestStatusText(t *testing.T) {
+	s := copyService(config.Template{ID: "one", Limits: config.LimitsConfig{PostsPerDay: 3}})
+	got := s.statusText("one", store.OwnerSummary{Status: "running", Posts: 1, CostUSD: 0.1})
+	want := "Status\nState: Running\nNext run: none scheduled\nPosts today: 1 of 3\nReplies today: 0\nSpend today: $0.10"
+	if got != want {
+		t.Fatalf("status:\n%s", got)
 	}
-	for _, lang := range []string{"vi", "en"} {
-		for _, kind := range kinds {
-			t.Run(lang+"/"+kind, func(t *testing.T) {
-				s := copyService(config.Template{ID: "one", Persona: config.PersonaConfig{Language: lang}})
-				text, err := s.render("one", kind, sampleData())
-				if err != nil {
-					t.Fatal(err)
-				}
-				if strings.TrimSpace(text) == "" || strings.Contains(text, "{{") {
-					t.Fatalf("bad copy %q", text)
-				}
-				if lang == "vi" {
-					for _, part := range parts[kind] {
-						if !strings.Contains(text, part) {
-							t.Fatalf("%s missing %q: %s", kind, part, text)
-						}
-					}
-				}
-			})
+}
+
+func TestCommandMenuAndHelpShareOneTable(t *testing.T) {
+	name := regexp.MustCompile(`^[a-z0-9_]{1,32}$`)
+	for _, multi := range []bool{false, true} {
+		menu := ownerCommands(multi)
+		help := helpText(multi)
+		for _, c := range menu {
+			if !name.MatchString(c.Command) || len(c.Description) == 0 || len(c.Description) > 256 {
+				t.Fatalf("invalid Bot API command %+v", c)
+			}
+			if c.Command != "start" && !strings.Contains(help, "\n/"+c.Command) {
+				t.Fatalf("help omits /%s:\n%s", c.Command, help)
+			}
+		}
+		if multi != strings.Contains(help, "/dnc <agent_id> <username>") {
+			t.Fatalf("multi=%v help agent-id form wrong:\n%s", multi, help)
+		}
+	}
+	for _, want := range []string{"start", "help", "status", "report", "pause", "resume"} {
+		found := false
+		for _, c := range ownerCommands(false) {
+			found = found || c.Command == want
+		}
+		if !found {
+			t.Fatalf("menu lacks /%s", want)
 		}
 	}
 }
 
-func TestMultiAgentHelpDocumentsAgentID(t *testing.T) {
-	s := copyService(config.Template{ID: "one", Persona: config.PersonaConfig{Language: "vi"}}, config.Template{ID: "two", Persona: config.PersonaConfig{Language: "vi"}})
-	data := sampleData()
-	data.MultiAgent = true
-	text, err := s.render("one", "help", data)
-	if err != nil {
-		t.Fatal(err)
+func TestNoticeKindsHaveCopy(t *testing.T) {
+	for _, kind := range []string{"daily_limit", "budget_80", "budget_100", "logged_out", "logged_in", "captcha", "killed"} {
+		if noticeText(kind) == "" {
+			t.Fatalf("no copy for %s", kind)
+		}
 	}
-	if !strings.Contains(text, "/dnc <agent_id> <username>") {
-		t.Fatalf("help omits the agent-id form: %s", text)
-	}
-}
-
-func TestPersonaMessagesOverrideDefaults(t *testing.T) {
-	s := copyService(config.Template{ID: "one", Persona: config.PersonaConfig{Name: "Giáo sư", Language: "vi"}, Telegram: config.TelegramConfig{Messages: map[string]string{
-		"digest": "tao là {{.Name}}, hôm nay đăng {{.Posts}} bài{{if .Budget}}, tiêu {{.Cost}} trên {{.Budget}}{{end}}",
-	}}})
-	data := sampleData()
-	data.Name = "Giáo sư"
-	text, err := s.render("one", "digest", data)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if text != "tao là Giáo sư, hôm nay đăng 1 bài, tiêu $0.00 trên $0.50" {
-		t.Fatalf("override not used: %s", text)
-	}
-}
-
-func TestUnknownMessageTemplateFails(t *testing.T) {
-	s := copyService()
-	if _, err := s.render("one", "digest", sampleData()); err == nil {
-		t.Fatal("unconfigured agent rendered")
-	}
-	s = copyService(config.Template{ID: "one"})
-	if _, err := s.render("one", "not-a-kind", sampleData()); err == nil {
-		t.Fatal("unknown kind rendered")
+	if noticeText("other") != "" {
+		t.Fatal("unknown notice kind has copy")
 	}
 }
 
 func TestRelativeTimeAndMoney(t *testing.T) {
 	for _, tc := range []struct {
-		d  time.Duration
-		vi string
-		en string
+		d    time.Duration
+		want string
 	}{
-		{-time.Minute, "tới giờ rồi", "due now"},
-		{30 * time.Second, "dưới 1 phút", "under a minute"},
-		{18 * time.Minute, "còn 18 phút", "in 18 min"},
-		{2*time.Hour + 5*time.Minute, "còn 2h05p", "in 2h05m"},
-		{49 * time.Hour, "còn 2 ngày", "in 2 days"},
+		{-time.Minute, "due now"},
+		{30 * time.Second, "in under a minute"},
+		{18 * time.Minute, "in 18 min"},
+		{2*time.Hour + 5*time.Minute, "in 2h 05min"},
+		{49 * time.Hour, "in 2 days"},
 	} {
-		if got := relativeTime("vi", tc.d); got != tc.vi {
-			t.Errorf("vi %v = %q, want %q", tc.d, got, tc.vi)
-		}
-		if got := relativeTime("en", tc.d); got != tc.en {
-			t.Errorf("en %v = %q, want %q", tc.d, got, tc.en)
+		if got := relativeTime(tc.d); got != tc.want {
+			t.Errorf("%v = %q, want %q", tc.d, got, tc.want)
 		}
 	}
 	if money(0.5) != "$0.50" || money(0) != "$0.00" {
 		t.Fatal("money format")
 	}
-}
-
-func TestDigestShowsWakeStudyAndDreamSpendSeparately(t *testing.T) {
-	s := copyService(config.Template{ID: "one", Persona: config.PersonaConfig{Language: "vi"}})
-	data := sampleData()
-	data.Cost = "$0.70"
-	data.WakeCost = "$0.40"
-	data.StudyCost = "$0.20"
-	data.DreamCost = "$0.10"
-	data.HasPhaseSpend = true
-	text, err := s.render("one", "digest", data)
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, part := range []string{"thức $0.40", "bắt trend $0.20", "mơ $0.10"} {
-		if !strings.Contains(text, part) {
-			t.Fatalf("digest missing %q: %s", part, text)
-		}
-	}
-	// A normal wake-only day keeps the short digest.
-	data.HasPhaseSpend = false
-	text, err = s.render("one", "digest", data)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if strings.Contains(text, "chia ra") {
-		t.Fatalf("phase line leaked on a wake-only day: %s", text)
+	if zoneLabel(time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)) != "UTC" {
+		t.Fatal("UTC zone label")
 	}
 }

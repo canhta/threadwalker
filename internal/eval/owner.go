@@ -86,7 +86,7 @@ func runOwnerCase(ctx context.Context, c Case, p Profile, repeat int, opts Optio
 	tmpl.LLM = p.Config
 	tmpl.LLM.BaseURL = "https://fixture.invalid"
 	tmpl.LLM.APIKey = config.NewSecret("synthetic-owner-private-key")
-	tmpl.Telegram = config.TelegramConfig{DigestHour: 18}
+	tmpl.Telegram = config.TelegramConfig{ReportHour: 0}
 	steps, _, usd := effectiveLimits(opts, c.Limits)
 	tmpl.Limits.MaxStepsPerWake = steps
 	tmpl.Limits.MaxUSDPerDay = usd
@@ -220,7 +220,7 @@ func runOwnerCase(ctx context.Context, c Case, p Profile, repeat int, opts Optio
 		}
 		found := false
 		for _, text := range sent {
-			if strings.Contains(text, "today: 1/3 posts") && strings.Contains(text, "spent $1.00 of $1.00") {
+			if strings.Contains(text, "Posts: 1 of 3") && strings.Contains(text, "Spend: $1.00 of $1.00 (100%)") {
 				found = true
 			}
 		}

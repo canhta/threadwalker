@@ -294,23 +294,18 @@ type ThreadsConfig struct {
 }
 
 type TelegramConfig struct {
-	DigestHour     int // UTC; defaults to 18 on loaded templates.
+	// ReportHour is the local hour (in Timezone) of the daily owner report;
+	// defaults to 21 on loaded templates.
+	ReportHour     int
 	Enabled        bool
 	BotTokenEnv    string
 	BotToken       Secret
 	OwnerChatIDEnv string
 	OwnerChatID    Secret
-	// Timezone is the owner's IANA zone for displayed times; loaded default
-	// Asia/Ho_Chi_Minh. Digest scheduling itself stays UTC.
+	// Timezone is the owner's IANA zone for displayed times and the report
+	// hour; loaded default Asia/Ho_Chi_Minh.
 	Timezone string
-	// Messages overrides owner-facing copy by message kind. Values are
-	// text/template strings rendered with persona name/language and exact facts,
-	// so a persona's voice lives in its template, never in Go.
-	Messages map[string]string
 }
-
-// TelegramMessageNames is the canonical set a template may override.
-var TelegramMessageNames = []string{"digest", "status", "pause", "resume", "kill", "dnc", "help", "note_ack", "question_hint", "notice"}
 
 // Options selects how Load resolves a template directory.
 type Options struct {
