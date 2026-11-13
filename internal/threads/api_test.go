@@ -121,7 +121,8 @@ func TestAPIReads(t *testing.T) {
 		t.Fatalf("search query=%v", q)
 	}
 	page, err = api.ReadPost(ctx, "2000000000000001")
-	if err != nil || page.Kind != "post" || page.Posts[0].Username != "tester_account" || page.Posts[0].Text != "synthetic own post" {
+	// The API sends "+0000"; Post.Timestamp is RFC 3339, which the inbox parses.
+	if err != nil || page.Kind != "post" || page.Posts[0].Username != "tester_account" || page.Posts[0].Text != "synthetic own post" || page.Posts[0].Timestamp != "2026-01-02T03:04:05Z" {
 		t.Fatalf("post=%+v err=%v", page, err)
 	}
 	page, err = api.ReadReplies(ctx, "2000000000000001")

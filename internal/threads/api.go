@@ -141,7 +141,17 @@ type apiPost struct {
 }
 
 func (p apiPost) post() Post {
-	return Post{ID: p.ID, Username: p.Username, Text: p.Text, URL: p.Permalink, Timestamp: p.Timestamp, IsReply: p.IsReply}
+	return Post{ID: p.ID, Username: p.Username, Text: p.Text, URL: p.Permalink, Timestamp: rfc3339(p.Timestamp), IsReply: p.IsReply}
+}
+
+// rfc3339 rewrites the API's "2026-01-02T05:00:00+0000" (no colon in the
+// offset, which time.RFC3339 refuses) to RFC 3339, the form Post documents.
+// Anything else passes through unchanged.
+func rfc3339(s string) string {
+	if t, err := time.Parse("2006-01-02T15:04:05-0700", s); err == nil {
+		return t.UTC().Format(time.RFC3339)
+	}
+	return s
 }
 
 func posts(kind string, in []apiPost) Page {
