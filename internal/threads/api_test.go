@@ -177,6 +177,28 @@ func TestAPIPostInsightsMissingCountersAreUnavailable(t *testing.T) {
 	}
 }
 
+func TestAPIReplyRepliesComeFromDirectReplies(t *testing.T) {
+	const zero = `{"data":[{"name":"views","values":[{"value":9}]},{"name":"likes","values":[{"value":2}]},{"name":"replies","values":[{"value":0}]},{"name":"reposts","values":[{"value":0}]}]}`
+	f, api, _ := newFake(t)
+	f.route("GET", "/3/insights", zero)
+	f.route("GET", "/3", `{"id":"3","is_reply":true}`)
+	f.route("GET", "/3/replies", `{"data":[{"id":"a"},{"id":"b"}]}`)
+	if m, err := api.ReadActionMetrics(context.Background(), "3"); err != nil || m.Replies != 2 || m.Likes != 2 {
+		t.Fatalf("reply: %+v err=%v", m, err)
+	}
+	f.route("GET", "/3/replies", "error.json")
+	if m, err := api.ReadActionMetrics(context.Background(), "3"); err != nil || m.Replies != 0 {
+		t.Fatalf("failed /replies keeps insights: %+v err=%v", m, err)
+	}
+	// A post keeps its insights value and never reads /replies.
+	f.route("GET", "/4/insights", `{"data":[{"name":"views","values":[{"value":9}]},{"name":"likes","values":[{"value":1}]},{"name":"replies","values":[{"value":5}]},{"name":"reposts","values":[{"value":0}]}]}`)
+	f.route("GET", "/4", `{"id":"4","is_reply":false}`)
+	f.route("GET", "/4/replies", `{"data":[{"id":"a"}]}`)
+	if m, err := api.ReadActionMetrics(context.Background(), "4"); err != nil || m.Replies != 5 || f.count("GET /4/replies") != 0 {
+		t.Fatalf("post: %+v err=%v", m, err)
+	}
+}
+
 func TestAPIFollowersFixtureReadsAccountValue(t *testing.T) {
 	var in insights
 	if err := json.Unmarshal(apiFixture(t, "followers.json"), &in); err != nil {

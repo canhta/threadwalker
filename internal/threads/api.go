@@ -324,8 +324,24 @@ func (a *API) ReadActionMetrics(ctx context.Context, id string) (Metrics, error)
 			return Metrics{}, ErrMetricsUnavailable
 		}
 	}
-	return in.metrics()
+	m, err := in.metrics()
+	if err != nil {
+		return m, err
+	}
+	// Insights reports replies 0 for an own reply comment, so count its direct
+	// replies. A failed lookup keeps the insights value.
+	var self apiPost
+	if a.do(ctx, http.MethodGet, "/"+url.PathEscape(id), url.Values{"fields": {"is_reply"}}, &self) == nil && self.IsReply {
+		// Capped at one page of replyCountCap: a comment with more direct replies counts as that many.
+		if page, err := a.list(ctx, "replies", "/"+url.PathEscape(id)+"/replies", url.Values{"fields": {"id"}, "limit": {strconv.Itoa(replyCountCap)}}); err == nil {
+			m.Replies = max(m.Replies, int64(len(page.Posts)))
+		}
+	}
+	return m, nil
 }
+
+// replyCountCap bounds the direct replies counted for an own reply comment.
+const replyCountCap = 100
 
 // ReadOwnMetrics returns the account insights and the follower count.
 func (a *API) ReadOwnMetrics(ctx context.Context) (Metrics, error) {

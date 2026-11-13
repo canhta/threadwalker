@@ -22,13 +22,13 @@ func TestKPIStatsCountsOwnRecentActionsAndSpend(t *testing.T) {
 		}
 	}
 	// Action 1: 2h old, two measurements (only the newest counts). 2: 3 days old (outside 24h, inside 7d).
-	// 3: another agent. 4: failed. 5: dry-run.
+	// 3: another agent. 4: failed. 5: dry-run. 6: a recent reply, which counts (2 likes + 1 reply).
 	exec(`INSERT INTO actions(id,agent_id,kind,text,dry_run,failed,posted_at) VALUES
  (1,'a','post','x',0,0,'2026-01-08T10:00:00Z'),(2,'a','reply','y',0,0,'2026-01-05T12:00:00Z'),
- (3,'b','post','z',0,0,'2026-01-08T10:00:00Z'),(4,'a','post','f',0,1,'2026-01-08T11:00:00Z'),(5,'a','post','d',1,0,'2026-01-08T11:30:00Z')`)
+ (3,'b','post','z',0,0,'2026-01-08T10:00:00Z'),(4,'a','post','f',0,1,'2026-01-08T11:00:00Z'),(5,'a','post','d',1,0,'2026-01-08T11:30:00Z'),(6,'a','reply','r',0,0,'2026-01-08T09:00:00Z')`)
 	exec(`INSERT INTO metrics(agent_id,action_id,measured_at,likes,replies,reposts,quotes,followers) VALUES
  ('a',1,'2026-01-08T10:30:00Z',9,9,9,9,100),('a',1,'2026-01-08T11:30:00Z',3,2,1,1,103),
- ('a',2,'2026-01-08T11:00:00Z',5,0,0,NULL,101),('b',3,'2026-01-08T11:00:00Z',50,0,0,0,500),('a',4,'2026-01-08T11:45:00Z',40,0,0,0,400)`)
+ ('a',2,'2026-01-08T11:00:00Z',5,0,0,NULL,101),('b',3,'2026-01-08T11:00:00Z',50,0,0,0,500),('a',4,'2026-01-08T11:45:00Z',40,0,0,0,400),('a',6,'2026-01-08T11:50:00Z',2,1,0,NULL,NULL)`)
 	// followers is the account total when measured: a gained 103-100 = 3 in 7 days;
 	// summing totals, the old reading, would say 206.
 	exec(`INSERT INTO ledger_phases(agent_id,day,phase,tokens_in,tokens_out,cost_usd) VALUES
@@ -41,7 +41,7 @@ func TestKPIStatsCountsOwnRecentActionsAndSpend(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := KPIStats{Engagements: 7, Followers: 3, LastPublish: time.Date(2026, 1, 8, 10, 0, 0, 0, time.UTC), SpendToday: 0.12, TokensToday: 165, Spend7d: 0.62, Tokens7d: 465, WakesToday: 2}
+	want := KPIStats{Engagements: 10, Followers: 3, LastPublish: time.Date(2026, 1, 8, 10, 0, 0, 0, time.UTC), SpendToday: 0.12, TokensToday: 165, Spend7d: 0.62, Tokens7d: 465, WakesToday: 2}
 	if got.Engagements != want.Engagements || got.Followers != want.Followers || !got.LastPublish.Equal(want.LastPublish) || got.TokensToday != want.TokensToday || got.Tokens7d != want.Tokens7d || got.WakesToday != want.WakesToday ||
 		abs(got.SpendToday-want.SpendToday) > 1e-9 || abs(got.Spend7d-want.Spend7d) > 1e-9 {
 		t.Fatalf("got %+v\nwant %+v", got, want)

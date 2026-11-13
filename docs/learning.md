@@ -121,7 +121,7 @@ Written by `ComputeOutcomes` ([`internal/metrics`](../internal/metrics)) after e
 
 | Item | Definition |
 |---|---|
-| Counters | One sample: views, likes, replies, reposts, quotes, shares, account followers, and for a reply `author_replied`. Followers are read through the guard and audit at the start of every agent wake and once per batch of claimed targets; the latest count at reservation is stored on the action. A counter the API did not return is absent, never zero |
+| Counters | One sample: views, likes, replies, reposts, quotes, shares, account followers, and for a reply `author_replied`. Followers are read through the guard and audit at the start of every agent wake and once per batch of claimed targets; the latest count at reservation is stored on the action. A counter the API did not return is absent, never zero. The replies count of an own reply comes from its direct replies, because insights reports 0 |
 | Rates per view | Conversation = replies / views; amplification = (reposts + quotes + shares) / views; applause = likes / views. Without quotes or shares, amplification is unavailable and resonance uses conversation alone |
 | Followers per 1k views | (followers at 24 h - followers at reservation) x 1000 / summed views of live measured actions posted from this action's time through the next 24 h, itself included. Unavailable if either follower count is |
 | Axes | `log(1+views)`, `log((replies+0.5)/(views+1))`, `log((reposts+quotes+shares+0.5)/(views+1))`, `log((likes+0.5)/(views+1))` |
