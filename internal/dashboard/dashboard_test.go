@@ -408,7 +408,7 @@ func TestEmptyDryRunAndPopulatedStates(t *testing.T) {
 	posted := started()
 	posted.Publications = []store.DashboardPublication{pub(1, "post", ago(time.Hour), ownLink("WAIT1"))}
 	body = get(newHandler(newSource(posted)), "/").Body.String()
-	if !strings.Contains(body, "Stats at 1h, 6h and 24h.") || strings.Count(body, "No stats yet") != 1 {
+	if strings.Contains(body, "Stats at 1h") || strings.Count(body, "No stats yet") != 1 {
 		t.Fatal("posted page should state the stats schedule once")
 	}
 

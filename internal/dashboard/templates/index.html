@@ -117,7 +117,6 @@
         {{if .Growth.Posts}}
         <ol class="post-list">{{range .Growth.Posts}}{{template "post" .}}{{end}}</ol>
         {{if .MoreURL}}<a class="more-link" href="{{.MoreURL}}">Show {{.MoreCount}} more<span class="sub"> of {{.Growth.Total}}</span></a>{{end}}
-        {{if .Growth.Unmeasured}}<p class="sub">Stats at 1h, 6h and 24h.</p>{{end}}
         {{else}}<p class="empty">{{.Growth.EmptyText}}</p>{{end}}
       </section>
     </div>
