@@ -11,6 +11,7 @@ import (
 	"github.com/canhta/threadz/internal/knowledge"
 	"github.com/canhta/threadz/internal/llm"
 	"github.com/canhta/threadz/internal/logging"
+	"github.com/canhta/threadz/internal/store"
 	"github.com/canhta/threadz/internal/threads"
 	"github.com/canhta/threadz/internal/trends"
 )
@@ -23,10 +24,13 @@ func (d *Dispatcher) executors() map[string]executor {
 		"playbook_propose": func(ctx context.Context, a arguments) (any, error) {
 			if id := a.Text("knowledge_id"); id != "" {
 				if _, ok, err := knowledge.Get(id); err != nil || !ok {
-					return nil, errors.New("proposing playbook entry: unknown knowledge_id")
+					return nil, fmt.Errorf("proposing playbook entry: %w", errUnknownKnowledge)
 				}
 			}
 			entry, err := d.opts.Store.ProposePlaybook(ctx, d.opts.Template.ID, a.Int("hypothesis_id"), a.Text("text"), d.opts.Now(), a.Text("knowledge_id"))
+			if errors.Is(err, store.ErrPlaybookInput) {
+				return nil, fmt.Errorf("proposing playbook entry: %w", store.ErrPlaybookInput)
+			}
 			if err != nil {
 				return nil, errors.New("proposing playbook entry: refused")
 			}
@@ -48,7 +52,7 @@ func (d *Dispatcher) executors() map[string]executor {
 		},
 		"strategy_write": func(ctx context.Context, a arguments) (any, error) {
 			version, err := d.opts.Store.WriteStrategy(ctx, d.opts.Template.ID, a.Text("text"), a.TextList("citations"), d.opts.Now())
-			d.event(ctx, logging.StrategyWritten, outcome(err), reason(err), "strategy_write", time.Time{})
+			d.event(ctx, logging.StrategyWritten, outcome(err), failureReason(err), "strategy_write", time.Time{})
 			if err != nil {
 				return nil, fmt.Errorf("writing strategy: %w", err)
 			}
@@ -65,7 +69,7 @@ func (d *Dispatcher) executors() map[string]executor {
 				return nil, fmt.Errorf("adding memory entry: %w", err)
 			}
 			err := d.opts.Store.AddMemoryEntry(ctx, d.opts.Template.ID, a.Text("text"), d.opts.Now(), d.memoryActor())
-			d.event(ctx, logging.MemoryAdded, outcome(err), reason(err), "memory_add", time.Time{})
+			d.event(ctx, logging.MemoryAdded, outcome(err), failureReason(err), "memory_add", time.Time{})
 			if err != nil {
 				return nil, fmt.Errorf("adding memory entry: %w", err)
 			}
@@ -76,7 +80,7 @@ func (d *Dispatcher) executors() map[string]executor {
 		},
 		"memory_supersede": func(ctx context.Context, a arguments) (any, error) {
 			err := d.opts.Store.SupersedeMemory(ctx, d.opts.Template.ID, a.Int("old_id"), a.Int("new_id"), d.opts.Now(), d.memoryActor())
-			d.event(ctx, logging.MemorySuperseded, outcome(err), reason(err), "memory_supersede", time.Time{})
+			d.event(ctx, logging.MemorySuperseded, outcome(err), failureReason(err), "memory_supersede", time.Time{})
 			if err != nil {
 				return nil, fmt.Errorf("superseding memory entry: %w", err)
 			}
@@ -87,7 +91,7 @@ func (d *Dispatcher) executors() map[string]executor {
 			if err == nil {
 				d.syncEmbeddings(ctx)
 			}
-			d.event(ctx, logging.NoteWritten, outcome(err), reason(err), "note_write", time.Time{})
+			d.event(ctx, logging.NoteWritten, outcome(err), failureReason(err), "note_write", time.Time{})
 			if err != nil {
 				return nil, fmt.Errorf("writing topic note: %w", err)
 			}
@@ -95,7 +99,7 @@ func (d *Dispatcher) executors() map[string]executor {
 		},
 		"note_search": func(ctx context.Context, a arguments) (any, error) {
 			hits, err := d.opts.Store.SearchMemory(ctx, d.opts.Template.ID, a.Text("query"), d.embedQuery(ctx, a.Text("query")), a.Time("since"), a.Time("until"), int(a.Int("limit")))
-			d.event(ctx, logging.NoteSearched, outcome(err), reason(err), "note_search", time.Time{})
+			d.event(ctx, logging.NoteSearched, outcome(err), failureReason(err), "note_search", time.Time{})
 			if err != nil {
 				return nil, fmt.Errorf("searching agent notes: %w", err)
 			}
@@ -103,7 +107,7 @@ func (d *Dispatcher) executors() map[string]executor {
 		},
 		"note_read": func(ctx context.Context, a arguments) (any, error) {
 			memory, err := d.opts.Store.ReadMemory(ctx, d.opts.Template.ID, a.Text("ref"))
-			d.event(ctx, logging.NoteRead, outcome(err), reason(err), "note_read", time.Time{})
+			d.event(ctx, logging.NoteRead, outcome(err), failureReason(err), "note_read", time.Time{})
 			if err != nil {
 				return nil, errors.New("reading agent note: not found")
 			}
@@ -112,7 +116,7 @@ func (d *Dispatcher) executors() map[string]executor {
 		"fetch_trends": func(ctx context.Context, a arguments) (any, error) {
 			if d.opts.Phase == guard.PhaseStudy {
 				feed, err := d.opts.FetchStudy(ctx)
-				d.event(ctx, logging.TrendsFetched, outcome(err), reason(err), "fetch_trends", time.Time{})
+				d.event(ctx, logging.TrendsFetched, outcome(err), failureReason(err), "fetch_trends", time.Time{})
 				if err != nil {
 					return nil, errors.New("fetching study sources: fetch failed")
 				}
@@ -121,7 +125,7 @@ func (d *Dispatcher) executors() map[string]executor {
 				return map[string]any{"stories": trends.TopStories(stories, 10), "failed_sources": feed.Failed, "skipped_sources": feed.Skipped}, nil
 			}
 			fetched, err := d.opts.FetchTrends(ctx)
-			d.event(ctx, logging.TrendsFetched, outcome(err), reason(err), "fetch_trends", time.Time{})
+			d.event(ctx, logging.TrendsFetched, outcome(err), failureReason(err), "fetch_trends", time.Time{})
 			if err != nil {
 				return nil, errors.New("fetching trends: source failed")
 			}
@@ -235,7 +239,7 @@ func (d *Dispatcher) executors() map[string]executor {
 // recordStories is best-effort: a storage failure never fails the read.
 func (d *Dispatcher) recordStories(ctx context.Context, phase string, stories []trends.Story) {
 	err := trends.Record(ctx, d.opts.Store, d.opts.Template.ID, phase, stories, d.opts.Now())
-	d.event(ctx, logging.TrendsRecorded, outcome(err), reason(err), "fetch_trends", time.Time{})
+	d.event(ctx, logging.TrendsRecorded, outcome(err), failureReason(err), "fetch_trends", time.Time{})
 }
 
 // searchCountry maps the persona's language to where its readers are, so a
@@ -261,7 +265,7 @@ func (d *Dispatcher) webSearch(ctx context.Context, query string) (trends.WebSea
 		return trends.WebSearchResult{}, err
 	}
 	if spent.CostUSD >= d.opts.Template.Limits.MaxUSDPerDay {
-		return trends.WebSearchResult{}, errors.New("web search: daily budget spent")
+		return trends.WebSearchResult{}, fmt.Errorf("web search: %w", errBudgetSpent)
 	}
 	result, err := d.opts.SearchWeb(ctx, trends.WebSearchRequest{
 		BaseURL:    d.opts.Template.Study.WebSearchBaseURL,
@@ -314,12 +318,6 @@ func outcome(err error) string {
 		return "error"
 	}
 	return "success"
-}
-func reason(err error) string {
-	if err != nil {
-		return "operation_failed"
-	}
-	return "completed"
 }
 
 // embedQuery returns the query's vector, or nil (logging the reason when a

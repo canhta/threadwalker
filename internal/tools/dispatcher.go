@@ -244,7 +244,7 @@ func (d *Dispatcher) Dispatch(ctx context.Context, call llm.ToolCall) (string, e
 		}
 		data, err := run(ctx, args)
 		if err != nil {
-			failure := &guard.ReasonedError{Err: err, Code: failureReason(err)}
+			failure := &guard.ReasonedError{Err: modelFacing(err), Code: failureReason(err)}
 			if se := threads.StageOf(err); se != nil {
 				failure.Stage, failure.Evidence = se.Stage, d.saveEvidence(ctx, safeTool, se)
 			}
@@ -298,7 +298,7 @@ func (d *Dispatcher) Dispatch(ctx context.Context, call llm.ToolCall) (string, e
 	}
 	why := "completed"
 	if err != nil {
-		why = "operation_failed"
+		why = failureReason(err)
 		if block != "" {
 			why = block
 		}

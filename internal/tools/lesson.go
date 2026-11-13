@@ -40,11 +40,51 @@ var lessonReasons = []struct {
 
 // failureReason is the audit reason code of a failed tool: the lesson gate's
 // code, the Threads backend's code, or operation_failed.
+//
+// It is the one map from an executor's error to its code: the audit row, the
+// tool.finished event and the per-tool events all read it, and a code listed in
+// modelFixable reaches the model as a blocked hint instead of a generic error.
 func failureReason(err error) string {
+	var blocked *guard.BlockedError
+	switch {
+	case err == nil:
+		return "completed"
+	case errors.As(err, &blocked):
+		return blocked.Reason
+	case errors.Is(err, store.ErrStrategyInput):
+		return "strategy_input"
+	case errors.Is(err, store.ErrPlaybookInput):
+		return "playbook_input"
+	case errors.Is(err, errUnknownKnowledge):
+		return "unknown_knowledge"
+	case errors.Is(err, errBudgetSpent):
+		return "budget"
+	}
 	if r := lessonReason(err); r != "operation_failed" {
 		return r
 	}
 	return cmp.Or(threads.Reason(err), "operation_failed")
+}
+
+var (
+	errUnknownKnowledge = errors.New("unknown knowledge_id")
+	errBudgetSpent      = errors.New("daily budget spent")
+)
+
+// modelFixable are the codes the model can act on; each has a guard hint.
+var modelFixable = map[string]bool{
+	"lesson_missing_citation": true, "lesson_foreign_citation": true, "lesson_number_mismatch": true,
+	"lesson_foreign_url": true, "lesson_secret": true, "lesson_cap": true,
+	"strategy_input": true, "playbook_input": true, "unknown_knowledge": true, "budget": true,
+}
+
+// modelFacing gives a model-fixable failure the blocked hint the model reads.
+func modelFacing(err error) error {
+	var blocked *guard.BlockedError
+	if code := failureReason(err); modelFixable[code] && !errors.As(err, &blocked) {
+		return errors.Join(err, &guard.BlockedError{Reason: code})
+	}
+	return err
 }
 
 func lessonReason(err error) string {
