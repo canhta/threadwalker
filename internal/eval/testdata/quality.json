@@ -39,7 +39,7 @@
         "template_dir": "../../../templates",
         "template_id": "viral",
         "kind": "post",
-        "draft": "ngân sách còn 2 đô mà tôi vẫn cà khịa được cả cõi. gớm.",
+        "draft": "ngân sách còn 1 đô mà tôi vẫn cà khịa được cả cõi. gớm.",
         "judge": "{\"violated_rules\":[],\"like_bad_example\":false}"
       },
       "expect": {
