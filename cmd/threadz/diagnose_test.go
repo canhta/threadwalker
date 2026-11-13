@@ -64,7 +64,7 @@ func seedWake(t *testing.T, writer bool) seededWake {
 		}
 		scope.Critic = func(context.Context, quality.CriticInput) (quality.CriticVerdict, error) {
 			if len(verdicts) == 0 {
-				return quality.CriticVerdict{Pass: true}, nil
+				return quality.CriticVerdict{Pass: true, Scores: quality.CriticScores{Hook: 4, NaturalVietnamese: 4, Specificity: 4, ForcedSelfReference: 5, TargetFit: 4, Novelty: 4, Clarity: 5}}, nil
 			}
 			v := verdicts[0]
 			verdicts = verdicts[1:]

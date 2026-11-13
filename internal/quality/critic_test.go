@@ -157,3 +157,20 @@ func TestPromptsCarryTheTemplatesAudienceAndLearnedPosts(t *testing.T) {
 		}
 	}
 }
+
+func TestAFlatPostGoesBackToTheWriterButAReplyPasses(t *testing.T) {
+	flat := CriticVerdict{Pass: true, Scores: CriticScores{Hook: 4, NaturalVietnamese: 5, Specificity: 4, ForcedSelfReference: 5, TargetFit: 5, Novelty: 3, Clarity: 5}}
+	judge := func(context.Context, CriticInput) (CriticVerdict, error) { return flat, nil }
+	if _, ok, _ := Revise(context.Background(), nil, judge, nil, WriterInput{Kind: Post, Draft: []string{"x"}}, 0); ok {
+		t.Fatal("a novelty 3 post passed")
+	}
+	if _, ok, _ := Revise(context.Background(), nil, judge, nil, WriterInput{Kind: Reply, Draft: []string{"x"}}, 0); !ok {
+		t.Fatal("a novelty 3 reply was failed")
+	}
+	sharp := flat
+	sharp.Scores.Novelty = 4
+	judge = func(context.Context, CriticInput) (CriticVerdict, error) { return sharp, nil }
+	if _, ok, _ := Revise(context.Background(), nil, judge, nil, WriterInput{Kind: Post, Draft: []string{"x"}}, 0); !ok {
+		t.Fatal("a hook 4, novelty 4 post failed")
+	}
+}
