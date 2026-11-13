@@ -113,7 +113,10 @@ type NewIntent struct {
 	TrendRef    string
 	AnswersNote int64
 	// CriticJSON is the pre-publish critic verdict, or empty.
-	CriticJSON               string
+	CriticJSON string
+	// RootURL is the canonical URL of the root post of the conversation a reply
+	// belongs to; empty for a post.
+	RootURL                  string
 	DryRun, Explore, Browser bool
 	At                       time.Time
 	// TargetScoreJSON and DelayMinutes describe a reply's target; empty and nil
@@ -126,7 +129,7 @@ type NewIntent struct {
 
 // InsertIntent records the reservation and returns its action id.
 func (t ReservationTx) InsertIntent(ctx context.Context, n NewIntent) (int64, error) {
-	res, err := t.conn.ExecContext(ctx, `INSERT INTO actions(agent_id,kind,text,target_url,target_username,hypothesis_ids_json,dry_run,posted_at,thread_url,explore,target_score_json,delay_minutes,topic_heat,followers_at_post,parent_replies,parent_age_minutes,hook,rationale,browser,trend_ref,answers_note,critic_json) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,(SELECT followers FROM account_followers WHERE agent_id=?),?,?,?,?,?,?,?,?)`, n.AgentID, n.Kind, n.Text, n.TargetURL, n.TargetUsername, n.HypothesisIDsJSON, n.DryRun, n.At.Format(time.RFC3339Nano), "", n.Explore, n.TargetScoreJSON, n.DelayMinutes, n.TopicHeat, n.AgentID, n.ParentReplies, n.ParentAgeMinutes, n.Hook, n.Rationale, n.Browser, n.TrendRef, n.AnswersNote, n.CriticJSON)
+	res, err := t.conn.ExecContext(ctx, `INSERT INTO actions(agent_id,kind,text,target_url,target_username,hypothesis_ids_json,dry_run,posted_at,thread_url,explore,target_score_json,delay_minutes,topic_heat,followers_at_post,parent_replies,parent_age_minutes,hook,rationale,browser,trend_ref,answers_note,critic_json,root_url) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,(SELECT followers FROM account_followers WHERE agent_id=?),?,?,?,?,?,?,?,?,?)`, n.AgentID, n.Kind, n.Text, n.TargetURL, n.TargetUsername, n.HypothesisIDsJSON, n.DryRun, n.At.Format(time.RFC3339Nano), "", n.Explore, n.TargetScoreJSON, n.DelayMinutes, n.TopicHeat, n.AgentID, n.ParentReplies, n.ParentAgeMinutes, n.Hook, n.Rationale, n.Browser, n.TrendRef, n.AnswersNote, n.CriticJSON, n.RootURL)
 	if err != nil {
 		return 0, fmt.Errorf("reserving action intent: %w", err)
 	}

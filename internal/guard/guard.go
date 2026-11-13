@@ -67,8 +67,9 @@ type Guard struct {
 	own         map[string]bool
 	mu          sync.Mutex
 	read        map[string]string
-	// inbox holds the canonical threads of replies to the account noted this wake.
-	inbox     map[string]bool
+	// inbox holds the canonical threads of replies to the account noted this
+	// wake, each with the root post of its conversation.
+	inbox     map[string]string
 	readText  map[string]string
 	trendText map[string]string
 	facts     map[string]trends.ItemFacts
@@ -165,7 +166,7 @@ func New(opts Scope) (*Guard, error) {
 		own[user] = true
 	}
 	opts.OwnUsernames = users
-	g := &Guard{opts: opts, stopPhrases: append([]string(nil), phrases...), own: own, read: map[string]string{}, inbox: map[string]bool{}, readText: map[string]string{}, trendText: map[string]string{}, facts: map[string]trends.ItemFacts{}, trends: map[string]bool{}, shortRef: map[string]string{}, refItem: map[string]string{}}
+	g := &Guard{opts: opts, stopPhrases: append([]string(nil), phrases...), own: own, read: map[string]string{}, inbox: map[string]string{}, readText: map[string]string{}, trendText: map[string]string{}, facts: map[string]trends.ItemFacts{}, trends: map[string]bool{}, shortRef: map[string]string{}, refItem: map[string]string{}}
 	if units := opts.Template.Guard.SelfStatUnits; len(units) > 0 {
 		g.statPattern = statPattern(units)
 	}

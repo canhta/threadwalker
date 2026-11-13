@@ -46,6 +46,9 @@ type actionIntent struct {
 	browser  bool
 	// inbox is true when the target is a reply to the account noted by NoteInbox.
 	inbox bool
+	// root is the canonical URL of the root post of the conversation a reply
+	// joins: the inbox item's root, else the replied-to post itself.
+	root string
 	// posting is harness-computed from stored observations.
 	posting trends.PostingContext
 }
@@ -74,15 +77,20 @@ func (g *Guard) NoteRead(id, raw, text string) {
 
 // NoteInbox is NoteRead for a reply to the account: the agent may answer it by
 // id, a conversation with the same person is not capped by
-// limits.replies_per_user_7d, and the returned short ref names it.
-func (g *Guard) NoteInbox(id, raw, text string) string {
+// limits.replies_per_user_7d, and the returned short ref names it. root is the
+// canonical URL of the root post of its conversation; empty means the reply
+// starts its own conversation.
+func (g *Guard) NoteInbox(id, raw, text, root string) string {
 	thread, err := store.CanonicalThread(raw)
 	if err != nil {
 		return ""
 	}
 	g.NoteRead(id, raw, text)
+	if root == "" {
+		root = thread
+	}
 	g.mu.Lock()
-	g.inbox[thread] = true
+	g.inbox[thread] = root
 	g.mu.Unlock()
 	refs := g.NoteTrend(raw)
 	if len(refs) == 0 {
@@ -426,7 +434,9 @@ func (g *Guard) content(a Attempt, draft bool) (*actionIntent, string) {
 		// A reply without a post id answers a feed post, through the browser.
 		intent.browser = intent.TargetID == ""
 		g.mu.Lock()
-		intent.inbox = g.inbox[thread]
+		var inboxRoot string
+		inboxRoot, intent.inbox = g.inbox[thread]
+		intent.root = cmp.Or(inboxRoot, thread)
 		outside := g.facts[thread].Outside
 		g.mu.Unlock()
 		if !g.wasRead(thread, intent.TargetID) {
@@ -533,7 +543,7 @@ func (g *Guard) reserve(ctx context.Context, a Attempt, intent *actionIntent, au
 				ids = []int64{}
 			}
 			encoded, _ := json.Marshal(ids)
-			if id, err = tx.InsertIntent(ctx, store.NewIntent{AgentID: agent, Kind: a.Tool, Text: intent.Text, TargetURL: intent.TargetURL, TargetUsername: intent.TargetUsername, Hook: intent.Hook, Rationale: intent.Rationale, TrendRef: strings.TrimSpace(intent.TrendRef), AnswersNote: intent.AnswersNote, CriticJSON: intent.criticJSON, Parts: intent.Parts, HypothesisIDsJSON: string(encoded), Explore: intent.Explore, TargetScoreJSON: intent.posting.TargetScoreJSON, DelayMinutes: intent.posting.DelayMinutes, TopicHeat: intent.posting.TopicHeat, ParentReplies: intent.posting.ParentReplies, ParentAgeMinutes: intent.posting.ParentAgeMinutes, DryRun: g.opts.Template.DryRun, Browser: intent.browser, At: now}); err != nil {
+			if id, err = tx.InsertIntent(ctx, store.NewIntent{AgentID: agent, Kind: a.Tool, Text: intent.Text, TargetURL: intent.TargetURL, TargetUsername: intent.TargetUsername, Hook: intent.Hook, Rationale: intent.Rationale, TrendRef: strings.TrimSpace(intent.TrendRef), AnswersNote: intent.AnswersNote, CriticJSON: intent.criticJSON, RootURL: intent.root, Parts: intent.Parts, HypothesisIDsJSON: string(encoded), Explore: intent.Explore, TargetScoreJSON: intent.posting.TargetScoreJSON, DelayMinutes: intent.posting.DelayMinutes, TopicHeat: intent.posting.TopicHeat, ParentReplies: intent.posting.ParentReplies, ParentAgeMinutes: intent.posting.ParentAgeMinutes, DryRun: g.opts.Template.DryRun, Browser: intent.browser, At: now}); err != nil {
 				return err
 			}
 			if err = playbook.Reserve(ctx, tx.Playbook(), agent, id, ids); err != nil {
@@ -616,6 +626,13 @@ func similarHooks(a, b map[string]bool) bool {
 		}
 	}
 	return shared >= 2 && shared*2 >= min(len(a), len(b))
+}
+
+// ConversationCap is the template's per-conversation reply cap as the store
+// rule reads it; the guard and the inbox share it.
+func ConversationCap(t config.Template) store.ConversationCap {
+	l := t.Limits
+	return store.ConversationCap{Max: l.RepliesPerConversation, HotLikes: l.ConversationHotLikes, HotReplies: l.ConversationHotReplies, DryRun: t.DryRun}
 }
 
 // NextPostAt is the earliest time min_minutes_between_posts allows a post after
@@ -721,6 +738,16 @@ func (g *Guard) quotas(ctx context.Context, tx store.ReservationTx, actions []st
 	}
 	if kind == "reply" && threadUsed {
 		return "thread_per_day", nil
+	}
+	if kind == "reply" {
+		n, capped, err := tx.ConversationReplies(ctx, g.opts.Template.ID, intent.root, ConversationCap(g.opts.Template))
+		if err != nil {
+			return "", err
+		}
+		if capped {
+			intent.detail = strconv.Itoa(n)
+			return "replies_per_conversation", nil
+		}
 	}
 	if next := NextPostAt(l, latestPost); kind == "post" && now.Before(next) {
 		intent.detail = next.UTC().Format(time.RFC3339)

@@ -206,6 +206,9 @@ func (d *decoder) limits(t *Template) {
 	l.PostsPerDay = d.posInt("limits.posts_per_day")
 	l.RepliesPerDay = d.posInt("limits.replies_per_day")
 	l.RepliesPerUser7d = d.posInt("limits.replies_per_user_7d")
+	l.RepliesPerConversation = d.boundedInt("limits.replies_per_conversation", 2, 0, 100)
+	l.ConversationHotLikes = d.boundedInt("limits.conversation_hot_likes", 5, 1, 1000000)
+	l.ConversationHotReplies = d.boundedInt("limits.conversation_hot_replies", 3, 1, 1000000)
 	l.BrowserRepliesPerDay = 5
 	if d.has("limits.browser_replies_per_day") {
 		l.BrowserRepliesPerDay = d.posInt("limits.browser_replies_per_day")

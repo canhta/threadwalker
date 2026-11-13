@@ -125,7 +125,7 @@ func TestReplyToAnOutsideWindowTargetIsRefusedUnlessInbox(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	g.NoteInbox("tid", dead, "")
+	g.NoteInbox("tid", dead, "", "")
 	g.NoteFacts(dead, facts)
 	if err := reply(g, dead); err != nil {
 		t.Fatalf("inbox reply: %v", err)

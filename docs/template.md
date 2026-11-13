@@ -78,6 +78,9 @@ The `OPENAI_API_KEY` environment variable is also required at load for memory em
 | `limits.posts_per_day` | int > 0 | required | code | Posts per UTC day (a series counts once) |
 | `limits.replies_per_day` | int > 0 | required | code | Replies per UTC day |
 | `limits.replies_per_user_7d` | int > 0 | required | code | Replies to one username in the rolling 7 days |
+| `limits.replies_per_conversation` | int 0..100 | 2 | code | Own replies under one root post (the post, its replies and ours); 0 is off. Lifted for a conversation whose first reply of ours has reached `limits.conversation_hot_likes` likes or `limits.conversation_hot_replies` replies in its newest stored metric |
+| `limits.conversation_hot_likes` | int > 0 | 5 | code | Likes on the first reply that lift the conversation cap |
+| `limits.conversation_hot_replies` | int > 0 | 3 | code | Replies to the first reply that lift the conversation cap |
 | `limits.browser_replies_per_day` | int > 0 | 5 | code | Cap on replies to feed posts (browser path) |
 | `limits.critic_rejections_per_wake` | int 1–20 | 2 | code | Drafts the critic may reject in one wake before further posts and replies are refused (`critic_limit`) |
 | `limits.min_seconds_between_actions` | int > 0 | required | code | Spacing between actions |

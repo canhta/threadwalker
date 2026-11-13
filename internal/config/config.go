@@ -263,6 +263,10 @@ type LimitsConfig struct {
 	PostsPerDay      int
 	RepliesPerDay    int
 	RepliesPerUser7d int
+	// RepliesPerConversation caps own replies under one root post; 0 is off. A
+	// conversation whose first reply reached ConversationHotLikes likes or
+	// ConversationHotReplies replies is exempt.
+	RepliesPerConversation, ConversationHotLikes, ConversationHotReplies int
 	// BrowserRepliesPerDay caps replies to feed posts, which go through the browser.
 	BrowserRepliesPerDay     int
 	MinSecondsBetweenActions int

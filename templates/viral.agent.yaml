@@ -206,6 +206,9 @@ limits:                           # starting values, no experimental basis
   browser_replies_per_day: 80     # replies under other people's posts go through the browser
   critic_rejections_per_wake: 5
   replies_per_user_7d: 2
+  replies_per_conversation: 2     # own replies under one root post; the loop stops here
+  conversation_hot_likes: 5       # first reply with this many likes lifts the cap...
+  conversation_hot_replies: 3     # ...or this many replies
   min_seconds_between_actions: 150
   min_minutes_between_posts: 120  # 6 posts spread over the waking day, not two in one wake
   max_steps_per_wake: 45

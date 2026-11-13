@@ -58,6 +58,7 @@ var hints = map[string]string{
 	"shared_promotion_link":       "remove the link and rewrite",
 	"do_not_contact":              "this user asked not to be contacted; pick another target",
 	"replies_per_user_7d":         "you have replied to this user the maximum times this week; pick another target",
+	"replies_per_conversation":    "you already replied %s times in this conversation; let it end unless your first reply there took off",
 	"thread_per_day":              "you already replied in this thread today; pick another thread",
 	"critic_rejected":             "an editor rejected this draft: %s; do not rewrite the same news: pick a different topic people actually live (from read_feed or fetch_trends) or a reply target, then try once more",
 	"critic_limit":                "the editor rejected %s drafts this wake; do not write more this wake",

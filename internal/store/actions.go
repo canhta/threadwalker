@@ -14,12 +14,14 @@ import (
 type PublishedAction struct {
 	MediaID, Text string
 	PostedAt      time.Time
+	// Root is the conversation root of a reply of ours; empty for a post or a reply stored without one.
+	Root string
 }
 
 // PublishedSince returns the confirmed live own posts and replies of the agent
 // posted since the given time, newest first.
 func (s *Store) PublishedSince(ctx context.Context, agentID string, since time.Time, limit int) ([]PublishedAction, error) {
-	rows, err := s.db.QueryContext(ctx, `SELECT media_id,text,posted_at FROM actions WHERE agent_id=? AND dry_run=0 AND failed=0 AND thread_url<>'' AND media_id<>'' AND julianday(posted_at)>=julianday(?) ORDER BY substr(posted_at,1,19) DESC,id DESC LIMIT ?`, agentID, since.UTC().Format(time.RFC3339Nano), limit)
+	rows, err := s.db.QueryContext(ctx, `SELECT media_id,text,posted_at,CASE WHEN kind='reply' THEN root_url ELSE '' END FROM actions WHERE agent_id=? AND dry_run=0 AND failed=0 AND thread_url<>'' AND media_id<>'' AND julianday(posted_at)>=julianday(?) ORDER BY substr(posted_at,1,19) DESC,id DESC LIMIT ?`, agentID, since.UTC().Format(time.RFC3339Nano), limit)
 	if err != nil {
 		return nil, fmt.Errorf("reading published actions: %w", err)
 	}
@@ -28,7 +30,7 @@ func (s *Store) PublishedSince(ctx context.Context, agentID string, since time.T
 	for rows.Next() {
 		var p PublishedAction
 		var at string
-		if err = rows.Scan(&p.MediaID, &p.Text, &at); err != nil {
+		if err = rows.Scan(&p.MediaID, &p.Text, &at, &p.Root); err != nil {
 			return nil, fmt.Errorf("reading published actions: %w", err)
 		}
 		if p.PostedAt, err = time.Parse(time.RFC3339Nano, at); err != nil {
@@ -118,4 +120,45 @@ func CanonicalThread(raw string) (string, error) {
 	u.Path = strings.TrimRight(u.Path, "/")
 	u.RawPath = ""
 	return u.String(), nil
+}
+
+// ConversationCap is the template's limit on replies in one conversation: Max
+// replies (0 is off), lifted when the first reply's newest metrics reach
+// HotLikes likes or HotReplies replies. DryRun selects dry-run or live actions.
+type ConversationCap struct {
+	Max, HotLikes, HotReplies int
+	DryRun                    bool
+}
+
+type rowQuerier interface {
+	QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row
+}
+
+// conversationReplies is the one rule for a conversation at its cap: it returns
+// how many replies the agent made under root and whether they are capped. Rows
+// stored without a root are not counted.
+func conversationReplies(ctx context.Context, q rowQuerier, agentID, root string, c ConversationCap) (n int, capped bool, err error) {
+	if c.Max <= 0 || root == "" {
+		return 0, false, nil
+	}
+	var likes, replies sql.NullInt64
+	err = q.QueryRowContext(ctx, `WITH r AS (SELECT id FROM actions WHERE agent_id=? AND kind='reply' AND failed=0 AND dry_run=? AND root_url=?)
+		SELECT (SELECT COUNT(*) FROM r),
+		(SELECT likes FROM metrics WHERE action_id=(SELECT MIN(id) FROM r) ORDER BY julianday(measured_at) DESC LIMIT 1),
+		(SELECT replies FROM metrics WHERE action_id=(SELECT MIN(id) FROM r) ORDER BY julianday(measured_at) DESC LIMIT 1)`, agentID, c.DryRun, root).Scan(&n, &likes, &replies)
+	if err != nil {
+		return 0, false, fmt.Errorf("reading conversation replies: %w", err)
+	}
+	hot := (likes.Valid && likes.Int64 >= int64(c.HotLikes)) || (replies.Valid && replies.Int64 >= int64(c.HotReplies))
+	return n, n >= c.Max && !hot, nil
+}
+
+// ConversationReplies reports the agent's replies under the conversation root and whether it is at the cap.
+func (s *Store) ConversationReplies(ctx context.Context, agentID, root string, c ConversationCap) (int, bool, error) {
+	return conversationReplies(ctx, s.db, agentID, root, c)
+}
+
+// ConversationReplies is the guard's view of the same rule inside its transaction.
+func (t ReservationTx) ConversationReplies(ctx context.Context, agentID, root string, c ConversationCap) (int, bool, error) {
+	return conversationReplies(ctx, t.conn, agentID, root, c)
 }

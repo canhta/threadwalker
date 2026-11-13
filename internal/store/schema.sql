@@ -32,7 +32,8 @@ CREATE TABLE actions (
     browser INTEGER NOT NULL DEFAULT 0 CHECK (browser IN (0, 1)),
     trend_ref TEXT NOT NULL DEFAULT '',
     answers_note INTEGER NOT NULL DEFAULT 0,
-    critic_json TEXT NOT NULL DEFAULT '');
+    critic_json TEXT NOT NULL DEFAULT '',
+    root_url TEXT NOT NULL DEFAULT '');
 
 CREATE TABLE action_parts (
     agent_id TEXT NOT NULL,

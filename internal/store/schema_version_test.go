@@ -9,7 +9,7 @@ import (
 // schemaFingerprint pins schemaVersion to the schema.sql it was cut from.
 // Changing schema.sql without bumping schemaVersion fails here: a database of
 // the old shape would otherwise pass the version check.
-const schemaFingerprint, fingerprintVersion = "cde2e726aeb11cb3", 10
+const schemaFingerprint, fingerprintVersion = "463119294315dabd", 11
 
 func TestSchemaVersionMatchesSchemaFile(t *testing.T) {
 	got := fmt.Sprintf("%x", sha256.Sum256([]byte(schemaSQL)))[:16]

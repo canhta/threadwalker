@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/canhta/threadz/internal/guard"
 	"github.com/canhta/threadz/internal/logging"
 	"github.com/canhta/threadz/internal/store"
 	"github.com/canhta/threadz/internal/tools"
@@ -106,7 +107,7 @@ func (r *Runtime) readInbox(ctx context.Context, now time.Time, running bool) ([
 	for _, u := range r.opts.OwnUsernames {
 		own[u] = true
 	}
-	return tools.ReadInbox(ctx, tools.InboxRead{Store: r.opts.Store, Threads: backend, AgentID: r.opts.Template.ID, Now: now, IsOwn: func(u string) bool {
+	return tools.ReadInbox(ctx, tools.InboxRead{Store: r.opts.Store, Threads: backend, AgentID: r.opts.Template.ID, Now: now, Cap: guard.ConversationCap(r.opts.Template), IsOwn: func(u string) bool {
 		n, err := store.NormalizeUsername(u)
 		return err == nil && own[n]
 	}})
