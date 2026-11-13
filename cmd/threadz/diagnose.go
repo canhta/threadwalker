@@ -124,11 +124,20 @@ func diagnoseWake(ctx context.Context, st *store.Store, agentID string, id int64
 		dc := diagnoseCall(i+1, c)
 		if a, ok := actions[c.Detail.ActionID]; ok {
 			dc.Action = &diagnosedAction{ID: c.Detail.ActionID, Kind: a.Kind, ThreadURL: a.ThreadURL, DryRun: a.DryRun, Failed: a.Failed}
+			waitedForSpacing(&dc)
 		}
 		d.Calls = append(d.Calls, dc)
 		d.Funnel.add(dc)
 	}
 	return d, nil
+}
+
+// waitedForSpacing relabels a call the guard refused for spacing, then waited
+// out and published: that is a success, not a block.
+func waitedForSpacing(dc *diagnosedCall) {
+	if a := dc.Action; a != nil && dc.Outcome == "blocked" && dc.Reason == "min_seconds_between_actions" && !a.Failed && a.ThreadURL != "" {
+		dc.Outcome, dc.Reason = "ok", "waited_for_spacing"
+	}
 }
 
 func (f *diagnosisFunnel) add(c diagnosedCall) {
