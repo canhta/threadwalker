@@ -1,0 +1,81 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: build, sign and publish
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Build release bundle
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          version="${TAG#v}"
+          stage="dist/threadz_${version}_linux_amd64"
+          mkdir -p "$stage"
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath \
+            -ldflags "-s -w -X main.buildVersion=${version}" \
+            -o "$stage/threadz" ./cmd/threadz
+          cp deploy/apparmor-chrome deploy/threadz.service deploy/threadz-dashboard.service deploy/threadz-update.service \
+            deploy/threadz-update.timer deploy/threadz-update.path "$stage/"
+          awk '
+            /^  backend: stub( |$)/ {
+              print "  backend: api"
+              print "  base_url: https://www.threads.com"
+              print "  executable_path: /opt/chrome/chrome"
+              print "  agent_browser_path: /opt/threadz/bin/agent-browser"
+              next
+            }
+            /^  profile_dir: data\/profiles\/viral$/ { print "  profile_dir: /opt/threadz/data/profiles/viral"; next }
+            /^  enabled: false/ { print "  enabled: true"; next }
+            { print }
+          ' templates/viral.agent.yaml > "$stage/viral.agent.yaml"
+          grep -qx '  backend: api' "$stage/viral.agent.yaml"
+          grep -qx '  profile_dir: /opt/threadz/data/profiles/viral' "$stage/viral.agent.yaml"
+          grep -qx '  enabled: true' "$stage/viral.agent.yaml"
+          grep -qx 'dry_run: true' "$stage/viral.agent.yaml"
+          tar -czf "dist/threadz_${version}_linux_amd64.tar.gz" -C "$stage" .
+          (cd dist && sha256sum "threadz_${version}_linux_amd64.tar.gz" \
+            > "threadz_${version}_linux_amd64.tar.gz.sha256")
+          "$stage/threadz" version
+
+      - name: Sign
+        env:
+          RELEASE_SIGNING_KEY: ${{ secrets.RELEASE_SIGNING_KEY }}
+        run: |
+          set -euo pipefail
+          umask 077
+          key="$(mktemp)"
+          trap 'shred -u "$key"' EXIT
+          printf '%s\n' "$RELEASE_SIGNING_KEY" > "$key"
+          pub="$(sed -n 's/^const ReleasePublicKey = "\(.*\)"$/\1/p' internal/update/update.go)"
+          (printf '\x30\x2a\x30\x05\x06\x03\x2b\x65\x70\x03\x21\x00'; printf '%s' "$pub" | base64 -d) \
+            | openssl pkey -pubin -inform DER -out "$RUNNER_TEMP/release.pub"
+          for f in dist/*.tar.gz; do
+            openssl pkeyutl -sign -inkey "$key" -rawin -in "$f" -out "$f.sig"
+            openssl pkeyutl -verify -pubin -inkey "$RUNNER_TEMP/release.pub" -rawin -in "$f" -sigfile "$f.sig"
+          done
+
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          # The release notes are the annotated tag's message; a "Manual step:" line in
+          # it makes self-update refuse the release.
+          gh release create "$TAG" dist/*.tar.gz dist/*.tar.gz.sig dist/*.sha256 --title "$TAG" --notes-from-tag

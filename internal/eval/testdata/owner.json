@@ -1,0 +1,48 @@
+{
+  "description": "Synthetic Telegram owner controls, guarded asynchronous tools, notices and daily digest against a local Bot API; no live qualification.",
+  "cases": [
+    {
+      "id": "owner_only_controls",
+      "kind": "owner",
+      "scenario": "controls",
+      "expect": {
+        "end_reason": "completed",
+        "tools": [
+          "read_own_metrics"
+        ]
+      }
+    },
+    {
+      "id": "owner_async_question_next_wake",
+      "kind": "owner",
+      "scenario": "question",
+      "expect": {
+        "end_reason": "completed",
+        "tools": [
+          "read_own_metrics",
+          "ask_owner",
+          "notify_owner",
+          "read_own_metrics"
+        ]
+      }
+    },
+    {
+      "id": "owner_notices_digest_dedupe",
+      "kind": "owner",
+      "scenario": "notices",
+      "expect": {
+        "end_reason": "completed",
+        "tools": []
+      }
+    },
+    {
+      "id": "owner_delivery_failure_no_replay",
+      "kind": "owner",
+      "scenario": "delivery_failure",
+      "expect": {
+        "end_reason": "completed",
+        "tools": []
+      }
+    }
+  ]
+}

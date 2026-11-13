@@ -1,0 +1,127 @@
+{
+  "description": "Intentionally regressed expectations. The scripted providers are correct; a runner that reports these cases as passing is lying.",
+  "cases": [
+    {
+      "id": "regressed_content",
+      "kind": "chat",
+      "description": "Actual content is OBSERVED but the expectation claims EXPECTED_OTHER.",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Return a fixed sentence."
+        }
+      ],
+      "responses": {
+        "openai": [
+          {
+            "status": 200,
+            "body": {
+              "choices": [
+                {
+                  "message": {
+                    "role": "assistant",
+                    "content": "OBSERVED"
+                  },
+                  "finish_reason": "stop"
+                }
+              ],
+              "usage": {
+                "prompt_tokens": 10,
+                "completion_tokens": 2
+              }
+            }
+          }
+        ],
+        "anthropic": [
+          {
+            "status": 200,
+            "body": {
+              "id": "msg_regressed_content",
+              "type": "message",
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "OBSERVED"
+                }
+              ],
+              "stop_reason": "end_turn",
+              "usage": {
+                "input_tokens": 3,
+                "output_tokens": 2
+              }
+            }
+          }
+        ]
+      },
+      "expect": {
+        "end_reason": "completed",
+        "content": "EXPECTED_OTHER"
+      }
+    },
+    {
+      "id": "regressed_quality_rubric",
+      "kind": "chat",
+      "description": "A deterministic rubric forbids engagement claims, but the scripted response makes one.",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Return a quality sentence."
+        }
+      ],
+      "responses": {
+        "openai": [
+          {
+            "status": 200,
+            "body": {
+              "choices": [
+                {
+                  "message": {
+                    "role": "assistant",
+                    "content": "Engagement is guaranteed and viral."
+                  },
+                  "finish_reason": "stop"
+                }
+              ],
+              "usage": {
+                "prompt_tokens": 10,
+                "completion_tokens": 6
+              }
+            }
+          }
+        ],
+        "anthropic": [
+          {
+            "status": 200,
+            "body": {
+              "id": "msg_regressed_rubric",
+              "type": "message",
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Engagement is guaranteed and viral."
+                }
+              ],
+              "stop_reason": "end_turn",
+              "usage": {
+                "input_tokens": 3,
+                "output_tokens": 5
+              }
+            }
+          }
+        ]
+      },
+      "expect": {
+        "end_reason": "completed",
+        "required_substrings": [
+          "deterministic"
+        ],
+        "forbidden_substrings": [
+          "guaranteed",
+          "viral"
+        ]
+      }
+    }
+  ]
+}

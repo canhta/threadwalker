@@ -1,0 +1,30 @@
+[Unit]
+Description=Threadz read-only dashboard
+After=network-online.target threadz.service
+Wants=network-online.target
+# The dashboard needs the SQLite DB the scheduler creates on its first start;
+# retry until it exists instead of failing the boot.
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+User=threadz
+Group=threadz
+WorkingDirectory=/opt/threadz
+Environment=HOME=/opt/threadz/data
+EnvironmentFile=-/etc/threadz/threadz.env
+ExecStart=/opt/threadz/threadz dashboard --agents /opt/threadz/agents --db /opt/threadz/data/threadz.db --listen 127.0.0.1:8080
+Restart=on-failure
+RestartSec=15s
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/threadz/data
+
+MemoryAccounting=true
+MemoryMax=128M
+TasksMax=64
+
+[Install]
+WantedBy=multi-user.target

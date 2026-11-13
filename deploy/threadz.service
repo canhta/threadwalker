@@ -1,0 +1,42 @@
+[Unit]
+Description=Threadz autonomous Threads experiment
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=threadz
+Group=threadz
+WorkingDirectory=/opt/threadz
+Environment=HOME=/opt/threadz/data
+Environment=XDG_CACHE_HOME=/opt/threadz/data/.cache
+Environment=XDG_CONFIG_HOME=/opt/threadz/data/.config
+EnvironmentFile=-/etc/threadz/threadz.env
+ExecStart=/opt/threadz/threadz run --agents /opt/threadz/agents --db /opt/threadz/data/threadz.db --socket /run/threadz/admin.sock --api-listen 127.0.0.1:8090
+RuntimeDirectory=threadz
+RuntimeDirectoryMode=0700
+# A wake logs several hundred records in seconds; the default journald limit (10000 per 30 s) drops them.
+LogRateLimitIntervalSec=30s
+LogRateLimitBurst=100000
+Restart=on-failure
+RestartSec=10s
+TimeoutStopSec=60s
+# SIGTERM only the harness first: a wake closes its browser gracefully before the rest of the cgroup is killed.
+KillMode=mixed
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/threadz/data
+
+# The host has 3.6 GiB RAM (~2.6 GiB available). Leave room for the OS and
+# SSH: Chrome and the agent-browser daemon are the largest consumers, and a
+# runaway Chrome is capped below the whole host.
+MemoryAccounting=true
+MemoryHigh=1800M
+MemoryMax=2400M
+MemorySwapMax=512M
+TasksMax=512
+
+[Install]
+WantedBy=multi-user.target

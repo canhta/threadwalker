@@ -1,0 +1,42 @@
+name: Feature request
+description: Propose a behaviour change, a tool or a docs fix
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Read the [design docs](https://github.com/canhta/threadz/blob/main/docs/README.md) first.
+        If it is silent or disagrees with your idea, say so here.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What is missing or wrong today?
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed change
+      description: What should happen instead, and which code or design doc it touches.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before sending
+      options:
+        - label: I searched the existing issues for the same proposal.
+          required: true
+        - label: I read the setup guide and the design doc this would change.
+          required: true

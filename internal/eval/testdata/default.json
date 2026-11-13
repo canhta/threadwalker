@@ -1,0 +1,1439 @@
+{
+  "description": "Versioned offline eval suite. Every response body is synthetic. The planted strings below exist only to prove reports never echo fixture content or credentials. Components without a case here are not certified by it. Selected-key isolation is verified by CLI/config acceptance tests alongside this fixture suite.",
+  "cases": [
+    {
+      "id": "valid_two_tool_loop",
+      "kind": "chat",
+      "description": "Two-tool loop completes and exports only known tool names.",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Look up the seed and append its marker."
+        }
+      ],
+      "tools": [
+        {
+          "type": "function",
+          "function": {
+            "name": "lookup_seed",
+            "description": "Return the synthetic seed for a label.",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "label": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "label"
+              ]
+            }
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "append_marker",
+            "description": "Append a marker for a synthetic seed.",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "seed": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "seed"
+              ]
+            }
+          }
+        }
+      ],
+      "responses": {
+        "openai": [
+          {
+            "status": 200,
+            "body": {
+              "choices": [
+                {
+                  "message": {
+                    "role": "assistant",
+                    "tool_calls": [
+                      {
+                        "id": "call_lookup",
+                        "type": "function",
+                        "function": {
+                          "name": "lookup_seed",
+                          "arguments": "{\"label\":\"demo\"}"
+                        }
+                      }
+                    ]
+                  },
+                  "finish_reason": "tool_calls"
+                }
+              ],
+              "usage": {
+                "prompt_tokens": 100,
+                "completion_tokens": 20
+              }
+            }
+          },
+          {
+            "status": 200,
+            "body": {
+              "choices": [
+                {
+                  "message": {
+                    "role": "assistant",
+                    "tool_calls": [
+                      {
+                        "id": "call_append",
+                        "type": "function",
+                        "function": {
+                          "name": "append_marker",
+                          "arguments": "{\"seed\":\"seed-demo\"}"
+                        }
+                      }
+                    ]
+                  },
+                  "finish_reason": "tool_calls"
+                }
+              ],
+              "usage": {
+                "prompt_tokens": 120,
+                "completion_tokens": 12
+              }
+            }
+          },
+          {
+            "status": 200,
+            "body": {
+              "choices": [
+                {
+                  "message": {
+                    "role": "assistant",
+                    "content": "DONE"
+                  },
+                  "finish_reason": "stop"
+                }
+              ],
+              "usage": {
+                "prompt_tokens": 140,
+                "completion_tokens": 3
+              }
+            }
+          }
+        ],
+        "anthropic": [
+          {
+            "status": 200,
+            "body": {
+              "id": "msg_valid_1",
+              "type": "message",
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "looking up the seed"
+                },
+                {
+                  "type": "tool_use",
+                  "id": "toolu_lookup",
+                  "name": "lookup_seed",
+                  "input": {
+                    "label": "demo"
+                  }
+                }
+              ],
+              "stop_reason": "tool_use",
+              "usage": {
+                "input_tokens": 10,
+                "output_tokens": 4
+              }
+            }
+          },
+          {
+            "status": 200,
+            "body": {
+              "id": "msg_valid_2",
+              "type": "message",
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "tool_use",
+                  "id": "toolu_append",
+                  "name": "append_marker",
+                  "input": {
+                    "seed": "seed-demo"
+                  }
+                }
+              ],
+              "stop_reason": "tool_use",
+              "usage": {
+                "input_tokens": 20,
+                "output_tokens": 6
+              }
+            }
+          },
+          {
+            "status": 200,
+            "body": {
+              "id": "msg_valid_3",
+              "type": "message",
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "DONE"
+                }
+              ],
+              "stop_reason": "end_turn",
+              "usage": {
+                "input_tokens": 30,
+                "output_tokens": 2
+              }
+            }
+          }
+        ]
+      },
+      "tool_outputs": {
+        "lookup_seed": "{\"seed\":\"seed-demo\",\"note\":\"fixture-secret-PLANTED-9931\",\"username\":\"fixture_stranger_9931\"}",
+        "append_marker": "marker-set"
+      },
+      "expect": {
+        "end_reason": "completed",
+        "content": "DONE",
+        "tools": [
+          "lookup_seed",
+          "append_marker"
+        ]
+      },
+      "limits": {
+        "max_output_tokens": 64
+      }
+    },
+    {
+      "id": "retry_then_success",
+      "kind": "chat",
+      "description": "A retryable provider failure is retried once, then a tool call and final answer succeed.",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Retry the synthetic provider once, then look up the seed."
+        }
+      ],
+      "tools": [
+        {
+          "type": "function",
+          "function": {
+            "name": "lookup_seed",
+            "description": "Return the synthetic seed for a label.",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "label": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "label"
+              ]
+            }
+          }
+        }
+      ],
+      "responses": {
+        "openai": [
+          {
+            "status": 500,
+            "body": {
+              "error": {
+                "message": "upstream unavailable for fixture-secret-PLANTED-9931 user fixture_stranger_9931"
+              }
+            }
+          },
+          {
+            "status": 200,
+            "body": {
+              "choices": [
+                {
+                  "message": {
+                    "role": "assistant",
+                    "tool_calls": [
+                      {
+                        "id": "call_retry_lookup",
+                        "type": "function",
+                        "function": {
+                          "name": "lookup_seed",
+                          "arguments": "{\"label\":\"retry\"}"
+                        }
+                      }
+                    ]
+                  },
+                  "finish_reason": "tool_calls"
+                }
+              ],
+              "usage": {
+                "prompt_tokens": 80,
+                "completion_tokens": 16
+              }
+            }
+          },
+          {
+            "status": 200,
+            "body": {
+              "choices": [
+                {
+                  "message": {
+                    "role": "assistant",
+                    "content": "RETRIED"
+                  },
+                  "finish_reason": "stop"
+                }
+              ],
+              "usage": {
+                "prompt_tokens": 120,
+                "completion_tokens": 8
+              }
+            }
+          }
+        ],
+        "anthropic": [
+          {
+            "status": 500,
+            "body": {
+              "error": {
+                "message": "upstream unavailable for fixture-secret-PLANTED-9931 user fixture_stranger_9931"
+              }
+            }
+          },
+          {
+            "status": 200,
+            "body": {
+              "id": "msg_retry_1",
+              "type": "message",
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "tool_use",
+                  "id": "toolu_retry_lookup",
+                  "name": "lookup_seed",
+                  "input": {
+                    "label": "retry"
+                  }
+                }
+              ],
+              "stop_reason": "tool_use",
+              "usage": {
+                "input_tokens": 8,
+                "output_tokens": 2
+              }
+            }
+          },
+          {
+            "status": 200,
+            "body": {
+              "id": "msg_retry_2",
+              "type": "message",
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "RETRIED"
+                }
+              ],
+              "stop_reason": "end_turn",
+              "usage": {
+                "input_tokens": 12,
+                "output_tokens": 2
+              }
+            }
+          }
+        ]
+      },
+      "tool_outputs": {
+        "lookup_seed": "seed-retry"
+      },
+      "expect": {
+        "end_reason": "completed",
+        "content": "RETRIED",
+        "tools": [
+          "lookup_seed"
+        ]
+      }
+    },
+    {
+      "id": "retry_exhaustion",
+      "kind": "chat",
+      "description": "Three retryable failures exhaust the provider retry policy.",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Call the synthetic provider."
+        }
+      ],
+      "responses": {
+        "openai": [
+          {
+            "status": 500,
+            "body": {
+              "error": {
+                "message": "unavailable"
+              }
+            }
+          },
+          {
+            "status": 500,
+            "body": {
+              "error": {
+                "message": "unavailable"
+              }
+            }
+          },
+          {
+            "status": 500,
+            "body": {
+              "error": {
+                "message": "unavailable"
+              }
+            }
+          }
+        ],
+        "anthropic": [
+          {
+            "status": 500,
+            "body": {
+              "error": {
+                "message": "unavailable"
+              }
+            }
+          },
+          {
+            "status": 500,
+            "body": {
+              "error": {
+                "message": "unavailable"
+              }
+            }
+          },
+          {
+            "status": 500,
+            "body": {
+              "error": {
+                "message": "unavailable"
+              }
+            }
+          }
+        ]
+      },
+      "expect": {
+        "end_reason": "provider_error"
+      }
+    },
+    {
+      "id": "malformed_response",
+      "kind": "chat",
+      "description": "A 200 response with malformed JSON fails closed as invalid_response.",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Return malformed JSON."
+        }
+      ],
+      "responses": {
+        "openai": [
+          {
+            "status": 200,
+            "body_raw": "{\"choices\":"
+          }
+        ],
+        "anthropic": [
+          {
+            "status": 200,
+            "body_raw": "{\"content\":"
+          }
+        ]
+      },
+      "expect": {
+        "end_reason": "invalid_response"
+      }
+    },
+    {
+      "id": "unknown_and_invalid_arguments_recover",
+      "kind": "chat",
+      "description": "Unknown tools and invalid arguments are rejected without dispatch; the model then recovers.",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Try an unknown tool and malformed arguments, then recover."
+        }
+      ],
+      "tools": [
+        {
+          "type": "function",
+          "function": {
+            "name": "lookup_seed",
+            "description": "Return the synthetic seed for a label.",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "label": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "label"
+              ]
+            }
+          }
+        }
+      ],
+      "responses": {
+        "openai": [
+          {
+            "status": 200,
+            "body": {
+              "choices": [
+                {
+                  "message": {
+                    "role": "assistant",
+                    "tool_calls": [
+                      {
+                        "id": "call_unknown",
+                        "type": "function",
+                        "function": {
+                          "name": "delete_everything",
+                          "arguments": "{}"
+                        }
+                      },
+                      {
+                        "id": "call_bad_arguments",
+                        "type": "function",
+                        "function": {
+                          "name": "lookup_seed",
+                          "arguments": "{not-json"
+                        }
+                      }
+                    ]
+                  },
+                  "finish_reason": "tool_calls"
+                }
+              ],
+              "usage": {
+                "prompt_tokens": 40,
+                "completion_tokens": 10
+              }
+            }
+          },
+          {
+            "status": 200,
+            "body": {
+              "choices": [
+                {
+                  "message": {
+                    "role": "assistant",
+                    "content": "RECOVERED"
+                  },
+                  "finish_reason": "stop"
+                }
+              ],
+              "usage": {
+                "prompt_tokens": 60,
+                "completion_tokens": 4
+              }
+            }
+          }
+        ],
+        "anthropic": [
+          {
+            "status": 200,
+            "body": {
+              "id": "msg_unknown_1",
+              "type": "message",
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "tool_use",
+                  "id": "toolu_unknown",
+                  "name": "delete_everything",
+                  "input": {}
+                },
+                {
+                  "type": "tool_use",
+                  "id": "toolu_bad_arguments",
+                  "name": "lookup_seed",
+                  "input": [
+                    1,
+                    2
+                  ]
+                }
+              ],
+              "stop_reason": "tool_use",
+              "usage": {
+                "input_tokens": 4,
+                "output_tokens": 2
+              }
+            }
+          },
+          {
+            "status": 200,
+            "body": {
+              "id": "msg_unknown_2",
+              "type": "message",
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "RECOVERED"
+                }
+              ],
+              "stop_reason": "end_turn",
+              "usage": {
+                "input_tokens": 6,
+                "output_tokens": 1
+              }
+            }
+          }
+        ]
+      },
+      "tool_outputs": {
+        "lookup_seed": "seed-never-dispatched"
+      },
+      "expect": {
+        "end_reason": "completed",
+        "content": "RECOVERED",
+        "tools": []
+      }
+    },
+    {
+      "id": "budget_stop",
+      "kind": "chat",
+      "description": "The first response's usage exceeds the case USD cap, so the next request stops on budget.",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Spend past the synthetic budget cap."
+        }
+      ],
+      "tools": [
+        {
+          "type": "function",
+          "function": {
+            "name": "lookup_seed",
+            "description": "Return the synthetic seed for a label.",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "label": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "label"
+              ]
+            }
+          }
+        }
+      ],
+      "responses": {
+        "openai": [
+          {
+            "status": 200,
+            "body": {
+              "choices": [
+                {
+                  "message": {
+                    "role": "assistant",
+                    "tool_calls": [
+                      {
+                        "id": "call_budget",
+                        "type": "function",
+                        "function": {
+                          "name": "lookup_seed",
+                          "arguments": "{\"label\":\"budget\"}"
+                        }
+                      }
+                    ]
+                  },
+                  "finish_reason": "tool_calls"
+                }
+              ],
+              "usage": {
+                "prompt_tokens": 100,
+                "completion_tokens": 20
+              }
+            }
+          }
+        ],
+        "anthropic": [
+          {
+            "status": 200,
+            "body": {
+              "id": "msg_budget_1",
+              "type": "message",
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "tool_use",
+                  "id": "toolu_budget",
+                  "name": "lookup_seed",
+                  "input": {
+                    "label": "budget"
+                  }
+                }
+              ],
+              "stop_reason": "tool_use",
+              "usage": {
+                "input_tokens": 100,
+                "output_tokens": 20
+              }
+            }
+          }
+        ]
+      },
+      "tool_outputs": {
+        "lookup_seed": "seed-budget"
+      },
+      "expect": {
+        "end_reason": "budget",
+        "tools": [
+          "lookup_seed"
+        ]
+      },
+      "limits": {
+        "max_usd": 0.0001
+      }
+    },
+    {
+      "id": "step_stop",
+      "kind": "chat",
+      "description": "One tool call consumes the case step cap before its tool can run.",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Take one step."
+        }
+      ],
+      "tools": [
+        {
+          "type": "function",
+          "function": {
+            "name": "lookup_seed",
+            "description": "Return the synthetic seed for a label.",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "label": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "label"
+              ]
+            }
+          }
+        }
+      ],
+      "responses": {
+        "openai": [
+          {
+            "status": 200,
+            "body": {
+              "choices": [
+                {
+                  "message": {
+                    "role": "assistant",
+                    "tool_calls": [
+                      {
+                        "id": "call_step",
+                        "type": "function",
+                        "function": {
+                          "name": "lookup_seed",
+                          "arguments": "{\"label\":\"step\"}"
+                        }
+                      }
+                    ]
+                  },
+                  "finish_reason": "tool_calls"
+                }
+              ],
+              "usage": {
+                "prompt_tokens": 20,
+                "completion_tokens": 5
+              }
+            }
+          }
+        ],
+        "anthropic": [
+          {
+            "status": 200,
+            "body": {
+              "id": "msg_step_1",
+              "type": "message",
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "tool_use",
+                  "id": "toolu_step",
+                  "name": "lookup_seed",
+                  "input": {
+                    "label": "step"
+                  }
+                }
+              ],
+              "stop_reason": "tool_use",
+              "usage": {
+                "input_tokens": 20,
+                "output_tokens": 5
+              }
+            }
+          }
+        ]
+      },
+      "tool_outputs": {
+        "lookup_seed": "seed-step"
+      },
+      "expect": {
+        "end_reason": "step_limit"
+      },
+      "limits": {
+        "max_steps": 1
+      }
+    },
+    {
+      "id": "cancelled_request",
+      "kind": "chat",
+      "description": "A cancelled synthetic transport is reported as a safe cancellation.",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Cancel the synthetic request."
+        }
+      ],
+      "responses": {
+        "openai": [
+          {
+            "error": "cancelled"
+          }
+        ],
+        "anthropic": [
+          {
+            "error": "cancelled"
+          }
+        ]
+      },
+      "expect": {
+        "end_reason": "cancelled"
+      }
+    },
+    {
+      "id": "deterministic_quality_rubric",
+      "kind": "chat",
+      "description": "Deterministic rubric: exact content, required and forbidden substrings, rune cap. This is not a human or engagement judgement.",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Reply with one deterministic quality-check sentence."
+        }
+      ],
+      "responses": {
+        "openai": [
+          {
+            "status": 200,
+            "body": {
+              "choices": [
+                {
+                  "message": {
+                    "role": "assistant",
+                    "content": "Short deterministic quality check: one clear claim."
+                  },
+                  "finish_reason": "stop"
+                }
+              ],
+              "usage": {
+                "prompt_tokens": 30,
+                "completion_tokens": 9
+              }
+            }
+          }
+        ],
+        "anthropic": [
+          {
+            "status": 200,
+            "body": {
+              "id": "msg_quality_1",
+              "type": "message",
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Short deterministic quality check: one clear claim."
+                }
+              ],
+              "stop_reason": "end_turn",
+              "usage": {
+                "input_tokens": 8,
+                "output_tokens": 8
+              }
+            }
+          }
+        ]
+      },
+      "expect": {
+        "end_reason": "completed",
+        "content": "Short deterministic quality check: one clear claim.",
+        "required_substrings": [
+          "deterministic",
+          "quality check",
+          "one clear claim"
+        ],
+        "forbidden_substrings": [
+          "guaranteed",
+          "viral"
+        ],
+        "max_runes": 80
+      }
+    },
+    {
+      "id": "missing_usage",
+      "kind": "chat",
+      "description": "Missing usage fails closed before final content is accepted.",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Complete this synthetic protocol check."
+        }
+      ],
+      "responses": {
+        "openai": [
+          {
+            "status": 200,
+            "body": {
+              "choices": [
+                {
+                  "message": {
+                    "role": "assistant",
+                    "content": "DONE"
+                  },
+                  "finish_reason": "stop"
+                }
+              ]
+            }
+          }
+        ],
+        "anthropic": [
+          {
+            "status": 200,
+            "body": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "DONE"
+                }
+              ],
+              "stop_reason": "end_turn"
+            }
+          }
+        ]
+      },
+      "expect": {
+        "end_reason": "accounting_error",
+        "tools": []
+      }
+    },
+    {
+      "id": "incomplete_usage",
+      "kind": "chat",
+      "description": "Incomplete usage fails closed without inventing token counts.",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Complete this synthetic protocol check."
+        }
+      ],
+      "responses": {
+        "openai": [
+          {
+            "status": 200,
+            "body": {
+              "choices": [
+                {
+                  "message": {
+                    "role": "assistant",
+                    "content": "DONE"
+                  },
+                  "finish_reason": "stop"
+                }
+              ],
+              "usage": {
+                "prompt_tokens": 12
+              }
+            }
+          }
+        ],
+        "anthropic": [
+          {
+            "status": 200,
+            "body": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "DONE"
+                }
+              ],
+              "stop_reason": "end_turn",
+              "usage": {
+                "input_tokens": 12
+              }
+            }
+          }
+        ]
+      },
+      "expect": {
+        "end_reason": "accounting_error",
+        "tools": []
+      }
+    },
+    {
+      "id": "negative_usage",
+      "kind": "chat",
+      "description": "Negative usage fails closed without recording invalid counters.",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Complete this synthetic protocol check."
+        }
+      ],
+      "responses": {
+        "openai": [
+          {
+            "status": 200,
+            "body": {
+              "choices": [
+                {
+                  "message": {
+                    "role": "assistant",
+                    "content": "DONE"
+                  },
+                  "finish_reason": "stop"
+                }
+              ],
+              "usage": {
+                "prompt_tokens": -1,
+                "completion_tokens": 2
+              }
+            }
+          }
+        ],
+        "anthropic": [
+          {
+            "status": 200,
+            "body": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "DONE"
+                }
+              ],
+              "stop_reason": "end_turn",
+              "usage": {
+                "input_tokens": -1,
+                "output_tokens": 2
+              }
+            }
+          }
+        ]
+      },
+      "expect": {
+        "end_reason": "accounting_error",
+        "tools": []
+      }
+    },
+    {
+      "id": "request_timeout",
+      "kind": "chat",
+      "description": "Synthetic request timeout, repeated on the one retry, records a provider error without sleeping or accessing a network.",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Complete this synthetic protocol check."
+        }
+      ],
+      "responses": {
+        "openai": [
+          {
+            "error": "timeout"
+          },
+          {
+            "error": "timeout"
+          }
+        ],
+        "anthropic": [
+          {
+            "error": "timeout"
+          },
+          {
+            "error": "timeout"
+          }
+        ]
+      },
+      "expect": {
+        "end_reason": "provider_error",
+        "tools": []
+      }
+    },
+    {
+      "id": "native_cache_usage_normalization",
+      "kind": "chat",
+      "description": "Equivalent normalized input usage across the two implemented protocol adapters.",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Complete this synthetic protocol check."
+        }
+      ],
+      "responses": {
+        "openai": [
+          {
+            "status": 200,
+            "body": {
+              "choices": [
+                {
+                  "message": {
+                    "role": "assistant",
+                    "content": "DONE"
+                  },
+                  "finish_reason": "stop"
+                }
+              ],
+              "usage": {
+                "prompt_tokens": 12,
+                "completion_tokens": 2
+              }
+            }
+          }
+        ],
+        "anthropic": [
+          {
+            "status": 200,
+            "body": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "DONE"
+                }
+              ],
+              "stop_reason": "end_turn",
+              "usage": {
+                "input_tokens": 3,
+                "output_tokens": 2,
+                "cache_read_input_tokens": 4,
+                "cache_creation_input_tokens": 5
+              }
+            }
+          }
+        ]
+      },
+      "expect": {
+        "end_reason": "completed",
+        "tools": [],
+        "content": "DONE"
+      }
+    },
+    {
+      "id": "output_bound",
+      "kind": "chat",
+      "description": "A compliant response fits the configured per-request two-token output bound.",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Complete this synthetic protocol check."
+        }
+      ],
+      "responses": {
+        "openai": [
+          {
+            "status": 200,
+            "body": {
+              "choices": [
+                {
+                  "message": {
+                    "role": "assistant",
+                    "content": "DONE"
+                  },
+                  "finish_reason": "stop"
+                }
+              ],
+              "usage": {
+                "prompt_tokens": 12,
+                "completion_tokens": 2
+              }
+            }
+          }
+        ],
+        "anthropic": [
+          {
+            "status": 200,
+            "body": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "DONE"
+                }
+              ],
+              "stop_reason": "end_turn",
+              "usage": {
+                "input_tokens": 12,
+                "output_tokens": 2
+              }
+            }
+          }
+        ]
+      },
+      "expect": {
+        "end_reason": "completed",
+        "tools": [],
+        "content": "DONE"
+      },
+      "limits": {
+        "max_output_tokens": 2
+      }
+    },
+    {
+      "id": "replay_mangled_trend_ref",
+      "kind": "replay",
+      "description": "A model copies a long Google News URL with two characters wrong and then one it never read; the near copy resolves, the far one is refused with the nearest noted refs in the stored detail, and the short ref works.",
+      "replay": {
+        "steps": [
+          {
+            "call": {
+              "type": "function",
+              "function": {
+                "name": "fetch_trends",
+                "arguments": "{}"
+              }
+            },
+            "output": {
+              "untrusted": true,
+              "source": "fetch_trends",
+              "data": [
+                {
+                  "ref": "r1",
+                  "source": "google_trends_vn",
+                  "title": "Synthetic headline about a language model price cut",
+                  "url": "https://news.google.com/rss/articles/CBMiSyntheticOpaqueIdentifierForReplayFixtureAAAAAAAAAAAAAAAAAAAAAAAAAAAA?oc=5"
+                },
+                {
+                  "ref": "r3",
+                  "source": "google_trends_vn",
+                  "title": "Synthetic headline about an office chair review",
+                  "url": "https://news.google.com/rss/articles/CBMiAnotherSyntheticOpaqueIdentifierForReplayBBBBBBBBBBBBBBBBBBBBBB?oc=5"
+                }
+              ]
+            }
+          },
+          {
+            "call": {
+              "type": "function",
+              "function": {
+                "name": "post",
+                "arguments": "{\"text\": \"Giá model giảm một nửa, hóa đơn của dev đi đâu?\", \"trend_ref\": \"https://news.google.com/rss/articles/CBMiSyntheticOpaqueIdentifierForReplayFixtrueAAAAAAAAAAAAAAAAAAAAAAAAAAAA?oc=5\", \"hook\": \"trend_detail\", \"rationale\": \"anchors to the price cut, hook states the cut, devs reply with their bills\"}"
+              }
+            }
+          },
+          {
+            "call": {
+              "type": "function",
+              "function": {
+                "name": "post",
+                "arguments": "{\"text\": \"Ghế văn phòng 5 triệu hay 15 triệu, đâu là khác biệt?\", \"trend_ref\": \"https://news.google.com/rss/articles/CBMiTotallyDifferentArticleThatWasNeverRead?oc=5\", \"hook\": \"curiosity_gap\", \"rationale\": \"anchors to the chair review, hook asks the price gap, devs reply with their chairs\"}"
+              }
+            },
+            "expected_blocked": "no_trend_anchor",
+            "expected_detail": "\"nearest\":[{\"ref\":\"r3\""
+          },
+          {
+            "call": {
+              "type": "function",
+              "function": {
+                "name": "post",
+                "arguments": "{\"text\": \"Ghế văn phòng 5 triệu hay 15 triệu, đâu là khác biệt?\", \"trend_ref\": \"r3\", \"hook\": \"curiosity_gap\", \"rationale\": \"anchors to the chair review, hook asks the price gap, devs reply with their chairs\"}"
+              }
+            },
+            "expected_detail": "\"resolved\":\"https://news.google.com/rss/articles/CBMiAnotherSyntheticOpaqueIdentifierForReplayBBBBBBBBBBBBBBBBBBBBBB?oc=5\""
+          }
+        ],
+        "expected_actions": 2
+      },
+      "expect": {
+        "end_reason": "completed",
+        "tools": [
+          "fetch_trends",
+          "post",
+          "post",
+          "post"
+        ]
+      }
+    },
+    {
+      "id": "replay_rough_draft_with_writer",
+      "kind": "replay",
+      "description": "A rough draft over 500 characters goes to the writer instead of being refused as text_length; a writer text that is still too long is checked in full and the editor's rejection names the length.",
+      "replay": {
+        "writer": [
+          [
+            "Giá model giảm nửa, hóa đơn dev vẫn tăng: ai đang gọi API nhiều hơn?"
+          ],
+          [
+            "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+          ],
+          [
+            "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+          ],
+          [
+            "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+          ]
+        ],
+        "critic": [
+          {
+            "pass": true,
+            "problems": [],
+            "scores": {
+              "hook": 5,
+              "natural_vietnamese": 5,
+              "specificity": 5,
+              "forced_self_reference": 5,
+              "target_fit": 5,
+              "novelty": 5,
+              "clarity": 5
+            }
+          }
+        ],
+        "steps": [
+          {
+            "call": {
+              "type": "function",
+              "function": {
+                "name": "fetch_trends",
+                "arguments": "{}"
+              }
+            },
+            "output": {
+              "untrusted": true,
+              "source": "fetch_trends",
+              "data": [
+                {
+                  "ref": "r1",
+                  "source": "google_trends_vn",
+                  "title": "Synthetic headline about a language model price cut",
+                  "url": "https://news.google.com/rss/articles/CBMiSyntheticOpaqueIdentifierForReplayFixtureAAAAAAAAAAAAAAAAAAAAAAAAAAAA?oc=5"
+                },
+                {
+                  "ref": "r3",
+                  "source": "google_trends_vn",
+                  "title": "Synthetic headline about an office chair review",
+                  "url": "https://news.google.com/rss/articles/CBMiAnotherSyntheticOpaqueIdentifierForReplayBBBBBBBBBBBBBBBBBBBBBB?oc=5"
+                }
+              ]
+            }
+          },
+          {
+            "call": {
+              "type": "function",
+              "function": {
+                "name": "post",
+                "arguments": "{\"text\": \"Bản nháp thô dài hơn năm trăm ký tự: model rẻ hơn nhưng hóa đơn vẫn tăng vì dev gọi nhiều hơn. model rẻ hơn nhưng hóa đơn vẫn tăng vì dev gọi nhiều hơn. model rẻ hơn nhưng hóa đơn vẫn tăng vì dev gọi nhiều hơn. model rẻ hơn nhưng hóa đơn vẫn tăng vì dev gọi nhiều hơn. model rẻ hơn nhưng hóa đơn vẫn tăng vì dev gọi nhiều hơn. model rẻ hơn nhưng hóa đơn vẫn tăng vì dev gọi nhiều hơn. model rẻ hơn nhưng hóa đơn vẫn tăng vì dev gọi nhiều hơn. model rẻ hơn nhưng hóa đơn vẫn tăng vì dev gọi nhiều hơn. model rẻ hơn nhưng hóa đơn vẫn tăng vì dev gọi nhiều hơn. model rẻ hơn nhưng hóa đơn vẫn tăng vì dev gọi nhiều hơn. model rẻ hơn nhưng hóa đơn vẫn tăng vì dev gọi nhiều hơn. model rẻ hơn nhưng hóa đơn vẫn tăng vì dev gọi nhiều hơn.\", \"trend_ref\": \"r1\", \"angle\": \"price cut vs bills\", \"fact\": \"synthetic\", \"hook\": \"trend_detail\", \"rationale\": \"anchors to the price cut, hook states the cut, devs reply with their bills\"}"
+              }
+            },
+            "expected_detail": "\"source\":\"agent\",\"first\":\"Bản nháp thô"
+          },
+          {
+            "call": {
+              "type": "function",
+              "function": {
+                "name": "post",
+                "arguments": "{\"text\": \"Rough draft\", \"trend_ref\": \"r3\", \"hook\": \"curiosity_gap\", \"rationale\": \"anchors to the chair review, hook asks the price gap, devs reply with their chairs\", \"angle\": \"chairs\", \"fact\": \"synthetic\"}"
+              }
+            },
+            "expected_blocked": "critic_rejected",
+            "expected_detail": "too long: "
+          }
+        ],
+        "expected_actions": 1
+      },
+      "expect": {
+        "end_reason": "completed",
+        "tools": [
+          "fetch_trends",
+          "post",
+          "post"
+        ]
+      }
+    },
+    {
+      "id": "replay_reply_composer_missing",
+      "kind": "replay",
+      "description": "A browser reply to a feed post whose page shows no composer is refused as write_refused at the composer_missing stage; the intent is marked failed and the page snapshot is saved as evidence.",
+      "replay": {
+        "live": true,
+        "steps": [
+          {
+            "call": {
+              "type": "function",
+              "function": {
+                "name": "read_feed",
+                "arguments": "{}"
+              }
+            },
+            "output": {
+              "untrusted": true,
+              "source": "read_feed",
+              "data": {
+                "kind": "feed",
+                "posts": [
+                  {
+                    "id": "",
+                    "username": "synthetic_author",
+                    "url": "https://www.threads.com/@synthetic_author/post/fixtureTaggedPost",
+                    "text": "",
+                    "likes": 305,
+                    "replies": 5
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "call": {
+              "type": "function",
+              "function": {
+                "name": "reply",
+                "arguments": "{\"text\": \"Cái này đúng, mình cũng bị rồi.\", \"target_url\": \"r1\", \"target_username\": \"synthetic_author\", \"hook\": \"personal_stake\"}"
+              }
+            },
+            "fail_write": {
+              "reason": "write_refused",
+              "stage": "composer_missing",
+              "snapshot": "synthetic accessibility snapshot of a post page without a composer"
+            },
+            "expected_stage": "composer_missing",
+            "expected_detail": "\"stage\":\"composer_missing\""
+          }
+        ],
+        "expected_actions": 1
+      },
+      "expect": {
+        "end_reason": "completed",
+        "tools": [
+          "read_feed",
+          "reply"
+        ]
+      }
+    }
+  ]
+}

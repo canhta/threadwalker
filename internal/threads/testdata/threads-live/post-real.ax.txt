@@ -1,0 +1,73 @@
+- navigation
+  - link "Threads" [ref=e134, url=https://www.threads.com/]
+    - image "Threads"
+  - link "Home" [ref=e135, url=https://www.threads.com/]
+    - image "Home"
+  - button "New thread" [ref=e136]
+    - image "New thread"
+  - link "Search" [ref=e137, url=https://www.threads.com/search]
+    - image "Search"
+  - link "Messages" [ref=e138, url=https://www.threads.com/messages/]
+    - image "Messages"
+  - link "Notifications" [ref=e139, url=https://www.threads.com/activity]
+    - image "Notifications"
+  - link "Profile" [ref=e140, url=https://www.threads.com/@synthetic_own]
+    - image "Profile"
+  - link "Insights" [ref=e141, url=https://www.threads.com/insights/]
+    - image "Insights"
+- generic
+  - generic
+    - generic
+      - generic
+        - button "Back" [ref=e143]
+          - image "Back"
+        - generic
+          - link "Column title" [ref=e153, url=https://www.threads.com/@synthetic_author/post/fixtureRealPost1]
+            - heading "Thread" [level=1, ref=e160]
+              - StaticText "Thread"
+          - StaticText "529 views"
+          - button "More" [expanded=false, ref=e161]
+            - image "More"
+      - region "Column body" [ref=e142] focusable [tabindex]
+        - generic
+          - generic [ref=e167] clickable [cursor:pointer, onclick]
+            - button "synthetic_author's profile picture Follow" [ref=e179]
+              - image "synthetic_author's profile picture"
+              - button "Follow" [ref=e185]
+                - image "Follow"
+            - link "synthetic_author" [ref=e180, url=https://www.threads.com/@synthetic_author]
+              - StaticText "synthetic_author"
+            - link "45 minutes ago" [ref=e181, url=https://www.threads.com/@synthetic_author/post/fixtureRealPost1]
+              - time
+                - Abbr "45 minutes ago"
+                  - StaticText "45m"
+            - button "More" [expanded=false, ref=e182]
+              - image "More"
+            - StaticText "Synthetic real-shaped post."
+            - link "Synthetic photo." [ref=e183, url=https://www.threads.com/@synthetic_author/post/fixtureRealPost1/media]
+              - generic
+                - generic
+                  - image "Synthetic photo."
+            - button "Like 2" [ref=e168]
+              - image "Like"
+              - StaticText "2"
+            - button "Reply" [ref=e169]
+              - image "Reply"
+            - button "Repost" [expanded=false, ref=e170]
+              - image "Repost"
+            - button "Share 1" [ref=e171]
+              - image "Share"
+              - StaticText "1"
+            - StaticText "No replies yet"
+            - button "View activity View activity" [ref=e172]
+              - StaticText "View activity"
+              - image "View activity"
+            - image "synthetic_own's profile picture"
+            - generic
+              - textbox "Empty text field. Type to compose a new post." [ref=e184]: 
+
+                - paragraph
+                  - LineBreak "\n"
+            - button "Attach media" [ref=e173]
+            - button "Add a GIF" [ref=e174]
+            - button "Expand composer" [ref=e175]

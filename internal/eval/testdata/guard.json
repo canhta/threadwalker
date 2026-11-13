@@ -1,0 +1,1423 @@
+{
+  "description": "Versioned synthetic guard policy component evals: actual guarded dispatcher and SQLite, injected time, no provider/browser/Telegram requests.",
+  "cases": [
+    {
+      "id": "guard_post_daily_n_nplus1",
+      "kind": "guard",
+      "description": "Synthetic production guard/SQLite boundary; no external services.",
+      "guard": {
+        "posts_per_day": 2,
+        "steps": [
+          {
+            "offset_ns": 0,
+            "call": {
+              "type": "function",
+              "function": {
+                "name": "post",
+                "arguments": "{\"text\":\"topic1\"}"
+              }
+            }
+          },
+          {
+            "offset_ns": 1000000000,
+            "call": {
+              "type": "function",
+              "function": {
+                "name": "post",
+                "arguments": "{\"text\":\"topic2\"}"
+              }
+            }
+          },
+          {
+            "offset_ns": 2000000000,
+            "call": {
+              "type": "function",
+              "function": {
+                "name": "post",
+                "arguments": "{\"text\":\"topic3\"}"
+              }
+            },
+            "expected_blocked": "posts_per_day"
+          }
+        ],
+        "expected_actions": 2
+      },
+      "expect": {
+        "end_reason": "completed",
+        "tools": [
+          "post",
+          "post",
+          "post"
+        ]
+      }
+    },
+    {
+      "id": "guard_reply_daily_n_nplus1",
+      "kind": "guard",
+      "description": "Synthetic production guard/SQLite boundary; no external services.",
+      "guard": {
+        "replies_per_day": 2,
+        "steps": [
+          {
+            "offset_ns": 0,
+            "call": {
+              "type": "function",
+              "function": {
+                "name": "reply",
+                "arguments": "{\"text\":\"Synthetic own reply number 1\",\"target_username\":\"fixture_author\",\"target_id\":\"id-1\",\"target_url\":\"https://threads.com/@fixture_author/post/1\"}"
+              }
+            }
+          },
+          {
+            "offset_ns": 1000000000,
+            "call": {
+              "type": "function",
+              "function": {
+                "name": "reply",
+                "arguments": "{\"text\":\"Synthetic own reply number 2\",\"target_username\":\"fixture_author\",\"target_id\":\"id-2\",\"target_url\":\"https://threads.com/@fixture_author/post/2\"}"
+              }
+            }
+          },
+          {
+            "offset_ns": 2000000000,
+            "call": {
+              "type": "function",
+              "function": {
+                "name": "reply",
+                "arguments": "{\"text\":\"Synthetic own reply number 3\",\"target_username\":\"fixture_author\",\"target_id\":\"id-3\",\"target_url\":\"https://threads.com/@fixture_author/post/3\"}"
+              }
+            },
+            "expected_blocked": "replies_per_day"
+          }
+        ],
+        "expected_actions": 2
+      },
+      "expect": {
+        "end_reason": "completed",
+        "tools": [
+          "reply",
+          "reply",
+          "reply"
+        ]
+      }
+    },
+    {
+      "id": "guard_daily_utc_rollover",
+      "kind": "guard",
+      "description": "Synthetic production guard/SQLite boundary; no external services.",
+      "guard": {
+        "posts_per_day": 1,
+        "steps": [
+          {
+            "offset_ns": 0,
+            "call": {
+              "type": "function",
+              "function": {
+                "name": "post",
+                "arguments": "{\"text\":\"topic1\"}"
+              }
+            }
+          },
+          {
+            "offset_ns": 86400000000000,
+            "call": {
+              "type": "function",
+              "function": {
+                "name": "post",
+                "arguments": "{\"text\":\"topic2\"}"
+              }
+            }
+          }
+        ],
+        "expected_actions": 2
+      },
+      "expect": {
+        "end_reason": "completed",
+        "tools": [
+          "post",
+          "post"
+        ]
+      }
+    },
+    {
+      "id": "guard_contact_n_nplus1",
+      "kind": "guard",
+      "description": "Synthetic production guard/SQLite boundary; no external services.",
+      "guard": {
+        "replies_per_user_7d": 2,
+        "steps": [
+          {
+            "offset_ns": 0,
+            "call": {
+              "type": "function",
+              "function": {
+                "name": "reply",
+                "arguments": "{\"text\":\"Synthetic own reply number 1\",\"target_username\":\"fixture_author\",\"target_id\":\"id-1\",\"target_url\":\"https://threads.com/@fixture_author/post/1\"}"
+              }
+            }
+          },
+          {
+            "offset_ns": 1000000000,
+            "call": {
+              "type": "function",
+              "function": {
+                "name": "reply",
+                "arguments": "{\"text\":\"Synthetic own reply number 2\",\"target_username\":\"fixture_author\",\"target_id\":\"id-2\",\"target_url\":\"https://threads.com/@fixture_author/post/2\"}"
+              }
+            }
+          },
+          {
+            "offset_ns": 2000000000,
+            "call": {
+              "type": "function",
+              "function": {
+                "name": "reply",
+                "arguments": "{\"text\":\"Synthetic own reply number 3\",\"target_username\":\"fixture_author\",\"target_id\":\"id-3\",\"target_url\":\"https://threads.com/@fixture_author/post/3\"}"
+              }
+            },
+            "expected_blocked": "replies_per_user_7d"
+          }
+        ],
+        "expected_actions": 2
+      },
+      "expect": {
+        "end_reason": "completed",
+        "tools": [
+          "reply",
+          "reply",
+          "reply"
+        ]
+      }
+    },
+    {
+      "id": "guard_contact_exact_7day",
+      "kind": "guard",
+      "description": "Synthetic production guard/SQLite boundary; no external services.",
+      "guard": {
+        "replies_per_user_7d": 1,
+        "steps": [
+          {
+            "offset_ns": 0,
+            "call": {
+              "type": "function",
+              "function": {
+                "name": "reply",
+                "arguments": "{\"text\":\"Synthetic own reply number 1\",\"target_username\":\"fixture_author\",\"target_id\":\"id-1\",\"target_url\":\"https://threads.com/@fixture_author/post/1\"}"
+              }
+            }
+          },
+          {
+            "offset_ns": 604799999999999,
+            "call": {
+              "type": "function",
+              "function": {
+                "name": "reply",
+                "arguments": "{\"text\":\"Synthetic own reply number 2\",\"target_username\":\"fixture_author\",\"target_id\":\"id-2\",\"target_url\":\"https://threads.com/@fixture_author/post/2\"}"
+              }
+            },
+            "expected_blocked": "replies_per_user_7d"
+          },
+          {
+            "offset_ns": 604800000000000,
+            "call": {
+              "type": "function",
+              "function": {
+                "name": "reply",
+                "arguments": "{\"text\":\"Synthetic own reply number 3\",\"target_username\":\"fixture_author\",\"target_id\":\"id-3\",\"target_url\":\"https://threads.com/@fixture_author/post/3\"}"
+              }
+            }
+          }
+        ],
+        "expected_actions": 2
+      },
+      "expect": {
+        "end_reason": "completed",
+        "tools": [
+          "reply",
+          "reply",
+          "reply"
+        ]
+      }
+    },
+    {
+      "id": "guard_spacing_nanosecond",
+      "kind": "guard",
+      "description": "Synthetic production guard/SQLite boundary; no external services.",
+      "guard": {
+        "spacing_seconds": 300,
+        "steps": [
+          {
+            "offset_ns": 0,
+            "call": {
+              "type": "function",
+              "function": {
+                "name": "post",
+                "arguments": "{\"text\":\"topic1\"}"
+              }
+            }
+          },
+          {
+            "offset_ns": 299999999999,
+            "call": {
+              "type": "function",
+              "function": {
+                "name": "post",
+                "arguments": "{\"text\":\"topic2\"}"
+              }
+            },
+            "expected_blocked": "min_seconds_between_actions"
+          },
+          {
+            "offset_ns": 300000000000,
+            "call": {
+              "type": "function",
+              "function": {
+                "name": "post",
+                "arguments": "{\"text\":\"topic3\"}"
+              }
+            }
+          }
+        ],
+        "expected_actions": 2
+      },
+      "expect": {
+        "end_reason": "completed",
+        "tools": [
+          "post",
+          "post",
+          "post"
+        ]
+      }
+    },
+    {
+      "id": "guard_post_forbidden_fold",
+      "kind": "guard",
+      "description": "Synthetic production guard/SQLite boundary; no external services.",
+      "guard": {
+        "blocked_phrases": [
+          "synthetic forbidden"
+        ],
+        "steps": [
+          {
+            "offset_ns": 0,
+            "call": {
+              "type": "function",
+              "function": {
+                "name": "post",
+                "arguments": "{\"text\":\"SYNTHETIC FORBIDDEN phrase\"}"
+              }
+            },
+            "expected_blocked": "blocked_phrase"
+          }
+        ],
+        "expected_actions": 0
+      },
+      "expect": {
+        "end_reason": "completed",
+        "tools": [
+          "post"
+        ]
+      }
+    },
+    {
+      "id": "guard_post_unicode_500_501",
+      "kind": "guard",
+      "description": "Synthetic production guard/SQLite boundary; no external services.",
+      "guard": {
+        "steps": [
+          {
+            "offset_ns": 0,
+            "call": {
+              "type": "function",
+              "function": {
+                "name": "post",
+                "arguments": "{\"text\":\"ểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểể🙂\"}"
+              }
+            }
+          },
+          {
+            "offset_ns": 1000000000,
+            "call": {
+              "type": "function",
+              "function": {
+                "name": "post",
+                "arguments": "{\"text\":\"ểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểể🙂x\"}"
+              }
+            },
+            "expected_blocked": "text_length"
+          }
+        ],
+        "expected_actions": 1
+      },
+      "expect": {
+        "end_reason": "completed",
+        "tools": [
+          "post",
+          "post"
+        ]
+      }
+    },
+    {
+      "id": "guard_reply_forbidden_fold",
+      "kind": "guard",
+      "description": "Synthetic production guard/SQLite boundary; no external services.",
+      "guard": {
+        "blocked_phrases": [
+          "synthetic forbidden"
+        ],
+        "steps": [
+          {
+            "offset_ns": 0,
+            "call": {
+              "type": "function",
+              "function": {
+                "name": "reply",
+                "arguments": "{\"text\":\"SYNTHETIC FORBIDDEN phrase\",\"target_username\":\"fixture_author\",\"target_id\":\"id-1\",\"target_url\":\"https://threads.com/@fixture_author/post/1\"}"
+              }
+            },
+            "expected_blocked": "blocked_phrase"
+          }
+        ],
+        "expected_actions": 0
+      },
+      "expect": {
+        "end_reason": "completed",
+        "tools": [
+          "reply"
+        ]
+      }
+    },
+    {
+      "id": "guard_reply_unicode_500_501",
+      "kind": "guard",
+      "description": "Synthetic production guard/SQLite boundary; no external services.",
+      "guard": {
+        "steps": [
+          {
+            "offset_ns": 0,
+            "call": {
+              "type": "function",
+              "function": {
+                "name": "reply",
+                "arguments": "{\"text\":\"ểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểể🙂\",\"target_username\":\"fixture_author\",\"target_id\":\"id-1\",\"target_url\":\"https://threads.com/@fixture_author/post/1\"}"
+              }
+            }
+          },
+          {
+            "offset_ns": 1000000000,
+            "call": {
+              "type": "function",
+              "function": {
+                "name": "reply",
+                "arguments": "{\"text\":\"ểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểể🙂x\",\"target_username\":\"fixture_author\",\"target_id\":\"id-1\",\"target_url\":\"https://threads.com/@fixture_author/post/1\"}"
+              }
+            },
+            "expected_blocked": "text_length"
+          }
+        ],
+        "expected_actions": 1
+      },
+      "expect": {
+        "end_reason": "completed",
+        "tools": [
+          "reply",
+          "reply"
+        ]
+      }
+    },
+    {
+      "id": "guard_reply_url_0",
+      "kind": "guard",
+      "description": "Synthetic production guard/SQLite boundary; no external services.",
+      "guard": {
+        "steps": [
+          {
+            "offset_ns": 0,
+            "call": {
+              "type": "function",
+              "function": {
+                "name": "reply",
+                "arguments": "{\"text\":\"Synthetic link https://example.test/x\",\"target_username\":\"fixture_author\",\"target_id\":\"id-1\",\"target_url\":\"https://threads.com/@fixture_author/post/1\"}"
+              }
+            },
+            "expected_blocked": "reply_url"
+          }
+        ],
+        "expected_actions": 0
+      },
+      "expect": {
+        "end_reason": "completed",
+        "tools": [
+          "reply"
+        ]
+      }
+    },
+    {
+      "id": "guard_reply_url_1",
+      "kind": "guard",
+      "description": "Synthetic production guard/SQLite boundary; no external services.",
+      "guard": {
+        "steps": [
+          {
+            "offset_ns": 0,
+            "call": {
+              "type": "function",
+              "function": {
+                "name": "reply",
+                "arguments": "{\"text\":\"Synthetic link http://example.test\",\"target_username\":\"fixture_author\",\"target_id\":\"id-1\",\"target_url\":\"https://threads.com/@fixture_author/post/1\"}"
+              }
+            },
+            "expected_blocked": "reply_url"
+          }
+        ],
+        "expected_actions": 0
+      },
+      "expect": {
+        "end_reason": "completed",
+        "tools": [
+          "reply"
+        ]
+      }
+    },
+    {
+      "id": "guard_reply_url_2",
+      "kind": "guard",
+      "description": "Synthetic production guard/SQLite boundary; no external services.",
+      "guard": {
+        "steps": [
+          {
+            "offset_ns": 0,
+            "call": {
+              "type": "function",
+              "function": {
+                "name": "reply",
+                "arguments": "{\"text\":\"Synthetic link www.example.test\",\"target_username\":\"fixture_author\",\"target_id\":\"id-1\",\"target_url\":\"https://threads.com/@fixture_author/post/1\"}"
+              }
+            },
+            "expected_blocked": "reply_url"
+          }
+        ],
+        "expected_actions": 0
+      },
+      "expect": {
+        "end_reason": "completed",
+        "tools": [
+          "reply"
+        ]
+      }
+    },
+    {
+      "id": "guard_reply_url_3",
+      "kind": "guard",
+      "description": "Synthetic production guard/SQLite boundary; no external services.",
+      "guard": {
+        "steps": [
+          {
+            "offset_ns": 0,
+            "call": {
+              "type": "function",
+              "function": {
+                "name": "reply",
+                "arguments": "{\"text\":\"Synthetic link example.test/path\",\"target_username\":\"fixture_author\",\"target_id\":\"id-1\",\"target_url\":\"https://threads.com/@fixture_author/post/1\"}"
+              }
+            },
+            "expected_blocked": "reply_url"
+          }
+        ],
+        "expected_actions": 0
+      },
+      "expect": {
+        "end_reason": "completed",
+        "tools": [
+          "reply"
+        ]
+      }
+    },
+    {
+      "id": "guard_reply_url_4",
+      "kind": "guard",
+      "description": "Synthetic production guard/SQLite boundary; no external services.",
+      "guard": {
+        "steps": [
+          {
+            "offset_ns": 0,
+            "call": {
+              "type": "function",
+              "function": {
+                "name": "reply",
+                "arguments": "{\"text\":\"Synthetic link example.test\",\"target_username\":\"fixture_author\",\"target_id\":\"id-1\",\"target_url\":\"https://threads.com/@fixture_author/post/1\"}"
+              }
+            },
+            "expected_blocked": "reply_url"
+          }
+        ],
+        "expected_actions": 0
+      },
+      "expect": {
+        "end_reason": "completed",
+        "tools": [
+          "reply"
+        ]
+      }
+    },
+    {
+      "id": "guard_reply_url_5",
+      "kind": "guard",
+      "description": "Synthetic production guard/SQLite boundary; no external services.",
+      "guard": {
+        "steps": [
+          {
+            "offset_ns": 0,
+            "call": {
+              "type": "function",
+              "function": {
+                "name": "reply",
+                "arguments": "{\"text\":\"Synthetic link ftp://example.test\",\"target_username\":\"fixture_author\",\"target_id\":\"id-1\",\"target_url\":\"https://threads.com/@fixture_author/post/1\"}"
+              }
+            },
+            "expected_blocked": "reply_url"
+          }
+        ],
+        "expected_actions": 0
+      },
+      "expect": {
+        "end_reason": "completed",
+        "tools": [
+          "reply"
+        ]
+      }
+    },
+    {
+      "id": "guard_reply_url_6",
+      "kind": "guard",
+      "description": "Synthetic production guard/SQLite boundary; no external services.",
+      "guard": {
+        "steps": [
+          {
+            "offset_ns": 0,
+            "call": {
+              "type": "function",
+              "function": {
+                "name": "reply",
+                "arguments": "{\"text\":\"Synthetic link //example.test\",\"target_username\":\"fixture_author\",\"target_id\":\"id-1\",\"target_url\":\"https://threads.com/@fixture_author/post/1\"}"
+              }
+            },
+            "expected_blocked": "reply_url"
+          }
+        ],
+        "expected_actions": 0
+      },
+      "expect": {
+        "end_reason": "completed",
+        "tools": [
+          "reply"
+        ]
+      }
+    },
+    {
+      "id": "guard_reply_url_7",
+      "kind": "guard",
+      "description": "Synthetic production guard/SQLite boundary; no external services.",
+      "guard": {
+        "steps": [
+          {
+            "offset_ns": 0,
+            "call": {
+              "type": "function",
+              "function": {
+                "name": "reply",
+                "arguments": "{\"text\":\"Synthetic link mailto:fixture@example.test\",\"target_username\":\"fixture_author\",\"target_id\":\"id-1\",\"target_url\":\"https://threads.com/@fixture_author/post/1\"}"
+              }
+            },
+            "expected_blocked": "reply_url"
+          }
+        ],
+        "expected_actions": 0
+      },
+      "expect": {
+        "end_reason": "completed",
+        "tools": [
+          "reply"
+        ]
+      }
+    },
+    {
+      "id": "guard_reply_author_dotted_mention",
+      "kind": "guard",
+      "description": "Synthetic production guard/SQLite boundary; no external services.",
+      "guard": {
+        "steps": [
+          {
+            "offset_ns": 0,
+            "call": {
+              "type": "function",
+              "function": {
+                "name": "reply",
+                "arguments": "{\"text\":\"Thanks @fixture.author\",\"target_username\":\"fixture.author\",\"target_id\":\"id-1\",\"target_url\":\"https://threads.com/@fixture.author/post/1\"}"
+              }
+            }
+          }
+        ],
+        "expected_actions": 1
+      },
+      "expect": {
+        "end_reason": "completed",
+        "tools": [
+          "reply"
+        ]
+      }
+    },
+    {
+      "id": "guard_reply_foreign_mention",
+      "kind": "guard",
+      "description": "Synthetic production guard/SQLite boundary; no external services.",
+      "guard": {
+        "steps": [
+          {
+            "offset_ns": 0,
+            "call": {
+              "type": "function",
+              "function": {
+                "name": "reply",
+                "arguments": "{\"text\":\"Thanks @third_author\",\"target_username\":\"fixture_author\",\"target_id\":\"id-1\",\"target_url\":\"https://threads.com/@fixture_author/post/1\"}"
+              }
+            },
+            "expected_blocked": "reply_mention"
+          }
+        ],
+        "expected_actions": 0
+      },
+      "expect": {
+        "end_reason": "completed",
+        "tools": [
+          "reply"
+        ]
+      }
+    },
+    {
+      "id": "guard_reply_thread_canonical_daily",
+      "kind": "guard",
+      "description": "Synthetic production guard/SQLite boundary; no external services.",
+      "guard": {
+        "steps": [
+          {
+            "offset_ns": 0,
+            "call": {
+              "type": "function",
+              "function": {
+                "name": "reply",
+                "arguments": "{\"text\":\"Synthetic own reply number 1\",\"target_username\":\"fixture_author\",\"target_id\":\"id-1\",\"target_url\":\"https://threads.com/@fixture_author/post/1\"}"
+              }
+            }
+          },
+          {
+            "offset_ns": 1000000000,
+            "call": {
+              "type": "function",
+              "function": {
+                "name": "reply",
+                "arguments": "{\"text\":\"Synthetic own reply number 2\",\"target_username\":\"fixture_author\",\"target_id\":\"id-x\",\"target_url\":\"https://threads.com/@fixture_author/post/1/?q=fixture#anchor\"}"
+              }
+            },
+            "expected_blocked": "thread_per_day"
+          },
+          {
+            "offset_ns": 86400000000000,
+            "call": {
+              "type": "function",
+              "function": {
+                "name": "reply",
+                "arguments": "{\"text\":\"Synthetic own reply number 3\",\"target_username\":\"fixture_author\",\"target_id\":\"id-1\",\"target_url\":\"https://threads.com/@fixture_author/post/1\"}"
+              }
+            }
+          }
+        ],
+        "expected_actions": 2
+      },
+      "expect": {
+        "end_reason": "completed",
+        "tools": [
+          "reply",
+          "reply",
+          "reply"
+        ]
+      }
+    },
+    {
+      "id": "guard_permanent_owner_contact",
+      "kind": "guard",
+      "description": "Synthetic production guard/SQLite boundary; no external services.",
+      "guard": {
+        "steps": [
+          {
+            "mark_username": " @Fixture_Author "
+          },
+          {
+            "offset_ns": 0,
+            "call": {
+              "type": "function",
+              "function": {
+                "name": "reply",
+                "arguments": "{\"text\":\"Synthetic own reply number 1\",\"target_username\":\"fixture_author\",\"target_id\":\"id-1\",\"target_url\":\"https://threads.com/@fixture_author/post/1\"}"
+              }
+            },
+            "expected_blocked": "do_not_contact"
+          }
+        ],
+        "expected_actions": 0
+      },
+      "expect": {
+        "end_reason": "completed",
+        "tools": [
+          "reply"
+        ]
+      }
+    },
+    {
+      "id": "guard_model_add_only_contact",
+      "kind": "guard",
+      "description": "Synthetic production guard/SQLite boundary; no external services.",
+      "guard": {
+        "steps": [
+          {
+            "offset_ns": 0,
+            "call": {
+              "type": "function",
+              "function": {
+                "name": "mark_do_not_contact",
+                "arguments": "{\"username\":\"@Fixture_Author\"}"
+              }
+            }
+          },
+          {
+            "offset_ns": 0,
+            "call": {
+              "type": "function",
+              "function": {
+                "name": "reply",
+                "arguments": "{\"text\":\"Synthetic own reply number 1\",\"target_username\":\"fixture_author\",\"target_id\":\"id-1\",\"target_url\":\"https://threads.com/@fixture_author/post/1\"}"
+              }
+            },
+            "expected_blocked": "do_not_contact"
+          }
+        ],
+        "expected_actions": 0
+      },
+      "expect": {
+        "end_reason": "completed",
+        "tools": [
+          "mark_do_not_contact",
+          "reply"
+        ]
+      }
+    },
+    {
+      "id": "guard_stop_english",
+      "kind": "guard",
+      "description": "Synthetic production guard/SQLite boundary; no external services.",
+      "guard": {
+        "steps": [
+          {
+            "observe": {
+              "username": "fixture_author",
+              "text": "PLEASE STOP now",
+              "addressed": true,
+              "expected_matched": true
+            }
+          },
+          {
+            "offset_ns": 0,
+            "call": {
+              "type": "function",
+              "function": {
+                "name": "reply",
+                "arguments": "{\"text\":\"Synthetic own reply number 1\",\"target_username\":\"fixture_author\",\"target_id\":\"id-1\",\"target_url\":\"https://threads.com/@fixture_author/post/1\"}"
+              }
+            },
+            "expected_blocked": "do_not_contact"
+          }
+        ],
+        "expected_actions": 0
+      },
+      "expect": {
+        "end_reason": "completed",
+        "tools": [
+          "reply"
+        ]
+      }
+    },
+    {
+      "id": "guard_stop_vietnamese",
+      "kind": "guard",
+      "description": "Synthetic production guard/SQLite boundary; no external services.",
+      "guard": {
+        "steps": [
+          {
+            "observe": {
+              "username": "fixture_author",
+              "text": "ĐỪNG TRẢ LỜI nữa",
+              "addressed": true,
+              "expected_matched": true
+            }
+          },
+          {
+            "offset_ns": 0,
+            "call": {
+              "type": "function",
+              "function": {
+                "name": "reply",
+                "arguments": "{\"text\":\"Synthetic own reply number 1\",\"target_username\":\"fixture_author\",\"target_id\":\"id-1\",\"target_url\":\"https://threads.com/@fixture_author/post/1\"}"
+              }
+            },
+            "expected_blocked": "do_not_contact"
+          }
+        ],
+        "expected_actions": 0
+      },
+      "expect": {
+        "end_reason": "completed",
+        "tools": [
+          "reply"
+        ]
+      }
+    },
+    {
+      "id": "guard_stop_custom_and_addressed",
+      "kind": "guard",
+      "description": "Synthetic production guard/SQLite boundary; no external services.",
+      "guard": {
+        "stop_phrases": [
+          "custom stop"
+        ],
+        "steps": [
+          {
+            "observe": {
+              "username": "fixture_author",
+              "text": "CUSTOM STOP",
+              "addressed": false,
+              "expected_matched": false
+            }
+          },
+          {
+            "observe": {
+              "username": "fixture_author",
+              "text": "normal message",
+              "addressed": true,
+              "expected_matched": false
+            }
+          },
+          {
+            "observe": {
+              "username": "fixture_author",
+              "text": "CUSTOM STOP",
+              "addressed": true,
+              "expected_matched": true
+            }
+          },
+          {
+            "offset_ns": 0,
+            "call": {
+              "type": "function",
+              "function": {
+                "name": "reply",
+                "arguments": "{\"text\":\"Synthetic own reply number 1\",\"target_username\":\"fixture_author\",\"target_id\":\"id-1\",\"target_url\":\"https://threads.com/@fixture_author/post/1\"}"
+              }
+            },
+            "expected_blocked": "do_not_contact"
+          }
+        ],
+        "expected_actions": 0
+      },
+      "expect": {
+        "end_reason": "completed",
+        "tools": [
+          "reply"
+        ]
+      }
+    },
+    {
+      "id": "guard_paused_every_tool",
+      "kind": "guard",
+      "description": "Synthetic production guard/SQLite boundary; no external services.",
+      "guard": {
+        "steps": [
+          {
+            "status": "paused"
+          },
+          {
+            "offset_ns": 0,
+            "call": {
+              "type": "function",
+              "function": {
+                "name": "mark_do_not_contact",
+                "arguments": "{\"username\":\"fixture_author\"}"
+              }
+            },
+            "expected_blocked": "agent_not_running"
+          },
+          {
+            "offset_ns": 0,
+            "call": {
+              "type": "function",
+              "function": {
+                "name": "note_write",
+                "arguments": "{\"topic\":\"synthetic\",\"text\":\"Synthetic note\"}"
+              }
+            },
+            "expected_blocked": "agent_not_running"
+          },
+          {
+            "offset_ns": 0,
+            "call": {
+              "type": "function",
+              "function": {
+                "name": "note_search",
+                "arguments": "{\"query\":\"fixture\"}"
+              }
+            },
+            "expected_blocked": "agent_not_running"
+          },
+          {
+            "offset_ns": 0,
+            "call": {
+              "type": "function",
+              "function": {
+                "name": "fetch_trends",
+                "arguments": "{}"
+              }
+            },
+            "expected_blocked": "agent_not_running"
+          },
+          {
+            "offset_ns": 0,
+            "call": {
+              "type": "function",
+              "function": {
+                "name": "read_feed",
+                "arguments": "{}"
+              }
+            },
+            "expected_blocked": "agent_not_running"
+          },
+          {
+            "offset_ns": 0,
+            "call": {
+              "type": "function",
+              "function": {
+                "name": "search",
+                "arguments": "{\"query\":\"fixture\"}"
+              }
+            },
+            "expected_blocked": "agent_not_running"
+          },
+          {
+            "offset_ns": 0,
+            "call": {
+              "type": "function",
+              "function": {
+                "name": "read_post",
+                "arguments": "{\"id\":\"x\"}"
+              }
+            },
+            "expected_blocked": "agent_not_running"
+          },
+          {
+            "offset_ns": 0,
+            "call": {
+              "type": "function",
+              "function": {
+                "name": "read_replies",
+                "arguments": "{}"
+              }
+            },
+            "expected_blocked": "agent_not_running"
+          },
+          {
+            "offset_ns": 0,
+            "call": {
+              "type": "function",
+              "function": {
+                "name": "read_own_metrics",
+                "arguments": "{}"
+              }
+            },
+            "expected_blocked": "agent_not_running"
+          },
+          {
+            "offset_ns": 0,
+            "call": {
+              "type": "function",
+              "function": {
+                "name": "post",
+                "arguments": "{\"text\":\"topic1\"}"
+              }
+            },
+            "expected_blocked": "agent_not_running"
+          },
+          {
+            "offset_ns": 0,
+            "call": {
+              "type": "function",
+              "function": {
+                "name": "reply",
+                "arguments": "{\"text\":\"Synthetic own reply number 1\",\"target_username\":\"fixture_author\",\"target_id\":\"id-1\",\"target_url\":\"https://threads.com/@fixture_author/post/1\"}"
+              }
+            },
+            "expected_blocked": "agent_not_running"
+          }
+        ],
+        "expected_actions": 0
+      },
+      "expect": {
+        "end_reason": "completed",
+        "tools": [
+          "mark_do_not_contact",
+          "note_write",
+          "note_search",
+          "fetch_trends",
+          "read_feed",
+          "search",
+          "read_post",
+          "read_replies",
+          "read_own_metrics",
+          "post",
+          "reply"
+        ]
+      }
+    },
+    {
+      "id": "guard_killed_every_tool",
+      "kind": "guard",
+      "description": "Synthetic production guard/SQLite boundary; no external services.",
+      "guard": {
+        "steps": [
+          {
+            "status": "killed"
+          },
+          {
+            "offset_ns": 0,
+            "call": {
+              "type": "function",
+              "function": {
+                "name": "mark_do_not_contact",
+                "arguments": "{\"username\":\"fixture_author\"}"
+              }
+            },
+            "expected_blocked": "agent_not_running"
+          },
+          {
+            "offset_ns": 0,
+            "call": {
+              "type": "function",
+              "function": {
+                "name": "note_write",
+                "arguments": "{\"topic\":\"synthetic\",\"text\":\"Synthetic note\"}"
+              }
+            },
+            "expected_blocked": "agent_not_running"
+          },
+          {
+            "offset_ns": 0,
+            "call": {
+              "type": "function",
+              "function": {
+                "name": "note_search",
+                "arguments": "{\"query\":\"fixture\"}"
+              }
+            },
+            "expected_blocked": "agent_not_running"
+          },
+          {
+            "offset_ns": 0,
+            "call": {
+              "type": "function",
+              "function": {
+                "name": "fetch_trends",
+                "arguments": "{}"
+              }
+            },
+            "expected_blocked": "agent_not_running"
+          },
+          {
+            "offset_ns": 0,
+            "call": {
+              "type": "function",
+              "function": {
+                "name": "read_feed",
+                "arguments": "{}"
+              }
+            },
+            "expected_blocked": "agent_not_running"
+          },
+          {
+            "offset_ns": 0,
+            "call": {
+              "type": "function",
+              "function": {
+                "name": "search",
+                "arguments": "{\"query\":\"fixture\"}"
+              }
+            },
+            "expected_blocked": "agent_not_running"
+          },
+          {
+            "offset_ns": 0,
+            "call": {
+              "type": "function",
+              "function": {
+                "name": "read_post",
+                "arguments": "{\"id\":\"x\"}"
+              }
+            },
+            "expected_blocked": "agent_not_running"
+          },
+          {
+            "offset_ns": 0,
+            "call": {
+              "type": "function",
+              "function": {
+                "name": "read_replies",
+                "arguments": "{}"
+              }
+            },
+            "expected_blocked": "agent_not_running"
+          },
+          {
+            "offset_ns": 0,
+            "call": {
+              "type": "function",
+              "function": {
+                "name": "read_own_metrics",
+                "arguments": "{}"
+              }
+            },
+            "expected_blocked": "agent_not_running"
+          },
+          {
+            "offset_ns": 0,
+            "call": {
+              "type": "function",
+              "function": {
+                "name": "post",
+                "arguments": "{\"text\":\"topic1\"}"
+              }
+            },
+            "expected_blocked": "agent_not_running"
+          },
+          {
+            "offset_ns": 0,
+            "call": {
+              "type": "function",
+              "function": {
+                "name": "reply",
+                "arguments": "{\"text\":\"Synthetic own reply number 1\",\"target_username\":\"fixture_author\",\"target_id\":\"id-1\",\"target_url\":\"https://threads.com/@fixture_author/post/1\"}"
+              }
+            },
+            "expected_blocked": "agent_not_running"
+          }
+        ],
+        "expected_actions": 0
+      },
+      "expect": {
+        "end_reason": "completed",
+        "tools": [
+          "mark_do_not_contact",
+          "note_write",
+          "note_search",
+          "fetch_trends",
+          "read_feed",
+          "search",
+          "read_post",
+          "read_replies",
+          "read_own_metrics",
+          "post",
+          "reply"
+        ]
+      }
+    },
+    {
+      "id": "guard_dispatcher_no_bypass",
+      "kind": "guard",
+      "description": "Synthetic production guard/SQLite boundary; no external services.",
+      "guard": {
+        "check_constructor": true,
+        "steps": [
+          {
+            "offset_ns": 0,
+            "call": {
+              "type": "function",
+              "function": {
+                "name": "unknown_schema_name",
+                "arguments": "{}"
+              }
+            },
+            "expected_blocked": "unknown_tool"
+          }
+        ],
+        "expected_actions": 0
+      },
+      "expect": {
+        "end_reason": "completed",
+        "tools": [
+          "unknown"
+        ]
+      }
+    },
+    {
+      "id": "guard_ungrounded_number_refusal_rate",
+      "kind": "guard",
+      "description": "Synthetic guard boundary: 1 of 3 posts quotes a self-stat number absent from the fact sheet and is refused; a unitless joke number passes.",
+      "guard": {
+        "self_stat_units": [
+          "cent",
+          "view"
+        ],
+        "steps": [
+          {
+            "offset_ns": 0,
+            "call": {
+              "type": "function",
+              "function": {
+                "name": "post",
+                "arguments": "{\"text\": \"Hôm nay tiêu 0 cent\"}"
+              }
+            }
+          },
+          {
+            "offset_ns": 1000000000,
+            "call": {
+              "type": "function",
+              "function": {
+                "name": "post",
+                "arguments": "{\"text\": \"Bài này được 9999 view rồi\"}"
+              }
+            },
+            "expected_blocked": "ungrounded_number"
+          },
+          {
+            "offset_ns": 2000000000,
+            "call": {
+              "type": "function",
+              "function": {
+                "name": "post",
+                "arguments": "{\"text\": \"Làm việc 6 tháng chưa ngủ\"}"
+              }
+            }
+          }
+        ],
+        "expected_actions": 2
+      },
+      "expect": {
+        "end_reason": "completed",
+        "tools": [
+          "post",
+          "post",
+          "post"
+        ]
+      }
+    },
+    {
+      "id": "guard_post_needs_trend_anchor",
+      "kind": "guard",
+      "description": "A post anchored to nothing read this wake is refused; after the trend is read it is allowed.",
+      "guard": {
+        "trend_anchor": true,
+        "steps": [
+          {
+            "offset_ns": 0,
+            "call": {
+              "type": "function",
+              "function": {
+                "name": "post",
+                "arguments": "{\"text\": \"Synthetic model price 3 dollars\\nsecond line\", \"hook\": \"trend_detail\", \"rationale\": \"Synthetic: anchored to the fixture trend, price hook, devs argue.\", \"trend_ref\": \"https://example.test/trend/1\"}"
+              }
+            },
+            "expected_blocked": "no_trend_anchor"
+          },
+          {
+            "offset_ns": 1000000000,
+            "note_trend": "https://example.test/trend/1",
+            "call": {
+              "type": "function",
+              "function": {
+                "name": "post",
+                "arguments": "{\"text\": \"Synthetic model price 3 dollars\\nsecond line\", \"hook\": \"trend_detail\", \"rationale\": \"Synthetic: anchored to the fixture trend, price hook, devs argue.\", \"trend_ref\": \"https://example.test/trend/1\"}"
+              }
+            }
+          },
+          {
+            "offset_ns": 2000000000,
+            "call": {
+              "type": "function",
+              "function": {
+                "name": "post",
+                "arguments": "{\"text\": \"Synthetic model price 3 dollars\\nsecond line\", \"hook\": \"shout\", \"rationale\": \"Synthetic: anchored to the fixture trend, price hook, devs argue.\", \"trend_ref\": \"https://example.test/trend/1\"}"
+              }
+            },
+            "expected_blocked": "invalid_tool_arguments"
+          }
+        ],
+        "expected_actions": 1
+      },
+      "expect": {
+        "end_reason": "completed",
+        "tools": [
+          "post",
+          "post",
+          "post"
+        ]
+      }
+    },
+    {
+      "id": "guard_series_counts_as_one_post",
+      "kind": "guard",
+      "description": "A series of three parts uses one post of the daily limit; a bait phrase in a later part refuses the whole series.",
+      "guard": {
+        "posts_per_day": 1,
+        "steps": [
+          {
+            "offset_ns": 0,
+            "call": {
+              "type": "function",
+              "function": {
+                "name": "post",
+                "arguments": "{\"text\": \"Synthetic part one\", \"parts\": [\"Synthetic part two\", \"like và share nhé\"]}"
+              }
+            },
+            "expected_blocked": "engagement_bait"
+          },
+          {
+            "offset_ns": 1000000000,
+            "call": {
+              "type": "function",
+              "function": {
+                "name": "post",
+                "arguments": "{\"text\": \"Synthetic part one\", \"parts\": [\"Synthetic part two\", \"Synthetic part three\"]}"
+              }
+            }
+          },
+          {
+            "offset_ns": 2000000000,
+            "call": {
+              "type": "function",
+              "function": {
+                "name": "post",
+                "arguments": "{\"text\": \"Synthetic another post\"}"
+              }
+            },
+            "expected_blocked": "posts_per_day"
+          }
+        ],
+        "expected_actions": 1
+      },
+      "expect": {
+        "end_reason": "completed",
+        "tools": [
+          "post",
+          "post",
+          "post"
+        ]
+      }
+    }
+  ]
+}

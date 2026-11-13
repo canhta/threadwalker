@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Setup, configuration and deployment
+    url: https://github.com/canhta/threadz/blob/main/docs/setup.md
+    about: Local checks, credentials, templates, the dashboard and a Linux host.
+  - name: Security policy
+    url: https://github.com/canhta/threadz/blob/main/SECURITY.md
+    about: Report a vulnerability privately.
+  - name: Design docs
+    url: https://github.com/canhta/threadz/blob/main/docs/README.md
+    about: Index of architecture, wake, tools, guards and decisions.

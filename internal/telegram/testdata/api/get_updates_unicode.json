@@ -1,0 +1,23 @@
+{
+  "ok": true,
+  "result": [
+    {
+      "update_id": 2001,
+      "message": {
+        "message_id": 8,
+        "chat": {
+          "id": 9001,
+          "type": "private"
+        },
+        "text": "h\u00e9llo \u2705 \ud83d\ude80 \"quoted\" \\ slash\nnew\tline",
+        "reply_to_message": {
+          "message_id": 7,
+          "chat": {
+            "id": 9001
+          },
+          "text": "r\u00e9ponse \u00e9chapp\u00e9e"
+        }
+      }
+    }
+  ]
+}

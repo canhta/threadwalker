@@ -1,0 +1,302 @@
+{
+  "description": "Guarded local runtime: synthetic services and logical time; no real qualification.",
+  "cases": [
+    {
+      "id": "runtime_note_dry_action",
+      "kind": "runtime",
+      "runtime": {
+        "calls": [
+          {
+            "type": "function",
+            "function": {
+              "name": "read_feed",
+              "arguments": "{}"
+            }
+          },
+          {
+            "type": "function",
+            "function": {
+              "name": "memory_add",
+              "arguments": "{\"text\": \"Synthetic persistent self note.\"}"
+            }
+          },
+          {
+            "type": "function",
+            "function": {
+              "name": "post",
+              "arguments": "{\"text\": \"Synthetic local action.\"}"
+            }
+          }
+        ],
+        "expected_next_minutes": 60,
+        "expected_actions": 1,
+        "expected_note": "Synthetic persistent self note."
+      },
+      "expect": {
+        "end_reason": "completed",
+        "tools": [
+          "read_own_metrics",
+          "read_feed",
+          "memory_add",
+          "post"
+        ]
+      }
+    },
+    {
+      "id": "runtime_default_wake",
+      "kind": "runtime",
+      "runtime": {
+        "calls": [],
+        "expected_next_minutes": 60,
+        "expected_actions": 0
+      },
+      "expect": {
+        "end_reason": "completed",
+        "tools": [
+          "read_own_metrics"
+        ]
+      }
+    },
+    {
+      "id": "runtime_step_stop",
+      "kind": "runtime",
+      "runtime": {
+        "calls": [
+          {
+            "type": "function",
+            "function": {
+              "name": "read_feed",
+              "arguments": "{}"
+            }
+          }
+        ],
+        "expected_next_minutes": 60,
+        "expected_actions": 0
+      },
+      "expect": {
+        "end_reason": "step_limit",
+        "tools": [
+          "read_own_metrics",
+          "read_feed"
+        ]
+      },
+      "limits": {
+        "max_steps": 1
+      }
+    },
+    {
+      "id": "runtime_stall_stop",
+      "kind": "runtime",
+      "runtime": {
+        "calls": [
+          {
+            "type": "function",
+            "function": {
+              "name": "note_search",
+              "arguments": "{\"query\": \"synthetic\"}"
+            }
+          },
+          {
+            "type": "function",
+            "function": {
+              "name": "note_search",
+              "arguments": "{\"query\": \"synthetic\"}"
+            }
+          },
+          {
+            "type": "function",
+            "function": {
+              "name": "note_search",
+              "arguments": "{\"query\": \"synthetic\"}"
+            }
+          },
+          {
+            "type": "function",
+            "function": {
+              "name": "note_search",
+              "arguments": "{\"query\": \"synthetic\"}"
+            }
+          },
+          {
+            "type": "function",
+            "function": {
+              "name": "note_search",
+              "arguments": "{\"query\": \"synthetic\"}"
+            }
+          },
+          {
+            "type": "function",
+            "function": {
+              "name": "note_search",
+              "arguments": "{\"query\": \"synthetic\"}"
+            }
+          },
+          {
+            "type": "function",
+            "function": {
+              "name": "note_search",
+              "arguments": "{\"query\": \"synthetic\"}"
+            }
+          },
+          {
+            "type": "function",
+            "function": {
+              "name": "note_search",
+              "arguments": "{\"query\": \"synthetic\"}"
+            }
+          },
+          {
+            "type": "function",
+            "function": {
+              "name": "note_search",
+              "arguments": "{\"query\": \"synthetic\"}"
+            }
+          },
+          {
+            "type": "function",
+            "function": {
+              "name": "note_search",
+              "arguments": "{\"query\": \"synthetic\"}"
+            }
+          }
+        ],
+        "expected_next_minutes": 60,
+        "expected_actions": 0
+      },
+      "expect": {
+        "end_reason": "stall_stop",
+        "tools": [
+          "read_own_metrics",
+          "note_search",
+          "note_search",
+          "note_search",
+          "note_search",
+          "note_search",
+          "note_search",
+          "note_search",
+          "note_search",
+          "note_search",
+          "note_search"
+        ]
+      }
+    },
+    {
+      "id": "runtime_interrupted_no_replay",
+      "kind": "runtime",
+      "runtime": {
+        "calls": [
+          {
+            "type": "function",
+            "function": {
+              "name": "read_own_metrics",
+              "arguments": "{}"
+            }
+          }
+        ],
+        "expected_next_minutes": 60,
+        "expected_actions": 1,
+        "restart": true
+      },
+      "expect": {
+        "end_reason": "completed",
+        "tools": [
+          "read_own_metrics",
+          "read_own_metrics"
+        ]
+      }
+    },
+    {
+      "id": "runtime_external_untrusted",
+      "kind": "runtime",
+      "runtime": {
+        "calls": [
+          {
+            "type": "function",
+            "function": {
+              "name": "read_feed",
+              "arguments": "{}"
+            }
+          },
+          {
+            "type": "function",
+            "function": {
+              "name": "search",
+              "arguments": "{\"query\": \"synthetic\"}"
+            }
+          },
+          {
+            "type": "function",
+            "function": {
+              "name": "read_post",
+              "arguments": "{\"id\": \"fixture-post\"}"
+            }
+          },
+          {
+            "type": "function",
+            "function": {
+              "name": "read_own_metrics",
+              "arguments": "{}"
+            }
+          },
+          {
+            "type": "function",
+            "function": {
+              "name": "fetch_trends",
+              "arguments": "{}"
+            }
+          }
+        ],
+        "expected_next_minutes": 60,
+        "expected_actions": 0,
+        "check_untrusted": true
+      },
+      "expect": {
+        "end_reason": "completed",
+        "tools": [
+          "read_own_metrics",
+          "read_feed",
+          "search",
+          "read_post",
+          "read_own_metrics",
+          "fetch_trends"
+        ]
+      }
+    },
+    {
+      "id": "runtime_blocked_phrase_rewritten",
+      "kind": "runtime",
+      "runtime": {
+        "calls": [
+          {
+            "type": "function",
+            "function": {
+              "name": "post",
+              "arguments": "{\"text\": \"Synthetic guaranteed result.\"}"
+            }
+          },
+          {
+            "type": "function",
+            "function": {
+              "name": "post",
+              "arguments": "{\"text\": \"Synthetic honest result.\"}"
+            }
+          }
+        ],
+        "blocked_phrases": [
+          "guaranteed"
+        ],
+        "expected_blocked": "blocked_phrase",
+        "expected_next_minutes": 60,
+        "expected_actions": 1
+      },
+      "expect": {
+        "end_reason": "completed",
+        "tools": [
+          "read_own_metrics",
+          "post",
+          "post"
+        ]
+      }
+    }
+  ]
+}

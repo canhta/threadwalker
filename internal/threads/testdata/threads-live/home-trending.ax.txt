@@ -1,0 +1,61 @@
+- generic [ref=e1] clickable [onclick]
+  - navigation
+    - link "Threads" [ref=e2, url=https://www.threads.com/]
+      - image "Threads"
+    - link "Home" [ref=e3, url=https://www.threads.com/]
+      - image "Home"
+    - button "New thread" [ref=e4]
+      - image "New thread"
+    - link "Search" [ref=e5, url=https://www.threads.com/search]
+      - image "Search"
+    - link "Notifications" [ref=e7, url=https://www.threads.com/activity]
+      - image "Notifications"
+    - link "Profile" [ref=e8, url=https://www.threads.com/@synthetic_author]
+      - image "Profile"
+    - link "Insights" [ref=e9, url=https://www.threads.com/insights/]
+      - image "Insights"
+  - generic
+    - generic
+      - generic
+        - region "Column body" [ref=e10] focusable [tabindex]
+          - generic
+            - generic [ref=e41] clickable [cursor:pointer, onclick]
+              - button "synthetic_poster's profile picture Follow" [ref=e80]
+                - image "synthetic_poster's profile picture"
+              - link "synthetic_poster" [ref=e81, url=https://www.threads.com/@synthetic_poster]
+                - StaticText "synthetic_poster"
+              - link "19 minutes ago" [ref=e82, url=https://www.threads.com/@synthetic_poster/post/fixtureFeed1]
+                - time
+                  - Abbr "19 minutes ago"
+                    - StaticText "19m"
+              - button "More" [expanded=false, ref=e83]
+                - image "More"
+              - StaticText "Synthetic English feed post."
+              - button "Like" [ref=e48]
+                - image "Like"
+            - status "Loading..."
+              - image "Loading..."
+        - generic
+          - image "Search"
+          - searchbox "Search" [ref=e29]
+          - generic
+            - image "Highlight"
+            - StaticText "Trending now"
+          - button "What people are saying, summarized by AI" [ref=e12]
+            - StaticText "What people are saying, summarized by AI"
+          - link "Synthetic topic one Synthetic summary of topic one · 2K posts 2K posts" [ref=e13, url=https://www.threads.com/search?q=Synthetic%20one&serp_type=trends&trend_fbid=1000000000000001]
+            - StaticText "Synthetic topic one"
+            - StaticText "Synthetic summary of topic one"
+            - StaticText "·"
+            - StaticText "2K posts"
+            - StaticText "2K posts"
+          - link "Synthetic topic two Synthetic summary of topic two · 9K posts 9K posts" [ref=e14, url=https://www.threads.com/search?q=Synthetic%20two&serp_type=trends&trend_fbid=1000000000000002]
+            - StaticText "Synthetic topic two"
+            - StaticText "Synthetic summary of topic two"
+            - StaticText "·"
+            - StaticText "9K posts"
+            - StaticText "9K posts"
+          - link "Show more" [ref=e16, url=https://www.threads.com/search]
+            - StaticText "Show more"
+          - link "synthetic_tag" [ref=e17, url=https://www.threads.com/search?q=synthetic&serp_type=tags&tag_id=1]
+            - StaticText "synthetic_tag"

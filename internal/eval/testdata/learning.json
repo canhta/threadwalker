@@ -1,0 +1,50 @@
+{
+  "description": "Full-size seeded simulations of the posterior decision rule under a null lift with heavy tails and under true lifts of 0.3 and 0.5; synthetic, no provider or live Threads calls. Too slow for go test, which runs them scaled down.",
+  "cases": [
+    {
+      "id": "playbook_simulation_null_101",
+      "kind": "playbook",
+      "scenario": "simulation_null-101",
+      "expect": {
+        "end_reason": "completed",
+        "tools": []
+      }
+    },
+    {
+      "id": "playbook_simulation_null_211",
+      "kind": "playbook",
+      "scenario": "simulation_null-211",
+      "expect": {
+        "end_reason": "completed",
+        "tools": []
+      }
+    },
+    {
+      "id": "playbook_simulation_null_307",
+      "kind": "playbook",
+      "scenario": "simulation_null-307",
+      "expect": {
+        "end_reason": "completed",
+        "tools": []
+      }
+    },
+    {
+      "id": "playbook_simulation_lift_0_3",
+      "kind": "playbook",
+      "scenario": "simulation_lift-0.3",
+      "expect": {
+        "end_reason": "completed",
+        "tools": []
+      }
+    },
+    {
+      "id": "playbook_simulation_lift_0_5",
+      "kind": "playbook",
+      "scenario": "simulation_lift-0.5",
+      "expect": {
+        "end_reason": "completed",
+        "tools": []
+      }
+    }
+  ]
+}

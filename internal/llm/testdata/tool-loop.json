@@ -1,0 +1,5 @@
+[
+  {"choices":[{"message":{"role":"assistant","tool_calls":[{"id":"call_1","type":"function","function":{"name":"echo","arguments":"{\"text\":\"hello\"}"}}]},"finish_reason":"tool_calls"}],"usage":{"prompt_tokens":100,"completion_tokens":20}},
+  {"choices":[{"message":{"role":"assistant","tool_calls":[{"id":"call_2","type":"function","function":{"name":"echo","arguments":"{\"text\":\"again\"}"}}]},"finish_reason":"tool_calls"}],"usage":{"prompt_tokens":150,"completion_tokens":10}},
+  {"choices":[{"message":{"role":"assistant","content":"done"},"finish_reason":"stop"}],"usage":{"prompt_tokens":200,"completion_tokens":5}}
+]

@@ -1,0 +1,239 @@
+{{define "chart"}}<figure class="chart {{.Height}}">
+  <figcaption>{{.Title}}</figcaption>
+  <div class="plot">
+    <div class="y" aria-hidden="true">{{if .YMax}}<span>{{.YMax}}</span>{{end}}{{if .YMid}}<span>{{.YMid}}</span>{{end}}<span>{{.YZero}}</span></div>
+    <div class="canvas">
+      <svg viewBox="0 0 600 160" preserveAspectRatio="none" aria-hidden="true" focusable="false">
+        <title>{{.Title}}</title>
+        <line class="grid" x1="0" x2="600" y1="0" y2="0"/>
+        <line class="grid" x1="0" x2="600" y1="80" y2="80"/>
+        <line class="grid" x1="0" x2="600" y1="160" y2="160"/>
+        {{if .Path}}<path class="trend" d="{{.Path}}"/>{{end}}
+        {{range .Rects}}<rect class="{{.Class}}" x="{{.X}}" y="{{.Y}}" width="{{.W}}" height="{{.H}}"/>{{end}}
+        {{if .BudgetY}}<line class="budget" x1="0" x2="600" y1="{{.BudgetY}}" y2="{{.BudgetY}}"/>{{end}}
+      </svg>
+      <div class="x-axis" aria-hidden="true">{{range .XLabels}}<span class="{{.Class}}">{{.Text}}</span>{{end}}</div>
+    </div>
+  </div>
+  {{if .Budget}}<p class="chart-note">{{.Budget}}</p>{{end}}
+  <table class="visually-hidden">
+    <caption>{{.Title}}</caption>
+    <thead><tr>{{range .Head}}<th>{{.}}</th>{{end}}</tr></thead>
+    <tbody>{{range .Rows}}<tr>{{range .}}<td>{{.}}</td>{{end}}</tr>{{end}}</tbody>
+  </table>
+</figure>{{end}}
+
+{{define "page"}}<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Threadz — Threads on autopilot</title>
+<meta name="description" content="Live numbers from an agent that runs a Threads account by itself: what it posted, what each post earned, and what it changed as a result.">
+<meta name="theme-color" content="#131517">
+<meta name="color-scheme" content="dark">
+{{if .Canonical}}<link rel="canonical" href="{{.Canonical}}">{{end}}
+
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Threadz">
+<meta property="og:title" content="Threadz — Threads on autopilot">
+<meta property="og:description" content="Live numbers from an agent that runs a Threads account by itself: what it posted, what each post earned, and what it changed as a result.">
+{{if .Canonical}}<meta property="og:url" content="{{.Canonical}}">{{end}}
+{{if .OGImage}}<meta property="og:image" content="{{.OGImage}}">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="The Threadz dashboard">{{end}}
+
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Threadz — Threads on autopilot">
+<meta name="twitter:description" content="Live numbers from an agent that runs a Threads account by itself.">
+{{if .OGImage}}<meta name="twitter:image" content="{{.OGImage}}">{{end}}
+<link rel="icon" type="image/svg+xml" href="/favicon.svg?v=2">
+<link rel="icon" href="/favicon.ico?v=2" sizes="any">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png?v=2">
+<link rel="stylesheet" href="{{cssHref}}">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<div class="wrap">
+  <header class="top">
+    <div class="id">
+      <span class="brand"><svg class="mark" viewBox="0 0 240 240" aria-hidden="true" focusable="false"><path d="M72 93 L89 145 Q94 157 104 145 L121 117 L139 145 Q148 158 153 144 L170 96 C190 109 201 133 187 160 C174 184 149 197 119 197 C73 197 41 162 41 119 C41 76 74 41 117 41 C143 41 165 49 182 67" fill="none" stroke="currentColor" stroke-width="16" stroke-linecap="round" stroke-linejoin="round"/></svg>Threadz</span>
+      <span class="chip s-{{.Agent.Status}}"><i aria-hidden="true"></i>{{statusText .Agent.Status}}</span>
+    </div>
+    <div class="tools">
+      <a class="ghost" href="https://github.com/canhta/threadz" rel="noreferrer noopener"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.4 7.4 0 0 1 2-.27c.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg><span>GitHub</span></a>
+      <a class="ghost" href="https://github.com/canhta/threadz/releases/latest" rel="noreferrer noopener"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" d="M8 1.8v8.4m0 0L4.9 7.1M8 10.2l3.1-3.1M2.2 11.6v1.3c0 .7.6 1.3 1.3 1.3h9c.7 0 1.3-.6 1.3-1.3v-1.3"/></svg><span>Download</span></a>
+    </div>
+    {{if gt (len .Agents) 1}}<nav class="agents" aria-label="Agents">{{range .Agents}}<a href="{{.URL}}"{{if .Current}} aria-current="true"{{end}}>{{.ID}}</a>{{end}}</nav>{{end}}
+  </header>
+
+  <main id="main">
+
+    <section class="hero" aria-labelledby="hero-h">
+      <div class="hero-head">
+        <h2 id="hero-h">How it is doing <em>{{.Growth.RangeLabel}}</em></h2>
+        <nav class="seg" aria-label="Time range">{{range .Ranges}}<a href="{{.URL}}" aria-label="{{.Label}}"{{if .Current}} aria-current="true"{{end}}>{{.Value}}d</a>{{end}}</nav>
+      </div>
+      {{if .Growth.HasMetrics}}
+      <dl class="figs">{{range slice .KPIs 0 3}}<div class="fig"><dt>{{.Label}}</dt><dd>{{.Value}}</dd>{{if .Note}}<small class="{{.Tone}}">{{template "tone" .Tone}}{{.Note}}</small>{{end}}</div>{{end}}</dl>
+      {{template "chart" .Growth.ViewsChart}}
+      <div class="charts">
+        {{template "chart" .Growth.RateChart}}
+        {{if .Followers.HasData}}{{template "chart" .Followers.Chart}}{{end}}
+      </div>
+      <dl class="facts">
+        <div><dt>Likes</dt><dd>{{formatCount .Growth.Likes}}</dd>{{if .Growth.LikesDelta}}{{$t := deltaTone .Growth.LikesDelta}}<small class="{{$t}}">{{template "tone" $t}}{{.Growth.LikesDelta}}</small>{{end}}</div>
+        <div><dt>Replies received</dt><dd>{{formatCount .Growth.Replies}}</dd>{{if .Growth.RepliesDelta}}{{$t := deltaTone .Growth.RepliesDelta}}<small class="{{$t}}">{{template "tone" $t}}{{.Growth.RepliesDelta}}</small>{{end}}</div>
+        <div><dt>Reposts</dt><dd>{{formatCount .Growth.Reposts}}</dd>{{if .Growth.RepostsDelta}}{{$t := deltaTone .Growth.RepostsDelta}}<small class="{{$t}}">{{template "tone" $t}}{{.Growth.RepostsDelta}}</small>{{end}}</div>
+        {{if and .Followers.HasData (ne .Followers.PerPost "—")}}<div><dt>Followers per post</dt><dd>{{.Followers.PerPost}}</dd></div>
+        <div><dt>Followers per 1,000 views</dt><dd>{{.Followers.Per1000}}</dd></div>{{end}}
+        {{with index .KPIs 3}}<div><dt>Posts</dt><dd>{{.Value}}</dd></div>{{end}}
+        {{with index .KPIs 4}}<div><dt>Replies sent</dt><dd>{{.Value}}</dd></div>{{end}}
+      </dl>
+      <p class="foot">Stats read {{.Growth.LastMeasured}}{{if .Outcomes.HasData}}. Scored {{.Outcomes.Scored}}: {{.Outcomes.Viral}} viral, {{.Outcomes.Flop}} flop{{end}}</p>
+      {{else}}
+      <p class="empty">{{.Growth.EmptyText}}</p>
+      {{end}}
+    </section>
+
+    <div class="cols">
+      {{if .Growth.Top}}
+      <section class="side" aria-labelledby="top-h">
+        <div class="list-head"><h2 id="top-h">Top performers</h2></div>
+        <ol class="toplist">{{range .Growth.Top}}<li>
+          <a class="ptext" href="{{.URL}}" rel="noreferrer noopener">{{.Link}}</a>
+          <p class="pstats compact">{{template "stats-brief" .}}</p>
+        </li>{{end}}</ol>
+      </section>
+      {{end}}
+
+      <section class="latest" aria-labelledby="posted-h">
+        <div class="list-head">
+          <h2 id="posted-h">Posts and replies</h2>
+          <nav class="seg" aria-label="Order">{{range .Orders}}<a href="{{.URL}}"{{if .Current}} aria-current="true"{{end}}>{{.Label}}</a>{{end}}</nav>
+        </div>
+        {{if .Growth.Posts}}
+        <ol class="post-list">{{range .Growth.Posts}}{{template "post" .}}{{end}}</ol>
+        {{if .MoreURL}}<a class="more-link" href="{{.MoreURL}}">Show {{.MoreCount}} more<span class="sub"> of {{.Growth.Total}}</span></a>{{end}}
+        {{if .Growth.Unmeasured}}<p class="sub">Stats at 1h, 6h and 24h.</p>{{end}}
+        {{else}}<p class="empty">{{.Growth.EmptyText}}</p>{{end}}
+      </section>
+    </div>
+
+    <h2 class="behind">Behind the scenes</h2>
+    <div class="folds">
+
+      {{if not .Learned.HasRows}}<div class="fold flat"><span class="ft">Learning</span><span class="fs">No results yet.</span></div>
+      {{else}}<details class="fold"><summary><span class="ft">Learning</span><span class="fs">{{.Learned.Testing}} ideas being tested{{if .Learned.Established}}, adopted {{.Learned.Established}}{{end}}{{if .Learned.Rejected}}, dropped {{.Learned.Rejected}}{{end}}, {{.Learned.Samples}} results measured</span></summary>
+        <div class="fb">
+        {{if .Learned.Posteriors}}<ul class="items">{{range .Learned.Posteriors}}<li><p>{{.Text}}</p><p class="sub">{{.Standing}}</p></li>{{end}}</ul>{{end}}
+        {{if .Content}}
+          {{if .Learned.Hypotheses}}<h3>Hypotheses</h3><ul class="items">{{range .Learned.Hypotheses}}<li><p>{{.Text}}</p><p class="sub">{{ideaStatus .Status}}, tried {{.Tried}}{{if .Evidence}}. {{.Evidence}}{{end}}</p></li>{{end}}</ul>{{end}}
+          {{if .Learned.OlderHypotheses}}<details class="more"><summary>Older hypotheses</summary><ul class="items">{{range .Learned.OlderHypotheses}}<li><p>{{.Text}}</p><p class="sub">{{ideaStatus .Status}}, tried {{.Tried}}{{if .Evidence}}. {{.Evidence}}{{end}}</p></li>{{end}}</ul></details>{{end}}
+          {{if .Learned.Candidates}}<h3>Techniques</h3><ul class="items">{{range .Learned.Candidates}}<li><p class="note">{{.Text}}</p><p class="sub">Unverified. <a href="{{.Source}}" rel="noreferrer noopener">{{.Source}}</a>, {{.When}}</p></li>{{end}}</ul>{{end}}
+          {{if .Learned.Penalties}}<h3>Demotion risks</h3><ul class="items">{{range .Learned.Penalties}}<li><p class="note">{{.Risk}}: {{.Claim}}</p><p class="sub"><a href="{{.Source}}" rel="noreferrer noopener">Source</a></p></li>{{end}}</ul>{{end}}
+          {{if .Learned.MemoryIndex}}<h3>Memory index</h3><p class="note">{{.Learned.MemoryIndex}}</p>{{end}}
+          {{if .Learned.MemoryJournal}}<h3>Memory journal</h3><p class="note">{{.Learned.MemoryJournal}}</p>{{end}}
+          {{if .Learned.Strategy}}<h3>Strategy</h3><ul class="items">{{range .Learned.Strategy}}<li><p class="sub">v{{.Version}}, {{.When}}{{if .Citations}}. {{.Citations}}{{end}}</p><div class="diff">{{range .Diff}}<p class="note">{{.Mark}} {{.Text}}</p>{{end}}</div></li>{{end}}</ul>{{end}}
+          {{if .Learned.NotesRows}}<h3>Journal</h3><ul class="items">{{range .Learned.NotesRows}}<li><p class="note">{{.Text}}</p><p class="sub">{{.When}}</p></li>{{end}}</ul>{{end}}
+          {{if .Learned.OlderNotes}}<details class="more"><summary>Older notes</summary><ul class="items">{{range .Learned.OlderNotes}}<li><p class="note">{{.Text}}</p><p class="sub">{{.When}}</p></li>{{end}}</ul></details>{{end}}
+        {{end}}
+        </div></details>
+      {{end}}
+
+      {{if .Blocked.Total}}<details class="fold"><summary><span class="ft">Held back</span><span class="fs">{{.Blocked.Total}} blocked, mostly {{(index .Blocked.Rows 0).Code}}</span></summary>
+        <div class="fb"><ul class="plain">{{range $i, $r := .Blocked.Rows}}{{if lt $i 3}}<li title="{{$r.Raw}}"><b>{{$r.Count}}</b> {{$r.Code}}</li>{{end}}{{end}}</ul>
+        {{if gt (len .Blocked.Rows) 3}}<details class="more"><summary>All reasons</summary><ul class="plain">{{range $i, $r := .Blocked.Rows}}{{if ge $i 3}}<li title="{{$r.Raw}}"><b>{{$r.Count}}</b> {{$r.Code}}</li>{{end}}{{end}}</ul></details>{{end}}</div></details>{{end}}
+
+      {{if or .Burn.HasRows (not .Return.Empty)}}<details class="fold"><summary><span class="ft">Cost</span><span class="fs">{{(index .KPIs 5).Value}} today</span></summary>
+        <div class="fb split">
+        <div>
+          <h3>{{if .Burn.MultiDay}}{{.Burn.RangeLabel}}{{else}}Today{{end}}</h3>
+          {{if not .Burn.HasRows}}<p class="empty">No spend yet.</p>
+          {{else if .Burn.MultiDay}}
+            {{template "chart" .Burn.Chart}}
+            <p class="key"><span class="dot wake"></span>Runs <span class="dot study"></span>Research <span class="dot dream"></span>Planning</p>
+          {{else}}
+            <div class="track" aria-hidden="true"><svg viewBox="0 0 100 8" preserveAspectRatio="none" focusable="false"><rect class="ok" x="0" y="0" width="{{printf "%.2f" .Burn.BarPct}}" height="8"/></svg></div>
+            <p class="sub">{{.Burn.PercentText}}{{if .Burn.PhaseText}}. {{.Burn.PhaseText}}{{end}}</p>
+          {{end}}
+        </div>
+        <div>
+          <h3>Unit cost</h3>
+          {{if .Return.Empty}}<p class="empty">No data yet.</p>
+          {{else}}
+          <dl class="rows">
+            <div><dt>Total spent</dt><dd>{{.Return.SpentTotal}}</dd></div>
+            <div><dt>Per post</dt><dd>{{.Return.CostPerPost}}</dd></div>
+            <div><dt>Per follower</dt><dd>{{.Return.CostPerFollow}}</dd></div>
+            {{if .Growth.HasMetrics}}<div><dt>Per 1,000 views</dt><dd>{{.Return.CostPer1000}}</dd></div>{{end}}
+          </dl>
+          {{end}}
+        </div></div></details>
+      {{else}}<div class="fold flat"><span class="ft">Cost</span><span class="fs">Nothing spent yet.</span></div>{{end}}
+
+      {{if .Wakes.Rows}}<details class="fold"><summary><span class="ft">Runs</span><span class="fs">{{.Wakes.RangeLabel}}</span></summary>
+        <div class="fb">
+        <div class="run runs-head" aria-hidden="true"><span>Time</span><span>Type</span><span>Steps</span><span>Cost</span><span>Result</span><span></span></div>
+        <ul class="runs">{{range .Wakes.Rows}}{{template "run" .}}{{end}}</ul>
+        {{if .Wakes.Older}}<details class="more"><summary>Older runs</summary><ul class="runs">{{range .Wakes.Older}}{{template "run" .}}{{end}}</ul></details>{{end}}
+        </div></details>
+      {{else}}<div class="fold flat"><span class="ft">Runs</span><span class="fs">None yet.</span></div>{{end}}
+
+      {{if .ToolCalls.Rows}}<details class="fold"><summary><span class="ft">Tools</span><span class="fs">{{.ToolCalls.RangeLabel}}</span></summary>
+        <div class="fb"><table class="tools"><thead><tr><th>Tool</th><th>OK</th><th>Failed</th><th>Blocked</th></tr></thead>
+        <tbody>{{range .ToolCalls.Rows}}<tr><th>{{.Name}}</th><td>{{if .OK}}{{.OK}}{{end}}</td><td{{if .Failed}} class="bad"{{end}}>{{if .Failed}}{{.Failed}}{{end}}</td><td>{{if .Blocked}}{{.Blocked}}{{end}}</td></tr>{{end}}</tbody></table></div></details>
+      {{else}}<div class="fold flat"><span class="ft">Tools</span><span class="fs">None yet.</span></div>{{end}}
+
+      {{if .Trending.Rows}}<details class="fold"><summary><span class="ft">Trends</span><span class="fs">{{.Trending.RangeLabel}}</span></summary>
+        <div class="fb"><ul class="trends">{{range .Trending.Rows}}<li>
+          <span class="src" title="{{.SourceName}}">{{.Source}}</span>
+          <span class="name" title="{{.Title}}">{{.Title}}</span>
+          <span class="seen">{{.Seen}}</span>
+          <svg class="meter" viewBox="0 0 100 8" preserveAspectRatio="none" aria-hidden="true" focusable="false"><rect class="ok" x="0" y="0" width="{{printf "%.2f" .Pct}}" height="8"/></svg>
+        </li>{{end}}</ul></div></details>
+      {{else}}<div class="fold flat"><span class="ft">Trends</span><span class="fs">None yet.</span></div>{{end}}
+
+    </div>
+  </main>
+
+  <footer>
+    <span class="brand"><svg class="mark" viewBox="0 0 240 240" aria-hidden="true" focusable="false"><path d="M72 93 L89 145 Q94 157 104 145 L121 117 L139 145 Q148 158 153 144 L170 96 C190 109 201 133 187 160 C174 184 149 197 119 197 C73 197 41 162 41 119 C41 76 74 41 117 41 C143 41 165 49 182 67" fill="none" stroke="currentColor" stroke-width="16" stroke-linecap="round" stroke-linejoin="round"/></svg>Threads on autopilot</span>
+    <span>An experiment by <a href="https://canhta.com" rel="noreferrer noopener">canhta.com</a></span>
+  </footer>
+</div>
+</body>
+</html>
+{{end}}
+
+{{define "run"}}{{if or .ToolSummary .Blocked}}<li><details>
+  <summary class="run">{{template "runrow" .}}<span class="x" aria-hidden="true">{{template "i-chevron"}}</span></summary>
+  <div class="run-more">
+    {{if .ToolSummary}}<ul class="plain">{{range .ToolSummary}}<li>{{.Name}}: {{if .Failed}}{{.Failed}} failed{{if .Why}} ({{.Why}}){{end}}{{end}}{{if and .Failed .Blocked}}, {{end}}{{if .Blocked}}{{.Blocked}} blocked{{end}}</li>{{end}}</ul>{{end}}
+    {{if .Blocked}}<ul class="plain">{{range .Blocked}}<li title="{{.Raw}}">{{.Code}}: {{.Count}}</li>{{end}}</ul>{{end}}
+  </div>
+</details></li>{{else}}<li><div class="run">{{template "runrow" .}}<span></span></div></li>{{end}}{{end}}
+
+{{define "runrow"}}<span class="t" title="{{.WhenTitle}}">{{.When}}</span><span class="k">{{.Kind}}</span><span class="s">{{.Steps}}</span><span class="c">{{.Cost}}</span><span class="e{{if .Bad}} er{{end}}" title="{{.EndCode}}">{{.EndReason}}</span>{{end}}
+
+{{define "post"}}<li class="post">
+  <p class="pmeta"><span class="kind">{{.Kind}}</span>{{if .Age}}<span title="{{.AgeTitle}}">{{.Age}} ago</span>{{end}}{{if .Mark}}<span class="tag {{.Mark}}">{{.Mark}}</span>{{end}}{{if .Label}}<span class="tag">{{.Label}}</span>{{end}}</p>
+  <a class="ptext" href="{{.URL}}" rel="noreferrer noopener">{{.Link}}</a>
+  {{if .HasSample}}<p class="pstats">{{template "stats" .}}</p>{{else}}<p class="sub">No stats yet</p>{{end}}
+  {{if .Why}}<p class="sub">{{range $i, $w := .Why}}{{if $i}}; {{end}}{{$w}}{{end}}</p>{{end}}
+</li>{{end}}
+
+{{define "tone"}}{{if eq . "up"}}{{template "i-up"}}{{else if eq . "down"}}{{template "i-down"}}{{end}}{{end}}
+
+{{define "i-eye"}}<svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M2.06 12.35a1 1 0 0 1 0-.7 10.75 10.75 0 0 1 19.88 0 1 1 0 0 1 0 .7 10.75 10.75 0 0 1-19.88 0"/><circle cx="12" cy="12" r="3"/></svg>{{end}}
+{{define "i-heart"}}<svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/></svg>{{end}}
+{{define "i-reply"}}<svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/></svg>{{end}}
+{{define "i-repost"}}<svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m2 9 3-3 3 3"/><path d="M13 18H7a2 2 0 0 1-2-2V6"/><path d="m22 15-3 3-3-3"/><path d="M11 6h6a2 2 0 0 1 2 2v10"/></svg>{{end}}
+{{define "i-zap"}}<svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/></svg>{{end}}
+{{define "i-chevron"}}<svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m6 9 6 6 6-6"/></svg>{{end}}
+{{define "i-up"}}<svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M16 7h6v6"/><path d="m22 7-8.5 8.5-5-5L2 17"/></svg>{{end}}
+{{define "i-down"}}<svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M16 17h6v-6"/><path d="m22 17-8.5-8.5-5 5L2 7"/></svg>{{end}}
+
+{{define "stats"}}<span class="rate" title="Engagement rate">{{template "i-zap"}}<b>{{.Rate}}</b><span class="vh"> engaged</span></span><span title="Views">{{template "i-eye"}}<b>{{.Views}}</b><span class="vh"> views</span></span><span title="Likes">{{template "i-heart"}}<b>{{.Likes}}</b><span class="vh"> likes</span></span><span title="Replies">{{template "i-reply"}}<b>{{.Replies}}</b><span class="vh"> replies</span></span><span title="Reposts">{{template "i-repost"}}<b>{{.Reposts}}</b><span class="vh"> reposts</span></span>{{end}}
+{{define "stats-brief"}}<span class="rate" title="Engagement rate">{{template "i-zap"}}<b>{{.Rate}}</b><span class="vh"> engaged</span></span><span title="Views">{{template "i-eye"}}<b>{{.Views}}</b><span class="vh"> views</span></span><span title="Likes">{{template "i-heart"}}<b>{{.Likes}}</b><span class="vh"> likes</span></span><span title="Replies">{{template "i-reply"}}<b>{{.Replies}}</b><span class="vh"> replies</span></span>{{end}}

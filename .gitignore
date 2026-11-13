@@ -1,0 +1,10 @@
+
+.claude/
+.env
+.privates/
+.research/
+*.db
+*.db-*
+/threadz
+data/
+.DS_Store

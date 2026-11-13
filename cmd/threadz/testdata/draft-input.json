@@ -1,0 +1,62 @@
+{
+ "items": [
+  {
+   "id": "ap-huang",
+   "kind": "post",
+   "text": "AP, 12/11: Jensen Huang từ chức CEO Nvidia; CFO Colette Kress làm CEO tạm quyền.",
+   "fact": "Ngày 12/11 Jensen Huang từ chức CEO Nvidia, CFO Colette Kress làm CEO tạm quyền (theo AP)."
+  },
+  {
+   "id": "trend-token-price",
+   "kind": "post",
+   "text": "Product Hunt (fixture): một nhà cung cấp LLM giảm giá token đầu vào một nửa nhưng tăng giá token đầu ra 20%."
+  },
+  {
+   "id": "trend-vn-1",
+   "kind": "post",
+   "text": "Google Trends VN (fixture): từ khoá tăng mạnh trong ngày — giá vé xem concert tăng gấp đôi sau khi mở bán, nhiều người than hết vé chỉ sau vài phút."
+  },
+  {
+   "id": "trend-vn-2",
+   "kind": "post",
+   "text": "Google Trends VN (fixture): nhiều người rủ nhau xoá app giao đồ ăn sau khi phí ship và phí dịch vụ cùng tăng."
+  },
+  {
+   "id": "feed-friend",
+   "kind": "reply",
+   "text": "Dạo này ai cũng dùng AI để viết caption, đọc xong thấy bài nào cũng giống nhau."
+  },
+  {
+   "id": "feed-phone",
+   "kind": "reply",
+   "text": "Điện thoại mới ra mắt, giá hơn 30 triệu, thay đổi lớn nhất là cái nút bấm."
+  },
+  {
+   "id": "feed-salary",
+   "kind": "reply",
+   "text": "lương tháng đầu đi làm 9 triệu, trừ tiền trọ, điện nước, xăng xe còn đúng 2 triệu để sống cả tháng"
+  },
+  {
+   "id": "feed-mom-wifi",
+   "kind": "reply",
+   "text": "mẹ bảo dùng điện thoại ít thôi xong 11h đêm mẹ vẫn đang xem video nấu ăn"
+  },
+  {
+   "id": "feed-chatgpt-homework",
+   "kind": "reply",
+   "text": "nhờ chatgpt làm bài luận xong cô giáo hỏi lại một câu là đứng hình luôn"
+  },
+  {
+   "id": "trend-vn-tet",
+   "kind": "post",
+   "text": "Tết còn hơn 2 tháng mà nhiều hãng bay đã báo giá vé về quê tăng gần gấp đôi ngày thường.",
+   "fact": "giá vé máy bay Tết tăng gần gấp đôi ngày thường, còn hơn 2 tháng nữa mới Tết"
+  },
+  {
+   "id": "trend-vn-milk-tea",
+   "kind": "post",
+   "text": "Một chuỗi trà sữa tăng giá thêm 5.000 đồng mỗi ly từ tuần này.",
+   "fact": "một chuỗi trà sữa tăng 5.000 đồng mỗi ly"
+  }
+ ]
+}

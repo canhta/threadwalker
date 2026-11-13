@@ -1,0 +1,9 @@
+[Unit]
+Description=Run the Threadz updater when the service or ctl asks
+
+[Path]
+PathExists=/run/threadz/update-request
+Unit=threadz-update.service
+
+[Install]
+WantedBy=multi-user.target

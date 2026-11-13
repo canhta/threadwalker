@@ -1,0 +1,97 @@
+{
+  "description": "Saved pages and scripted browser outcomes through the guard, SQLite and wake runtime; no Chromium or live Threads qualification.",
+  "cases": [
+    {
+      "id": "browser_six_operations",
+      "kind": "browser",
+      "scenario": "six_operations",
+      "expect": {
+        "end_reason": "completed",
+        "tools": [
+          "read_own_metrics",
+          "read_feed",
+          "search",
+          "read_post",
+          "read_own_metrics",
+          "post",
+          "reply"
+        ]
+      }
+    },
+    {
+      "id": "browser_dry_run_no_submit",
+      "kind": "browser",
+      "scenario": "dry_run",
+      "expect": {
+        "end_reason": "completed",
+        "tools": [
+          "read_own_metrics",
+          "read_feed",
+          "post",
+          "reply"
+        ]
+      }
+    },
+    {
+      "id": "browser_logged_out_pause_notice",
+      "kind": "browser",
+      "scenario": "logged_out",
+      "expect": {
+        "end_reason": "logged_out",
+        "tools": [
+          "read_own_metrics",
+          "read_feed"
+        ]
+      }
+    },
+    {
+      "id": "browser_captcha_pause_notice",
+      "kind": "browser",
+      "scenario": "captcha",
+      "expect": {
+        "end_reason": "captcha",
+        "tools": [
+          "read_own_metrics",
+          "read_feed"
+        ]
+      }
+    },
+    {
+      "id": "browser_unknown_page_no_guess",
+      "kind": "browser",
+      "scenario": "unknown_page",
+      "expect": {
+        "end_reason": "completed",
+        "tools": [
+          "read_own_metrics",
+          "read_feed"
+        ]
+      }
+    },
+    {
+      "id": "browser_uncertain_submit_no_retry",
+      "kind": "browser",
+      "scenario": "uncertain_submit",
+      "expect": {
+        "end_reason": "unknown_outcome",
+        "tools": [
+          "read_own_metrics",
+          "post"
+        ]
+      }
+    },
+    {
+      "id": "browser_addressed_stop_request",
+      "kind": "browser",
+      "scenario": "stop_request",
+      "expect": {
+        "end_reason": "completed",
+        "tools": [
+          "read_own_metrics",
+          "read_post",
+          "reply"
+        ]
+      }
+    }
+  ]
+}

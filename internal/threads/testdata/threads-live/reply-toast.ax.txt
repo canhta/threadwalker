@@ -1,0 +1,18 @@
+- generic
+  - navigation
+    - link "Threads" [ref=e2, url=https://www.threads.com/]
+    - link "Home" [ref=e3, url=https://www.threads.com/]
+    - button "New thread" [ref=e4]
+    - link "Search" [ref=e5, url=https://www.threads.com/search]
+    - link "Messages" [ref=e6, url=https://www.threads.com/messages/]
+    - link "Notifications" [ref=e7, url=https://www.threads.com/activity]
+    - link "Profile Profile" [ref=e8, url=https://www.threads.com/@synthetic_author]
+    - link "Insights Insights" [ref=e9, url=https://www.threads.com/insights/]
+  - generic
+    - list
+      - listitem [level=1]
+        - status
+          - generic
+            - image
+            - generic
+              - link "View" [ref=e20, url=https://www.threads.com/@synthetic_author/post/fixtureNestedReply1]

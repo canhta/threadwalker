@@ -1,0 +1,59 @@
+- generic [ref=e130] clickable [onclick]
+  - navigation
+    - link "Threads" [ref=e131, url=https://www.threads.com/]
+      - image "Threads"
+    - link "Home" [ref=e132, url=https://www.threads.com/]
+      - image "Home"
+    - link "Search" [ref=e134, url=https://www.threads.com/search]
+      - image "Search"
+    - link "Profile" [ref=e137, url=https://www.threads.com/@synthetic_author]
+      - image "Profile"
+    - link "Insights" [ref=e138, url=https://www.threads.com/insights/]
+      - image "Insights"
+  - generic
+    - generic
+      - generic
+        - generic
+          - generic
+            - image "Search"
+            - searchbox "Search" [ref=e151]: Synthetic one
+              - StaticText "Synthetic one"
+        - region "Column body" [ref=e139] focusable [tabindex]
+          - generic
+            - image "Highlight"
+            - StaticText "Trending"
+            - StaticText "Synthetic summary of topic one"
+            - StaticText "2K posts"
+            - generic
+              - link "Top" [ref=e165, url=https://www.threads.com/search?exact_match=false&q=Synthetic%20one&serp_type=trends&trend_fbid=1000000000000001]
+                - StaticText "Top"
+            - generic [ref=e168] clickable [cursor:pointer, onclick]
+              - button "synthetic_viet's profile picture Follow" [ref=e202]
+                - image "synthetic_viet's profile picture"
+              - link "synthetic_viet" [ref=e203, url=https://www.threads.com/@synthetic_viet]
+                - StaticText "synthetic_viet"
+              - generic
+                - link "synthetic_tag" [ref=e228, url=https://www.threads.com/search?q=synthetic&serp_type=tags&tag_id=1]
+                  - StaticText "synthetic_tag"
+              - link "about an hour ago" [ref=e177, url=https://www.threads.com/@synthetic_viet/post/fixtureTopic1]
+                - time
+                  - Abbr "about an hour ago"
+                    - StaticText "1h"
+              - StaticText "Bài mẫu tổng hợp bằng tiếng Việt về chủ đề một"
+              - button "Translate" [ref=e229]
+                - StaticText "Translate"
+              - StaticText "1"
+              - StaticText "/"
+              - StaticText "2"
+              - link "Photo by @synthetic_viet" [ref=e205, url=https://www.threads.com/@synthetic_viet/post/fixtureTopic1/media]
+                - image "Photo by @synthetic_viet"
+              - button "Like 278" [ref=e178]
+                - StaticText "278"
+            - generic [ref=e169] clickable [cursor:pointer, onclick]
+              - link "synthetic_two" [ref=e207, url=https://www.threads.com/@synthetic_two]
+                - StaticText "synthetic_two"
+              - image "Verified"
+              - link "2 hours ago" [ref=e208, url=https://www.threads.com/@synthetic_two/post/fixtureTopic2]
+                - time
+                  - Abbr "2 hours ago"
+              - StaticText "Synthetic second topic post"

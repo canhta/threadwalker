@@ -1,0 +1,81 @@
+name: Bug report
+description: Report a bug or behaviour that differs from the docs
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Remove API keys, bot tokens, usernames, cookies and private post text from anything you
+        paste. Security problems go through
+        [SECURITY.md](https://github.com/canhta/threadz/blob/main/SECURITY.md), not an issue.
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: The behaviour you saw, with the error text or reason code.
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      description: The command, the template fields and the smallest input that shows the problem.
+      placeholder: |
+        1. Build with `go build ./cmd/threadz`
+        2. Run `threadz check --agents ...`
+        3. See error ...
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Version or commit
+      description: The output of `threadz version`, or the commit you built.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Scheduler or CLI
+        - Guards or limits
+        - Template or catalog parsing
+        - Threads API or feed browser
+        - Dashboard
+        - Telegram
+        - Evals
+        - Logging
+        - Docs
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Operating system, Go version, and the Threads backend from the template.
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before sending
+      options:
+        - label: I removed secrets, private content and real account names.
+          required: true
+        - label: I read the setup guide and searched existing issues.
+          required: true

@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:ht="https://trends.google.com/trending/rss">
+  <channel>
+    <title>Google Trends Vietnam (synthetic fixture)</title>
+    <item>
+      <title>giá vàng &amp; chứng khoán</title>
+      <ht:approx_traffic>2,000+</ht:approx_traffic>
+      <link>https://trends.google.com/trending/rss?geo=VN&amp;q=gold</link>
+    </item>
+    <item>
+      <title>Missing link trend</title>
+    </item>
+    <item>
+      <link>https://trends.google.com/trends/explore?q=no-title</link>
+    </item>
+    <item>
+      <title>AI &lt;tool&gt; 日本語</title>
+      <link>https://trends.google.com/trends/explore?q=ai</link>
+    </item>
+  </channel>
+</rss>

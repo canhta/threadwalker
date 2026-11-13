@@ -1,0 +1,55 @@
+{
+  "source": "https://www.threads.com/ measured in the owner-authorized authenticated Orca Browser tab",
+  "measured_at": "2026-11-12",
+  "auth_state": "authenticated for feed; logged-out for logged-out fixture",
+  "replacements": "usernames, post text, post IDs, media alt text, tracking URLs and profile data replaced with synthetic content; roles, nesting, control labels and URL patterns preserved",
+  "limits": "one throwaway account, one host, one day; captcha/challenge, account survival, session portability and rate-limit banners were not measured",
+  "fixtures": [
+    {
+      "file": "home-trending.ax.txt",
+      "sha256": "339489360e01e8d58e0f65d36f43887cef4df01af31da7584ed9e9ec45b57b57",
+      "note": "measured 2026-11-13 (agent-browser snapshot -c -u of the home page and of a trends topic page); Trending-now links to /search?serp_type=trends sit outside the Column body"
+    },
+    {
+      "file": "topic.ax.txt",
+      "sha256": "e21459ac11d5631a75e1ec429ecfc29be1634cb2b93a292b88f99dfeb8f2976d"
+    },
+    {
+      "file": "feed.ax.txt",
+      "sha256": "da50df934a53b571329338bcd24fc77a3a142c09e67444e79ffb0d06f753f8c7"
+    },
+    {
+      "file": "logged-out.ax.txt",
+      "sha256": "b6cf50ce672ec10f165153a1f203bc21cab3c7f544ed143658d1e7afbe04b4d5"
+    },
+    {
+      "file": "post-real-filled.ax.txt",
+      "sha256": "451303aabc793c689370116d73020fd6a12cd1023bfae0f8926c2c4dc6a76299"
+    },
+    {
+      "file": "post-real.ax.txt",
+      "sha256": "6addf208774fa86e6fa1f24cf434cab4e2aa7ecd0318bd7975d1ebc366ebfb32"
+    },
+    {
+      "file": "reply-live-filled.ax.txt",
+      "sha256": "c2354b2ab8bf1025f0a4cf56558f4a17659cf8e15d94616679dbc95fa09b1d54"
+    },
+    {
+      "file": "reply-live.ax.txt",
+      "sha256": "88cb9d564eac584b6c3f7e73d54b6cb20419d5f7b984b8fede5cc953946fec91"
+    },
+    {
+      "file": "reply-toast.ax.txt",
+      "sha256": "c424ec1aae2e86eabf661fe66f1e96c1c70f9b42eb2b385701e8ebcff0dca708"
+    },
+    {
+      "file": "unknown.ax.txt",
+      "sha256": "0b3d9a8f5da0738d8f6df21a87117a55bd9ea8c73adb077c711007b9c0b5fa0f"
+    },
+    {
+      "file": "post-tagged.ax.txt",
+      "sha256": "5ea14737d28626d03f1fb32421129d4a5833a8dae82b92cb9b7e2dfa7fcffd60",
+      "note": "measured 2026-11-13 (agent-browser snapshot -c -u of a post page): the post carries a topic tag, so its timestamp permalink sits inside a nested generic and the only direct post link is the /media link"
+    }
+  ]
+}

@@ -1,0 +1,237 @@
+- navigation
+  - link "Threads" [ref=e468, url=https://www.threads.com/]
+    - image "Threads"
+  - link "Home" [ref=e469, url=https://www.threads.com/]
+    - image "Home"
+  - button "New thread" [ref=e470]
+    - image "New thread"
+  - link "Search" [ref=e471, url=https://www.threads.com/search]
+    - image "Search"
+  - link "Messages" [ref=e472, url=https://www.threads.com/messages/]
+    - image "Messages"
+  - link "Notifications" [ref=e473, url=https://www.threads.com/activity]
+    - image "Notifications"
+  - link "Profile" [ref=e474, url=https://www.threads.com/@synthetic_own]
+    - image "Profile"
+  - link "Insights" [ref=e475, url=https://www.threads.com/insights/]
+    - image "Insights"
+- generic
+  - generic
+    - generic
+      - generic
+        - button "Back" [ref=e477]
+          - image "Back"
+        - generic
+          - link "Column title" [ref=e487, url=https://www.threads.com/@synthetic_author/post/fixtureRealPost2]
+            - heading "Thread" [level=1, ref=e497]
+              - StaticText "Synthetic text 1."
+          - StaticText "Synthetic text 2."
+          - button "More" [expanded=false, ref=e498]
+            - image "More"
+      - region "Column body" [ref=e476] focusable [tabindex]
+        - generic
+          - generic [ref=e507] clickable [cursor:pointer, onclick]
+            - button "synthetic_author's profile picture Follow" [ref=e529]
+              - image "synthetic_author's profile picture"
+              - button "Follow" [ref=e534]
+                - image "Follow"
+            - link "synthetic_author" [ref=e530, url=https://www.threads.com/@synthetic_author]
+              - StaticText "Synthetic text 3."
+            - link "23 hours ago" [ref=e531, url=https://www.threads.com/@synthetic_author/post/fixtureRealPost2]
+              - time
+                - Abbr "23 hours ago"
+                  - StaticText "23h"
+            - button "More" [expanded=false, ref=e532]
+              - image "More"
+            - StaticText "Synthetic text 4."
+            - StaticText "Synthetic text 5."
+            - button "Translate" [ref=e535]
+              - StaticText "Translate"
+            - button "Like 6.5K" [ref=e511]
+              - image "Like"
+              - StaticText "6.5K"
+            - button "Reply 83" [ref=e512]
+              - image "Reply"
+              - StaticText "83"
+            - button "Repost 163" [expanded=false, ref=e513]
+              - image "Repost"
+              - StaticText "163"
+            - button "Share 536" [ref=e514]
+              - image "Share"
+              - StaticText "536"
+            - button "Sort Top More" [expanded=false, ref=e515]
+              - image "Sort"
+              - StaticText "Top"
+              - image "More"
+            - button "View activity View activity" [ref=e516]
+              - StaticText "View activity"
+              - image "View activity"
+            - image "synthetic_own's profile picture"
+            - generic
+              - textbox "Empty text field. Type to compose a new post." [ref=e533]: 
+
+                - paragraph
+                  - LineBreak "\n"
+            - button "Attach media" [ref=e517]
+            - button "Add a GIF" [ref=e518]
+            - button "Expand composer" [ref=e519]
+          - generic [ref=e520] clickable [cursor:pointer, onclick]
+            - StaticText "Pinned"
+            - generic
+              - link "synthetic_user0's profile picture" [ref=e573, url=https://www.threads.com/@synthetic_user0]
+                - image "synthetic_user0's profile picture"
+              - link "synthetic_user0" [ref=e557, url=https://www.threads.com/@synthetic_user0]
+                - StaticText "Synthetic text 6."
+              - link "21 hours ago" [ref=e558, url=https://www.threads.com/@synthetic_user0/post/fixtureReply1]
+                - time
+                  - Abbr "21 hours ago"
+                    - StaticText "21h"
+              - generic
+                - image "synthetic_user's profile picture"
+                - generic
+                  - image "Liked by original author"
+              - button "More" [expanded=false, ref=e559]
+                - image "More"
+              - StaticText "Synthetic text 7."
+              - StaticText "Synthetic text 8."
+              - StaticText "Synthetic text 9."
+              - link "synthetic.test/x" [ref=e560, url=https://synthetic.test/x]
+              - button "Translate" [ref=e574]
+                - StaticText "Translate"
+              - link "synthetic.test card" [ref=e536, url=https://synthetic.test/x]
+                - image "synthetic card"
+                - StaticText "Synthetic text 10."
+                - StaticText "Synthetic text 11."
+              - button "Like 35" [ref=e537]
+                - image "Like"
+                - StaticText "35"
+              - button "Reply 2" [ref=e538]
+                - image "Reply"
+                - StaticText "2"
+              - button "Repost 1" [expanded=false, ref=e539]
+                - image "Repost"
+                - StaticText "1"
+              - button "Share 3" [ref=e540]
+                - image "Share"
+                - StaticText "3"
+          - generic
+            - generic [ref=e521] clickable [cursor:pointer, onclick]
+              - generic
+                - link "synthetic_user1's profile picture" [ref=e575, url=https://www.threads.com/@synthetic_user1]
+                  - image "synthetic_user1's profile picture"
+                - link "synthetic_user1" [ref=e561, url=https://www.threads.com/@synthetic_user1]
+                  - StaticText "Synthetic text 12."
+                - link "22 hours ago" [ref=e562, url=https://www.threads.com/@synthetic_user1/post/fixtureReply2]
+                  - time
+                    - Abbr "22 hours ago"
+                      - StaticText "22h"
+                - generic
+                  - image "synthetic_user's profile picture"
+                  - generic
+                    - image "Liked by original author"
+                - button "More" [expanded=false, ref=e563]
+                  - image "More"
+                - StaticText "Synthetic text 13."
+                - button "Translate" [ref=e576]
+                  - StaticText "Translate"
+                - button "Like 202" [ref=e541]
+                  - image "Like"
+                  - StaticText "202"
+                - button "Reply 2" [ref=e542]
+                  - image "Reply"
+                  - StaticText "2"
+                - button "Repost" [expanded=false, ref=e543]
+                  - image "Repost"
+                - button "Share" [ref=e544]
+                  - image "Share"
+            - generic [ref=e522] clickable [cursor:pointer, onclick]
+              - generic
+                - link "synthetic_author's profile picture" [ref=e577, url=https://www.threads.com/@synthetic_author]
+                  - image "synthetic_author's profile picture"
+                - link "synthetic_author" [ref=e564, url=https://www.threads.com/@synthetic_author]
+                  - StaticText "Synthetic text 14."
+                - generic
+                  - link "22 hours ago" [ref=e565, url=https://www.threads.com/@synthetic_author/post/fixtureReply3]
+                    - time
+                      - Abbr "22 hours ago"
+                        - StaticText "22h"
+                  - StaticText "·"
+                  - StaticText "Synthetic text 15."
+                - button "More" [expanded=false, ref=e566]
+                  - image "More"
+                - StaticText "Synthetic text 16."
+                - button "Translate" [ref=e578]
+                  - StaticText "Translate"
+                - button "Like 150" [ref=e545]
+                  - image "Like"
+                  - StaticText "150"
+                - button "Reply 2" [ref=e546]
+                  - image "Reply"
+                  - StaticText "2"
+                - button "Repost" [expanded=false, ref=e547]
+                  - image "Repost"
+                - button "Share 3" [ref=e548]
+                  - image "Share"
+                  - StaticText "3"
+            - button "Show replies" [ref=e523]
+              - image "synthetic_user's profile picture"
+              - image "synthetic_user's profile picture"
+              - StaticText "Synthetic text 17."
+          - generic
+            - generic [ref=e524] clickable [cursor:pointer, onclick]
+              - generic
+                - link "synthetic_user2's profile picture" [ref=e579, url=https://www.threads.com/@synthetic_user2]
+                  - image "synthetic_user2's profile picture"
+                - link "synthetic_user2" [ref=e567, url=https://www.threads.com/@synthetic_user2]
+                  - StaticText "Synthetic text 18."
+                - link "22 hours ago" [ref=e568, url=https://www.threads.com/@synthetic_user2/post/fixtureReply4]
+                  - time
+                    - Abbr "22 hours ago"
+                      - StaticText "22h"
+                - generic
+                  - image "synthetic_user's profile picture"
+                  - generic
+                    - image "Liked by original author"
+                - button "More" [expanded=false, ref=e569]
+                  - image "More"
+                - StaticText "Synthetic text 19."
+                - button "Translate" [ref=e580]
+                  - StaticText "Translate"
+                - button "Like 66" [ref=e549]
+                  - image "Like"
+                  - StaticText "66"
+                - button "Reply 3" [ref=e550]
+                  - image "Reply"
+                  - StaticText "3"
+                - button "Repost" [expanded=false, ref=e551]
+                  - image "Repost"
+                - button "Share 1" [ref=e552]
+                  - image "Share"
+                  - StaticText "1"
+            - generic [ref=e525] clickable [cursor:pointer, onclick]
+              - generic
+                - link "synthetic_author's profile picture" [ref=e581, url=https://www.threads.com/@synthetic_author]
+                  - image "synthetic_author's profile picture"
+                - link "synthetic_author" [ref=e570, url=https://www.threads.com/@synthetic_author]
+                  - StaticText "Synthetic text 20."
+                - generic
+                  - link "21 hours ago" [ref=e571, url=https://www.threads.com/@synthetic_author/post/fixtureReply5]
+                    - time
+                      - Abbr "21 hours ago"
+                        - StaticText "21h"
+                  - StaticText "·"
+                  - StaticText "Synthetic text 21."
+                - button "More" [expanded=false, ref=e572]
+                  - image "More"
+                - StaticText "Synthetic text 22."
+                - button "Translate" [ref=e582]
+                  - StaticText "Translate"
+                - button "Like 7" [ref=e553]
+                  - image "Like"
+                  - StaticText "7"
+                - button "Reply" [ref=e554]
+                  - image "Reply"
+                - button "Repost" [expanded=false, ref=e555]
+                  - image "Repost"
+                - button "Share" [ref=e556]
+                  - image "Share"

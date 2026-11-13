@@ -1,0 +1,32 @@
+{
+  "description": "Actual public dashboard handler and read-only temporary SQLite projection; synthetic privacy sentinels, no credentials or external network.",
+  "cases": [
+    {
+      "id": "dashboard_public_privacy",
+      "kind": "dashboard",
+      "scenario": "privacy",
+      "expect": {
+        "end_reason": "completed",
+        "tools": []
+      }
+    },
+    {
+      "id": "dashboard_database_read_only",
+      "kind": "dashboard",
+      "scenario": "read_only",
+      "expect": {
+        "end_reason": "completed",
+        "tools": []
+      }
+    },
+    {
+      "id": "dashboard_query_failure_redacted",
+      "kind": "dashboard",
+      "scenario": "query_failure",
+      "expect": {
+        "end_reason": "persistence_error",
+        "tools": []
+      }
+    }
+  ]
+}

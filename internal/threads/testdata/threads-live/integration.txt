@@ -1,0 +1,6 @@
+=== RUN   TestAgentBrowserLocalIntegration
+--- PASS: TestAgentBrowserLocalIntegration (31.43s)
+=== RUN   TestAgentBrowserThreadsLiveLoggedOutFailsClosed
+--- PASS: TestAgentBrowserThreadsLiveLoggedOutFailsClosed (7.44s)
+PASS
+ok  	github.com/canhta/threadz/internal/threads	39.255s

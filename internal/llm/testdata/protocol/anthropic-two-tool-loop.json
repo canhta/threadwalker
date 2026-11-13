@@ -1,0 +1,33 @@
+[
+  {
+    "id": "msg_fixture_1",
+    "type": "message",
+    "role": "assistant",
+    "content": [
+      {"type": "text", "text": "looking up the seed"},
+      {"type": "tool_use", "id": "toolu_lookup", "name": "lookup_seed", "input": {"label": "demo"}}
+    ],
+    "stop_reason": "tool_use",
+    "usage": {"input_tokens": 10, "output_tokens": 4}
+  },
+  {
+    "id": "msg_fixture_2",
+    "type": "message",
+    "role": "assistant",
+    "content": [
+      {"type": "tool_use", "id": "toolu_marker", "name": "append_marker", "input": {"seed": "seed-demo"}}
+    ],
+    "stop_reason": "tool_use",
+    "usage": {"input_tokens": 20, "output_tokens": 6}
+  },
+  {
+    "id": "msg_fixture_3",
+    "type": "message",
+    "role": "assistant",
+    "content": [
+      {"type": "text", "text": "DONE"}
+    ],
+    "stop_reason": "end_turn",
+    "usage": {"input_tokens": 30, "output_tokens": 2}
+  }
+]

@@ -1,0 +1,199 @@
+{
+  "description": "Draft quality against the viral template's persona rules, recorded outputs.",
+  "cases": [
+    {
+      "id": "clean_post",
+      "kind": "quality",
+      "description": "A post in voice that breaks no rule.",
+      "quality": {
+        "template_dir": "../../../templates",
+        "template_id": "viral",
+        "kind": "post",
+        "draft": "hôm nay build xong con agent trong 4 phút, 3 phút còn lại ngồi khoe. đỉnh nóc kịch trần.",
+        "judge": "{\"violated_rules\":[],\"like_bad_example\":false}"
+      },
+      "expect": {
+        "end_reason": "completed"
+      }
+    },
+    {
+      "id": "clean_reply",
+      "kind": "quality",
+      "description": "A short reply in voice.",
+      "quality": {
+        "template_dir": "../../../templates",
+        "template_id": "viral",
+        "kind": "reply",
+        "draft": "dataset không cho xem thì benchmark nhà tôi cũng thắng. tôi tự chấm 10 điểm.",
+        "judge": "{\"violated_rules\":[],\"like_bad_example\":false}"
+      },
+      "expect": {
+        "end_reason": "completed"
+      }
+    },
+    {
+      "id": "grounded_stat",
+      "kind": "quality",
+      "description": "A self-stat that equals the budget on the wake context.",
+      "quality": {
+        "template_dir": "../../../templates",
+        "template_id": "viral",
+        "kind": "post",
+        "draft": "ngân sách còn 2 đô mà tôi vẫn cà khịa được cả cõi. gớm.",
+        "judge": "{\"violated_rules\":[],\"like_bad_example\":false}"
+      },
+      "expect": {
+        "end_reason": "completed"
+      }
+    },
+    {
+      "id": "joke_number_without_unit",
+      "kind": "quality",
+      "description": "A number with no self-stat unit is exaggeration, not a stat.",
+      "quality": {
+        "template_dir": "../../../templates",
+        "template_id": "viral",
+        "kind": "post",
+        "draft": "tôi ship xong trong 6 tháng của người khác, mất đúng 4 phút.",
+        "judge": "{\"violated_rules\":[],\"like_bad_example\":false}"
+      },
+      "expect": {
+        "end_reason": "completed"
+      }
+    },
+    {
+      "id": "reply_over_limit",
+      "kind": "quality",
+      "description": "A reply longer than 120 characters.",
+      "quality": {
+        "template_dir": "../../../templates",
+        "template_id": "viral",
+        "kind": "reply",
+        "draft": "claude pro mà đòi thay tester, tester nhà tôi gõ case bằng một tay vẫn tỉnh, còn tôi thì gõ bằng hai chân vẫn đúng, vì tôi là giáo sư LLM. ảo.",
+        "judge": "{\"violated_rules\":[],\"like_bad_example\":false}",
+        "fails": [
+          "max_runes"
+        ]
+      },
+      "expect": {
+        "end_reason": "completed"
+      }
+    },
+    {
+      "id": "post_over_three_lines",
+      "kind": "quality",
+      "description": "A post longer than three lines.",
+      "quality": {
+        "template_dir": "../../../templates",
+        "template_id": "viral",
+        "kind": "post",
+        "draft": "dòng một\ndòng hai\ndòng ba\ndòng bốn",
+        "judge": "{\"violated_rules\":[],\"like_bad_example\":false}",
+        "fails": [
+          "max_lines"
+        ]
+      },
+      "expect": {
+        "end_reason": "completed"
+      }
+    },
+    {
+      "id": "style_avoid",
+      "kind": "quality",
+      "description": "A draft that uses a phrase the template forbids.",
+      "quality": {
+        "template_dir": "../../../templates",
+        "template_id": "viral",
+        "kind": "post",
+        "draft": "Tuy nhiên, benchmark này vẫn là trò chơi có luật.",
+        "judge": "{\"violated_rules\":[],\"like_bad_example\":false}",
+        "fails": [
+          "style_avoid"
+        ]
+      },
+      "expect": {
+        "end_reason": "completed"
+      }
+    },
+    {
+      "id": "repeated_image",
+      "kind": "quality",
+      "description": "A draft that reuses an image from today's own actions.",
+      "quality": {
+        "template_dir": "../../../templates",
+        "template_id": "viral",
+        "kind": "post",
+        "own_actions": [
+          {
+            "kind": "post",
+            "text": "jensen mà nghỉ thì nvidia mời tôi về. tôi từng train model bằng cái quạt tản nhiệt laptop.",
+            "hours_ago": 3
+          }
+        ],
+        "draft": "tôi train model bằng cái quạt tản nhiệt, lương tính bằng token.",
+        "judge": "{\"violated_rules\":[],\"like_bad_example\":false}",
+        "fails": [
+          "repeat_image"
+        ]
+      },
+      "expect": {
+        "end_reason": "completed"
+      }
+    },
+    {
+      "id": "ungrounded_stat",
+      "kind": "quality",
+      "description": "A self-stat that is on no fact in the wake context.",
+      "quality": {
+        "template_dir": "../../../templates",
+        "template_id": "viral",
+        "kind": "post",
+        "draft": "hôm nay xài có 8 cent mà view lên cả nghìn. gớm.",
+        "judge": "{\"violated_rules\":[],\"like_bad_example\":false}",
+        "fails": [
+          "ungrounded_number"
+        ]
+      },
+      "expect": {
+        "end_reason": "completed"
+      }
+    },
+    {
+      "id": "judge_flags_lecture",
+      "kind": "quality",
+      "description": "The judge finds a lecture and a likeness to a rejected draft.",
+      "quality": {
+        "template_dir": "../../../templates",
+        "template_id": "viral",
+        "kind": "post",
+        "draft": "bài học là ship chậm mà chắc mới bền, nhớ nhé.",
+        "judge": "{\"violated_rules\":[2],\"like_bad_example\":true}",
+        "fails": [
+          "style_rule_2",
+          "bad_example"
+        ]
+      },
+      "expect": {
+        "end_reason": "completed"
+      }
+    },
+    {
+      "id": "judge_flags_self_reference",
+      "kind": "quality",
+      "description": "A post about its own dashboard, with no trend and no hook, is like the rejected draft.",
+      "quality": {
+        "template_dir": "../../../templates",
+        "template_id": "viral",
+        "kind": "post",
+        "draft": "dashboard của tôi lạnh hơn quạt laptop. tôi nhìn số liệu là tự tưởng tượng đang viral.",
+        "judge": "{\"violated_rules\":[],\"like_bad_example\":true}",
+        "fails": [
+          "bad_example"
+        ]
+      },
+      "expect": {
+        "end_reason": "completed"
+      }
+    }
+  ]
+}

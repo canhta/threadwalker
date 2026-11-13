@@ -1,0 +1,79 @@
+- navigation
+  - link "Threads" [ref=e1, url=https://www.threads.com/]
+    - image "Threads"
+  - link "Home" [ref=e2, url=https://www.threads.com/]
+    - image "Home"
+  - button "New thread" [ref=e3]
+    - image "New thread"
+  - link "Search" [ref=e4, url=https://www.threads.com/search]
+    - image "Search"
+  - link "Messages" [ref=e5, url=https://www.threads.com/messages/]
+    - image "Messages"
+  - link "Notifications" [ref=e6, url=https://www.threads.com/activity]
+    - image "Notifications"
+  - link "Profile" [ref=e7, url=https://www.threads.com/@synthetic_own]
+    - image "Profile"
+  - link "Insights" [ref=e8, url=https://www.threads.com/insights/]
+    - image "Insights"
+- generic
+  - generic
+    - generic
+      - generic
+        - button "Back" [ref=e10]
+          - image "Back"
+        - generic
+          - link "Column title" [ref=e20, url=https://www.threads.com/@synthetic_author/post/fixtureTaggedPost]
+            - heading "Thread" [level=1, ref=e27]
+              - StaticText "Thread"
+          - StaticText "3.8K views"
+          - button "More" [expanded=false, ref=e28]
+            - image "More"
+      - region "Column body" [ref=e9] focusable [tabindex]
+        - generic
+          - generic [ref=e34] clickable [cursor:pointer, onclick]
+            - button "synthetic_author's profile picture Follow" [ref=e46]
+              - image "synthetic_author's profile picture"
+              - button "Follow" [ref=e52]
+                - image "Follow"
+            - link "synthetic_author" [ref=e47, url=https://www.threads.com/@synthetic_author]
+              - StaticText "synthetic_author"
+            - generic
+              - generic
+                - link "Synthetic Topic" [ref=e54, url=https://www.threads.com/search?q=Synthetic%20Topic&serp_type=tags&tag_id=1]
+                  - StaticText "Synthetic Topic"
+              - link "16 hours ago" [ref=e48, url=https://www.threads.com/@synthetic_author/post/fixtureTaggedPost]
+                - time
+                  - Abbr "16 hours ago"
+                    - StaticText "16h"
+            - button "More" [expanded=false, ref=e49]
+              - image "More"
+            - StaticText "Synthetic post text."
+            - button "Translate" [ref=e53]
+              - StaticText "Translate"
+            - link "Photo by Synthetic Author on November 12, 2026. May be a Twitter screenshot of text." [ref=e50, url=https://www.threads.com/@synthetic_author/post/fixtureTaggedPost/media]
+              - generic
+                - generic
+                  - image "Photo by Synthetic Author on November 12, 2026. May be a Twitter screenshot of text."
+            - button "Like 305" [ref=e35]
+              - image "Like"
+              - StaticText "305"
+            - button "Reply" [ref=e36]
+              - image "Reply"
+            - button "Repost 5" [expanded=false, ref=e37]
+              - image "Repost"
+              - StaticText "5"
+            - button "Share" [ref=e38]
+              - image "Share"
+            - StaticText "No replies yet"
+            - button "View activity View activity" [ref=e39]
+              - StaticText "View activity"
+              - image "View activity"
+            - image "synthetic_own's profile picture"
+            - generic
+              - textbox "Empty text field. Type to compose a new post." [ref=e51]: 
+
+                - paragraph
+                  - LineBreak "\n"
+            - button "Attach media" [ref=e40]
+            - button "Add a GIF" [ref=e41]
+            - button "Expand composer" [ref=e42]

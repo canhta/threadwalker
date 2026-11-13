@@ -1,0 +1,13 @@
+[Unit]
+Description=Threadz release updater
+After=network-online.target
+Wants=network-online.target
+
+# Runs as root: the binary and units are root-owned. Started by the timer and by
+# threadz-update.path; without an update request it does nothing unless
+# THREADZ_UPDATE_AUTO=true in the env file.
+[Service]
+Type=oneshot
+EnvironmentFile=-/etc/threadz/threadz.env
+ExecStart=/opt/threadz/threadz update --scheduled --agents /opt/threadz/agents --db /opt/threadz/data/threadz.db
+TimeoutStartSec=20min

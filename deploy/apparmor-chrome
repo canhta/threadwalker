@@ -1,0 +1,12 @@
+# Allow the pinned Chrome for Testing to use its own user-namespace sandbox on
+# Ubuntu 24.04, where AppArmor restricts unprivileged user namespaces. Without
+# this the browser aborts with "No usable sandbox"; the alternative is
+# --no-sandbox, which weakens the renderer. The profile is intentionally
+# unconfined and only grants the userns permission.
+abi <abi/3.0>,
+#include <tunables/global>
+
+profile chrome /opt/chrome/chrome flags=(unconfined) {
+  userns,
+  include if exists <local/chrome>
+}

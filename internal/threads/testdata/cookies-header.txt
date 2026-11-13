@@ -1,0 +1,1 @@
+Cookie: sessionid=synthetic-session-value; ds_user_id=1000000000000001; ps_l=1; csrftoken=synthetic-csrf; rur="SYN\054000000000000001\0541893456000:synthetic"

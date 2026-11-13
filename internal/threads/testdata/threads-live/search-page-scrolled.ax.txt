@@ -1,0 +1,47 @@
+- generic [ref=e1] clickable [onclick]
+  - navigation
+    - link "Home" [ref=e3, url=https://www.threads.com/]
+      - image "Home"
+    - link "Profile" [ref=e8, url=https://www.threads.com/@synthetic_owner]
+      - image "Profile"
+    - link "Insights" [ref=e9, url=https://www.threads.com/insights/]
+      - image "Insights"
+  - generic
+    - generic
+      - generic
+        - region "Column body" [ref=e10] focusable [tabindex]
+          - generic
+            - StaticText "Trending"
+            - StaticText "Synthetic summary of the topic"
+            - StaticText "1K posts"
+            - generic [ref=e30] clickable [cursor:pointer, onclick]
+              - button "synthetic_user3's profile picture Follow" [ref=e31]
+                - image "synthetic_user3's profile picture"
+              - link "synthetic_user3" [ref=e32, url=https://www.threads.com/@synthetic_user3]
+                - StaticText "synthetic_user3"
+              - link "1 hour ago" [ref=e34, url=https://www.threads.com/@synthetic_user3/post/synth3]
+                - StaticText "1h"
+              - StaticText "Synthetic post number 3"
+              - button "Like 3" [ref=e35]
+                - StaticText "3"
+            - generic [ref=e40] clickable [cursor:pointer, onclick]
+              - button "synthetic_user4's profile picture Follow" [ref=e41]
+                - image "synthetic_user4's profile picture"
+              - link "synthetic_user4" [ref=e42, url=https://www.threads.com/@synthetic_user4]
+                - StaticText "synthetic_user4"
+              - link "1 hour ago" [ref=e44, url=https://www.threads.com/@synthetic_user4/post/synth4]
+                - StaticText "1h"
+              - StaticText "Synthetic post number 4"
+              - button "Like 4" [ref=e45]
+                - StaticText "4"
+            - generic [ref=e50] clickable [cursor:pointer, onclick]
+              - button "synthetic_user5's profile picture Follow" [ref=e51]
+                - image "synthetic_user5's profile picture"
+              - link "synthetic_user5" [ref=e52, url=https://www.threads.com/@synthetic_user5]
+                - StaticText "synthetic_user5"
+              - link "1 hour ago" [ref=e54, url=https://www.threads.com/@synthetic_user5/post/synth5]
+                - StaticText "1h"
+              - StaticText "Synthetic post number 5"
+              - button "Like 5" [ref=e55]
+                - StaticText "5"
+            - status "Loading..."
