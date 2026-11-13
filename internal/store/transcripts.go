@@ -11,6 +11,7 @@ import (
 const (
 	TranscriptContext    = "context"
 	TranscriptAssistant  = "assistant"
+	TranscriptUser       = "user"
 	TranscriptToolResult = "tool_result"
 	TranscriptUsage      = "usage"
 	TranscriptEnd        = "end"

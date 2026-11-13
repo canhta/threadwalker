@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"strings"
 
 	"github.com/canhta/threadz/internal/stdx"
 	"github.com/canhta/threadz/internal/store"
@@ -26,17 +27,29 @@ func (c *Client) record(ctx context.Context, kind string, body any) {
 }
 
 // recordContext stores the hash of every rendered message and the data message
-// itself; the system prompt is derived from the template, so only its hash is kept.
+// itself, plus the system prompt text once per run (not per request), bounded.
 func (c *Client) recordContext(ctx context.Context, messages []Message) {
 	h := sha256.New()
-	var data []string
+	var data, system []string
 	for _, m := range messages {
 		h.Write([]byte(m.Role + "\x00" + m.Content + "\x00"))
-		if m.Role != "system" {
+		if m.Role == "system" {
+			system = append(system, m.Content)
+		} else {
 			data = append(data, m.Content)
 		}
 	}
-	c.record(ctx, store.TranscriptContext, map[string]any{"hash": hex.EncodeToString(h.Sum(nil)), "data": data})
+	full := strings.Join(system, "\n\n")
+	systemHash := sha256.Sum256([]byte(full))
+	prompt, truncated := stdx.TruncateUTF8(full, MaxTranscriptToolBytes)
+	c.record(ctx, store.TranscriptContext, map[string]any{"hash": hex.EncodeToString(h.Sum(nil)), "system_hash": hex.EncodeToString(systemHash[:]), "system": prompt, "system_truncated": truncated, "data": data})
+}
+
+// recordUser stores a user turn the loop injected (a nudge or stop check), so
+// a transcript shows why the model acted after it stopped.
+func (c *Client) recordUser(ctx context.Context, m Message) {
+	text, truncated := stdx.TruncateUTF8(c.redactMessage(m).Content, MaxTranscriptToolBytes)
+	c.record(ctx, store.TranscriptUser, map[string]any{"text": text, "truncated": truncated})
 }
 
 func (c *Client) recordAssistant(ctx context.Context, request int, m Message) {

@@ -319,7 +319,9 @@ func (c *Client) Run(ctx context.Context, agentID string, wakeID int64, messages
 				}
 				if len(asks) > 0 {
 					nudges++
-					result.Messages = append(result.Messages, Message{Role: "user", Content: strings.Join(asks, " ")})
+					nudge := Message{Role: "user", Content: strings.Join(asks, " ")}
+					result.Messages = append(result.Messages, nudge)
+					c.recordUser(ctx, nudge)
 					continue
 				}
 			}
