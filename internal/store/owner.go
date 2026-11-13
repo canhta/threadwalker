@@ -418,7 +418,7 @@ func (s *Store) OwnerSummary(ctx context.Context, id string, dryRun bool, from, 
 	if err != nil {
 		return out, fmt.Errorf("counting owner summary actions: %w", err)
 	}
-	err = s.db.QueryRowContext(ctx, `SELECT COUNT(*),COALESCE(SUM(m.views),0),COALESCE(SUM(m.likes),0),COALESCE(SUM(m.replies),0),COALESCE(SUM(m.reposts),0) FROM metrics m JOIN actions a ON a.id=m.action_id AND a.agent_id=m.agent_id WHERE m.agent_id=? AND julianday(m.measured_at)>=julianday(?) AND julianday(m.measured_at)<julianday(?) AND m.measured_at=(SELECT MAX(m2.measured_at) FROM metrics m2 WHERE m2.agent_id=m.agent_id AND m2.action_id=m.action_id AND julianday(m2.measured_at)<julianday(?))`, id, formatStoreTimestamp(from), formatStoreTimestamp(to), formatStoreTimestamp(to)).Scan(&out.MetricSamples, &out.Views, &out.Likes, &out.Responses, &out.Reposts)
+	err = s.db.QueryRowContext(ctx, `SELECT COUNT(*),COALESCE(SUM(m.views),0),COALESCE(SUM(m.likes),0),COALESCE(SUM(m.replies),0),COALESCE(SUM(m.reposts),0) FROM metrics m JOIN actions a ON a.id=m.action_id AND a.agent_id=m.agent_id WHERE m.agent_id=? AND a.dry_run=? AND julianday(m.measured_at)>=julianday(?) AND julianday(m.measured_at)<julianday(?) AND m.measured_at=(SELECT MAX(m2.measured_at) FROM metrics m2 WHERE m2.agent_id=m.agent_id AND m2.action_id=m.action_id AND julianday(m2.measured_at)<julianday(?))`, id, dryRun, formatStoreTimestamp(from), formatStoreTimestamp(to), formatStoreTimestamp(to)).Scan(&out.MetricSamples, &out.Views, &out.Likes, &out.Responses, &out.Reposts)
 	if err != nil {
 		return out, fmt.Errorf("counting owner summary metrics: %w", err)
 	}

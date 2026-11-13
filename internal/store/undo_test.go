@@ -136,6 +136,10 @@ func TestOwnerSummaryTopPostAndFollowers(t *testing.T) {
 	if sum.Top != (TopPost{ActionID: 2, URL: "https://example.test/p/2", Views: 300, Engagements: 4}) {
 		t.Fatalf("top = %+v", sum.Top)
 	}
+	// Live samples only: 80 + 300 + the reply's 5000; the dry-run post's 9000 is left out.
+	if sum.Views != 5380 {
+		t.Fatalf("views = %d", sum.Views)
+	}
 	if sum.Followers == nil || *sum.Followers != 112 || sum.FollowersBefore == nil || *sum.FollowersBefore != 100 {
 		t.Fatalf("followers = %v %v", sum.Followers, sum.FollowersBefore)
 	}
