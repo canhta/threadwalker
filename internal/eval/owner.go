@@ -200,7 +200,7 @@ func runOwnerCase(ctx context.Context, c Case, p Profile, repeat int, opts Optio
 		if err = st.RecordUnattributedLLMUsage(ctx, tmpl.ID, day, store.LLMUsage{TokensIn: 10, TokensOut: 20, CostUSD: 1}); err != nil {
 			return r
 		}
-		if _, err = st.SeedAction(ctx, store.SeededAction{AgentID: tmpl.ID, Kind: "post", Text: "Synthetic eval action", DryRun: tmpl.DryRun, PostedAt: now}); err != nil {
+		if _, err = st.SeedAction(ctx, store.SeededAction{AgentID: tmpl.ID, Kind: "post", Text: "Synthetic eval action", DryRun: tmpl.DryRun, PostedAt: now.Add(-time.Minute)}); err != nil {
 			return r
 		}
 		tmpl.Limits.PostsPerDay = 1
@@ -220,7 +220,7 @@ func runOwnerCase(ctx context.Context, c Case, p Profile, repeat int, opts Optio
 		}
 		found := false
 		for _, text := range sent {
-			if strings.Contains(text, "Posts: 1 of 3") && strings.Contains(text, "Spend: $1.00 of $1.00 (100%)") {
+			if strings.Contains(text, "Posts: 1\n") && strings.Contains(text, "$1.00 of $1.00 (100%)") {
 				found = true
 			}
 		}

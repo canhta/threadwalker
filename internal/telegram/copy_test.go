@@ -38,26 +38,26 @@ func TestReportText(t *testing.T) {
 		Blocked: []store.Refusal{{Reason: "blocked_phrase", Count: 3}, {Reason: "quota", Count: 1}},
 	}
 	want := `Daily report, 1 Jan 2026
-Period: 1 Jan 07:00 to 1 Jan 21:15 UTC+07 (limits day from 00:00 UTC)
+Period: last 24 hours, 31 Dec 21:15 to 1 Jan 21:15 UTC+07
 State: Running, next run 21:45 (in 30 min)
 
-Posts: 2 of 3
-Replies: 5 of 15
-Metrics (4 measured today): 3400 views, 120 likes, 30 replies, 8 reposts
+Posts: 2
+Replies: 5
+Metrics (4 measured): 3400 views, 120 likes, 30 replies, 8 reposts
 Top post: 1234 views, 56 engagements
 https://www.threads.com/@a/post/x
 Followers: 1034 (+12)
 Playbook changes: 1
-Spend: $0.42 of $0.50 (84%); wake $0.30, study $0.10, dream $0.02
+Spend since 07:00 UTC+07: $0.42 of $0.50 (84%); wake $0.30, study $0.10, dream $0.02
 
 Failed runs: 1 (step_limit ×1)
 Blocked actions: blocked_phrase ×3, quota ×1`
-	if got := s.reportText("one", full, day); got != want {
+	if got := s.reportText("one", full); got != want {
 		t.Fatalf("report:\n%s\nwant:\n%s", got, want)
 	}
 	// Missing measurements say so instead of showing zero.
-	empty := s.reportText("one", store.OwnerSummary{Status: "paused"}, day)
-	for _, part := range []string{"State: Paused, next run none scheduled", "Metrics: none measured today", "Followers: not measured today", "Failed runs: 0", "Blocked actions: none"} {
+	empty := s.reportText("one", store.OwnerSummary{Status: "paused"})
+	for _, part := range []string{"State: Paused, next run none scheduled", "Metrics: none measured\n", "Followers: not measured\n", "Failed runs: 0", "Blocked actions: none"} {
 		if !strings.Contains(empty, part) {
 			t.Fatalf("empty report missing %q:\n%s", part, empty)
 		}
@@ -106,11 +106,11 @@ func TestCommandMenuAndHelpShareOneTable(t *testing.T) {
 
 func TestNoticeKindsHaveCopy(t *testing.T) {
 	for _, kind := range []string{"daily_limit", "budget_80", "budget_100", "logged_out", "logged_in", "captcha", "killed"} {
-		if noticeText(kind) == "" {
+		if noticeText(kind, "07:00 UTC+07") == "" {
 			t.Fatalf("no copy for %s", kind)
 		}
 	}
-	if noticeText("other") != "" {
+	if noticeText("other", "07:00 UTC+07") != "" {
 		t.Fatal("unknown notice kind has copy")
 	}
 }

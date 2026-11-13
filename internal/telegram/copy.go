@@ -186,14 +186,15 @@ func zoneLabel(t time.Time) string {
 }
 
 // noticeText is the body of a code-owned notice kind. Only these kinds exist.
-func noticeText(kind string) string {
+// reset is when the daily limits reset, in the owner's zone.
+func noticeText(kind, reset string) string {
 	switch kind {
 	case "daily_limit":
-		return "Daily action limit reached. Posting and replying resume when the limits reset at 00:00 UTC."
+		return "Daily action limit reached. Posting and replying resume when the limits reset at " + reset + "."
 	case "budget_80":
 		return "Today's spend has reached 80% of the daily cap."
 	case "budget_100":
-		return "Daily spend cap reached. The agent stops until the limits reset at 00:00 UTC."
+		return "Daily spend cap reached. The agent stops until the limits reset at " + reset + "."
 	case "logged_out":
 		return "The Threads browser session is logged out. The agent is paused."
 	case "logged_in":
@@ -204,6 +205,12 @@ func noticeText(kind string) string {
 		return "The agent is stopped permanently."
 	}
 	return ""
+}
+
+// resetText is when the limits day (00:00 UTC) starts in the owner's zone.
+func (s *Service) resetText(id string) string {
+	midnight := s.opts.Now().UTC().Truncate(24 * time.Hour).In(s.location(id))
+	return midnight.Format("15:04") + " " + zoneLabel(midnight)
 }
 
 func (s *Service) location(id string) *time.Location {
@@ -239,7 +246,7 @@ func (s *Service) nextRunLine(id string, summary store.OwnerSummary) string {
 }
 
 // statusText answers /status. Counts are for the limits day, which starts at
-// 00:00 UTC.
+// 00:00 UTC; the next run is in the owner's zone.
 func (s *Service) statusText(id string, summary store.OwnerSummary) string {
 	tmpl := s.templates[id]
 	return strings.Join([]string{
@@ -252,24 +259,25 @@ func (s *Service) statusText(id string, summary store.OwnerSummary) string {
 	}, "\n")
 }
 
-// reportText is the daily report, also sent by /report. It covers the limits
-// day (from 00:00 UTC) up to now, shown in the owner's zone. A missing metric
-// is said to be missing, never shown as zero.
-func (s *Service) reportText(id string, summary store.OwnerSummary, dayStart time.Time) string {
-	tmpl, loc, now := s.templates[id], s.location(id), s.opts.Now()
+// reportText is the daily report, also sent by /report. summary covers the 24
+// hours up to now, so consecutive daily reports leave no gap, except its spend,
+// which is the limits day's because the cap applies to that day. A missing
+// metric is said to be missing, never shown as zero.
+func (s *Service) reportText(id string, summary store.OwnerSummary) string {
+	loc, now := s.location(id), s.opts.Now()
 	local := now.In(loc)
 	lines := []string{
 		"Daily report, " + local.Format("2 Jan 2006"),
-		fmt.Sprintf("Period: %s to %s %s (limits day from 00:00 UTC)", dayStart.In(loc).Format("2 Jan 15:04"), local.Format("2 Jan 15:04"), zoneLabel(local)),
+		fmt.Sprintf("Period: last 24 hours, %s to %s %s", local.Add(-24*time.Hour).Format("2 Jan 15:04"), local.Format("2 Jan 15:04"), zoneLabel(local)),
 		"State: " + stateText(summary.Status) + ", next run " + s.nextRunLine(id, summary),
 		"",
-		"Posts: " + countOf(summary.Posts, tmpl.Limits.PostsPerDay),
-		"Replies: " + countOf(summary.Replies, tmpl.Limits.RepliesPerDay),
+		fmt.Sprintf("Posts: %d", summary.Posts),
+		fmt.Sprintf("Replies: %d", summary.Replies),
 	}
 	if summary.MetricSamples > 0 {
-		lines = append(lines, fmt.Sprintf("Metrics (%d measured today): %d views, %d likes, %d replies, %d reposts", summary.MetricSamples, summary.Views, summary.Likes, summary.Responses, summary.Reposts))
+		lines = append(lines, fmt.Sprintf("Metrics (%d measured): %d views, %d likes, %d replies, %d reposts", summary.MetricSamples, summary.Views, summary.Likes, summary.Responses, summary.Reposts))
 	} else {
-		lines = append(lines, "Metrics: none measured today")
+		lines = append(lines, "Metrics: none measured")
 	}
 	if summary.Top.ActionID != 0 {
 		lines = append(lines, fmt.Sprintf("Top post: %d views, %d engagements", summary.Top.Views, summary.Top.Engagements))
@@ -279,7 +287,7 @@ func (s *Service) reportText(id string, summary store.OwnerSummary, dayStart tim
 	}
 	switch {
 	case summary.Followers == nil:
-		lines = append(lines, "Followers: not measured today")
+		lines = append(lines, "Followers: not measured")
 	case summary.FollowersBefore == nil:
 		lines = append(lines, fmt.Sprintf("Followers: %d", *summary.Followers))
 	default:
@@ -288,7 +296,7 @@ func (s *Service) reportText(id string, summary store.OwnerSummary, dayStart tim
 	if summary.PlaybookChanges > 0 {
 		lines = append(lines, fmt.Sprintf("Playbook changes: %d", summary.PlaybookChanges))
 	}
-	lines = append(lines, "Spend: "+s.spendLine(id, summary), "")
+	lines = append(lines, "Spend since "+s.resetText(id)+": "+s.spendLine(id, summary), "")
 	failed := fmt.Sprintf("Failed runs: %d", summary.FailedWakes)
 	if len(summary.FailReasons) > 0 {
 		failed += " (" + refusalList(summary.FailReasons) + ")"

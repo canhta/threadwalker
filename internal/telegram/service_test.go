@@ -247,7 +247,7 @@ func TestNoticesAndDigestOncePerEventWithContent(t *testing.T) {
 	for _, text := range bot.texts {
 		if strings.HasPrefix(text, "Daily report, 2 Jan 2026\n") {
 			found = true
-			for _, part := range []string{"Posts: 1 of 1", "Replies: 0 of 1", "Spend: $1.00 of $1.00 (100%)", "Metrics (1 measured today): 10 views, 2 likes, 3 replies, 4 reposts", "Playbook changes: 1"} {
+			for _, part := range []string{"Posts: 1\n", "Replies: 0\n", "Spend since 07:00 UTC+07: $1.00 of $1.00 (100%)", "Metrics (1 measured): 10 views, 2 likes, 3 replies, 4 reposts", "Playbook changes: 1"} {
 				if !strings.Contains(text, part) {
 					t.Fatalf("digest missing %s: %s", part, text)
 				}
@@ -616,7 +616,7 @@ func TestDailyReportOncePerLocalDayNamesEachAgent(t *testing.T) {
 	}
 	now = now.Add(time.Hour)
 	tick()
-	if len(bot.texts) != 2 || !strings.HasPrefix(bot.texts[0], "Kaito · Daily report, 1 Jan 2026\n") || !strings.Contains(bot.texts[0], "Posts: 0 of 3") || !strings.HasPrefix(bot.texts[1], "Professor · Daily report, 31 Dec 2025\n") {
+	if len(bot.texts) != 2 || !strings.HasPrefix(bot.texts[0], "Kaito · Daily report, 1 Jan 2026\n") || !strings.Contains(bot.texts[0], "Posts: 0\n") || !strings.HasPrefix(bot.texts[1], "Professor · Daily report, 31 Dec 2025\n") {
 		t.Fatalf("reports %q", bot.texts)
 	}
 	now = now.Add(2 * time.Hour)
@@ -653,7 +653,7 @@ func TestReportCommandAnswersEachRequest(t *testing.T) {
 	if err = svc.Flush(ctx); err != nil {
 		t.Fatal(err)
 	}
-	if len(bot.texts) != 2 || bot.texts[0] != bot.texts[1] || !strings.HasPrefix(bot.texts[0], "Daily report, 1 Jan 2026\nPeriod: 1 Jan 07:00 to 1 Jan 10:00 UTC+07") {
+	if len(bot.texts) != 2 || bot.texts[0] != bot.texts[1] || !strings.HasPrefix(bot.texts[0], "Daily report, 1 Jan 2026\nPeriod: last 24 hours, 31 Dec 10:00 to 1 Jan 10:00 UTC+07") {
 		t.Fatalf("report replies %q", bot.texts)
 	}
 	if state, err := st.AgentState(ctx, "one"); err != nil || state.Status != "running" {

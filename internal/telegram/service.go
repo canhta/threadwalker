@@ -261,12 +261,14 @@ func (s *Service) handle(ctx context.Context, u Update) error {
 	}
 	text := receiptText(command, username)
 	if command == "status" || command == "report" {
-		summary, dayStart, err := s.summary(ctx, id)
+		summary, err := s.summary(ctx, id)
 		if err != nil {
 			return err
 		}
 		if text = s.statusText(id, summary); command == "report" {
-			text = s.reportText(id, summary, dayStart)
+			if text, err = s.report(ctx, id, summary); err != nil {
+				return err
+			}
 		}
 	}
 	if err := s.opts.Store.OwnerControl(ctx, id, command, key, text, s.opts.Now()); err != nil {
@@ -454,7 +456,7 @@ func (s *Service) notice(ctx context.Context, id, kind, event, extra string) err
 	if event == "" || len(event) > 200 {
 		return errors.New("queueing owner notice: event identity required")
 	}
-	notice := noticeText(kind)
+	notice := noticeText(kind, s.resetText(id))
 	if notice == "" {
 		return errors.New("queueing owner notice: unknown kind")
 	}
@@ -499,12 +501,23 @@ func (s *Service) BrowserRestored(ctx context.Context, id, event string) error {
 }
 
 // summary reads the limits day so far, which starts at 00:00 UTC like the
-// caps and the spend ledger, and returns that start.
-func (s *Service) summary(ctx context.Context, id string) (store.OwnerSummary, time.Time, error) {
+// caps and the spend ledger.
+func (s *Service) summary(ctx context.Context, id string) (store.OwnerSummary, error) {
 	now := s.opts.Now().UTC()
 	day := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
-	summary, err := s.opts.Store.OwnerSummary(ctx, id, s.templates[id].DryRun, day, day.Add(24*time.Hour))
-	return summary, day, err
+	return s.opts.Store.OwnerSummary(ctx, id, s.templates[id].DryRun, day, day.Add(24*time.Hour))
+}
+
+// report renders the daily report: the 24 hours up to now, with the limits
+// day's spend from day.
+func (s *Service) report(ctx context.Context, id string, day store.OwnerSummary) (string, error) {
+	now := s.opts.Now()
+	window, err := s.opts.Store.OwnerSummary(ctx, id, s.templates[id].DryRun, now.Add(-24*time.Hour), now)
+	if err != nil {
+		return "", err
+	}
+	window.CostUSD, window.WakeCostUSD, window.StudyCostUSD, window.DreamCostUSD = day.CostUSD, day.WakeCostUSD, day.StudyCostUSD, day.DreamCostUSD
+	return s.reportText(id, window), nil
 }
 
 // Tick observes persisted state, thresholds and the daily report hour. A
@@ -518,7 +531,7 @@ func (s *Service) Tick(ctx context.Context) error {
 	day := now.Format("2006-01-02")
 	for _, id := range s.ids {
 		tmpl := s.templates[id]
-		summary, dayStart, err := s.summary(ctx, id)
+		summary, err := s.summary(ctx, id)
 		if err != nil {
 			return err
 		}
@@ -546,7 +559,15 @@ func (s *Service) Tick(ctx context.Context) error {
 			return err
 		}
 		if local := now.In(s.location(id)); local.Hour() >= tmpl.Telegram.ReportHour {
-			n, err := s.opts.Store.QueueOwner(ctx, id, "report", s.reportText(id, summary, dayStart), "report:"+local.Format(time.DateOnly), now)
+			key := "report:" + local.Format(time.DateOnly)
+			if sent, err := s.opts.Store.OwnerEventID(ctx, id, key); err == nil && sent != 0 {
+				continue
+			}
+			text, err := s.report(ctx, id, summary)
+			if err != nil {
+				return err
+			}
+			n, err := s.opts.Store.QueueOwner(ctx, id, "report", text, key, now)
 			outcome, reason := "queued", "daily_report"
 			if err != nil {
 				outcome, reason = "error", "report_failed"
