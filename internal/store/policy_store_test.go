@@ -27,19 +27,19 @@ func TestCountActionsExactHalfOpenWindow(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	got, err := st.CountActions(ctx, "a", true, from, to)
+	got, err := st.CountActions(ctx, store.ActionScope{AgentID: "a", DryRun: true}, from, to)
 	if err != nil || got.Posts != 1 || got.Replies != 0 {
 		t.Fatalf("dry-run counts=%+v err=%v", got, err)
 	}
-	got, err = st.CountActions(ctx, "a", false, from, to)
+	got, err = st.CountActions(ctx, store.ActionScope{AgentID: "a", DryRun: false}, from, to)
 	if err != nil || got.Posts != 0 || got.Replies != 1 {
 		t.Fatalf("live counts=%+v err=%v", got, err)
 	}
-	got, err = st.CountActions(ctx, "missing", false, from, to)
+	got, err = st.CountActions(ctx, store.ActionScope{AgentID: "missing", DryRun: false}, from, to)
 	if err != nil || got.Posts != 0 || got.Replies != 0 {
 		t.Fatalf("empty=%+v err=%v", got, err)
 	}
-	if _, err = st.CountActions(ctx, "a", false, to, from); err == nil {
+	if _, err = st.CountActions(ctx, store.ActionScope{AgentID: "a", DryRun: false}, to, from); err == nil {
 		t.Fatal("reversed interval accepted")
 	}
 }

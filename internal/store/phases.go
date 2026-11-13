@@ -381,12 +381,13 @@ type OwnAction struct {
 	Parts int `json:"parts,omitempty"`
 }
 
-// RecentOwnActions returns this agent's own actions since the given time.
-func (s *Store) RecentOwnActions(ctx context.Context, agentID string, since time.Time, limit int) ([]OwnAction, error) {
-	if agentID == "" || limit < 1 || limit > 100 {
+// RecentOwnActions returns the scope's own actions that did not fail since the
+// given time, newest first.
+func (s *Store) RecentOwnActions(ctx context.Context, scope ActionScope, since time.Time, limit int) ([]OwnAction, error) {
+	if scope.AgentID == "" || limit < 1 || limit > 100 {
 		return nil, errors.New("reading own actions: agent and limit 1..100 required")
 	}
-	rows, err := s.db.QueryContext(ctx, `SELECT id,kind,text,posted_at,CASE WHEN length(thread_url)<=512 THEN thread_url ELSE '' END,dry_run,explore,hook,(SELECT COUNT(*) FROM action_parts WHERE action_id=actions.id) FROM actions WHERE agent_id=? AND julianday(posted_at)>=julianday(?) ORDER BY substr(posted_at,1,19) DESC,id DESC LIMIT ?`, agentID, since.UTC().Format(time.RFC3339Nano), limit)
+	rows, err := s.db.QueryContext(ctx, `SELECT id,kind,text,posted_at,CASE WHEN length(thread_url)<=512 THEN thread_url ELSE '' END,dry_run,explore,hook,(SELECT COUNT(*) FROM action_parts WHERE action_id=actions.id) FROM actions WHERE agent_id=? AND dry_run=? AND failed=0 AND julianday(posted_at)>=julianday(?) ORDER BY substr(posted_at,1,19) DESC,id DESC LIMIT ?`, scope.AgentID, scope.DryRun, since.UTC().Format(time.RFC3339Nano), limit)
 	if err != nil {
 		return nil, fmt.Errorf("reading own actions: %w", err)
 	}

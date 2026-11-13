@@ -85,7 +85,7 @@ func TestUnpublishedPostStopsCounting(t *testing.T) {
 	}
 	id, _ := res.LastInsertId()
 	count := func() int {
-		c, e := st.CountActions(ctx, "a", false, at.Add(-time.Hour), at.Add(time.Hour))
+		c, e := st.CountActions(ctx, ActionScope{AgentID: "a", DryRun: false}, at.Add(-time.Hour), at.Add(time.Hour))
 		if e != nil {
 			t.Fatal(e)
 		}

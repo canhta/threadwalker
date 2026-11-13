@@ -99,11 +99,11 @@ func TestConcurrentAgentsReserveSharedPromotionOnce(t *testing.T) {
 	if effects.Load() != 1 {
 		t.Fatalf("effects=%d", effects.Load())
 	}
-	counts, err := st.CountActions(context.Background(), "agent", opts.Template.DryRun, opts.Now().Add(-time.Hour), opts.Now().Add(time.Hour))
+	counts, err := st.CountActions(context.Background(), store.ActionScope{AgentID: "agent", DryRun: opts.Template.DryRun}, opts.Now().Add(-time.Hour), opts.Now().Add(time.Hour))
 	if err != nil {
 		t.Fatal(err)
 	}
-	other, err := st.CountActions(context.Background(), "other", opts.Template.DryRun, opts.Now().Add(-time.Hour), opts.Now().Add(time.Hour))
+	other, err := st.CountActions(context.Background(), store.ActionScope{AgentID: "other", DryRun: opts.Template.DryRun}, opts.Now().Add(-time.Hour), opts.Now().Add(time.Hour))
 	if err != nil || counts.Posts+other.Posts != 1 {
 		t.Fatalf("reservations %v %v %v", counts, other, err)
 	}

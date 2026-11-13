@@ -40,7 +40,7 @@ func (r *Runtime) scoreboard(ctx context.Context, now time.Time) (scoreboard, er
 	}
 	u := now.UTC()
 	day := time.Date(u.Year(), u.Month(), u.Day(), 0, 0, 0, 0, time.UTC)
-	done, err := r.opts.Store.CountActions(ctx, t.ID, t.DryRun, day, day.Add(24*time.Hour))
+	done, err := r.opts.Store.CountActions(ctx, store.ActionScope{AgentID: t.ID, DryRun: t.DryRun}, day, day.Add(24*time.Hour))
 	b.PostsCapped = done.Posts >= t.Limits.PostsPerDay
 	return b, err
 }
@@ -193,7 +193,7 @@ func (r *Runtime) capReset(ctx context.Context, now time.Time) (time.Time, error
 		return time.Time{}, err
 	}
 	utcDay := now.UTC().Truncate(24 * time.Hour)
-	done, err := r.opts.Store.CountActions(ctx, t.ID, t.DryRun, utcDay, utcDay.Add(24*time.Hour))
+	done, err := r.opts.Store.CountActions(ctx, store.ActionScope{AgentID: t.ID, DryRun: t.DryRun}, utcDay, utcDay.Add(24*time.Hour))
 	if err != nil {
 		return time.Time{}, err
 	}

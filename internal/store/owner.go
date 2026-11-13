@@ -413,7 +413,7 @@ func (s *Store) OwnerSummary(ctx context.Context, id string, dryRun bool, from, 
 	}
 	out.StudyCostUSD = phases["study"].CostUSD
 	out.DreamCostUSD = phases["dream"].CostUSD
-	counts, err := s.CountActions(ctx, id, dryRun, from, to)
+	counts, err := s.CountActions(ctx, ActionScope{AgentID: id, DryRun: dryRun}, from, to)
 	out.Posts, out.Replies = counts.Posts, counts.Replies
 	if err != nil {
 		return out, fmt.Errorf("counting owner summary actions: %w", err)

@@ -7,6 +7,13 @@ import (
 	"time"
 )
 
+// ActionScope names whose actions a reader sees: one agent, one mode. Readers
+// that feed the agent context or the KPI take it, so live and dry-run rows never mix.
+type ActionScope struct {
+	AgentID string
+	DryRun  bool
+}
+
 // ActionCounts counts action intents of one mode (dry-run or live), including
 // unknown outcomes. Its interval is exactly half-open [from,to).
 type ActionCounts struct {
@@ -14,12 +21,12 @@ type ActionCounts struct {
 	Replies int
 }
 
-func (s *Store) CountActions(ctx context.Context, agentID string, dryRun bool, from, to time.Time) (ActionCounts, error) {
+func (s *Store) CountActions(ctx context.Context, scope ActionScope, from, to time.Time) (ActionCounts, error) {
 	var counts ActionCounts
-	if agentID == "" || to.Before(from) {
+	if scope.AgentID == "" || to.Before(from) {
 		return counts, errors.New("counting actions: invalid scope or interval")
 	}
-	rows, err := s.db.QueryContext(ctx, `SELECT kind,posted_at FROM actions WHERE agent_id=? AND dry_run=? AND failed=0`, agentID, dryRun)
+	rows, err := s.db.QueryContext(ctx, `SELECT kind,posted_at FROM actions WHERE agent_id=? AND dry_run=? AND failed=0`, scope.AgentID, scope.DryRun)
 	if err != nil {
 		return counts, fmt.Errorf("counting actions: %w", err)
 	}

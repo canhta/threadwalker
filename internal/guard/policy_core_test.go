@@ -26,7 +26,7 @@ func TestPolicyReservesQuotaBeforeEffect(t *testing.T) {
 	calls := 0
 	effect := func() (string, error) {
 		calls++
-		counts, err := st.CountActions(context.Background(), "agent", opts.Template.DryRun, opts.Now().Add(-time.Second), opts.Now().Add(time.Second))
+		counts, err := st.CountActions(context.Background(), store.ActionScope{AgentID: "agent", DryRun: opts.Template.DryRun}, opts.Now().Add(-time.Second), opts.Now().Add(time.Second))
 		if err != nil || counts.Posts != 1 {
 			t.Fatalf("intent missing before effect %+v %v", counts, err)
 		}
@@ -70,7 +70,7 @@ func TestConcurrentGuardsCannotSpendLastSlotTwice(t *testing.T) {
 		}()
 	}
 	wg.Wait()
-	counts, err := st.CountActions(context.Background(), "agent", opts.Template.DryRun, opts.Now().Add(-time.Hour), opts.Now().Add(time.Hour))
+	counts, err := st.CountActions(context.Background(), store.ActionScope{AgentID: "agent", DryRun: opts.Template.DryRun}, opts.Now().Add(-time.Hour), opts.Now().Add(time.Hour))
 	if err != nil || counts.Posts != 1 || effects.Load() != 1 {
 		t.Fatalf("double spend %+v effects %d err %v", counts, effects.Load(), err)
 	}

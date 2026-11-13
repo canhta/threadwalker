@@ -83,7 +83,7 @@ func newEvalBrowser(snapshots map[string]json.RawMessage, scenario string, st *s
 		if c.Op != threads.OpPost && c.Op != threads.OpReply {
 			return nil
 		}
-		counts, err := st.CountActions(ctx, agentID, false, now.Add(-time.Hour), now.Add(time.Hour))
+		counts, err := st.CountActions(ctx, store.ActionScope{AgentID: agentID, DryRun: false}, now.Add(-time.Hour), now.Add(time.Hour))
 		if err != nil || counts.Posts+counts.Replies != ev.writes+1 {
 			ev.intentMissing = true
 			return errors.New("missing_intent")

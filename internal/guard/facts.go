@@ -30,7 +30,7 @@ func FactSheet(ctx context.Context, st *store.Store, t config.Template, now time
 	if err != nil {
 		return nil, fmt.Errorf("building fact sheet: %w", err)
 	}
-	today, err := st.CountActions(ctx, t.ID, t.DryRun, dayStart, dayStart.Add(24*time.Hour))
+	today, err := st.CountActions(ctx, store.ActionScope{AgentID: t.ID, DryRun: t.DryRun}, dayStart, dayStart.Add(24*time.Hour))
 	if err != nil {
 		return nil, fmt.Errorf("building fact sheet: %w", err)
 	}

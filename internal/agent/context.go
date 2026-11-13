@@ -240,17 +240,17 @@ func (r *Runtime) ownActions(ctx context.Context, now time.Time, redactor *confi
 	c := counters{PostsLimit: t.Limits.PostsPerDay, RepliesLimit: t.Limits.RepliesPerDay, WindowHours: int(ownActionWindow.Hours())}
 	u := now.UTC()
 	dayStart := time.Date(u.Year(), u.Month(), u.Day(), 0, 0, 0, 0, time.UTC)
-	today, err := r.opts.Store.CountActions(ctx, t.ID, t.DryRun, dayStart, dayStart.Add(24*time.Hour))
+	today, err := r.opts.Store.CountActions(ctx, store.ActionScope{AgentID: t.ID, DryRun: t.DryRun}, dayStart, dayStart.Add(24*time.Hour))
 	if err != nil {
 		return nil, c, err
 	}
 	c.PostsToday, c.RepliesToday = today.Posts, today.Replies
-	total, err := r.opts.Store.CountActions(ctx, t.ID, t.DryRun, now.Add(-ownActionWindow), now.Add(time.Nanosecond))
+	total, err := r.opts.Store.CountActions(ctx, store.ActionScope{AgentID: t.ID, DryRun: t.DryRun}, now.Add(-ownActionWindow), now.Add(time.Nanosecond))
 	if err != nil {
 		return nil, c, err
 	}
 	c.ActionsInLast = total.Posts + total.Replies
-	actions, err := r.opts.Store.RecentOwnActions(ctx, t.ID, now.Add(-ownActionWindow), ownActionLimit)
+	actions, err := r.opts.Store.RecentOwnActions(ctx, store.ActionScope{AgentID: t.ID, DryRun: t.DryRun}, now.Add(-ownActionWindow), ownActionLimit)
 	if err != nil {
 		return nil, c, err
 	}

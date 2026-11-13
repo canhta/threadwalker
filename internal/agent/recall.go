@@ -76,7 +76,7 @@ func (r *Runtime) recallQuery(ctx context.Context) string {
 			parts = append(parts, clip(e.Text, recallQueryText))
 		}
 	}
-	actions, _ := r.opts.Store.RecentOwnActions(ctx, r.opts.Template.ID, r.opts.Now().Add(-ownActionWindow), recallActions)
+	actions, _ := r.opts.Store.RecentOwnActions(ctx, store.ActionScope{AgentID: r.opts.Template.ID, DryRun: r.opts.Template.DryRun}, r.opts.Now().Add(-ownActionWindow), recallActions)
 	for _, a := range actions {
 		parts = append(parts, clip(a.Text, recallQueryText))
 	}
