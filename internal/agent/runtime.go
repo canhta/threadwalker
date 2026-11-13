@@ -973,7 +973,7 @@ func NewReviewer(o ReviewerOptions, wakeID int64) Reviewer {
 			for i := range items {
 				items[i].Text = redact(items[i].Text)
 			}
-			recent, err := o.Store.RecentPostTexts(ctx, t.ID, t.DryRun, 10)
+			recent, err := o.Store.RecentOwnTexts(ctx, store.ActionScope{AgentID: t.ID, DryRun: t.DryRun}, 20)
 			if err != nil {
 				return nil, err
 			}

@@ -203,19 +203,19 @@ func (s *Store) RepliedSince(ctx context.Context, agentID string, dryRun bool, s
 	return out, rows.Err()
 }
 
-// RecentPostTexts returns the texts of the agent's newest limit posts of one
-// mode (dry-run or live), newest first.
-func (s *Store) RecentPostTexts(ctx context.Context, agentID string, dryRun bool, limit int) ([]string, error) {
-	rows, err := s.db.QueryContext(ctx, `SELECT text FROM actions WHERE agent_id=? AND kind='post' AND dry_run=? ORDER BY id DESC LIMIT ?`, agentID, dryRun, limit)
+// RecentOwnTexts returns the texts of the scope's newest limit posts and
+// replies that did not fail, newest first.
+func (s *Store) RecentOwnTexts(ctx context.Context, scope ActionScope, limit int) ([]string, error) {
+	rows, err := s.db.QueryContext(ctx, `SELECT text FROM actions WHERE agent_id=? AND dry_run=? AND failed=0 ORDER BY id DESC LIMIT ?`, scope.AgentID, scope.DryRun, limit)
 	if err != nil {
-		return nil, fmt.Errorf("reading recent posts: %w", err)
+		return nil, fmt.Errorf("reading recent own texts: %w", err)
 	}
 	defer rows.Close()
 	out := []string{}
 	for rows.Next() {
 		var t string
 		if err = rows.Scan(&t); err != nil {
-			return nil, fmt.Errorf("reading recent post: %w", err)
+			return nil, fmt.Errorf("reading recent own text: %w", err)
 		}
 		out = append(out, t)
 	}

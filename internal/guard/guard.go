@@ -374,13 +374,16 @@ func (g *Guard) review(ctx context.Context, a Attempt, intent *actionIntent) (re
 	if rejected >= limit {
 		return "critic_limit", strconv.Itoa(rejected), ""
 	}
-	recent, err := g.opts.Store.RecentPostTexts(ctx, g.opts.Template.ID, g.opts.Template.DryRun, 10)
+	recent, err := g.opts.Store.RecentOwnTexts(ctx, store.ActionScope{AgentID: g.opts.Template.ID, DryRun: g.opts.Template.DryRun}, 20)
 	if err != nil {
 		return "critic_unavailable", "", ""
 	}
 	check := func(texts []string) []string {
 		if why, d := g.recheck(a, texts); why != "" {
 			return []string{Hint(why, d)}
+		}
+		if p := repetitionProblem(texts[len(texts)-1], recent); p != "" {
+			return []string{p}
 		}
 		return nil
 	}

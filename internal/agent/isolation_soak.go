@@ -119,8 +119,9 @@ func RunIsolationSoak(ctx context.Context, dbPath string, hours int, logger *slo
 	}
 	active := 0
 	var runtimes []*Runtime
+	var fixtures []*OfflineFixture
 	create := func() error {
-		runtimes = nil
+		runtimes, fixtures = nil, nil
 		for i, t := range templates {
 			fixture := NewOfflineFixture(clock)
 			fixture.Observe = func(messages []llm.Message) {
@@ -143,6 +144,7 @@ func RunIsolationSoak(ctx context.Context, dbPath string, hours int, logger *slo
 				return err
 			}
 			runtimes = append(runtimes, r)
+			fixtures = append(fixtures, fixture)
 			// The synthetic transport requests these actual guarded tools each wake.
 			// A blocked own-account reply is nonterminal and cannot reach the backend.
 			fixture.Calls = []llm.ToolCall{
@@ -150,7 +152,7 @@ func RunIsolationSoak(ctx context.Context, dbPath string, hours int, logger *slo
 				SyntheticCall("note_write", string(mustJSON(map[string]string{"text": markers[i]}))),
 				SyntheticCall("playbook_read", `{}`),
 				SyntheticCall("reply", string(mustJSON(map[string]string{"text": "Synthetic refused own-account reply.", "target_username": templates[1-i].Threads.Username, "target_id": "fixture-id", "target_url": "https://threads.net/@" + templates[1-i].Threads.Username + "/post/1"}))),
-				SyntheticCall("post", string(mustJSON(map[string]string{"text": fmt.Sprintf("agent%d https://links.invalid/%d", i, i)}))),
+				SyntheticCall("post", ""),
 			}
 		}
 		return nil
@@ -199,6 +201,10 @@ func RunIsolationSoak(ctx context.Context, dbPath string, hours int, logger *slo
 				return e, err
 			}
 			e.Restarts++
+		}
+		// A post differs each wake, so the repeated-closing check never fires on the fixture.
+		for i, f := range fixtures {
+			f.Calls[len(f.Calls)-1] = SyntheticCall("post", string(mustJSON(map[string]string{"text": fmt.Sprintf("agent%d https://links.invalid/%d wake%d", i, i, hour)})))
 		}
 		// Once executes one due session. Repeating it at the same injected instant
 		// drains the two agents without introducing concurrent wake execution.
