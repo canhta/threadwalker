@@ -12,7 +12,9 @@ type KPIStats struct {
 	// Engagements is likes, replies, reposts and quotes on own actions posted
 	// in the last 24 hours, from each action's newest metrics row.
 	Engagements int64
-	// Followers is the followers gained on own actions posted in the last 7 days.
+	// Followers is the followers gained over the last 7 days: the newest account
+	// follower count measured in that window minus the oldest, never negative.
+	// metrics.followers is the account total at measurement time, not a delta.
 	Followers int64
 	// LastPublish is the newest published action; zero when there is none.
 	LastPublish time.Time
@@ -33,7 +35,8 @@ func (s *Store) KPIStats(ctx context.Context, agentID string, dryRun bool, now t
 		agentID, dryRun, formatStoreTimestamp(now.Add(-24*time.Hour))).Scan(&k.Engagements); err != nil {
 		return k, fmt.Errorf("reading engagements: %w", err)
 	}
-	if err := s.db.QueryRowContext(ctx, `SELECT COALESCE(SUM(COALESCE(m.followers,0)),0) FROM actions a `+latest+` WHERE a.agent_id=? AND a.dry_run=? AND a.failed=0 AND julianday(a.posted_at)>=julianday(?)`,
+	if err := s.db.QueryRowContext(ctx, `WITH s AS (SELECT m.followers f, m.measured_at t FROM metrics m JOIN actions a ON a.id=m.action_id AND a.agent_id=m.agent_id WHERE a.agent_id=? AND a.dry_run=? AND a.failed=0 AND m.followers IS NOT NULL AND julianday(m.measured_at)>=julianday(?))
+		SELECT COALESCE(MAX(0, (SELECT f FROM s ORDER BY julianday(t) DESC LIMIT 1) - (SELECT f FROM s ORDER BY julianday(t) LIMIT 1)), 0)`,
 		agentID, dryRun, formatStoreTimestamp(now.Add(-7*24*time.Hour))).Scan(&k.Followers); err != nil {
 		return k, fmt.Errorf("reading followers gained: %w", err)
 	}

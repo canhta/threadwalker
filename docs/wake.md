@@ -66,7 +66,7 @@ Optional `kpi:` block: `engagements_per_day`, `followers_per_week`, `max_hours_w
 | Wakes today | Agent wakes started on the UTC day |
 | Last published action | Hours since the newest non-failed own action in the template's mode |
 | Engagements | Likes + replies + reposts + quotes in the newest metrics of own actions posted in the last 24 hours, against `engagements_per_day` |
-| Followers | Followers gained on own actions posted in the last 7 days, against `followers_per_week` |
+| Followers | Account followers gained in the last 7 days: the newest follower count measured in that window minus the oldest (never negative), against `followers_per_week` |
 | Cost per engagement | Spend today over engagements in 24 hours |
 | Gap line | `behind: 3 of 40 engagements in 24h after $0.12 and 4 wakes today; nothing published for 9h`, or `on target: ...` |
 

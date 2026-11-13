@@ -27,8 +27,10 @@ func TestKPIStatsCountsOwnRecentActionsAndSpend(t *testing.T) {
  (1,'a','post','x',0,0,'2026-01-08T10:00:00Z'),(2,'a','reply','y',0,0,'2026-01-05T12:00:00Z'),
  (3,'b','post','z',0,0,'2026-01-08T10:00:00Z'),(4,'a','post','f',0,1,'2026-01-08T11:00:00Z'),(5,'a','post','d',1,0,'2026-01-08T11:30:00Z')`)
 	exec(`INSERT INTO metrics(agent_id,action_id,measured_at,likes,replies,reposts,quotes,followers) VALUES
- ('a',1,'2026-01-08T10:30:00Z',9,9,9,9,9),('a',1,'2026-01-08T11:30:00Z',3,2,1,1,2),
- ('a',2,'2026-01-08T11:00:00Z',5,0,0,NULL,1),('b',3,'2026-01-08T11:00:00Z',50,0,0,0,50),('a',4,'2026-01-08T11:30:00Z',40,0,0,0,40)`)
+ ('a',1,'2026-01-08T10:30:00Z',9,9,9,9,100),('a',1,'2026-01-08T11:30:00Z',3,2,1,1,103),
+ ('a',2,'2026-01-08T11:00:00Z',5,0,0,NULL,101),('b',3,'2026-01-08T11:00:00Z',50,0,0,0,500),('a',4,'2026-01-08T11:45:00Z',40,0,0,0,400)`)
+	// followers is the account total when measured: a gained 103-100 = 3 in 7 days;
+	// summing totals, the old reading, would say 206.
 	exec(`INSERT INTO ledger_phases(agent_id,day,phase,tokens_in,tokens_out,cost_usd) VALUES
  ('a','2026-01-08','agent',100,50,0.10),('a','2026-01-08','critic',10,5,0.02),('a','2026-01-01','agent',1000,0,9),('a','2026-01-03','agent',200,100,0.50),('b','2026-01-08','agent',1,1,5)`)
 	exec(`INSERT INTO wakes(agent_id,started_at,ended_at,kind) VALUES
