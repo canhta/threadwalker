@@ -67,6 +67,7 @@ Optional `kpi:` block: `engagements_per_day`, `followers_per_week`, `max_hours_w
 | Last published action | Hours since the newest non-failed own action in the template's mode |
 | Engagements | Likes + replies + reposts + quotes in the newest metrics of own actions posted in the last 24 hours, against `engagements_per_day` |
 | Followers | Account followers gained in the last 7 days: the newest follower count measured in that window minus the oldest (never negative), against `followers_per_week` |
+| Next post | When the newest own post plus `limits.min_minutes_between_posts` has not passed, the local time and minutes until a post is allowed (the guard's own rule); when today's `posts_per_day` is used, a line saying no more posts today; otherwise no line |
 | Cost per engagement | Spend today over engagements in 24 hours |
 | Gap line | `behind: 3 of 40 engagements in 24h after $0.12 and 4 wakes today; nothing published for 9h`, or `on target: ...` |
 

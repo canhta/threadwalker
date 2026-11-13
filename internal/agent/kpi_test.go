@@ -19,6 +19,10 @@ var kpiNow = time.Date(2026, 1, 1, 12, 0, 0, 0, time.UTC)
 // kpiRuntime is an offline runtime with a kpi block whose store holds one own
 // action posted publishedAgo ago, with engagements likes, $0.12 spent today and 4 wakes today.
 func kpiRuntime(t *testing.T, publishedAgo time.Duration, engagements int) (*agent.Runtime, *store.Store, *agent.OfflineFixture) {
+	return kpiRuntimeSpaced(t, publishedAgo, engagements, 0)
+}
+
+func kpiRuntimeSpaced(t *testing.T, publishedAgo time.Duration, engagements, minMinutesBetweenPosts int) (*agent.Runtime, *store.Store, *agent.OfflineFixture) {
 	t.Helper()
 	ctx := context.Background()
 	st, err := store.Open(ctx, filepath.Join(t.TempDir(), "kpi.db"))
@@ -27,6 +31,7 @@ func kpiRuntime(t *testing.T, publishedAgo time.Duration, engagements int) (*age
 	}
 	t.Cleanup(func() { st.Close() })
 	tmpl := agent.OfflineTemplate()
+	tmpl.Limits.MinMinutesBetweenPosts = minMinutesBetweenPosts
 	tmpl.KPI = config.KPIConfig{EngagementsPerDay: 10, FollowersPerWeek: 5, MaxHoursWithoutPublish: 8, OnTargetMinutes: 180}
 	if err = st.EnsureAgent(ctx, tmpl.ID); err != nil {
 		t.Fatal(err)
@@ -56,6 +61,33 @@ func kpiRuntime(t *testing.T, publishedAgo time.Duration, engagements int) (*age
 }
 
 func itoa(n int64) string { return strconv.FormatInt(n, 10) }
+
+func TestScoreboardShowsNextAllowedPost(t *testing.T) {
+	const line = "- Next post allowed at "
+	// Posted 30 min ago, 120 min apart: allowed at 13:30 UTC = 20:30 in Asia/Ho_Chi_Minh, in 90 min.
+	for _, c := range []struct {
+		ago  time.Duration
+		gap  int
+		want string
+	}{
+		{30 * time.Minute, 120, line + "20:30 local (in 90 min); until then only reply.\n"},
+		{30 * time.Minute, 0, ""},
+		{5 * time.Hour, 120, ""},
+	} {
+		r, _, _ := kpiRuntimeSpaced(t, c.ago, 3, c.gap)
+		messages, err := r.Context(context.Background(), "agent")
+		if err != nil {
+			t.Fatal(err)
+		}
+		user := messages[1].Content
+		if c.want == "" && strings.Contains(user, line) {
+			t.Errorf("gap %d, posted %v ago: unexpected next-post line in:\n%.900s", c.gap, c.ago, user)
+		}
+		if c.want != "" && !strings.Contains(user, c.want) {
+			t.Errorf("scoreboard lacks %q in:\n%.900s", c.want, user)
+		}
+	}
+}
 
 func TestScoreboardTopsTheWakeAndStatesTheGap(t *testing.T) {
 	r, _, _ := kpiRuntime(t, 9*time.Hour, 3)

@@ -18,6 +18,8 @@ type KPIStats struct {
 	Followers int64
 	// LastPublish is the newest published action; zero when there is none.
 	LastPublish time.Time
+	// LastPost is the newest own post (not a reply); zero when there is none.
+	LastPost time.Time
 	// Spend and tokens over all phases: the UTC day of now, and that day with the 6 before it.
 	SpendToday, Spend7d   float64
 	TokensToday, Tokens7d int64
@@ -50,6 +52,17 @@ func (s *Store) KPIStats(ctx context.Context, agentID string, dryRun bool, now t
 			return k, fmt.Errorf("reading last publish: invalid timestamp")
 		}
 		k.LastPublish = at
+	}
+	var lastPost sql.NullString
+	if err := s.db.QueryRowContext(ctx, `SELECT posted_at FROM actions WHERE agent_id=? AND dry_run=? AND failed=0 AND kind='post' ORDER BY julianday(posted_at) DESC LIMIT 1`, agentID, dryRun).Scan(&lastPost); err != nil && err != sql.ErrNoRows {
+		return k, fmt.Errorf("reading last post: %w", err)
+	}
+	if lastPost.Valid {
+		at, err := time.Parse(time.RFC3339Nano, lastPost.String)
+		if err != nil {
+			return k, fmt.Errorf("reading last post: invalid timestamp")
+		}
+		k.LastPost = at
 	}
 	week := now.AddDate(0, 0, -6).Format(time.DateOnly)
 	if err := s.db.QueryRowContext(ctx, `SELECT

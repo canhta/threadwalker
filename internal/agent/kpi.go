@@ -3,11 +3,13 @@ package agent
 import (
 	"context"
 	"fmt"
+	"math"
 	"slices"
 	"strings"
 	"time"
 
 	"github.com/canhta/threadz/internal/config"
+	"github.com/canhta/threadz/internal/guard"
 	"github.com/canhta/threadz/internal/store"
 )
 
@@ -17,12 +19,29 @@ type scoreboard struct {
 	store.KPIStats
 	KPI config.KPIConfig
 	Now time.Time
+	// NextPost is when the guard next allows a post; zero when allowed now.
+	// PostsCapped means today's posts_per_day is used up. Loc renders local times.
+	NextPost    time.Time
+	PostsCapped bool
+	Loc         *time.Location
 }
 
 func (r *Runtime) scoreboard(ctx context.Context, now time.Time) (scoreboard, error) {
 	t := r.opts.Template
 	stats, err := r.opts.Store.KPIStats(ctx, t.ID, t.DryRun, now)
-	return scoreboard{KPIStats: stats, KPI: t.KPI, Now: now}, err
+	b := scoreboard{KPIStats: stats, KPI: t.KPI, Now: now, Loc: time.UTC}
+	if err != nil {
+		return b, err
+	}
+	b.Loc = r.schedule.loc
+	if next := guard.NextPostAt(t.Limits, stats.LastPost); now.Before(next) {
+		b.NextPost = next
+	}
+	u := now.UTC()
+	day := time.Date(u.Year(), u.Month(), u.Day(), 0, 0, 0, 0, time.UTC)
+	done, err := r.opts.Store.CountActions(ctx, t.ID, t.DryRun, day, day.Add(24*time.Hour))
+	b.PostsCapped = done.Posts >= t.Limits.PostsPerDay
+	return b, err
 }
 
 // hoursSincePublish is -1 when nothing was ever published.
@@ -74,6 +93,11 @@ func (s scoreboard) text() string {
 		fmt.Fprintf(&b, "- Cost per engagement: $%.3f (spend today over engagements in 24h).\n", s.SpendToday/float64(s.Engagements))
 	} else {
 		b.WriteString("- Cost per engagement: none yet, no engagements.\n")
+	}
+	if s.PostsCapped {
+		b.WriteString("- Posts: today's cap is used; no more posts today, only reply.\n")
+	} else if !s.NextPost.IsZero() {
+		fmt.Fprintf(&b, "- Next post allowed at %s local (in %d min); until then only reply.\n", s.NextPost.In(s.Loc).Format("15:04"), int(math.Ceil(s.NextPost.Sub(s.Now).Minutes())))
 	}
 	b.WriteString(s.gap() + "\n")
 	b.WriteString("Pressure means: try more and better ideas, never lower quality. The critic still decides and the caps still hold.")

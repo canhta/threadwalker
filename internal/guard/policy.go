@@ -618,6 +618,15 @@ func similarHooks(a, b map[string]bool) bool {
 	return shared >= 2 && shared*2 >= min(len(a), len(b))
 }
 
+// NextPostAt is the earliest time min_minutes_between_posts allows a post after
+// the newest own post; zero when the limit is off or there is no post.
+func NextPostAt(l config.LimitsConfig, latestPost time.Time) time.Time {
+	if l.MinMinutesBetweenPosts <= 0 || latestPost.IsZero() {
+		return time.Time{}
+	}
+	return latestPost.Add(time.Duration(l.MinMinutesBetweenPosts) * time.Minute)
+}
+
 func (g *Guard) quotas(ctx context.Context, tx store.ReservationTx, actions []store.ReservedAction, kind string, intent *actionIntent, now time.Time) (string, error) {
 	l := g.opts.Template.Limits
 	day := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
@@ -713,8 +722,8 @@ func (g *Guard) quotas(ctx context.Context, tx store.ReservationTx, actions []st
 	if kind == "reply" && threadUsed {
 		return "thread_per_day", nil
 	}
-	if gap := time.Duration(l.MinMinutesBetweenPosts) * time.Minute; kind == "post" && !latestPost.IsZero() && now.Sub(latestPost) < gap {
-		intent.detail = latestPost.Add(gap).UTC().Format(time.RFC3339)
+	if next := NextPostAt(l, latestPost); kind == "post" && now.Before(next) {
+		intent.detail = next.UTC().Format(time.RFC3339)
 		return "min_minutes_between_posts", nil
 	}
 	if !latest.IsZero() && now.Sub(latest) < time.Duration(l.MinSecondsBetweenActions)*time.Second {
