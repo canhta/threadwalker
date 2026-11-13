@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"net/url"
 	"strings"
 	"time"
 
@@ -84,7 +83,7 @@ func (d *Dispatcher) checkTopic(a *arguments) error {
 		}
 		// Only a Threads topic link opens; a news link would fail in the
 		// browser and still use up a read.
-		if u, err := url.Parse(seen); err != nil || u.Path != "/search" || !strings.HasPrefix(u.Hostname(), "www.threads.") {
+		if !threads.IsTopicURL(seen) {
 			return &guard.BlockedError{Reason: "topic_args"}
 		}
 		a.Args = a.Args.WithText("url", seen)

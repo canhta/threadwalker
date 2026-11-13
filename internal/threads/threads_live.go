@@ -24,6 +24,13 @@ func isThreadsHost(u *url.URL) bool {
 	return host == "threads.com" || host == "threads.net"
 }
 
+// IsTopicURL reports whether raw opens a Threads topic or search page, the
+// only kind of link read_topic can read.
+func IsTopicURL(raw string) bool {
+	u, err := url.Parse(raw)
+	return err == nil && isThreadsHost(u) && u.Path == "/search"
+}
+
 type axNode struct {
 	role     string
 	name     string

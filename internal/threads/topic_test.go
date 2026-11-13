@@ -76,3 +76,18 @@ func TestBrowserReadTopic(t *testing.T) {
 		t.Fatalf("non-search path: %v", err)
 	}
 }
+
+func TestIsTopicURL(t *testing.T) {
+	for raw, want := range map[string]bool{
+		"https://www.threads.com/search?q=K.O&serp_type=trends": true,
+		"https://threads.com/search?q=x":                        true,
+		"https://www.threads.net/search?q=x":                    true,
+		"https://vnexpress.net/search?q=x":                      false,
+		"https://www.threads.com/@a/post/B":                     false,
+		"http://www.threads.com/search?q=x":                     false,
+	} {
+		if IsTopicURL(raw) != want {
+			t.Errorf("%s: want %v", raw, want)
+		}
+	}
+}
