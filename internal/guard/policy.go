@@ -624,7 +624,7 @@ func (g *Guard) quotas(ctx context.Context, tx store.ReservationTx, actions []st
 	from := now.Add(-7 * 24 * time.Hour)
 	posts, replies, browserReplies, contact := 0, 0, 0, 0
 	threadUsed := false
-	var latest time.Time
+	var latest, latestPost time.Time
 	counts := map[string]int{}
 	for _, row := range actions {
 		if row.Agent != g.opts.Template.ID {
@@ -636,6 +636,9 @@ func (g *Guard) quotas(ctx context.Context, tx store.ReservationTx, actions []st
 		}
 		if at.After(latest) {
 			latest = at
+		}
+		if row.Kind == "post" && at.After(latestPost) {
+			latestPost = at
 		}
 		// Future persisted intents are counted conservatively after clock rollback.
 		if !at.Before(day) && at.Before(day.Add(24*time.Hour)) {
@@ -709,6 +712,10 @@ func (g *Guard) quotas(ctx context.Context, tx store.ReservationTx, actions []st
 	}
 	if kind == "reply" && threadUsed {
 		return "thread_per_day", nil
+	}
+	if gap := time.Duration(l.MinMinutesBetweenPosts) * time.Minute; kind == "post" && !latestPost.IsZero() && now.Sub(latestPost) < gap {
+		intent.detail = latestPost.Add(gap).UTC().Format(time.RFC3339)
+		return "min_minutes_between_posts", nil
 	}
 	if !latest.IsZero() && now.Sub(latest) < time.Duration(l.MinSecondsBetweenActions)*time.Second {
 		intent.detail = latest.Add(time.Duration(l.MinSecondsBetweenActions) * time.Second).UTC().Format(time.RFC3339)

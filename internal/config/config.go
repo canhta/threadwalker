@@ -260,9 +260,11 @@ type LimitsConfig struct {
 	// BrowserRepliesPerDay caps replies to feed posts, which go through the browser.
 	BrowserRepliesPerDay     int
 	MinSecondsBetweenActions int
-	MaxStepsPerWake          int
-	MaxUSDPerDay             float64
-	MinMinutesBetweenWakes   int
+	// MinMinutesBetweenPosts spaces posts (not replies) apart; 0 is off.
+	MinMinutesBetweenPosts int
+	MaxStepsPerWake        int
+	MaxUSDPerDay           float64
+	MinMinutesBetweenWakes int
 	// Dreaming has its own spend and step caps and is excluded from MaxUSDPerDay.
 	MaxUSDPerDream   float64
 	MaxStepsPerDream int

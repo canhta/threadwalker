@@ -212,6 +212,9 @@ func (d *decoder) limits(t *Template) {
 		l.BrowserRepliesPerDay = d.posInt("limits.browser_replies_per_day")
 	}
 	l.MinSecondsBetweenActions = d.posInt("limits.min_seconds_between_actions")
+	if d.has("limits.min_minutes_between_posts") {
+		l.MinMinutesBetweenPosts = d.posInt("limits.min_minutes_between_posts")
+	}
 	l.MaxStepsPerWake = d.posInt("limits.max_steps_per_wake")
 	l.MaxUSDPerDay = d.float("limits.max_usd_per_day", false)
 	l.MinMinutesBetweenWakes = d.posInt("limits.min_minutes_between_wakes")

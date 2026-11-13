@@ -98,7 +98,7 @@ func endReasonBad(raw string) bool {
 var blockedReasons = []string{
 	"agent_not_running", "invalid_hypothesis", "invalid_policy",
 	"invalid_tool_arguments", "no_trend_anchor", "own_account", "phase_read_only",
-	"blocked_phrase", "identity_targeting", "political_recommendation", "engagement_bait", "explore_budget", "repeat_topic", "owner_note_open", "sensitive_arguments", "min_seconds_between_actions",
+	"blocked_phrase", "identity_targeting", "political_recommendation", "engagement_bait", "explore_budget", "repeat_topic", "owner_note_open", "sensitive_arguments", "min_seconds_between_actions", "min_minutes_between_posts",
 	"posts_per_day", "replies_per_day", "browser_replies_per_day", "replies_per_user_7d", "reply_mention",
 	"reply_target_host", "reply_target_mismatch", "reply_target_unread", "target_outside_window",
 	"critic_rejected", "critic_limit", "critic_unavailable", "ungrounded_number",
@@ -128,6 +128,7 @@ var blockedLabels = map[string]string{
 	"owner_note_open":             "Owner note unanswered",
 	"sensitive_arguments":         "Private data",
 	"min_seconds_between_actions": "Too soon",
+	"min_minutes_between_posts":   "Post too soon",
 	"posts_per_day":               "Daily post limit",
 	"replies_per_day":             "Daily reply limit",
 	"browser_replies_per_day":     "Daily feed reply limit",

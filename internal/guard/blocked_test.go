@@ -45,10 +45,25 @@ func TestBlockedResultNamesTheFixablePart(t *testing.T) {
 }
 
 func TestEveryReasonCodeHasAFixedHint(t *testing.T) {
-	for _, reason := range []string{"unknown_tool", "unsupported_tool_type", "invalid_tool_call_id", "invalid_tool_arguments", "sensitive_arguments", "agent_not_running", "wake_not_open", "phase_read_only", "text_length", "blocked_phrase", "identity_targeting", "political_recommendation", "engagement_bait", "explore_budget", "own_account", "reply_target_host", "reply_target_mismatch", "reply_target_unread", "reply_url", "reply_mention", "invalid_policy", "invalid_hypothesis", "shared_promotion_link", "do_not_contact", "replies_per_user_7d", "thread_per_day", "target_outside_window", "min_seconds_between_actions", "limit_per_wake", "topic_args"} {
+	for _, reason := range []string{"unknown_tool", "unsupported_tool_type", "invalid_tool_call_id", "invalid_tool_arguments", "sensitive_arguments", "agent_not_running", "wake_not_open", "phase_read_only", "text_length", "blocked_phrase", "identity_targeting", "political_recommendation", "engagement_bait", "explore_budget", "own_account", "reply_target_host", "reply_target_mismatch", "reply_target_unread", "reply_url", "reply_mention", "invalid_policy", "invalid_hypothesis", "shared_promotion_link", "do_not_contact", "replies_per_user_7d", "thread_per_day", "target_outside_window", "min_seconds_between_actions", "limit_per_wake", "topic_args", "min_minutes_between_posts"} {
 		b, hint := modelResult(t, &guard.BlockedError{Reason: reason, Detail: "x"})
 		if b != reason || hint == "" || strings.Contains(hint, "%!") {
 			t.Errorf("%s: %q", reason, hint)
 		}
 	}
+}
+
+func TestPostsAreSpacedApart(t *testing.T) {
+	h := newPolicyHarness(t, func(tmpl *config.Template) {
+		tmpl.Limits.MinSecondsBetweenActions = 1
+		tmpl.Limits.MinMinutesBetweenPosts = 120
+	})
+	h.allow("post", postArgs(1))
+	h.clock.Advance(10 * time.Minute)
+	_, err := h.call("post", postArgs(2))
+	if b, hint := modelResult(t, err); b != "min_minutes_between_posts" || !strings.Contains(hint, "2026-11-11T12:00:00Z") {
+		t.Fatalf("post spacing: %q %q", b, hint)
+	}
+	h.clock.Advance(111 * time.Minute)
+	h.allow("post", postArgs(3))
 }

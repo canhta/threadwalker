@@ -63,6 +63,7 @@ flowchart TD
 | `replies_per_user_7d` | `limits.replies_per_user_7d` replies to one username in the rolling 7 days; an answer to a reply listed in the wake's inbox ([wake.md](wake.md)) is exempt, so a conversation continues, while it still counts toward `replies_per_day` and the person's count | template | reserve |
 | `thread_per_day` | One reply per thread per UTC day; each reply to us is its own thread, so a back-and-forth answers every new reply once | code | reserve |
 | `min_seconds_between_actions` | Spacing since the newest action under `limits.min_seconds_between_actions`; the hint names the next allowed time | template | reserve |
+| `min_minutes_between_posts` | A post within `limits.min_minutes_between_posts` of the newest own post; replies are not affected; the hint names the next allowed time | template | reserve |
 | `owner_note_open` | An owner note is open and the post names none via `answers_note` | code | reserve |
 | `repeat_topic` | Post's `trend_ref` equals that of an own post of the last 24 h, or its first line shares at least two words (4+ letters, links left out) and half of the smaller word set with one | code | reserve |
 | `invalid_hypothesis` | More than 5, duplicate, foreign or decided `hypothesis_ids` | code | reserve |

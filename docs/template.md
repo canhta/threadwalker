@@ -81,6 +81,7 @@ The `OPENAI_API_KEY` environment variable is also required at load for memory em
 | `limits.browser_replies_per_day` | int > 0 | 5 | code | Cap on replies to feed posts (browser path) |
 | `limits.critic_rejections_per_wake` | int 1–20 | 2 | code | Drafts the critic may reject in one wake before further posts and replies are refused (`critic_limit`) |
 | `limits.min_seconds_between_actions` | int > 0 | required | code | Spacing between actions |
+| `limits.min_minutes_between_posts` | int > 0 | off | code | Spacing between posts; replies only follow `min_seconds_between_actions` |
 | `limits.max_steps_per_wake` | int > 0 | required | code | Step limit of an agent wake |
 | `limits.max_usd_per_day` | number > 0 | required | code | Daily spend cap shared by agent, study and critic phases |
 | `limits.min_minutes_between_wakes` | int 1..1440 | required | code | Wake spacing when behind, and the minimum cadence ([wake.md](wake.md)) |
