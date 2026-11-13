@@ -289,6 +289,15 @@ func (d *decoder) schedule(t *Template) {
 	if d.has("schedule.dream_at") {
 		t.Schedule.DreamAt = d.clock("schedule.dream_at", d.doc.scalars["schedule.dream_at"])
 	}
+	if d.has("schedule.quiet_from") != d.has("schedule.quiet_until") {
+		d.fail("schedule.quiet_from", "set both quiet_from and quiet_until, or neither")
+	} else if d.has("schedule.quiet_from") {
+		t.Schedule.QuietFrom = d.clock("schedule.quiet_from", d.doc.scalars["schedule.quiet_from"])
+		t.Schedule.QuietUntil = d.clock("schedule.quiet_until", d.doc.scalars["schedule.quiet_until"])
+		if t.Schedule.QuietFrom == t.Schedule.QuietUntil && t.Schedule.QuietFrom != "" {
+			d.fail("schedule.quiet_until", "must differ from quiet_from")
+		}
+	}
 	if d.has("schedule.study_slots") {
 		seen := map[string]bool{}
 		for _, slot := range d.list("schedule.study_slots") {

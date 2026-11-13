@@ -223,7 +223,9 @@ kpi:                              # pressure: the scoreboard in every wake shows
   on_target_minutes_between_wakes: 180   # when behind, the wait is limits.min_minutes_between_wakes
 schedule:                         # local-time phases
   timezone: Asia/Ho_Chi_Minh
-  dream_at: "23:30"               # once per local day; a missed one runs once on next start
+  dream_at: "23:30"
+  quiet_from: "01:00"             # no agent wake in the night; the next one waits for quiet_until
+  quiet_until: "07:00"               # once per local day; a missed one runs once on next start
   study_slots:                    # minimum "đi học" cadence; spikes can add sessions
     - "09:00"
     - "15:00"

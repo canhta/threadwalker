@@ -107,6 +107,7 @@ The `kpi:` block is optional; once any of its four keys exists all four are requ
 |---|---|---|---|---|
 | `schedule.timezone` | IANA name | `Asia/Ho_Chi_Minh` | code | Zone of dream and study times and of the posting-hour buckets in the outcome model |
 | `schedule.dream_at` | `HH:MM` local | empty (off) | code | Nightly dream, once per local day |
+| `schedule.quiet_from`, `schedule.quiet_until` | `HH:MM` local, both or neither | empty (off) | code | Night window with no agent wake; one scheduled inside it moves to `quiet_until`. May cross midnight. Dream and study keep their own times |
 | `schedule.study_slots` | list of `HH:MM` | empty (off) | code | Study sessions; a minimum cadence |
 
 ## inbox

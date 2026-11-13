@@ -14,6 +14,8 @@ type PhaseSchedule struct {
 	loc        *time.Location
 	dreamAt    string
 	studySlots []string
+	// quietFrom/quietUntil are the local quiet window; empty is none.
+	quietFrom, quietUntil string
 }
 
 // NewPhaseSchedule validates schedule fields. Empty dream/study settings disable
@@ -27,7 +29,7 @@ func NewPhaseSchedule(schedule config.ScheduleConfig) (*PhaseSchedule, error) {
 	if err != nil {
 		return nil, errors.New("configuring phases: invalid schedule timezone")
 	}
-	s := &PhaseSchedule{loc: loc}
+	s := &PhaseSchedule{loc: loc, quietFrom: schedule.QuietFrom, quietUntil: schedule.QuietUntil}
 	if schedule.DreamAt != "" {
 		if _, err := time.Parse("15:04", schedule.DreamAt); err != nil {
 			return nil, errors.New("configuring phases: invalid dream time")
@@ -42,6 +44,31 @@ func NewPhaseSchedule(schedule config.ScheduleConfig) (*PhaseSchedule, error) {
 	}
 	sort.Strings(s.studySlots)
 	return s, nil
+}
+
+// AfterQuiet returns at, or the end of the local quiet window when at falls
+// inside it. A window may cross midnight (01:00-07:00 or 23:00-07:00).
+func (s *PhaseSchedule) AfterQuiet(at time.Time) time.Time {
+	if s == nil || s.quietFrom == "" {
+		return at
+	}
+	local := at.In(s.loc)
+	day := func(offset int, hhmm string) time.Time {
+		h, m := clock(hhmm)
+		d := local.AddDate(0, 0, offset)
+		return time.Date(d.Year(), d.Month(), d.Day(), h, m, 0, 0, s.loc)
+	}
+	for _, offset := range []int{-1, 0} {
+		from := day(offset, s.quietFrom)
+		until := day(offset, s.quietUntil)
+		if !until.After(from) {
+			until = until.AddDate(0, 0, 1)
+		}
+		if !local.Before(from) && local.Before(until) {
+			return until
+		}
+	}
+	return at
 }
 
 // DreamEnabled reports whether the template configures a dream time.

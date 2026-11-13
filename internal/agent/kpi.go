@@ -148,7 +148,8 @@ func (r *Runtime) nextWake(ctx context.Context, now time.Time) (time.Time, error
 	if tomorrow := nextUTCDay(now); capped && next.Before(tomorrow) {
 		next = tomorrow
 	}
-	return next, nil
+	// Nobody reads at 3am: a night wake spends tokens for posts that sink.
+	return r.schedule.AfterQuiet(next), nil
 }
 
 func nextUTCDay(now time.Time) time.Time {

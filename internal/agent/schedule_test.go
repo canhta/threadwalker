@@ -148,3 +148,30 @@ func TestDreamRunsOnceAcrossRestartAndDoesNotMoveNextWake(t *testing.T) {
 		t.Fatalf("dream repeated same day: due=%v ok=%v err=%v", due, ok, err)
 	}
 }
+
+func TestAfterQuietMovesANightWakeToMorning(t *testing.T) {
+	vn := time.FixedZone("ICT", 7*3600)
+	s := mustPhaseSchedule(t, config.ScheduleConfig{Timezone: "Asia/Ho_Chi_Minh", QuietFrom: "01:00", QuietUntil: "07:00"})
+	at := func(d, h, m int) time.Time { return time.Date(2026, 11, d, h, m, 0, 0, vn) }
+	for _, c := range []struct{ in, want time.Time }{
+		{at(14, 0, 59), at(14, 0, 59)},
+		{at(14, 1, 0), at(14, 7, 0)},
+		{at(14, 6, 59), at(14, 7, 0)},
+		{at(14, 7, 0), at(14, 7, 0)},
+	} {
+		if got := s.AfterQuiet(c.in); !got.Equal(c.want) {
+			t.Errorf("%v: got %v want %v", c.in, got, c.want)
+		}
+	}
+	// A window across midnight.
+	wrap := mustPhaseSchedule(t, config.ScheduleConfig{Timezone: "Asia/Ho_Chi_Minh", QuietFrom: "23:00", QuietUntil: "07:00"})
+	if got := wrap.AfterQuiet(at(13, 23, 30)); !got.Equal(at(14, 7, 0)) {
+		t.Errorf("before midnight: %v", got)
+	}
+	if got := wrap.AfterQuiet(at(14, 2, 0)); !got.Equal(at(14, 7, 0)) {
+		t.Errorf("after midnight: %v", got)
+	}
+	if got := mustPhaseSchedule(t, config.ScheduleConfig{}).AfterQuiet(at(14, 3, 0)); !got.Equal(at(14, 3, 0)) {
+		t.Errorf("no window: %v", got)
+	}
+}

@@ -100,6 +100,9 @@ type ScheduleConfig struct {
 	Timezone   string
 	DreamAt    string   // "HH:MM" local time; empty disables dreaming.
 	StudySlots []string // "HH:MM" local times; empty disables study wakes.
+	// QuietFrom and QuietUntil ("HH:MM" local, both or neither) bound the night
+	// in which no agent wake is scheduled; a window may cross midnight.
+	QuietFrom, QuietUntil string
 }
 
 // TrendsConfig holds deterministic ranking keywords for fetch_trends. Omitted
