@@ -136,8 +136,8 @@ avoided:
 	if tmpl.Limits.PostsPerDay != 6 || tmpl.Limits.RepliesPerDay != 80 || tmpl.Limits.RepliesPerUser7d != 2 {
 		t.Errorf("Limits = %+v, want the fixture starting values", tmpl.Limits)
 	}
-	if tmpl.Limits.MaxUSDPerDay != 2.00 {
-		t.Errorf("Limits.MaxUSDPerDay = %v, want the owner's 2.00 cap", tmpl.Limits.MaxUSDPerDay)
+	if tmpl.Limits.MaxUSDPerDay != 1.00 {
+		t.Errorf("Limits.MaxUSDPerDay = %v, want the owner's 1.00 cap", tmpl.Limits.MaxUSDPerDay)
 	}
 	if tmpl.LLM.Model != "gpt-6-luna" || tmpl.LLM.Protocol != "openai" || tmpl.LLM.APIKeyEnv != "OPENAI_API_KEY" {
 		t.Errorf("LLM = %+v, want the owner's inline gpt-6-luna block", tmpl.LLM)

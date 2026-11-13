@@ -183,14 +183,14 @@ writer:                           # drafts every post and reply from the agent's
     reasoning_effort: high
     price_per_mtok_in_usd: 0.10
     price_per_mtok_out_usd: 0.50
-  post_llm:                       # posts only: in the owner's blind vote sol beat luna on posts (66% vs 50%), barely on replies
+  post_llm:                       # posts only; luna since 2026-11-14 to cut cost (sol beat it 66% vs 50% in a blind vote)
     protocol: openai
     base_url: https://api.openai.com/v1
-    model: gpt-6.1-sol
+    model: gpt-6-luna
     api_key_env: OPENAI_API_KEY
     reasoning_effort: high
-    price_per_mtok_in_usd: 2.00    # OpenAI Standard short-context input rate (2026-11-13)
-    price_per_mtok_out_usd: 10.00  # OpenAI Standard short-context output rate (2026-11-13)
+    price_per_mtok_in_usd: 0.10
+    price_per_mtok_out_usd: 0.50
 critic:                           # reviews every draft before the guard; defaults to the llm block
   llm:
     protocol: openai
@@ -212,7 +212,7 @@ limits:                           # starting values, no experimental basis
   min_seconds_between_actions: 150
   min_minutes_between_posts: 120  # 6 posts spread over the waking day, not two in one wake
   max_steps_per_wake: 45
-  max_usd_per_day: 2.00           # owner cap for the live viral account
+  max_usd_per_day: 1.00           # owner cap for the live viral account
   max_usd_per_dream: 0.30         # nightly dream has its own cap, outside the daily cap
   max_steps_per_dream: 20
   min_minutes_between_wakes: 20
