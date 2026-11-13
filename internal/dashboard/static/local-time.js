@@ -10,7 +10,7 @@
   var hm = { hour: "2-digit", minute: "2-digit" };
   var dm = { day: "numeric", month: "short" };
   function clock(d) { var t = p(d, hm); return t.hour + ":" + t.minute; }
-  function day(d) { var t = p(d, dm); return t.day + " " + t.month; }
+  function day(d) { var t = p(d, dm); return t.day + " " + t.month.slice(0, 3); }
   function key(d) { var t = p(d, { year: "numeric", month: "numeric", day: "numeric" }); return t.year + "-" + t.month + "-" + t.day; }
   o.format = function (kind, d, now) {
     switch (kind) {
