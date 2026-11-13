@@ -4,9 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"sync"
 	"time"
 
+	"github.com/canhta/threadz/internal/logging"
 	"github.com/canhta/threadz/internal/store"
 	"github.com/canhta/threadz/internal/tools"
 )
@@ -68,7 +70,21 @@ func (r *Runtime) PollInbox(ctx context.Context, now time.Time) error {
 		c.next = now.Add(time.Duration(t.Inbox.PollMinutes) * time.Minute)
 	}
 	c.mu.Unlock()
-	if pollErr != nil || c.markSeen(replies) == 0 {
+	fresh := 0
+	if pollErr == nil {
+		fresh = c.markSeen(replies)
+	}
+	// A poll that silently finds nothing is how a parsing bug hid replies for a
+	// night; every poll leaves one line with what it saw.
+	outcome, reason := "success", "nothing_new"
+	switch {
+	case pollErr != nil:
+		outcome, reason = "error", "read_failed"
+	case fresh > 0:
+		reason = "woke_early"
+	}
+	logging.Emit(ctx, r.opts.Logger, slog.LevelInfo, logging.Record{Event: logging.InboxPolled, AgentID: t.ID, Operation: "inbox", Outcome: outcome, Reason: reason, N: int64(len(replies))})
+	if fresh == 0 {
 		return nil
 	}
 	return r.opts.Store.WakeEarly(ctx, t.ID, now, time.Duration(t.Inbox.MinMinutesAfterWake)*time.Minute)

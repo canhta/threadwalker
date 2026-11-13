@@ -57,6 +57,7 @@ const (
 	TrendsRecorded            = "trends.recorded"
 	TrendsSampled             = "trends.sampled"
 	WebSearchFinished         = "web_search.finished"
+	InboxPolled               = "inbox.polled"
 	CheckStarted              = "check.started"
 	CheckConfigured           = "check.configured"
 	CheckFinished             = "check.finished"
