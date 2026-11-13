@@ -1,0 +1,6 @@
+{
+  "data": [
+    {"id": "9000000000000006", "is_reply": false, "permalink": "https://www.threads.com/@user_1/post/SYNTH0005", "text": "redacted text redacted text redacted", "timestamp": "2026-01-02T05:00:00+0000", "username": "user_1"}
+  ],
+  "paging": {"cursors": {"after": "redacted", "before": "redacted"}}
+}

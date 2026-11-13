@@ -13,7 +13,7 @@ import (
 )
 
 func inboxPost(id, user string, at time.Time, text string) threads.Post {
-	return threads.Post{ID: id, Username: user, Text: text, URL: "https://www.threads.com/@" + user + "/post/" + id, Timestamp: at.Format(time.RFC3339), AddressedToAgent: true}
+	return threads.Post{ID: id, Username: user, Text: text, URL: "https://www.threads.com/@" + user + "/post/" + id, Timestamp: at, AddressedToAgent: true}
 }
 
 func TestInboxListsNewRepliesAndAnswerUsesTheAPIPath(t *testing.T) {
@@ -99,5 +99,22 @@ func TestInboxListsNewRepliesAndAnswerUsesTheAPIPath(t *testing.T) {
 	now = now.Add(time.Minute)
 	if _, err := d.Dispatch(ctx, call("reply", args(second, "va tiep"))); err != nil {
 		t.Fatalf("second answer to the same person: %v", err)
+	}
+}
+
+func TestReadInboxCountsRepliesWithoutATimestamp(t *testing.T) {
+	ctx := context.Background()
+	now := time.Date(2026, 11, 11, 12, 0, 0, 0, time.UTC)
+	st, _, _ := setup(t)
+	mem := threads.NewMemory()
+	mem.Replies = map[string]threads.Page{
+		"": {Kind: "mentions", Skipped: 2, Posts: []threads.Post{
+			inboxPost("h1", "hank", now.Add(-10*time.Minute), "ok"),
+			inboxPost("h2", "ivy", time.Time{}, "no timestamp"),
+		}},
+	}
+	got, skipped, err := tools.ReadInbox(ctx, tools.InboxRead{Store: st, Threads: mem, AgentID: "agent", Now: now, IsOwn: func(string) bool { return false }})
+	if err != nil || len(got) != 1 || got[0].Post.ID != "h1" || skipped != 3 {
+		t.Fatalf("got=%+v skipped=%d err=%v", got, skipped, err)
 	}
 }

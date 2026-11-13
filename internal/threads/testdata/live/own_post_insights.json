@@ -1,0 +1,10 @@
+{
+  "data": [
+    {"name": "views", "period": "lifetime", "values": [{"value": 120}], "title": "Views", "description": "The number of times your post was viewed.", "id": "9000000000000002/insights/views/lifetime"},
+    {"name": "likes", "period": "lifetime", "values": [{"value": 9}], "title": "Likes", "description": "The number of likes on your post.", "id": "9000000000000002/insights/likes/lifetime"},
+    {"name": "replies", "period": "lifetime", "values": [{"value": 3}], "title": "Replies", "description": "The number of replies on your post.", "id": "9000000000000002/insights/replies/lifetime"},
+    {"name": "reposts", "period": "lifetime", "values": [{"value": 0}], "title": "Reposts", "description": "The number of times your post was reposted.", "id": "9000000000000002/insights/reposts/lifetime"},
+    {"name": "quotes", "period": "lifetime", "values": [{"value": 0}], "title": "Quotes", "description": "The number of times your post was quoted.", "id": "9000000000000002/insights/quotes/lifetime"},
+    {"name": "shares", "period": "lifetime", "values": [{"value": 0}], "title": "Shares", "description": "The number of times your post was shared.", "id": "9000000000000002/insights/shares/lifetime"}
+  ]
+}

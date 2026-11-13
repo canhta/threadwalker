@@ -140,24 +140,42 @@ type apiPost struct {
 	Timestamp string `json:"timestamp"`
 }
 
-func (p apiPost) post() Post {
-	return Post{ID: p.ID, Username: p.Username, Text: p.Text, URL: p.Permalink, Timestamp: rfc3339(p.Timestamp), IsReply: p.IsReply}
-}
-
-// rfc3339 rewrites the API's "2026-01-02T05:00:00+0000" (no colon in the
-// offset, which time.RFC3339 refuses) to RFC 3339, the form Post documents.
-// Anything else passes through unchanged.
-func rfc3339(s string) string {
-	if t, err := time.Parse("2006-01-02T15:04:05-0700", s); err == nil {
-		return t.UTC().Format(time.RFC3339)
+func (p apiPost) post() (Post, error) {
+	at, err := parseTimestamp(p.Timestamp)
+	if err != nil {
+		return Post{}, err
 	}
-	return s
+	return Post{ID: p.ID, Username: p.Username, Text: p.Text, URL: p.Permalink, Timestamp: at, IsReply: p.IsReply}, nil
 }
 
+// errTimestamp means the API sent a timestamp in a format this client does not know.
+var errTimestamp = fmt.Errorf("%w: unknown timestamp format", ErrAPI)
+
+// parseTimestamp reads the API's "2026-01-02T05:00:00+0000" (no colon in the
+// offset, which time.RFC3339 refuses) as UTC. An empty string is the zero time
+// (a field not requested); any other format is an error, never passed through.
+func parseTimestamp(s string) (time.Time, error) {
+	if s == "" {
+		return time.Time{}, nil
+	}
+	t, err := time.Parse("2006-01-02T15:04:05-0700", s)
+	if err != nil {
+		return time.Time{}, errTimestamp
+	}
+	return t.UTC(), nil
+}
+
+// posts converts the API posts; one with an unknown timestamp format is
+// skipped and counted in Page.Skipped, so a format change shows up as a count.
 func posts(kind string, in []apiPost) Page {
 	page := Page{Kind: kind, Posts: make([]Post, 0, len(in))}
 	for _, p := range in {
-		page.Posts = append(page.Posts, p.post())
+		post, err := p.post()
+		if err != nil {
+			page.Skipped++
+			continue
+		}
+		page.Posts = append(page.Posts, post)
 	}
 	return page
 }
@@ -246,7 +264,11 @@ func (a *API) ReadPost(ctx context.Context, id string) (Page, error) {
 	if err := a.do(ctx, http.MethodGet, "/"+url.PathEscape(id), url.Values{"fields": {postFields}}, &p); err != nil {
 		return Page{}, err
 	}
-	return posts("post", []apiPost{p}), nil
+	page := posts("post", []apiPost{p})
+	if page.Skipped > 0 {
+		return Page{}, errTimestamp
+	}
+	return page, nil
 }
 
 type insights struct {

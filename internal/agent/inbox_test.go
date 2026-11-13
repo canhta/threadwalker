@@ -64,7 +64,7 @@ func (g *inboxRig) park(t *testing.T) {
 }
 
 func (g *inboxRig) reply(id, user string) {
-	p := threads.Post{ID: id, Username: user, Text: "hello", URL: "https://www.threads.com/@" + user + "/post/" + id, Timestamp: g.now.Add(-time.Minute).Format(time.RFC3339)}
+	p := threads.Post{ID: id, Username: user, Text: "hello", URL: "https://www.threads.com/@" + user + "/post/" + id, Timestamp: g.now.Add(-time.Minute)}
 	page := g.mem.Replies["m1"]
 	page.Kind = "replies"
 	page.Posts = append(page.Posts, p)

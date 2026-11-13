@@ -1,0 +1,4 @@
+These files were written by hand to match the live API formats (timestamps like
+2026-01-02T03:04:05+0000, insights as data[].name and values[0].value). They are
+stand-ins, not recordings. `threadz ctl capture-api --agent ID` replaces them with
+redacted live responses and removes this file.

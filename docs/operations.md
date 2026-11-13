@@ -36,6 +36,7 @@ The service listens on a Unix socket (`--socket`, `THREADZ_ADMIN_SOCKET`, defaul
 | `wake-export <id> --agent [--keep-text]` | database, read-only | The wake's reads, calls and guard verdicts as a `replay` eval suite on stdout ([evals.md](evals.md#replay-cases)); the text of other people's posts is blanked unless `--keep-text` |
 | `logs [--agent] [--wake] [--event] [--follow] [--source journal\|db]` | journald, or `db` for one wake's transcript | Structured log filtered by agent, wake or event; `--unit` selects another journald unit |
 | `draft --agent --input FILE` | host | Writer and critic on fixed items, nothing published ([content.md](content.md)) |
+| `capture-api --agent [--out DIR]` | host, read-only Threads calls | Saves redacted responses (me, an own post and reply with their insights, the reply's `/replies`, mentions) to `--out` (default `internal/threads/testdata/live/`) for the API contract tests. Other usernames, all free text, query strings and tokens are removed; ids become synthetic of the same length; field names, value types and timestamp formats are kept. Uses the token from the environment, never writes it |
 | `doctor` | host | Exits non-zero when any check fails |
 | `update` | host | Installs the latest release; as root it is `threadz update`, else it asks the root updater |
 

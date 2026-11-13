@@ -1,0 +1,7 @@
+{
+  "data": [
+    {"id": "9000000000000004", "is_reply": true, "permalink": "https://www.threads.com/@user_1/post/SYNTH0003", "text": "redacted text redacted", "timestamp": "2026-01-02T04:30:00+0000", "username": "user_1"},
+    {"id": "9000000000000005", "is_reply": true, "permalink": "https://www.threads.com/@user_2/post/SYNTH0004", "text": "redacted text", "timestamp": "2026-01-02T04:45:00+0000", "username": "user_2"}
+  ],
+  "paging": {"cursors": {"after": "redacted", "before": "redacted"}}
+}

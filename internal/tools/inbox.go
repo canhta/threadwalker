@@ -55,17 +55,18 @@ type InboxRead struct {
 // first. It skips own replies, replies older than InboxWindow, authors on the
 // do-not-contact list, and replies the agent already answered (a stored reply
 // action targets them, or the account itself replied under them) and replies of
-// conversations already at limits.replies_per_conversation. It fails
-// only when every read failed.
-func ReadInbox(ctx context.Context, in InboxRead) ([]InboxReply, error) {
+// conversations already at limits.replies_per_conversation. The int counts the
+// replies skipped because their timestamp was missing or in an unknown format.
+// It fails only when every read failed.
+func ReadInbox(ctx context.Context, in InboxRead) ([]InboxReply, int, error) {
 	since := in.Now.Add(-InboxWindow)
 	parents, err := in.Store.PublishedSince(ctx, in.AgentID, since, InboxParents)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	targets, err := in.Store.ReplyTargets(ctx, in.AgentID)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	answered := map[string]bool{}
 	for _, target := range targets {
@@ -75,7 +76,7 @@ func ReadInbox(ctx context.Context, in InboxRead) ([]InboxReply, error) {
 	}
 	seen := map[string]bool{}
 	var cands []InboxReply
-	failed, reads := 0, 0
+	failed, reads, skipped := 0, 0, 0
 	capped := map[string]bool{}
 	atCap := func(root string) (bool, error) {
 		full, ok := capped[root]
@@ -95,9 +96,14 @@ func ReadInbox(ctx context.Context, in InboxRead) ([]InboxReply, error) {
 		if in.Observe != nil && in.Observe(ctx, page) != nil {
 			return
 		}
+		skipped += page.Skipped
 		for _, p := range page.Posts {
-			at, err := time.Parse(time.RFC3339, p.Timestamp)
-			if err != nil || p.ID == "" || seen[p.ID] || at.Before(since) || in.IsOwn(p.Username) {
+			at := p.Timestamp
+			if at.IsZero() {
+				skipped++
+				continue
+			}
+			if p.ID == "" || seen[p.ID] || at.Before(since) || in.IsOwn(p.Username) {
 				continue
 			}
 			canonical, err := store.CanonicalThread(p.URL)
@@ -120,7 +126,7 @@ func ReadInbox(ctx context.Context, in InboxRead) ([]InboxReply, error) {
 	}
 	collect("", "", "")
 	if failed == reads {
-		return nil, errors.New("reading inbox: every read failed")
+		return nil, skipped, errors.New("reading inbox: every read failed")
 	}
 	slices.SortStableFunc(cands, func(a, b InboxReply) int { return cmp.Compare(b.At.UnixNano(), a.At.UnixNano()) })
 
@@ -139,7 +145,7 @@ func ReadInbox(ctx context.Context, in InboxRead) ([]InboxReply, error) {
 		}
 		out = append(out, c)
 	}
-	return out, nil
+	return out, skipped, nil
 }
 
 // InboxItem is one inbox reply as the wake's data message shows it. Text and
@@ -161,7 +167,7 @@ func (d *Dispatcher) Inbox(ctx context.Context) ([]InboxReply, []InboxItem) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	now := d.opts.Now()
-	replies, err := ReadInbox(ctx, InboxRead{Store: d.opts.Store, Threads: d.opts.Threads, AgentID: d.opts.Template.ID, Now: now, IsOwn: d.guard.IsOwn, Cap: guard.ConversationCap(d.opts.Template),
+	replies, _, err := ReadInbox(ctx, InboxRead{Store: d.opts.Store, Threads: d.opts.Threads, AgentID: d.opts.Template.ID, Now: now, IsOwn: d.guard.IsOwn, Cap: guard.ConversationCap(d.opts.Template),
 		Observe: func(ctx context.Context, page threads.Page) error { return d.observeStops(ctx, "read_replies", page) }})
 	if err != nil {
 		return nil, nil

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/url"
 	"strings"
+	"time"
 	"unicode"
 )
 
@@ -37,10 +38,10 @@ type Post struct {
 	URL      string `json:"url"`
 	// Topic is the Threads topic (community) the post is filed under, from a browser read.
 	Topic string `json:"topic,omitempty"`
-	// Timestamp is the API's publish time (RFC 3339); empty for a feed post.
-	Timestamp        string `json:"timestamp,omitempty"`
-	IsReply          bool   `json:"is_reply,omitempty"`
-	AddressedToAgent bool   `json:"addressed_to_agent,omitempty"`
+	// Timestamp is the API's publish time in UTC; zero for a feed post.
+	Timestamp        time.Time `json:"timestamp,omitzero"`
+	IsReply          bool      `json:"is_reply,omitempty"`
+	AddressedToAgent bool      `json:"addressed_to_agent,omitempty"`
 	// Likes, Replies, Reposts and AgeMinutes come from a browser read. Nil means
 	// the page did not show the figure; Threads shows no number at zero, so a
 	// counter button without a number is 0.
@@ -110,6 +111,8 @@ type Page struct {
 	// LimitedAccess explains an empty result the Meta app's access level may
 	// cause; it is set only on such a result.
 	LimitedAccess string `json:"limited_access,omitempty"`
+	// Skipped counts API posts left out because their timestamp format is unknown.
+	Skipped int `json:"-"`
 }
 
 type snapshotOperationError struct {

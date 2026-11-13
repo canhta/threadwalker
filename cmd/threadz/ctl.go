@@ -52,6 +52,7 @@ Commands that read the database or the host:
   wake-export <id> [--keep-text]            one wake as a replay eval case (post text of other people removed unless --keep-text)
   logs [--agent ID] [--wake ID] [--event NAME] [--follow] [--source journal|db]
   draft --agent ID --input FILE             run the writer and critic on fixed items, publish nothing
+  capture-api --agent ID [--out DIR]        read-only API calls, redacted responses saved as contract-test fixtures (default internal/threads/testdata/live)
   doctor                                    check config, keys, database, browser, Telegram, disk, retention
   update                                    install the latest release (root runs it; else asks the root updater)
 
@@ -137,6 +138,8 @@ func runCtl(ctx context.Context, args []string, getenv func(string) string, stdo
 		return ctlLogs(ctx, getenv, rest, stdout, stderr, deps)
 	case "draft":
 		return ctlDraft(ctx, getenv, rest, stdout, stderr)
+	case "capture-api":
+		return ctlCaptureAPI(ctx, getenv, rest, stdout, stderr)
 	case "doctor":
 		return ctlDoctor(ctx, getenv, rest, stdout, stderr, deps)
 	case "update":

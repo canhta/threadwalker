@@ -61,7 +61,7 @@ func (r *Runtime) PollInbox(ctx context.Context, now time.Time) error {
 	if err != nil {
 		return err
 	}
-	replies, pollErr := r.readInbox(ctx, now, state.Status == "running")
+	replies, skipped, pollErr := r.readInbox(ctx, now, state.Status == "running")
 	c.mu.Lock()
 	if pollErr != nil {
 		c.streak++
@@ -76,15 +76,18 @@ func (r *Runtime) PollInbox(ctx context.Context, now time.Time) error {
 		fresh = c.markSeen(replies)
 	}
 	// A poll that silently finds nothing is how a parsing bug hid replies for a
-	// night; every poll leaves one line with what it saw.
+	// night; every poll leaves one line with what it saw. Count is the replies skipped
+	// for a missing or unknown timestamp format.
 	outcome, reason := "success", "nothing_new"
 	switch {
 	case pollErr != nil:
 		outcome, reason = "error", "read_failed"
 	case fresh > 0:
 		reason = "woke_early"
+	case skipped > 0:
+		reason = "unparsed_timestamps"
 	}
-	logging.Emit(ctx, r.opts.Logger, slog.LevelInfo, logging.Record{Event: logging.InboxPolled, AgentID: t.ID, Operation: "inbox", Outcome: outcome, Reason: reason, N: int64(len(replies))})
+	logging.Emit(ctx, r.opts.Logger, slog.LevelInfo, logging.Record{Event: logging.InboxPolled, AgentID: t.ID, Operation: "inbox", Outcome: outcome, Reason: reason, N: int64(len(replies)), Count: skipped})
 	if fresh == 0 {
 		return nil
 	}
@@ -92,15 +95,15 @@ func (r *Runtime) PollInbox(ctx context.Context, now time.Time) error {
 }
 
 // readInbox polls only for a running agent; a paused or killed one asks for no wake.
-func (r *Runtime) readInbox(ctx context.Context, now time.Time, running bool) ([]tools.InboxReply, error) {
+func (r *Runtime) readInbox(ctx context.Context, now time.Time, running bool) ([]tools.InboxReply, int, error) {
 	if !running {
-		return nil, nil
+		return nil, 0, nil
 	}
 	ctx, cancel := context.WithTimeout(ctx, inboxPollTimeout)
 	defer cancel()
 	backend, err := r.opts.ThreadsFactory(ctx, r.opts.Template)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	defer backend.Close(context.WithoutCancel(ctx))
 	own := map[string]bool{}
