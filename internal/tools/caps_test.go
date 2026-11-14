@@ -2,15 +2,10 @@ package tools_test
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"net/http"
-	"net/http/httptest"
 	"testing"
 
-	"github.com/canhta/threadz/internal/config"
-	"github.com/canhta/threadz/internal/llm"
 	"github.com/canhta/threadz/internal/store"
 	"github.com/canhta/threadz/internal/tools"
 )
@@ -54,6 +49,13 @@ func TestTimeGatedRefusalsNeverCloseATool(t *testing.T) {
 		_, err := d.Dispatch(context.Background(), call("post", fmt.Sprintf(`{"text":"unrelated words number%d"}`, i)))
 		if reason := notClosedOrStalled(t, err); reason != "min_minutes_between_posts" {
 			t.Fatalf("call %d: %s", i, reason)
+		}
+	}
+	// The same post again and again is waiting for the gate, not repeating a failure.
+	for i := 1; i <= 5; i++ {
+		_, err := d.Dispatch(context.Background(), call("post", `{"text":"the same words each time"}`))
+		if reason := notClosedOrStalled(t, err); reason != "min_minutes_between_posts" {
+			t.Fatalf("same post %d: %s", i, reason)
 		}
 	}
 }
@@ -105,32 +107,5 @@ func TestPermanentToolsAreCappedPerWake(t *testing.T) {
 				t.Fatalf("reason %s", reason)
 			}
 		}
-	}
-}
-
-// What the model asks for on the last request it may make is never published:
-// it could not read the result.
-func TestWriteOnTheLastRequestIsRefused(t *testing.T) {
-	st, _, d := setup(t)
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		json.NewEncoder(w).Encode(map[string]any{"choices": []any{map[string]any{"message": llm.Message{Role: "assistant", ToolCalls: []llm.ToolCall{
-			{ID: "a", Type: "function", Function: llm.CallFunction{Name: "fetch_trends", Arguments: "{}"}},
-			{ID: "b", Type: "function", Function: llm.CallFunction{Name: "post", Arguments: `{"text":"last words"}`}},
-		}}, "finish_reason": "tool_calls"}}, "usage": map[string]int{"prompt_tokens": 0, "completion_tokens": 0}})
-	}))
-	defer server.Close()
-	client, err := llm.New(config.LLMConfig{BaseURL: server.URL, Model: "synthetic", APIKey: config.NewSecret("dummy")}, config.LimitsConfig{MaxStepsPerWake: 1, MaxUSDPerDay: 1}, st, d.ConfigureClient(llm.Options{}))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err = client.Run(context.Background(), "agent", 1, nil, d.Definitions(), d); !errors.Is(err, llm.ErrStepLimit) {
-		t.Fatal(err)
-	}
-	var posts, refused, trends int
-	st.DB().QueryRow(`SELECT COUNT(*) FROM actions`).Scan(&posts)
-	st.DB().QueryRow(`SELECT COUNT(*) FROM tool_calls WHERE tool='post' AND blocked_by='last_request'`).Scan(&refused)
-	st.DB().QueryRow(`SELECT COUNT(*) FROM tool_calls WHERE tool='fetch_trends' AND blocked_by=''`).Scan(&trends)
-	if posts != 0 || refused != 1 || trends != 1 {
-		t.Fatalf("actions %d refused %d trends %d", posts, refused, trends)
 	}
 }

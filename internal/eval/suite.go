@@ -147,7 +147,7 @@ func validateSuite(s *Suite) error {
 		}
 		seen[c.ID] = true
 		switch c.Expect.EndReason {
-		case "completed", "step_limit", "budget", "provider_error", "invalid_response", "cancelled", "accounting_error", "persistence_error", "stall_stop", "action_limit", "unknown_outcome", "logged_out", "captcha", "nothing_to_do":
+		case "completed", "step_limit", "budget", "provider_error", "invalid_response", "cancelled", "accounting_error", "persistence_error", "stall_stop", "action_limit", "unknown_outcome", "logged_out", "captcha", "nothing_to_do", "tool_call_cap":
 		default:
 			return invalid()
 		}

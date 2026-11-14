@@ -13,9 +13,9 @@ import (
 // valid JSON and valid UTF-8. A result that stays too large without its lists
 // is replaced by a note.
 //
-// ponytail: refs of dropped items stay in the guard's registry, where the
-// executor noted them before the clip; clipping first would put the clip
-// inside every list-returning tool. The model never sees those refs.
+// Refs of dropped items stay in the guard's registry, where the executor noted
+// them before the clip; the dispatcher records which refs the model was shown
+// and offers only those as open targets.
 func clipResult(result string, max int) string {
 	if len(result) <= max {
 		return result

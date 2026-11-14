@@ -43,7 +43,6 @@ var hints = map[string]string{
 	"tool_closed":                 "this tool was refused 3 times for the same reason and is closed for the rest of the wake; use another tool or end the wake",
 	"tool_hidden":                 "this tool is not offered in this wake; use another tool or end the wake",
 	"tool_call_cap":               "this wake used all its tool calls; end the wake now",
-	"last_request":                "this was the wake's last model request, so nothing is posted or replied now; end the wake",
 	"repeat_refused":              "this exact call already failed 3 times the same way and was not run; use different inputs, try another approach, or say what blocks you",
 	"unknown_tool":                "no such tool; call one from the tool list",
 	"unsupported_tool_type":       "only function tool calls are supported",

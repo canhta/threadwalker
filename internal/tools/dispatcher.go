@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"regexp"
 	"slices"
 	"strings"
 	"sync"
@@ -91,7 +92,8 @@ type Dispatcher struct {
 	reads        map[string]int
 	refused      map[string]int // refusals per tool and reason
 	closed       map[string]bool
-	calls        int // model tool calls this wake, refused ones included
+	calls        int             // model tool calls this wake, refused ones included
+	shown        map[string]bool // refs the model was shown, after clipping
 	capRefusals  int
 }
 
@@ -148,7 +150,7 @@ const closeAtRefusals = 3
 
 // uncounted are refusals the dispatcher itself raises about the wake or the
 // repeat, not about what the model asked for.
-var uncounted = []string{"tool_closed", "tool_hidden", "tool_call_cap", "last_request", "repeat_refused", "stall_stop", "browser_stopped", "audit_failure"}
+var uncounted = []string{"tool_closed", "tool_hidden", "tool_call_cap", "repeat_refused", "stall_stop", "browser_stopped", "audit_failure"}
 
 // timeGated refusals lift as the wake goes on; they never close a tool.
 var timeGated = []string{"min_minutes_between_posts", "replies_per_hour", "min_seconds_between_actions", "reply_breaker"}
@@ -204,7 +206,7 @@ func NewDispatcher(opts Options) (*Dispatcher, error) {
 	if opts.FetchTrends == nil || (opts.Template.WebSearch.Enabled && opts.SearchWeb == nil) {
 		return nil, errors.New("configuring tools: injected trend and web-search fetchers required")
 	}
-	d := &Dispatcher{guard: g, opts: opts, registry: map[string]executor{}, seen: map[[32]byte]seenCall{}, reads: map[string]int{}, refused: map[string]int{}, closed: map[string]bool{}}
+	d := &Dispatcher{guard: g, opts: opts, registry: map[string]executor{}, seen: map[[32]byte]seenCall{}, reads: map[string]int{}, refused: map[string]int{}, closed: map[string]bool{}, shown: map[string]bool{}}
 	include, avoid := opts.Template.TrendKeywords()
 	d.trendProfile = trends.TrendProfile{Include: include, Avoid: avoid}
 	d.redactor = config.NewRedactor(opts.Redactor, opts.Template)
@@ -231,6 +233,9 @@ func (d *Dispatcher) attach(executors map[string]executor) error {
 // as worth answering when the agent wants to stop.
 const OpenTargetScore = 0.5
 
+// shownRef finds the refs in a result as the model receives it.
+var shownRef = regexp.MustCompile(`"ref":"(r\d+)"`)
+
 // OpenTargets lists the refs of posts read this wake that score at least
 // OpenTargetScore and that the account has not replied to in the last day,
 // best first. The agent decides which deserve a reply; code only shows them.
@@ -239,9 +244,11 @@ func (d *Dispatcher) OpenTargets(ctx context.Context) []string {
 	if err != nil {
 		return nil
 	}
+	d.mu.Lock()
+	defer d.mu.Unlock()
 	var refs []string
 	for _, it := range d.guard.Seen() {
-		if it.Score >= OpenTargetScore && strings.Contains(it.URL, "/post/") && !replied[it.URL] {
+		if d.shown[it.Ref] && it.Score >= OpenTargetScore && strings.Contains(it.URL, "/post/") && !replied[it.URL] {
 			refs = append(refs, it.Ref)
 		}
 	}
@@ -334,9 +341,6 @@ func (d *Dispatcher) Dispatch(ctx context.Context, call llm.ToolCall) (string, e
 		block = "repeat_refused"
 	} else if d.closed[safeTool] {
 		block = "tool_closed"
-	} else if known && spec.Effect == guard.EffectThreadsWrite && llm.FinalRequest(ctx) {
-		// Its result could never be read, so nothing is published.
-		block = "last_request"
 	}
 	// A thrice-failed call is refused without running; the second such
 	// refusal ends the wake. The second call past the cap does too.
@@ -398,7 +402,8 @@ func (d *Dispatcher) Dispatch(ctx context.Context, call llm.ToolCall) (string, e
 		d.stopped = err
 	}
 	d.countRefusal(safeTool, call.Function.Arguments, err)
-	if block != "repeat_refused" {
+	var gated *guard.BlockedError
+	if block != "repeat_refused" && !(errors.As(err, &gated) && slices.Contains(timeGated, gated.Reason)) {
 		answer := sha256.Sum256([]byte(output))
 		if err != nil {
 			answer = sha256.Sum256([]byte(err.Error()))
@@ -429,6 +434,9 @@ func (d *Dispatcher) Dispatch(ctx context.Context, call llm.ToolCall) (string, e
 	d.event(ctx, logging.ToolFinished, outcome(err), why, safeTool, started)
 	if !harness && err == nil {
 		output = clipResult(output, MaxResultBytes)
+		for _, m := range shownRef.FindAllStringSubmatch(output, -1) { // d.mu is held
+			d.shown[m[1]] = true
+		}
 	}
 	return output, err
 }
