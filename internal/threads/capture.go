@@ -25,6 +25,8 @@ const (
 	CaptureOwnReplyMetric  = "own_reply_insights.json"
 	CaptureOwnReplyReplies = "own_reply_replies.json"
 	CaptureMentions        = "mentions.json"
+	CaptureAccount         = "account_insights.json"
+	CaptureFollowers       = "followers.json"
 )
 
 // Capture makes the read-only calls that matter for the API contract and
@@ -113,10 +115,23 @@ func (a *API) Capture(ctx context.Context) (map[string][]byte, error) {
 			}
 		}
 	}
-	if raw, err = get(CaptureMentions, "/"+a.o.UserID+"/mentions", url.Values{"fields": {postFields}}); err == nil {
-		err = put(CaptureMentions, raw)
+	insights := "/" + a.o.UserID + "/threads_insights"
+	for _, call := range []struct {
+		file, path string
+		q          url.Values
+	}{
+		{CaptureMentions, "/" + a.o.UserID + "/mentions", url.Values{"fields": {postFields}}},
+		{CaptureAccount, insights, url.Values{"metric": {accountMetrics}}},
+		{CaptureFollowers, insights, url.Values{"metric": {"followers_count"}}},
+	} {
+		if raw, err = get(call.file, call.path, call.q); err == nil {
+			err = put(call.file, raw)
+		}
+		if err != nil {
+			return nil, err
+		}
 	}
-	return out, err
+	return out, nil
 }
 
 // Redactor makes a captured response safe to commit while keeping its shape:

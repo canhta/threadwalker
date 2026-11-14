@@ -190,9 +190,10 @@ func TestCaptureRedactsEverythingPrivate(t *testing.T) {
 	f.route("GET", "/"+ownReply+"/insights", insight)
 	f.route("GET", "/"+ownReply+"/replies", list(post("17841400000000009", "stranger_one", "a stranger says things", true)))
 	f.route("GET", "/1000000000000001/mentions", list(post("17841400000000010", "stranger_two", "@real_owner hello there", false)))
+	f.route("GET", "/1000000000000001/threads_insights", `{"data":[{"name":"followers_count","period":"day","title":"followers_count","description":"x","total_value":{"value":1},"id":"1000000000000001/insights/followers_count/day"}]}`)
 
 	files, err := api.Capture(context.Background())
-	if err != nil || len(files) != 7 {
+	if err != nil || len(files) != 9 {
 		t.Fatalf("capture: %d files, err=%v", len(files), err)
 	}
 	for name, b := range files {
