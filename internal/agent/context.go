@@ -18,7 +18,6 @@ import (
 	"github.com/canhta/threadz/internal/logging"
 	"github.com/canhta/threadz/internal/playbook"
 	"github.com/canhta/threadz/internal/store"
-	"github.com/canhta/threadz/internal/trends"
 )
 
 const (
@@ -104,6 +103,10 @@ func (r *Runtime) wakeContext(ctx context.Context, phase string, wakeID int64) (
 	if err != nil {
 		return nil, err
 	}
+	if phase != guard.PhaseDream { // the dream cites ids from the whole index
+		index = capMemoryIndex(index)
+	}
+	topics = undatedTopics(topics)
 	redactor := r.redactor()
 	var strategy *store.StrategyRevision
 	if len(history) > 0 {
@@ -188,18 +191,12 @@ func (r *Runtime) wakeContext(ctx context.Context, phase string, wakeID int64) (
 		if phase == guard.PhaseStudy {
 			window = 72 * time.Hour
 		}
-		if data["study_trends"], err = r.opts.Store.RecentStudyTrends(ctx, t.ID, now.Add(-window), 10); err != nil {
+		stories, err := r.opts.Store.RecentStudyTrends(ctx, t.ID, now.Add(-window), 10)
+		if err != nil {
 			return nil, err
 		}
+		data["study_trends"] = dietStories(stories, t)
 	}
-	if phase == guard.PhaseAgent {
-		var brief trends.Brief
-		if brief, err = r.computeBrief(ctx); err != nil {
-			return nil, err
-		}
-		data["threads_trend_brief"] = brief
-	}
-
 	hidden, err := r.opts.Store.RefusedTools(ctx, t.ID, now)
 	if err != nil {
 		return nil, err

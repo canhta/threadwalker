@@ -247,3 +247,15 @@ func TopStories(stories []Story, limit int) []Story {
 	}
 	return stories
 }
+
+// Avoided reports whether title matches any avoid keyword, scored as RankStories does.
+func Avoided(title string, avoid []string) bool {
+	title = normalizeTrendText(title)
+	tokens := trendTokens(title)
+	for _, keyword := range cleanKeywords(avoid) {
+		if trendKeywordScore(title, tokens, keyword) > 0 {
+			return true
+		}
+	}
+	return false
+}

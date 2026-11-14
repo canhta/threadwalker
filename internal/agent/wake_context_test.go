@@ -157,7 +157,7 @@ func TestWakeContextLoadsOnlyTheMemoryIndex(t *testing.T) {
 	if err := json.Unmarshal([]byte(messages[1].Content), &data); err != nil {
 		t.Fatal(err)
 	}
-	if len(data.MemoryIndex) != 2 || data.MemoryIndex[0].Text != "indexed fact, detail in topic hooks" || data.MemoryIndex[1].Text != "leaked [REDACTED] here" {
+	if len(data.MemoryIndex) != 2 || data.MemoryIndex[1].Text != "indexed fact, detail in topic hooks" || data.MemoryIndex[0].Text != "leaked [REDACTED] here" {
 		t.Fatalf("memory_index=%v", data.MemoryIndex)
 	}
 	if len(data.Topics) != 1 || data.Topics[0] != (store.TopicSummary{Topic: "hooks", Description: "opening lines"}) {

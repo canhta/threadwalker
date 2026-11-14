@@ -100,7 +100,7 @@ func TestStudyPhaseSamplesThreadsAndBlocksWrites(t *testing.T) {
 	for _, message := range messages {
 		joined += message.Content
 	}
-	if !strings.Contains(joined, "threads_trend_brief") || !strings.Contains(joined, "Jensen Huang") {
+	if strings.Contains(joined, "threads_trend_brief") || !strings.Contains(joined, "study_trends") || !strings.Contains(joined, "Jensen Huang") {
 		t.Fatalf("normal context missing study trends")
 	}
 }

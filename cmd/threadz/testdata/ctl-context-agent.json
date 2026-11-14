@@ -8,7 +8,7 @@
     },
     {
       "role": "user",
-      "content": "{\"counters\":{\"posts_today\":0,\"posts_limit\":3,\"replies_today\":0,\"replies_limit\":15,\"own_actions_in_window\":0,\"window_hours\":24,\"own_actions_shown\":0,\"own_actions_omitted\":0},\"facts\":[{\"id\":\"usd_spent_today\",\"value\":0},{\"id\":\"usd_left_today\",\"value\":1},{\"id\":\"tokens_today\",\"value\":0},{\"id\":\"posts_today\",\"value\":0},{\"id\":\"replies_today\",\"value\":0}],\"knowledge_ids\":[],\"memory_index\":[],\"metrics\":[],\"outcomes\":[],\"own_actions\":[],\"owner_answers\":[],\"phase\":\"agent\",\"playbook\":[],\"remaining_usd\":1,\"strategy\":null,\"study_trends\":[],\"suggested_hypothesis\":null,\"threads_trend_brief\":{\"generated_at\":\"2026-11-11T09:00:00Z\",\"rising_keywords\":[],\"hot_posts\":[],\"formats\":[],\"stories\":[]},\"topics\":[]}"
+      "content": "{\"counters\":{\"posts_today\":0,\"posts_limit\":3,\"replies_today\":0,\"replies_limit\":15,\"own_actions_in_window\":0,\"window_hours\":24,\"own_actions_shown\":0,\"own_actions_omitted\":0},\"facts\":[{\"id\":\"usd_spent_today\",\"value\":0},{\"id\":\"usd_left_today\",\"value\":1},{\"id\":\"tokens_today\",\"value\":0},{\"id\":\"posts_today\",\"value\":0},{\"id\":\"replies_today\",\"value\":0}],\"knowledge_ids\":[],\"memory_index\":[],\"metrics\":[],\"outcomes\":[],\"own_actions\":[],\"owner_answers\":[],\"phase\":\"agent\",\"playbook\":[],\"remaining_usd\":1,\"strategy\":null,\"study_trends\":[],\"suggested_hypothesis\":null,\"topics\":[]}"
     }
   ]
 }
