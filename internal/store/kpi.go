@@ -27,6 +27,23 @@ type KPIStats struct {
 	WakesToday int
 }
 
+// LastPublish is the newest published action of a kind ("" for any) in the
+// dryRun mode; zero when there is none.
+func (s *Store) LastPublish(ctx context.Context, agentID string, dryRun bool, kind string) (time.Time, error) {
+	var last sql.NullString
+	if err := s.db.QueryRowContext(ctx, `SELECT posted_at FROM actions WHERE agent_id=? AND dry_run=? AND failed=0 AND (?3='' OR kind=?3) ORDER BY julianday(posted_at) DESC LIMIT 1`, agentID, dryRun, kind).Scan(&last); err != nil && err != sql.ErrNoRows {
+		return time.Time{}, fmt.Errorf("reading last publish: %w", err)
+	}
+	if !last.Valid {
+		return time.Time{}, nil
+	}
+	at, err := time.Parse(time.RFC3339Nano, last.String)
+	if err != nil {
+		return time.Time{}, fmt.Errorf("reading last publish: invalid timestamp")
+	}
+	return at, nil
+}
+
 // KPIStats reads the scoreboard numbers; "today" starts at dayStart, a local midnight whose date is the ledger day key. dryRun picks which actions count, as in CountActions.
 func (s *Store) KPIStats(ctx context.Context, agentID string, dryRun bool, now, dayStart time.Time) (KPIStats, error) {
 	var k KPIStats
@@ -42,27 +59,12 @@ func (s *Store) KPIStats(ctx context.Context, agentID string, dryRun bool, now, 
 		agentID, dryRun, formatStoreTimestamp(now.Add(-7*24*time.Hour))).Scan(&k.Followers); err != nil {
 		return k, fmt.Errorf("reading followers gained: %w", err)
 	}
-	var last sql.NullString
-	if err := s.db.QueryRowContext(ctx, `SELECT posted_at FROM actions WHERE agent_id=? AND dry_run=? AND failed=0 ORDER BY julianday(posted_at) DESC LIMIT 1`, agentID, dryRun).Scan(&last); err != nil && err != sql.ErrNoRows {
-		return k, fmt.Errorf("reading last publish: %w", err)
+	var err error
+	if k.LastPublish, err = s.LastPublish(ctx, agentID, dryRun, ""); err != nil {
+		return k, err
 	}
-	if last.Valid {
-		at, err := time.Parse(time.RFC3339Nano, last.String)
-		if err != nil {
-			return k, fmt.Errorf("reading last publish: invalid timestamp")
-		}
-		k.LastPublish = at
-	}
-	var lastPost sql.NullString
-	if err := s.db.QueryRowContext(ctx, `SELECT posted_at FROM actions WHERE agent_id=? AND dry_run=? AND failed=0 AND kind='post' ORDER BY julianday(posted_at) DESC LIMIT 1`, agentID, dryRun).Scan(&lastPost); err != nil && err != sql.ErrNoRows {
-		return k, fmt.Errorf("reading last post: %w", err)
-	}
-	if lastPost.Valid {
-		at, err := time.Parse(time.RFC3339Nano, lastPost.String)
-		if err != nil {
-			return k, fmt.Errorf("reading last post: invalid timestamp")
-		}
-		k.LastPost = at
+	if k.LastPost, err = s.LastPublish(ctx, agentID, dryRun, "post"); err != nil {
+		return k, err
 	}
 	week := dayStart.AddDate(0, 0, -6).Format(time.DateOnly)
 	if err := s.db.QueryRowContext(ctx, `SELECT

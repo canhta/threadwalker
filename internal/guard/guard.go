@@ -292,6 +292,10 @@ func (g *Guard) Execute(ctx context.Context, a Attempt, effect func() (string, e
 					if serr := g.opts.Sleep(ctx, wait); serr == nil {
 						now = g.opts.Now().UTC()
 						reserved, reason, err = g.reserve(ctx, a, intent, id, now, false)
+						if err == nil && reason == "" {
+							// The first pass marked the row refused; the action went out.
+							err = g.opts.Store.ClearBlocked(ctx, id)
+						}
 					}
 				}
 			}

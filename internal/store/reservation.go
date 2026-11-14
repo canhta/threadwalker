@@ -150,6 +150,14 @@ func (t ReservationTx) MarkBlocked(ctx context.Context, auditID int64, reason st
 	return nil
 }
 
+// ClearBlocked empties the refusal on an audited attempt that went on to succeed.
+func (s *Store) ClearBlocked(ctx context.Context, auditID int64) error {
+	if _, err := s.db.ExecContext(ctx, `UPDATE tool_calls SET blocked_by='' WHERE id=?`, auditID); err != nil {
+		return fmt.Errorf("clearing refusal: %w", err)
+	}
+	return nil
+}
+
 // AgentWakeOpen is the non-transactional state read behind the first audit row.
 func (s *Store) AgentWakeOpen(ctx context.Context, agentID string, wakeID int64) (running, open bool, err error) {
 	err = s.db.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM agents WHERE id=? AND status='running'), EXISTS(SELECT 1 FROM wakes WHERE id=? AND agent_id=? AND ended_at IS NULL)`, agentID, wakeID, agentID).Scan(&running, &open)

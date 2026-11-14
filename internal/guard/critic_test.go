@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -166,8 +167,13 @@ func TestALongDraftReachesTheWriterWhoseTextIsCheckedInFull(t *testing.T) {
 }
 
 func TestAReviewedDraftWaitsOutThePacingRuleInsteadOfBeingLost(t *testing.T) {
-	for _, withSleep := range []bool{true, false} {
-		_, scope := setup(t)
+	for _, c := range []struct {
+		withSleep bool
+		spacing   int
+	}{{true, 300}, {false, 300}, {true, 3600}} {
+		// A wait beyond MaxPacingWait is refused even with a sleeper.
+		withSleep, waits := c.withSleep, c.withSleep && c.spacing == 300
+		st, scope := setup(t)
 		clock := time.Date(2026, 11, 11, 0, 0, 0, 0, time.UTC)
 		scope.Now = func() time.Time { return clock }
 		slept := time.Duration(0)
@@ -177,7 +183,7 @@ func TestAReviewedDraftWaitsOutThePacingRuleInsteadOfBeingLost(t *testing.T) {
 		scope.Critic = func(context.Context, quality.CriticInput) (quality.CriticVerdict, error) { return verdict(true), nil }
 		scope.Template = policyTemplate()
 		scope.Template.ID = "agent"
-		scope.Template.Limits.MinSecondsBetweenActions = 300
+		scope.Template.Limits.MinSecondsBetweenActions = c.spacing
 		scope.Template.Limits.BrowserRepliesPerDay = 5
 		g, err := guard.New(scope)
 		if err != nil {
@@ -194,11 +200,31 @@ func TestAReviewedDraftWaitsOutThePacingRuleInsteadOfBeingLost(t *testing.T) {
 		}
 		clock = clock.Add(2 * time.Minute)
 		err = reply("second")
-		if withSleep && (err != nil || slept < 3*time.Minute || slept > 3*time.Minute+2*time.Second) {
+		if waits && (err != nil || slept < 3*time.Minute || slept > 3*time.Minute+2*time.Second) {
 			t.Fatalf("reviewed draft not published after waiting: %v slept %v", err, slept)
 		}
-		if !withSleep && err == nil {
-			t.Fatal("without a sleeper the pacing rule must still refuse")
+		if !waits && err == nil {
+			t.Fatal("without a sleeper, or past MaxPacingWait, the pacing rule must still refuse")
+		}
+		var blocked []string
+		rows, qerr := st.DB().Query(`SELECT blocked_by FROM tool_calls ORDER BY id`)
+		if qerr != nil {
+			t.Fatal(qerr)
+		}
+		for rows.Next() {
+			var b string
+			if qerr = rows.Scan(&b); qerr != nil {
+				t.Fatal(qerr)
+			}
+			blocked = append(blocked, b)
+		}
+		rows.Close()
+		want := []string{"", ""}
+		if !waits {
+			want[1] = "min_seconds_between_actions"
+		}
+		if fmt.Sprint(blocked) != fmt.Sprint(want) {
+			t.Fatalf("case %+v audit blocked_by %q, want %q", c, blocked, want)
 		}
 	}
 }

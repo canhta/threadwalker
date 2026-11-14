@@ -305,27 +305,7 @@ type Refusal struct {
 	Count  int
 }
 
-// OwnerSilence returns when the agent last published (or, with nothing
-// published, when its first wake started; zero when neither exists) and how
-// its latest finished wake ended.
-func (s *Store) OwnerSilence(ctx context.Context, id string, dryRun bool) (since time.Time, lastReason string, err error) {
-	var at sql.NullString
-	if err = s.db.QueryRowContext(ctx, `SELECT COALESCE((SELECT posted_at FROM actions WHERE agent_id=?1 AND dry_run=?2 AND failed=0 ORDER BY julianday(posted_at) DESC LIMIT 1),(SELECT started_at FROM wakes WHERE agent_id=?1 ORDER BY julianday(started_at) LIMIT 1))`, id, dryRun).Scan(&at); err != nil {
-		return since, "", fmt.Errorf("reading last publish: %w", err)
-	}
-	if at.Valid {
-		if since, err = time.Parse(time.RFC3339Nano, at.String); err != nil {
-			return since, "", fmt.Errorf("reading last publish: invalid timestamp")
-		}
-	}
-	err = s.db.QueryRowContext(ctx, `SELECT COALESCE((SELECT end_reason FROM wakes WHERE agent_id=? AND ended_at IS NOT NULL ORDER BY julianday(ended_at) DESC LIMIT 1),'')`, id).Scan(&lastReason)
-	if err != nil {
-		return since, "", fmt.Errorf("reading last wake end: %w", err)
-	}
-	return since, lastReason, nil
-}
-
-const failedWakeFilter = `end_reason NOT IN ('','completed','already_ran','too_few_episodes')`
+const failedWakeFilter = `end_reason NOT IN ('','completed','already_ran','too_few_episodes','nothing_to_do')`
 
 // dayFailures fills FailedWakes, their top three end reasons and the top
 // five guard refusals for [from,to).

@@ -317,15 +317,3 @@ func refusalList(refusals []store.Refusal) string {
 	}
 	return strings.Join(parts, ", ")
 }
-
-// silentText is the once-a-day notice for an agent that published nothing.
-func silentText(hours int, lastReason string, blocked []store.Refusal) string {
-	if lastReason == "" {
-		lastReason = "none"
-	}
-	top := "none"
-	if len(blocked) > 0 {
-		top = refusalList(blocked)
-	}
-	return fmt.Sprintf("No post or reply for %d hours.\nLast run ended: %s\nBlocked actions today: %s", hours, lastReason, top)
-}

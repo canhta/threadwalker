@@ -195,19 +195,6 @@ func TestWakeExportRoundTripsThroughTheReplayKind(t *testing.T) {
 	}
 }
 
-func TestASpacingWaitThatPublishedIsNotABlock(t *testing.T) {
-	waited := diagnosedCall{Outcome: "blocked", Reason: "min_seconds_between_actions", Action: &diagnosedAction{ThreadURL: "https://www.threads.com/@a/post/B"}}
-	waitedForSpacing(&waited)
-	if waited.Outcome != "ok" || waited.Reason != "waited_for_spacing" {
-		t.Fatalf("waited: %+v", waited)
-	}
-	refused := diagnosedCall{Outcome: "blocked", Reason: "min_seconds_between_actions"}
-	waitedForSpacing(&refused)
-	if refused.Outcome != "blocked" {
-		t.Fatalf("refused: %+v", refused)
-	}
-}
-
 func TestWakeExportBriefsCarriesTheWriterExchange(t *testing.T) {
 	w := seedWake(t, true)
 	export := func(extra ...string) string {

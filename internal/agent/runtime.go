@@ -411,6 +411,13 @@ func (r *Runtime) execute(ctx context.Context, wake WakeResult, phase string, ca
 	if err != nil {
 		return result, err
 	}
+	var state wakeState
+	if phase == guard.PhaseAgent {
+		if state, err = r.wakeState(ctx, r.opts.Now()); err != nil {
+			return result, err
+		}
+		hidden = state.withClosed(hidden)
+	}
 	reviewer := r.Reviewer(result.ID)
 	if reviewer.Ideas == nil {
 		hidden = append(hidden, "ideas") // no writer block: the wake text must not name the tool
@@ -438,27 +445,33 @@ func (r *Runtime) execute(ctx context.Context, wake WakeResult, phase string, ca
 	if err != nil {
 		return result, err
 	}
-	messages, err := build(section)
-	if err != nil {
-		return result, err
-	}
-	var stopCheck func(called map[string]bool, succeeded map[string]int) string
-	if phase == guard.PhaseAgent {
-		board, boardErr := r.scoreboard(ctx, r.opts.Now())
-		if boardErr != nil {
-			return result, boardErr
+	if phase == guard.PhaseAgent && state.nothingToDo(len(inbox)) {
+		// Every write gate is shut for the whole wake and nobody wrote: a model
+		// call could only read.
+		result.EndReason = "nothing_to_do"
+	} else {
+		messages, err := build(section)
+		if err != nil {
+			return result, err
 		}
-		stopCheck = board.stopCheck(hidden, func() []string { return dispatcher.OpenTargets(ctx) }, r.opts.Template.Limits.MaxUSDPerDay-board.SpendToday)
-	}
-	client, err := llm.New(r.opts.Template.LLM, r.opts.Template.Limits, r.opts.Store, dispatcher.ConfigureClient(llm.Options{StopCheck: stopCheck, Logger: r.opts.Logger, Now: r.opts.Now, Sleep: r.opts.Wait, HTTPClient: r.opts.HTTPClient, ReasoningEffort: r.opts.Template.LLM.ReasoningEffort, Phase: phase, CapUSD: capUSD, MaxSteps: maxSteps, Transcript: func(ctx context.Context, kind, body string) { r.appendTranscript(ctx, phase, result.ID, kind, body) }}))
-	if err != nil {
-		return result, err
-	}
-	run, err := client.Run(ctx, r.opts.Template.ID, result.ID, messages, dispatcher.Definitions(), dispatcher)
-	result.Steps = run.Steps
-	result.EndReason = wakeEndReason(err)
-	if err != nil && !nonFatalWakeEnd(result.EndReason) {
-		return result, fmt.Errorf("running wake: %w", err)
+		var stopCheck func(called map[string]bool, succeeded map[string]int) string
+		if phase == guard.PhaseAgent {
+			board, boardErr := r.scoreboard(ctx, r.opts.Now())
+			if boardErr != nil {
+				return result, boardErr
+			}
+			stopCheck = board.stopCheck(hidden, func() []string { return dispatcher.OpenTargets(ctx) }, r.opts.Template.Limits.MaxUSDPerDay-board.SpendToday)
+		}
+		client, err := llm.New(r.opts.Template.LLM, r.opts.Template.Limits, r.opts.Store, dispatcher.ConfigureClient(llm.Options{StopCheck: stopCheck, Logger: r.opts.Logger, Now: r.opts.Now, Sleep: r.opts.Wait, HTTPClient: r.opts.HTTPClient, ReasoningEffort: r.opts.Template.LLM.ReasoningEffort, Phase: phase, CapUSD: capUSD, MaxSteps: maxSteps, Transcript: func(ctx context.Context, kind, body string) { r.appendTranscript(ctx, phase, result.ID, kind, body) }}))
+		if err != nil {
+			return result, err
+		}
+		run, err := client.Run(ctx, r.opts.Template.ID, result.ID, messages, dispatcher.Definitions(), dispatcher)
+		result.Steps = run.Steps
+		result.EndReason = wakeEndReason(err)
+		if err != nil && !nonFatalWakeEnd(result.EndReason) {
+			return result, fmt.Errorf("running wake: %w", err)
+		}
 	}
 	if phase == guard.PhaseAgent {
 		// Code owns the cadence. A failed wake keeps the fallback set at its start.
@@ -700,6 +713,9 @@ func (s Scheduler) Run(ctx context.Context, once bool) error {
 				return err
 			}
 			if err := r.PollInbox(ctx, now); err != nil {
+				return err
+			}
+			if err := r.WarnIfSilent(ctx, now); err != nil {
 				return err
 			}
 			candidate, ok, err := r.NextWork(ctx, now)

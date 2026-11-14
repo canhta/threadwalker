@@ -502,9 +502,6 @@ func (s *Service) Tick(ctx context.Context) error {
 				return err
 			}
 		}
-		if err = s.silentAgent(ctx, id, summary, now); err != nil {
-			return err
-		}
 		if local := now.In(s.location(id)); local.Hour() >= tmpl.Telegram.ReportHour {
 			key := "report:" + local.Format(time.DateOnly)
 			if sent, err := s.opts.Store.OwnerEventID(ctx, id, key); err == nil && sent != 0 {
@@ -526,23 +523,6 @@ func (s *Service) Tick(ctx context.Context) error {
 		}
 	}
 	return nil
-}
-
-// silentAgent queues one notice per local day while a running agent has
-// published nothing for longer than kpi.max_hours_without_publish. With nothing
-// ever published the clock starts at its first wake.
-func (s *Service) silentAgent(ctx context.Context, id string, summary store.OwnerSummary, now time.Time) error {
-	tmpl := s.templates[id]
-	limit := time.Duration(tmpl.KPI.MaxHoursWithoutPublish) * time.Hour
-	if limit <= 0 || summary.Status != "running" {
-		return nil
-	}
-	since, lastReason, err := s.opts.Store.OwnerSilence(ctx, id, tmpl.DryRun)
-	if err != nil || since.IsZero() || now.Sub(since) <= limit {
-		return err
-	}
-	text := silentText(int(now.Sub(since).Hours()), lastReason, summary.Blocked)
-	return s.queueNotice(ctx, id, "no_publish", now.In(s.location(id)).Format(time.DateOnly), text)
 }
 
 // registerCommands replaces the bot menu once per service start. Telegram

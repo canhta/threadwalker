@@ -47,7 +47,7 @@ var endReasons = []string{
 	"completed", "interrupted", "step_limit", "budget", "provider_error",
 	"invalid_response", "cancelled", "accounting_error", "persistence_error",
 	"stall_stop", "action_limit", "unknown_outcome", "logged_out", "captcha",
-	"browser_error", "stopped", "too_few_episodes", "in_progress", "",
+	"browser_error", "stopped", "too_few_episodes", "nothing_to_do", "in_progress", "",
 }
 
 var endReasonLabels = map[string]string{
@@ -68,6 +68,7 @@ var endReasonLabels = map[string]string{
 	"captcha":           "Captcha",
 	"stopped":           "Stopped",
 	"too_few_episodes":  "Skipped: too few new results",
+	"nothing_to_do":     "Skipped: nothing to do",
 	"in_progress":       "Running",
 	"":                  "Stopped",
 }
@@ -80,7 +81,7 @@ func endReasonLabel(raw string) string {
 }
 
 func endReasonBad(raw string) bool {
-	return raw != "completed" && raw != "in_progress" && raw != "too_few_episodes" && raw != ""
+	return raw != "completed" && raw != "in_progress" && raw != "too_few_episodes" && raw != "nothing_to_do" && raw != ""
 }
 
 // blockedReasons is the fixed guard vocabulary. Anything not listed is shown

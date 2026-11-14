@@ -8,7 +8,7 @@ import (
 	"time"
 )
 
-func TestOwnerSummaryFailuresAndSilence(t *testing.T) {
+func TestOwnerSummaryFailures(t *testing.T) {
 	ctx := context.Background()
 	st, err := Open(ctx, filepath.Join(t.TempDir(), "fail.db"))
 	if err != nil {
@@ -20,10 +20,7 @@ func TestOwnerSummaryFailuresAndSilence(t *testing.T) {
 	}
 	day := time.Date(2026, 11, 2, 0, 0, 0, 0, time.UTC)
 	ts := func(h int) string { return formatTime(day.Add(time.Duration(h) * time.Hour)) }
-	if since, reason, err := st.OwnerSilence(ctx, "a", false); err != nil || !since.IsZero() || reason != "" {
-		t.Fatalf("empty: %v %q %v", since, reason, err)
-	}
-	for i, reason := range []string{"completed", "step_limit", "step_limit", "provider_error", "already_ran", "too_few_episodes"} {
+	for i, reason := range []string{"completed", "step_limit", "step_limit", "provider_error", "already_ran", "too_few_episodes", "nothing_to_do"} {
 		if _, err = st.db.ExecContext(ctx, `INSERT INTO wakes(agent_id,started_at,ended_at,end_reason) VALUES('a',?,?,?)`, ts(i+1), ts(i+1), reason); err != nil {
 			t.Fatal(err)
 		}
@@ -39,16 +36,6 @@ func TestOwnerSummaryFailuresAndSilence(t *testing.T) {
 	}
 	if sum.FailedWakes != 3 || !slices.Equal(sum.FailReasons, []Refusal{{"step_limit", 2}, {"provider_error", 1}}) || !slices.Equal(sum.Blocked, []Refusal{{"blocked_phrase", 2}, {"critic_rejected", 1}, {"quota", 1}}) {
 		t.Fatalf("summary=%+v", sum)
-	}
-	since, reason, err := st.OwnerSilence(ctx, "a", false)
-	if err != nil || !since.Equal(day.Add(time.Hour)) || reason != "too_few_episodes" {
-		t.Fatalf("no publish: %v %q %v", since, reason, err)
-	}
-	if _, err = st.db.ExecContext(ctx, `INSERT INTO actions(agent_id,kind,text,dry_run,posted_at) VALUES('a','post','x',0,?)`, ts(9)); err != nil {
-		t.Fatal(err)
-	}
-	if since, _, err = st.OwnerSilence(ctx, "a", false); err != nil || !since.Equal(day.Add(9*time.Hour)) {
-		t.Fatalf("published: %v %v", since, err)
 	}
 }
 

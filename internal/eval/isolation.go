@@ -136,7 +136,8 @@ func runIsolationCaptured(ctx context.Context, c Case, p Profile, repeat int, op
 			var state struct {
 				RemainingUSD float64 `json:"remaining_usd"`
 			}
-			if json.Unmarshal([]byte(messages[1].Content), &state) != nil {
+			// The data JSON leads the message; the text sections follow it.
+			if json.NewDecoder(strings.NewReader(messages[1].Content)).Decode(&state) != nil {
 				return r
 			}
 			expected := 1.0

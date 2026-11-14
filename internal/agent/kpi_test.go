@@ -75,15 +75,15 @@ func kpiRuntimeFull(t *testing.T, zone string, publishedAgo time.Duration, engag
 
 func itoa(n int64) string { return strconv.FormatInt(n, 10) }
 
-func TestScoreboardShowsNextAllowedPost(t *testing.T) {
-	const line = "- Next post allowed at "
+func TestLimitsShowNextAllowedPost(t *testing.T) {
+	const line = "; next post allowed at "
 	// Posted 30 min ago, 120 min apart: allowed at 13:30 UTC = 20:30 in Asia/Ho_Chi_Minh, in 90 min.
 	for _, c := range []struct {
 		ago  time.Duration
 		gap  int
 		want string
 	}{
-		{30 * time.Minute, 120, line + "20:30 local (in 90 min); until then only reply.\n"},
+		{30 * time.Minute, 120, line + "20:30 local (in 90 min).\n"},
 		{30 * time.Minute, 0, ""},
 		{5 * time.Hour, 120, ""},
 	} {
@@ -97,7 +97,7 @@ func TestScoreboardShowsNextAllowedPost(t *testing.T) {
 			t.Errorf("gap %d, posted %v ago: unexpected next-post line in:\n%.900s", c.gap, c.ago, user)
 		}
 		if c.want != "" && !strings.Contains(user, c.want) {
-			t.Errorf("scoreboard lacks %q in:\n%.900s", c.want, user)
+			t.Errorf("limits lack %q in:\n%.900s", c.want, user)
 		}
 	}
 }
@@ -305,7 +305,58 @@ func TestWakeContextHasNoTimestamps(t *testing.T) {
 	if stamp := regexp.MustCompile(`\d{4}-\d\d-\d\dT|\+08:00`); stamp.MatchString(messages[1].Content) {
 		t.Errorf("context carries a timestamp:\n%.1500s", messages[1].Content)
 	}
-	if !strings.Contains(messages[1].Content, "Next post allowed at 20:30 local") {
+	if !strings.Contains(messages[1].Content, "next post allowed at 20:30 local") {
 		t.Errorf("context lacks the template-zone clock time:\n%.1500s", messages[1].Content)
+	}
+}
+
+func TestLimitsStateHidesTheClosedWriteToolsAndSkipsAnIdleWake(t *testing.T) {
+	ctx := context.Background()
+	for _, tc := range []struct {
+		name                string
+		posts, replies, gap int
+		wantTools, wantLine string
+	}{
+		{"open", 0, 0, 0, "ideas, post, reply,", "- Posts: 3 of 3 left today.\n- Replies: 15 of 15 left today."},
+		{"posts used", 3, 0, 0, "ideas, reply,", "- Posts: 0 of 3 left today.\n"},
+		{"post gap outlasts the wake", 1, 0, 600, "ideas, reply,", "next post allowed at"},
+		{"replies used", 0, 15, 0, "ideas, post,", "- Replies: 0 of 15 left today."},
+	} {
+		r, st, _ := kpiRuntimeFull(t, "", 24*time.Hour, 3, tc.gap)
+		if _, err := st.DB().Exec(`DELETE FROM actions`); err != nil {
+			t.Fatal(err)
+		}
+		for i := 0; i < tc.posts; i++ {
+			seedToday(t, st, "post", i)
+		}
+		for i := 0; i < tc.replies; i++ {
+			seedToday(t, st, "reply", 100+i)
+		}
+		messages, err := r.Context(ctx, "agent")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !strings.Contains(messages[0].Content, tc.wantTools) || !strings.Contains(messages[1].Content, tc.wantLine) {
+			t.Errorf("%s: tools %q / line %q missing:\n%s\n%s", tc.name, tc.wantTools, tc.wantLine, messages[0].Content, messages[1].Content)
+		}
+	}
+
+	calls := 0
+	r, st, fixture := kpiRuntimeFull(t, "", 24*time.Hour, 3, 0)
+	fixture.Observe = func([]llm.Message) { calls++ }
+	fixture.Calls = []llm.ToolCall{agent.SyntheticCall("read_feed", `{}`)}
+	for i := 0; i < 3; i++ {
+		seedToday(t, st, "post", i)
+	}
+	for i := 0; i < 15; i++ {
+		seedToday(t, st, "reply", 100+i)
+	}
+	wake, err := r.Wake(ctx)
+	if err != nil || wake.EndReason != "nothing_to_do" || calls != 0 {
+		t.Fatalf("wake %+v err %v model calls %d", wake, err, calls)
+	}
+	state, err := st.AgentState(ctx, "synthetic-offline")
+	if err != nil || !state.NextWake.After(kpiNow) {
+		t.Fatalf("next wake %v err %v", state.NextWake, err)
 	}
 }

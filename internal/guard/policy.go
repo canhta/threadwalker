@@ -777,6 +777,21 @@ func (g *Guard) ObserveStopRequest(ctx context.Context, username, text string, a
 // breaker queues; the newest such notice's time is when the pause began.
 const BreakerPrefix = "notice:reply_breaker:"
 
+// ReplyPause is when the last reply breaker trip began and when its pause
+// lifts; until is zero when replies are not paused.
+func ReplyPause(ctx context.Context, st *store.Store, agent string, l config.LimitsConfig, now time.Time) (began, until time.Time, err error) {
+	if l.BreakerMinLikes <= 0 {
+		return time.Time{}, time.Time{}, nil
+	}
+	if began, err = st.LastOwnerEvent(ctx, agent, BreakerPrefix); err != nil {
+		return time.Time{}, time.Time{}, err
+	}
+	if end := began.Add(time.Duration(l.BreakerHours) * time.Hour); !began.IsZero() && now.Before(end) {
+		until = end
+	}
+	return began, until, nil
+}
+
 // replyBreaker refuses a reply while replies are paused. Replies pause when
 // the newest limits.breaker_actions own actions with a metric sample earned
 // fewer than limits.breaker_min_likes likes plus replies in total, judging
@@ -789,12 +804,12 @@ func (g *Guard) replyBreaker(ctx context.Context, intent *actionIntent, now time
 	}
 	agent := g.opts.Template.ID
 	pause := time.Duration(l.BreakerHours) * time.Hour
-	began, err := g.opts.Store.LastOwnerEvent(ctx, agent, BreakerPrefix)
+	began, lifts, err := ReplyPause(ctx, g.opts.Store, agent, l, now)
 	if err != nil {
 		return "", err
 	}
-	if !began.IsZero() && now.Before(began.Add(pause)) {
-		intent.detail = began.Add(pause).UTC().Format(time.RFC3339)
+	if !lifts.IsZero() {
+		intent.detail = lifts.UTC().Format(time.RFC3339)
 		return "reply_breaker", nil
 	}
 	count, likes, newest, err := g.opts.Store.MeasuredEngagement(ctx, store.ActionScope{AgentID: agent, DryRun: g.opts.Template.DryRun}, began, l.BreakerActions)
