@@ -38,9 +38,8 @@ REWRITES = [
 REMOVED = re.compile(r"\b(read_feed|read_topic|profile_posts|target_url|target_id|target_username|trend_ref)\b|\bsearch\b(?=[ ,.)])")
 
 # sha256 of the persona: block of templates/viral.agent.yaml at v0.2.1 (after the REWRITES above), the only
-# block this script replaces. KNOWN_PERSONA_SHA256 in the environment overrides it; the tests use that for a
-# fixture with placeholder names.
-OLD_PERSONA_SHA256 = os.environ.get("KNOWN_PERSONA_SHA256", "7d37b4ca52ac78f836b7c54a43abaad05e194fdb489cb5f87303d22c7a212214")
+# block this script replaces. The Go test checks it against the v0.2.1 release tag.
+OLD_PERSONA_SHA256 = "7d37b4ca52ac78f836b7c54a43abaad05e194fdb489cb5f87303d22c7a212214"
 DEFAULT_TEMPLATE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "templates", "viral.agent.yaml")
 
 

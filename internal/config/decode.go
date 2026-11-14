@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/url"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -18,16 +19,50 @@ type decoder struct {
 	path string
 	doc  yamlDoc
 	errs []error
+	read map[string]bool
 }
 
 func (d *decoder) fail(field, msg string) {
 	d.errs = append(d.errs, fmt.Errorf("template %s: field %s: %s", d.path, field, msg))
 }
 
-func (d *decoder) has(field string) bool { return d.doc.keys[field] }
+// scalar reads a scalar field and marks it known; unknownFields reports the rest.
+func (d *decoder) scalar(field string) (string, bool) {
+	d.read[field] = true
+	v, ok := d.doc.scalars[field]
+	return v, ok
+}
+
+func (d *decoder) value(field string) string {
+	v, _ := d.scalar(field)
+	return v
+}
+
+func (d *decoder) has(field string) bool {
+	d.read[field] = true
+	return d.doc.keys[field]
+}
+
+// unknownFields fails for every scalar or list key the decoder never read, so
+// a field left over from an older template (writer.post_llm) is an error and
+// not a silent change of behaviour.
+func (d *decoder) unknownFields() {
+	var unknown []string
+	for key := range d.doc.keys {
+		_, scalar := d.doc.scalars[key]
+		_, list := d.doc.lists[key]
+		if (scalar || list) && !d.read[key] {
+			unknown = append(unknown, key)
+		}
+	}
+	slices.Sort(unknown)
+	for _, key := range unknown {
+		d.fail(key, "unknown field")
+	}
+}
 
 func (d *decoder) str(field string) string {
-	val := strings.TrimSpace(d.doc.scalars[field])
+	val := strings.TrimSpace(d.value(field))
 	if val == "" {
 		d.fail(field, "required field is missing")
 	}
@@ -35,6 +70,7 @@ func (d *decoder) str(field string) string {
 }
 
 func (d *decoder) list(field string) []string {
+	d.read[field] = true
 	if list, ok := d.doc.lists[field]; ok && len(list) > 0 {
 		return list
 	}
@@ -43,7 +79,7 @@ func (d *decoder) list(field string) []string {
 }
 
 func (d *decoder) posInt(field string) int {
-	raw, ok := d.doc.scalars[field]
+	raw, ok := d.scalar(field)
 	if !ok || strings.TrimSpace(raw) == "" {
 		d.fail(field, "required field is missing")
 		return 0
@@ -60,7 +96,7 @@ func (d *decoder) posInt(field string) int {
 }
 
 func (d *decoder) float(field string, allowZero bool) float64 {
-	raw, ok := d.doc.scalars[field]
+	raw, ok := d.scalar(field)
 	if !ok || strings.TrimSpace(raw) == "" {
 		d.fail(field, "required field is missing")
 		return 0
@@ -90,7 +126,7 @@ func (d *decoder) nonEmpty(field string, items []string, what string) {
 func (d *decoder) root(t *Template) {
 	t.ID = d.str("id")
 	t.Goal = d.str("goal")
-	if raw, ok := d.doc.scalars["dry_run"]; !ok || strings.TrimSpace(raw) == "" {
+	if raw, ok := d.scalar("dry_run"); !ok || strings.TrimSpace(raw) == "" {
 		d.fail("dry_run", "required field is missing")
 	} else if b, err := strconv.ParseBool(strings.TrimSpace(raw)); err != nil {
 		d.fail("dry_run", fmt.Sprintf("must be a boolean: %v", err))
@@ -168,7 +204,7 @@ func (d *decoder) llmBlock(prefix string, l *LLMConfig) {
 	if d.has(prefix + ".profile") {
 		d.fail(prefix+".profile", "catalog profiles are not supported; declare the llm block inline")
 	}
-	l.Protocol = strings.TrimSpace(d.doc.scalars[prefix+".protocol"])
+	l.Protocol = strings.TrimSpace(d.value(prefix + ".protocol"))
 	if !d.has(prefix + ".protocol") {
 		l.Protocol = "openai"
 	}
@@ -184,7 +220,7 @@ func (d *decoder) llmBlock(prefix string, l *LLMConfig) {
 		c := d.float(prefix+".cached_input_per_mtok", true)
 		l.PricePerMTokCachedInUSD = &c
 	}
-	l.ReasoningEffort = strings.TrimSpace(d.doc.scalars[prefix+".reasoning_effort"])
+	l.ReasoningEffort = strings.TrimSpace(d.value(prefix + ".reasoning_effort"))
 }
 
 func (d *decoder) limits(t *Template) {
@@ -246,7 +282,7 @@ func (d *decoder) timezone(field, def string) string {
 	if !d.has(field) {
 		return def
 	}
-	zone := strings.TrimSpace(d.doc.scalars[field])
+	zone := strings.TrimSpace(d.value(field))
 	if _, err := time.LoadLocation(zone); err != nil {
 		d.fail(field, "must be an IANA timezone name")
 		return def
@@ -267,13 +303,13 @@ func (d *decoder) schedule(t *Template) {
 	t.Schedule.Timezone = d.timezone("schedule.timezone", "Asia/Ho_Chi_Minh")
 	t.Limits.Timezone = t.Schedule.Timezone
 	if d.has("schedule.dream_at") {
-		t.Schedule.DreamAt = d.clock("schedule.dream_at", d.doc.scalars["schedule.dream_at"])
+		t.Schedule.DreamAt = d.clock("schedule.dream_at", d.value("schedule.dream_at"))
 	}
 	if d.has("schedule.quiet_from") != d.has("schedule.quiet_until") {
 		d.fail("schedule.quiet_from", "set both quiet_from and quiet_until, or neither")
 	} else if d.has("schedule.quiet_from") {
-		t.Schedule.QuietFrom = d.clock("schedule.quiet_from", d.doc.scalars["schedule.quiet_from"])
-		t.Schedule.QuietUntil = d.clock("schedule.quiet_until", d.doc.scalars["schedule.quiet_until"])
+		t.Schedule.QuietFrom = d.clock("schedule.quiet_from", d.value("schedule.quiet_from"))
+		t.Schedule.QuietUntil = d.clock("schedule.quiet_until", d.value("schedule.quiet_until"))
 		if t.Schedule.QuietFrom == t.Schedule.QuietUntil && t.Schedule.QuietFrom != "" {
 			d.fail("schedule.quiet_until", "must differ from quiet_from")
 		}
@@ -311,7 +347,7 @@ func (d *decoder) boundedInt(field string, def, lo, hi int) int {
 	if !d.has(field) {
 		return def
 	}
-	n, err := strconv.Atoi(strings.TrimSpace(d.doc.scalars[field]))
+	n, err := strconv.Atoi(strings.TrimSpace(d.value(field)))
 	if err != nil || n < lo || n > hi {
 		d.fail(field, fmt.Sprintf("must be an integer within %d..%d", lo, hi))
 		return def
@@ -323,7 +359,7 @@ func (d *decoder) boolean(field string) bool {
 	if !d.has(field) {
 		return false
 	}
-	v, err := strconv.ParseBool(strings.TrimSpace(d.doc.scalars[field]))
+	v, err := strconv.ParseBool(strings.TrimSpace(d.value(field)))
 	if err != nil {
 		d.fail(field, "must be a boolean")
 	}
@@ -361,7 +397,7 @@ func (d *decoder) webSearch(t *Template) {
 	s.Enabled = d.boolean("web_search.enabled")
 	s.BaseURL = "https://api.openai.com/v1"
 	if d.has("web_search.base_url") {
-		raw := strings.TrimSpace(d.doc.scalars["web_search.base_url"])
+		raw := strings.TrimSpace(d.value("web_search.base_url"))
 		u, err := url.Parse(raw)
 		if err != nil || u == nil || (u.Scheme != "http" && u.Scheme != "https") || u.Hostname() == "" || u.User != nil || u.RawQuery != "" || u.Fragment != "" {
 			d.fail("web_search.base_url", "must be an HTTP(S) endpoint without query or fragment")
@@ -369,7 +405,7 @@ func (d *decoder) webSearch(t *Template) {
 			s.BaseURL = strings.TrimRight(raw, "/")
 		}
 	}
-	s.Model = strings.TrimSpace(d.doc.scalars["web_search.model"])
+	s.Model = strings.TrimSpace(d.value("web_search.model"))
 	s.MaxResults = 5
 	if d.has("web_search.max_results") {
 		s.MaxResults = d.posInt("web_search.max_results")
@@ -425,7 +461,7 @@ func (d *decoder) threads(t *Template) {
 		th.BaseURL = d.str("threads.base_url")
 		th.ExecutablePath = d.str("threads.executable_path")
 		u, err := url.Parse(th.BaseURL)
-		_, threadsHost := "", false
+		threadsHost := false
 		if err == nil && u != nil {
 			_, threadsHost = stdx.ThreadsHost(u.Hostname())
 		}
@@ -440,7 +476,7 @@ func (d *decoder) threads(t *Template) {
 		d.fail("threads.backend", "must be stub or api")
 	}
 	if d.has("threads.no_sandbox") {
-		v, err := strconv.ParseBool(d.doc.scalars["threads.no_sandbox"])
+		v, err := strconv.ParseBool(d.value("threads.no_sandbox"))
 		if err != nil {
 			d.fail("threads.no_sandbox", "must be a boolean")
 		} else {
@@ -454,7 +490,7 @@ func (d *decoder) telegram(t *Template) {
 	tg.Enabled = d.boolean("telegram.enabled")
 	tg.ReportHour = 21
 	if d.has("telegram.report_hour") {
-		hour, err := strconv.Atoi(d.doc.scalars["telegram.report_hour"])
+		hour, err := strconv.Atoi(d.value("telegram.report_hour"))
 		if err != nil || hour < 0 || hour > 23 {
 			d.fail("telegram.report_hour", "must be an integer within 0..23")
 		} else {
@@ -462,9 +498,12 @@ func (d *decoder) telegram(t *Template) {
 		}
 	}
 	tg.Timezone = d.timezone("telegram.timezone", "Asia/Ho_Chi_Minh")
+	// The env names are kept when the bot is off, so switching it on is one edit.
+	tg.BotTokenEnv = strings.TrimSpace(d.value("telegram.bot_token_env"))
+	tg.OwnerChatIDEnv = strings.TrimSpace(d.value("telegram.owner_chat_id_env"))
 	if tg.Enabled {
-		tg.BotTokenEnv = d.str("telegram.bot_token_env")
-		tg.OwnerChatIDEnv = d.str("telegram.owner_chat_id_env")
+		d.str("telegram.bot_token_env")
+		d.str("telegram.owner_chat_id_env")
 	}
 }
 

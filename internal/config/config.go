@@ -344,7 +344,7 @@ func loadFile(path string, opts Options) (Template, error) {
 		return Template{}, fmt.Errorf("parsing template %s: %w", path, err)
 	}
 
-	d := &decoder{path: path, doc: doc}
+	d := &decoder{path: path, doc: doc, read: map[string]bool{}}
 	var tmpl Template
 	d.root(&tmpl)
 	d.guard(&tmpl)
@@ -362,6 +362,7 @@ func loadFile(path string, opts Options) (Template, error) {
 	d.threads(&tmpl)
 	d.telegram(&tmpl)
 	d.secrets(&tmpl, opts)
+	d.unknownFields()
 
 	if len(d.errs) > 0 {
 		return Template{}, errors.Join(d.errs...)

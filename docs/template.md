@@ -4,7 +4,7 @@ A template is one YAML file in `templates/*.agent.yaml` (the shipped example is 
 
 Owner column: `template` = text or numbers the agent and the LLM calls read as starting voice or rules; `code` = a hard limit or setting code enforces or computes from; `ops` = plumbing for a backend or host. Who owns what: [architecture.md](architecture.md).
 
-"Required" means the template fails to load without it. Lists are YAML sequences of nonblank strings unless noted.
+"Required" means the template fails to load without it. Lists are YAML sequences of nonblank strings unless noted. A key this page does not list fails the load as `field KEY: unknown field`, so a key left over from an older release (such as `writer.post_llm`) is an error and not silently ignored.
 
 ## Root
 

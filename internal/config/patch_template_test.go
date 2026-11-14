@@ -13,15 +13,77 @@ import (
 // fixturePersonaSHA256 is the hash of the fixture's persona block after the script's
 // sentence rewrites. The fixture is a trimmed copy of the v0.2.1 live template with
 // placeholder names, so its hash is not the one the script knows for the live persona;
-// the script takes this one from KNOWN_PERSONA_SHA256. When the fixture's persona
+// the test runs a temporary copy of the script with this one. When the fixture's persona
 // changes, the script's warning "block differs" means this value needs the new hash.
 const fixturePersonaSHA256 = "95016ad2f4689b2af926884cbc39d1bd946f53a8bceb3e69e1a3684c129b391f"
 
-// patchCommand runs the script as the deploy does, with the fixture's persona hash.
+var scriptPath = filepath.Join("..", "..", "deploy", "patch-template-v13.py")
+
+var personaHashLine = regexp.MustCompile(`(?m)^OLD_PERSONA_SHA256 = "[0-9a-f]{64}"$`)
+
+// fixtureScript writes a copy of the script that knows the fixture's persona hash and returns its path.
+func fixtureScript(t *testing.T) string {
+	t.Helper()
+	raw, err := os.ReadFile(scriptPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !personaHashLine.Match(raw) {
+		t.Fatal("the script has no OLD_PERSONA_SHA256 line")
+	}
+	copyPath := filepath.Join(t.TempDir(), "patch-template-v13.py")
+	body := personaHashLine.ReplaceAll(raw, []byte(`OLD_PERSONA_SHA256 = "`+fixturePersonaSHA256+`"`))
+	if err = os.WriteFile(copyPath, body, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	return copyPath
+}
+
+// hashProgram prints the sha256 of a template's persona block after the script's
+// rewrites, then the script's own constant.
+const hashProgram = `
+import hashlib, importlib.util, sys
+spec = importlib.util.spec_from_file_location("patch", sys.argv[1])
+patch = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(patch)
+text = open(sys.argv[2], encoding="utf-8", newline="").read()
+for old, new in patch.REWRITES:
+    text = text.replace(old, new)
+lines = text.splitlines(keepends=True)
+start, end = patch.persona_span(lines)
+print(hashlib.sha256("".join(lines[start:end]).encode("utf-8")).hexdigest(), patch.OLD_PERSONA_SHA256)
+`
+
+// The hash in the script is the persona the v0.2.1 release shipped, with the script's rewrites applied.
+func TestPatchScriptKnowsTheV021Persona(t *testing.T) {
+	py, err := exec.LookPath("python3")
+	if err != nil {
+		t.Skip("python3 not installed")
+	}
+	vcs, err := exec.LookPath("git")
+	if err != nil {
+		t.Skip("git not installed")
+	}
+	shipped, err := exec.Command(vcs, "show", "v0.2.1:templates/viral.agent.yaml").Output()
+	if err != nil {
+		t.Skip("tag v0.2.1 is not available")
+	}
+	source := filepath.Join(t.TempDir(), "v0.2.1.agent.yaml")
+	if err = os.WriteFile(source, shipped, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	out, err := exec.Command(py, "-I", "-c", hashProgram, scriptPath, source).Output()
+	if err != nil {
+		t.Fatalf("hashing the v0.2.1 persona: %v", err)
+	}
+	if got := strings.Fields(string(out)); len(got) != 2 || got[0] != got[1] {
+		t.Fatalf("v0.2.1 persona hash and the script's constant differ: %s", out)
+	}
+}
+
+// patchCommand runs a script on a live yaml and the repo template.
 func patchCommand(py, script string, args ...string) *exec.Cmd {
-	cmd := exec.Command(py, append([]string{script}, args...)...)
-	cmd.Env = append(os.Environ(), "KNOWN_PERSONA_SHA256="+fixturePersonaSHA256)
-	return cmd
+	return exec.Command(py, append([]string{script}, args...)...)
 }
 
 // The v0.3.0 deploy patches the live v0.2.1 yaml with deploy/patch-template-v13.py.
@@ -39,7 +101,7 @@ func TestPatchTemplateV13(t *testing.T) {
 	if err := os.WriteFile(live, raw, 0o600); err != nil {
 		t.Fatal(err)
 	}
-	script := filepath.Join("..", "..", "deploy", "patch-template-v13.py")
+	script := fixtureScript(t)
 	run := func(path string) string {
 		out, err := patchCommand(py, script, path, viralTemplatePath()).CombinedOutput()
 		if err != nil {

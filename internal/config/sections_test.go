@@ -129,12 +129,9 @@ func TestSectionTelegram(t *testing.T) {
 			}
 		}},
 		{name: "bad timezone", old: "report_hour: 21", new: "timezone: Mars/Base\n  report_hour: 21", wantErr: "telegram.timezone"},
-		// Unknown keys are ignored.
-		{name: "unknown keys ignored", old: "report_hour: 21", new: "digest_hour: 18\n  messages:\n    help: hello\n  report_hour: 21", check: func(t *testing.T, tmpl config.Template) {
-			if tmpl.Telegram.ReportHour != 21 {
-				t.Fatalf("report hour %d", tmpl.Telegram.ReportHour)
-			}
-		}},
+		// A key the decoder does not read is an error naming the key, never a silent change of behaviour.
+		{name: "unknown key", old: "report_hour: 21", new: "digest_hour: 18\n  report_hour: 21", wantErr: "telegram.digest_hour: unknown field"},
+		{name: "unknown nested key", old: "report_hour: 21", new: "messages:\n    help: hello\n  report_hour: 21", wantErr: "telegram.messages.help: unknown field"},
 	})
 }
 

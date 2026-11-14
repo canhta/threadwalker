@@ -60,10 +60,11 @@ func scheduledAllowed(getenv func(string) string, now time.Time) (bool, error) {
 	return auto && window.Allows(now), nil
 }
 
-// checkUpdateSupported refuses a platform without the systemd service the
-// update restarts. It runs first, so nothing is downloaded, swapped or rolled back.
-func checkUpdateSupported(goos string) error {
-	if goos != "linux" {
+// checkUpdateSupported refuses an install on a platform without the systemd
+// service the update restarts. It runs first, so nothing is downloaded, swapped
+// or rolled back. A check only reads the release list, so it runs anywhere.
+func checkUpdateSupported(goos string, checkOnly bool) error {
+	if goos != "linux" && !checkOnly {
 		return errors.New("self-update manages the Linux service; on macOS download the darwin_arm64 bundle from the release")
 	}
 	return nil
@@ -92,7 +93,7 @@ func runUpdate(ctx context.Context, args []string, getenv func(string) string, s
 		fmt.Fprintln(stderr, "only the stable channel exists")
 		return exitUsage
 	}
-	if err := checkUpdateSupported(runtime.GOOS); err != nil {
+	if err := checkUpdateSupported(runtime.GOOS, *check); err != nil {
 		fmt.Fprintln(stderr, err)
 		return exitFailure
 	}

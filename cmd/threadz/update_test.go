@@ -8,14 +8,17 @@ import (
 	"time"
 )
 
-func TestUpdateRefusesPlatformsWithoutTheLinuxService(t *testing.T) {
+func TestUpdateInstallIsRefusedWithoutTheLinuxServiceButACheckIsNot(t *testing.T) {
 	const message = "self-update manages the Linux service; on macOS download the darwin_arm64 bundle from the release"
-	if err := checkUpdateSupported("linux"); err != nil {
+	if err := checkUpdateSupported("linux", false); err != nil {
 		t.Fatalf("linux refused: %v", err)
 	}
 	for _, goos := range []string{"darwin", "windows"} {
-		if err := checkUpdateSupported(goos); err == nil || err.Error() != message {
+		if err := checkUpdateSupported(goos, false); err == nil || err.Error() != message {
 			t.Fatalf("%s: %v", goos, err)
+		}
+		if err := checkUpdateSupported(goos, true); err != nil {
+			t.Fatalf("%s check refused: %v", goos, err)
 		}
 	}
 	if runtime.GOOS == "linux" {
@@ -23,7 +26,7 @@ func TestUpdateRefusesPlatformsWithoutTheLinuxService(t *testing.T) {
 	}
 	// On this host the command stops before it reads a release or touches the binary.
 	var out, errOut bytes.Buffer
-	if code := runUpdate(context.Background(), []string{"--check"}, func(string) string { return "" }, &out, &errOut); code != exitFailure || errOut.String() != message+"\n" || out.Len() != 0 {
+	if code := runUpdate(context.Background(), nil, func(string) string { return "" }, &out, &errOut); code != exitFailure || errOut.String() != message+"\n" || out.Len() != 0 {
 		t.Fatalf("code %d, stdout %q, stderr %q", code, out.String(), errOut.String())
 	}
 }
