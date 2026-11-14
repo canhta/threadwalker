@@ -242,7 +242,7 @@ schedule:                         # local-time phases
   timezone: Asia/Ho_Chi_Minh
   dream_at: "00:30"               # once per local day, after the evening peak so its metrics exist
   quiet_from: "01:00"             # no agent wake in the night; the next one waits for quiet_until
-  quiet_until: "07:00"               # once per local day; a missed one runs once on next start
+  quiet_until: "07:00"
   study_slots:                    # minimum "đi học" cadence; spikes can add sessions
     - "09:00"
     - "15:00"
