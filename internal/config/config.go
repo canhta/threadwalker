@@ -50,20 +50,17 @@ type Template struct {
 	Critic LLMConfig
 	// Writer is the optional tool-free model that drafts every post and reply
 	// from the agent's brief, with its own reasoning effort. Empty Model: no writer.
-	Writer LLMConfig
-	// PostWriter, when set, replaces Writer for the draft of a post or series;
-	// replies and ideas keep Writer. It requires Writer.
-	PostWriter LLMConfig
-	Limits     LimitsConfig
-	Schedule   ScheduleConfig
-	KPI        KPIConfig
-	WebSearch  WebSearchConfig
-	Inbox      InboxConfig
-	Trends     TrendsConfig
-	Targets    TargetsConfig
-	Threads    ThreadsConfig
-	Telegram   TelegramConfig
-	DryRun     bool
+	Writer    LLMConfig
+	Limits    LimitsConfig
+	Schedule  ScheduleConfig
+	KPI       KPIConfig
+	WebSearch WebSearchConfig
+	Inbox     InboxConfig
+	Trends    TrendsConfig
+	Targets   TargetsConfig
+	Threads   ThreadsConfig
+	Telegram  TelegramConfig
+	DryRun    bool
 }
 
 // KPIConfig is the pressure on the agent. Without a kpi block every field is
@@ -160,7 +157,7 @@ type GuardConfig struct {
 	TrendAnchor                                bool
 	// ReplyMaxRunes caps a published reply's length in characters; code
 	// counts it exactly so the writer gets a number, not an editor's guess.
-	// 0 leaves only the 500-character platform cap.
+	// 0 leaves only the platform cap (stdx.MaxThreadsPostRunes).
 	ReplyMaxRunes int
 }
 

@@ -127,8 +127,6 @@ func TestIsolationAcceptanceOwnActionsAreInvisibleAcrossAgents(t *testing.T) {
 	}
 }
 
-type isolationWakeTemplate interface{ TemplateIDForAcceptance() string }
-
 func TestIsolationAcceptanceLedgerAndBudgetAreIndependent(t *testing.T) {
 	env := newIsolationAgentFixture(t, nil)
 	ctx := context.Background()

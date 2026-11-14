@@ -11,6 +11,43 @@ import (
 
 func i64(v int64) *int64 { return &v }
 
+// threads.net, www. and threads.com name one post, so they share one address
+// and one p ref.
+func TestCanonicalThreadMapsEveryThreadsHostToOne(t *testing.T) {
+	const want = "https://threads.com/@alice/post/abc"
+	for _, raw := range []string{
+		"https://threads.com/@alice/post/abc",
+		"https://www.threads.com/@alice/post/abc/",
+		"https://threads.net/@alice/post/abc?x=1#top",
+		"http://www.threads.net/@alice/post/abc",
+		"https://THREADS.NET/@alice/post/abc",
+	} {
+		if got, err := store.CanonicalThread(raw); err != nil || got != want {
+			t.Errorf("%s: got %q, %v; want %q", raw, got, err, want)
+		}
+	}
+	if got, err := store.CanonicalThread("https://www.example.com/a/"); err != nil || got != "https://example.com/a" {
+		t.Errorf("other hosts only lose www.: %q, %v", got, err)
+	}
+}
+
+func TestOnePostHasOnePRefAcrossThreadsHosts(t *testing.T) {
+	ctx := context.Background()
+	st, err := store.Open(ctx, filepath.Join(t.TempDir(), "hosts.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	a, err := st.NoteSeenPost(ctx, "agent", store.SeenPost{URL: "https://threads.net/@alice/post/abc", Author: "alice", Text: "x"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, err := st.NoteSeenPost(ctx, "agent", store.SeenPost{URL: "https://www.threads.com/@alice/post/abc", Author: "alice", Text: "x"})
+	if err != nil || a != b {
+		t.Fatalf("one post got ids %d and %d (err %v)", a, b, err)
+	}
+}
+
 func TestSeenPostsKeepOneIdPerAgentAndURL(t *testing.T) {
 	ctx := context.Background()
 	s, err := store.Open(ctx, filepath.Join(t.TempDir(), "seen.db"))

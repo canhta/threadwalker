@@ -33,7 +33,7 @@ func TestBlockedResultNamesTheFixablePart(t *testing.T) {
 		t.Fatalf("forbidden: %q %q", b, hint)
 	}
 	_, err = h.call("post", map[string]any{"text": strings.Repeat("あ", 501)})
-	if b, hint := modelResult(t, err); b != ruleTextLength || hint != "too long: 501 of 500 characters; cut it to one short idea and send it again" {
+	if b, hint := modelResult(t, err); b != ruleTextLength || hint != "too long: 501 of 300 characters; cut it to one short idea and send it again" {
 		t.Fatalf("length: %q %q", b, hint)
 	}
 	h.allow("post", postArgs(1))

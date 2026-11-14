@@ -13,7 +13,7 @@ carries style_rules, style_avoid, bad_examples or critic_rules.
 This script does two things to AGENT.yaml:
  1. Rewrites the persona sentences that name a removed tool or argument.
  2. Replaces the whole persona: block with the template's, but only when the
-    live block (after step 1) is exactly the v0.2.x repo persona, checked by
+    live block (after step 1) is exactly the v0.2.1 repo persona, checked by
     sha256. A block the owner edited is left alone with a warning: merge it by
     hand.
 It writes AGENT.yaml.bak first, prints every change and touches nothing else
@@ -37,8 +37,10 @@ REWRITES = [
 ]
 REMOVED = re.compile(r"\b(read_feed|read_topic|profile_posts|target_url|target_id|target_username|trend_ref)\b|\bsearch\b(?=[ ,.)])")
 
-# sha256 of the persona: block of templates/viral.agent.yaml at v0.2.x (commit 3094fc1), the only block this script replaces.
-OLD_PERSONA_SHA256 = "7d37b4ca52ac78f836b7c54a43abaad05e194fdb489cb5f87303d22c7a212214"
+# sha256 of the persona: block of templates/viral.agent.yaml at v0.2.1 (after the REWRITES above), the only
+# block this script replaces. KNOWN_PERSONA_SHA256 in the environment overrides it; the tests use that for a
+# fixture with placeholder names.
+OLD_PERSONA_SHA256 = os.environ.get("KNOWN_PERSONA_SHA256", "7d37b4ca52ac78f836b7c54a43abaad05e194fdb489cb5f87303d22c7a212214")
 DEFAULT_TEMPLATE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "templates", "viral.agent.yaml")
 
 
@@ -65,7 +67,7 @@ def replace_persona(text, template_text, log):
     if old == new:
         return text
     if hashlib.sha256(old.encode("utf-8")).hexdigest() != OLD_PERSONA_SHA256:
-        log.append("WARNING persona: block differs from the known v0.2.x persona (edited by hand?); left unchanged. Merge templates/viral.agent.yaml by hand")
+        log.append("WARNING persona: block differs from the known v0.2.1 persona (edited by hand?); left unchanged. Merge templates/viral.agent.yaml by hand")
         return text
     log.append("replaced persona: block (%d bytes -> %d bytes)" % (len(old.encode("utf-8")), len(new.encode("utf-8"))))
     return "".join(lines[:span[0]]) + new + "".join(lines[span[1]:])

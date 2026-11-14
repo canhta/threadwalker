@@ -122,33 +122,70 @@ func (s scoreboard) stopCheck(hidden []string, open func() []string, usdLeft flo
 const minUSDToContinue = 0.05
 
 // nextWake is when code wakes the agent again: the template minimum when
-// behind, the on-target interval when not, and the end of the capped day
-// when the day is capped (see capReset).
+// behind, the on-target interval when not, stretched by budget pacing (see
+// pacedInterval), and the end of the capped day when the day is capped (see
+// capReset).
 func (r *Runtime) nextWake(ctx context.Context, now time.Time) (time.Time, error) {
 	t := r.opts.Template
 	s, err := r.scoreboard(ctx, now)
 	if err != nil {
 		return time.Time{}, err
 	}
-	next := r.fallback(now)
+	interval := r.fallback(now).Sub(now)
 	if t.KPI.Enabled() {
 		minutes := t.KPI.OnTargetMinutes
 		if s.Behind() {
 			minutes = t.Limits.MinMinutesBetweenWakes
 		}
-		next = now.Add(time.Duration(minutes) * time.Minute)
+		interval = time.Duration(minutes) * time.Minute
 	}
-	// A capped day cannot be worked: a wake would burn tokens on reads and ideas
-	// and publish nothing. Wait until the caps reset.
-	reset, err := r.capReset(ctx, now)
-	if err != nil {
-		return time.Time{}, err
+	_, dayEnd, _ := t.Limits.DayBounds(now)
+	horizon := dayEnd
+	if quiet, ok := r.schedule.NextQuietFrom(now); ok && quiet.Before(horizon) {
+		horizon = quiet
 	}
-	if next.Before(reset) {
-		next = reset
+	interval = max(interval, pacedInterval(horizon.Sub(now), s.SpendToday, int64(s.WakesToday), t.Limits.MaxUSDPerDay-s.SpendToday))
+	return r.settleWake(ctx, now)(now.Add(interval))
+}
+
+// pacedInterval spreads what is left of the daily budget over what is left of
+// the working day, so a behind agent does not spend it all by the afternoon and
+// sleep through the evening peak.
+//
+//	interval = timeLeft * (spentToday / wakesToday) / usdLeft
+//
+// timeLeft is the time until the working day ends: the next start of the quiet
+// window, or the day reset, whichever comes first. spentToday / wakesToday is
+// the average cost of one agent wake today, all phases included, and usdLeft is
+// limits.max_usd_per_day minus spentToday. The interval is the time that, at
+// that average cost, makes the budget last until timeLeft is over. The caller
+// takes the larger of it and the template's own interval. With no wake or no
+// spend today there is no cost history and the result is zero; with no budget
+// left the day is capped and capReset decides.
+func pacedInterval(timeLeft time.Duration, spentToday float64, wakesToday int64, usdLeft float64) time.Duration {
+	if timeLeft <= 0 || wakesToday <= 0 || spentToday <= 0 || usdLeft <= 0 {
+		return 0
 	}
-	// Nobody reads at 3am: a night wake spends tokens for posts that sink.
-	return r.schedule.AfterQuiet(next), nil
+	paced := float64(timeLeft) * (spentToday / float64(wakesToday)) / usdLeft
+	return time.Duration(min(paced, float64(timeLeft)))
+}
+
+// settleWake returns the rule every wake time follows, early ones included:
+// not before a capped day resets (see capReset), and not inside the quiet
+// window, where a wake spends tokens for posts nobody reads. A capped day
+// cannot be worked: a wake would burn tokens on reads and ideas and publish
+// nothing. The cap is read only when a time is settled.
+func (r *Runtime) settleWake(ctx context.Context, now time.Time) func(time.Time) (time.Time, error) {
+	return func(at time.Time) (time.Time, error) {
+		reset, err := r.capReset(ctx, now)
+		if err != nil {
+			return time.Time{}, err
+		}
+		if at.Before(reset) {
+			at = reset
+		}
+		return r.schedule.AfterQuiet(at), nil
+	}
 }
 
 // capReset is when a capped day ends, or the zero time when it is not capped:
@@ -157,7 +194,7 @@ func (r *Runtime) nextWake(ctx context.Context, now time.Time) (time.Time, error
 func (r *Runtime) capReset(ctx context.Context, now time.Time) (time.Time, error) {
 	t := r.opts.Template
 	dayStart, dayEnd, day := t.Limits.DayBounds(now)
-	spent, err := r.opts.Store.LLMUsageForDayPhases(ctx, t.ID, day, "agent")
+	spent, err := r.opts.Store.LLMUsageForDay(ctx, t.ID, day)
 	if err != nil {
 		return time.Time{}, err
 	}

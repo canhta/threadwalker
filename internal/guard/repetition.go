@@ -87,7 +87,7 @@ func isRegionalIndicator(r rune) bool { return r >= 0x1F1E6 && r <= 0x1F1FF }
 // graphemes splits runes into user-perceived symbols: a base rune with the
 // extenders after it, a joiner with the rune after it, and a flag's two
 // regional indicators.
-// ponytail: an approximation of UAX #29 for emoji, not a full segmenter; upgrade to a segmenter library if other scripts matter.
+// Limit: an approximation of UAX #29 for emoji, not a full segmenter; upgrade to a segmenter library if other scripts matter.
 func graphemes(runes []rune) [][]rune {
 	var units [][]rune
 	for _, r := range runes {

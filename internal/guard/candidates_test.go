@@ -10,6 +10,33 @@ import (
 	"github.com/canhta/threadz/internal/store"
 )
 
+// Only refs a wake issued count as issued: a post that is stored and open, but
+// was not handed out or read this wake, is not.
+func TestIssuedIsTrueOnlyForRefsThisWakeHandedOut(t *testing.T) {
+	ctx := context.Background()
+	st, opts := setup(t)
+	now := opts.Now()
+	n := func(v int64) *int64 { return &v }
+	note := func(slug string) string {
+		id, err := st.NoteSeenPost(ctx, opts.Template.ID, store.SeenPost{URL: "https://threads.com/@alice/post/" + slug, Author: "alice", Text: slug, Likes: n(300), Replies: n(2), AgeMinutes: n(20), ReadAt: now})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return store.PostRef(id)
+	}
+	handedOut, later := note("handed-out"), note("later")
+	g, err := guard.New(opts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = g.IssueCandidates(ctx, []guard.Candidate{{Ref: handedOut}}); err != nil {
+		t.Fatal(err)
+	}
+	if !g.Issued(handedOut) || g.Issued(later) || g.Issued("p9999") || g.Issued("t1") {
+		t.Fatalf("issued: handed out %v, later %v", g.Issued(handedOut), g.Issued(later))
+	}
+}
+
 func TestOpenCandidatesAreRankedAgedAndFiltered(t *testing.T) {
 	ctx := context.Background()
 	st, opts := setup(t)

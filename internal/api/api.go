@@ -55,7 +55,6 @@ const (
 // Store is the persistence the server needs.
 type Store interface {
 	RecordWebhookEvent(ctx context.Context, agentID, field, objectID string, at time.Time) (bool, error)
-	WakeOnWebhook(ctx context.Context, agentID string, at time.Time, minGap time.Duration) error
 }
 
 // Tokens keeps the token the OAuth flow obtains.
@@ -68,8 +67,6 @@ type Agent struct {
 	ID       string
 	UserID   string
 	Username string
-	// MinWakeGap is the agent's minimum time between wakes.
-	MinWakeGap time.Duration
 }
 
 // Options configures a Server. GraphURL is the Graph origin without a version
@@ -310,11 +307,9 @@ func (s *Server) webhookEvent(w http.ResponseWriter, r *http.Request) string {
 	agent, known := s.byUser[p.TargetID]
 	v := p.Values
 	if known && (v.Field == fieldReplies || v.Field == fieldMentions) && v.Value.ID != "" && !strings.EqualFold(v.Value.Username, agent.Username) {
-		fresh, err := s.o.Store.RecordWebhookEvent(r.Context(), agent.ID, v.Field, v.Value.ID, now)
-		if err == nil && fresh {
-			err = s.o.Store.WakeOnWebhook(r.Context(), agent.ID, now, agent.MinWakeGap)
-		}
-		if err != nil {
+		// The scheduler wakes the agent early for a new event, within the
+		// agent's quiet hours and caps.
+		if _, err := s.o.Store.RecordWebhookEvent(r.Context(), agent.ID, v.Field, v.Value.ID, now); err != nil {
 			http.Error(w, "Unavailable.", http.StatusServiceUnavailable)
 			return "store"
 		}

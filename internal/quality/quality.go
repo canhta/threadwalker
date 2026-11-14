@@ -4,6 +4,7 @@
 package quality
 
 import (
+	"cmp"
 	_ "embed"
 	"encoding/json"
 	"errors"
@@ -17,12 +18,21 @@ import (
 
 	"github.com/canhta/threadz/internal/config"
 	"github.com/canhta/threadz/internal/llm"
+	"github.com/canhta/threadz/internal/stdx"
 )
 
 // Kinds of draft.
 const (
 	Post  = "post"
 	Reply = "reply"
+)
+
+// The length of a post: code owns both limits. The guard refuses a post over
+// them and the scorer checks them, so the two cannot disagree. A reply's limit
+// is the template's guard.reply_max_runes.
+const (
+	MaxPostRunes = 300
+	MaxPostLines = 3
 )
 
 // Check ids. Judge checks are StyleRulePrefix plus the 1-based rule number.
@@ -41,13 +51,10 @@ var rubricJSON []byte
 
 // Rubric is the fixed scoring configuration shared by every consumer.
 type Rubric struct {
-	MaxRunes           map[string]int `json:"max_runes"`
-	MaxPostLines       int            `json:"max_post_lines"`
-	SelfStatUnits      []string       `json:"self_stat_units"`
-	ImageWords         []string       `json:"image_words"`
-	JudgeInstructions  string         `json:"judge_instructions"`
-	CriticInstructions string         `json:"critic_instructions"`
-	WriterInstructions string         `json:"writer_instructions"`
+	ImageWords         []string `json:"image_words"`
+	JudgeInstructions  string   `json:"judge_instructions"`
+	CriticInstructions string   `json:"critic_instructions"`
+	WriterInstructions string   `json:"writer_instructions"`
 }
 
 // DefaultRubric returns the embedded rubric.
@@ -58,6 +65,9 @@ func DefaultRubric() (Rubric, error) {
 	}
 	return r, nil
 }
+
+// Lines is the number of lines of a text, ignoring surrounding blank space.
+func Lines(text string) int { return len(strings.Split(strings.TrimSpace(text), "\n")) }
 
 // RubricJSON is the raw rubric, for fingerprinting.
 func RubricJSON() []byte { return rubricJSON }
@@ -106,15 +116,20 @@ func JudgeMessages(r Rubric, p config.PersonaConfig, kind, text string) []llm.Me
 	return []llm.Message{{Role: "system", Content: r.JudgeInstructions}, {Role: "user", Content: b.String()}}
 }
 
-// Score runs every check. wake is the wake context's user message: its JSON
-// holds the numbers a self-stat may quote. said is what the account already
-// said. The result lists code checks, then one check per style rule, then
-// bad_example.
-func Score(r Rubric, p config.PersonaConfig, kind, text, wake string, said []string, v Verdict) []Check {
+// Score runs every check. g holds the template's limits the guard enforces:
+// the reply length and the units of a self-stat. wake is the wake context's
+// user message: its JSON holds the numbers a self-stat may quote. said is what
+// the account already said. The result lists code checks, then one check per
+// style rule, then bad_example.
+func Score(r Rubric, p config.PersonaConfig, g config.GuardConfig, kind, text, wake string, said []string, v Verdict) []Check {
 	var out []Check
 	add := func(id string, pass bool) { out = append(out, Check{id, pass}) }
-	add(MaxRunes, utf8.RuneCountInString(text) <= r.MaxRunes[kind])
-	add(MaxLines, kind != Post || len(strings.Split(strings.TrimSpace(text), "\n")) <= r.MaxPostLines)
+	limit := MaxPostRunes
+	if kind == Reply {
+		limit = cmp.Or(g.ReplyMaxRunes, stdx.MaxThreadsPostRunes)
+	}
+	add(MaxRunes, utf8.RuneCountInString(text) <= limit)
+	add(MaxLines, kind != Post || Lines(text) <= MaxPostLines)
 	add(StyleAvoid, !containsAny(text, p.StyleAvoid))
 	var facts []float64
 	var tree any
@@ -123,7 +138,7 @@ func Score(r Rubric, p config.PersonaConfig, kind, text, wake string, said []str
 		facts = numbers(tree, nil)
 	}
 	add(RepeatImage, !repeatsImage(text, said, r.ImageWords))
-	add(UngroundedNumber, grounded(text, r.SelfStatUnits, facts))
+	add(UngroundedNumber, grounded(text, g.SelfStatUnits, facts))
 	violated := map[int]bool{}
 	for _, n := range v.ViolatedRules {
 		violated[n] = true

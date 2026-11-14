@@ -394,8 +394,8 @@ the running agent would receive from the real template (`templates/viral.agent.y
 
 | Check id | Meaning |
 |---|---|
-| `max_runes` | Draft within the rubric's limit for its kind (reply 120, post 300) |
-| `max_lines` | Post within the rubric's line limit |
+| `max_runes` | Draft within the limit for its kind: `quality.MaxPostRunes` for a post, `guard.reply_max_runes` for a reply |
+| `max_lines` | Post within `quality.MaxPostLines` |
 | `style_avoid` | No `style_avoid` entry of the template, case-folded |
 | `repeat_image` | No rubric image word that today's own actions already used |
 | `ungrounded_number` | Every number next to a rubric self-stat unit equals, at the precision written, a number on the wake context |

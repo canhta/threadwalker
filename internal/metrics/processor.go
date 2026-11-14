@@ -314,7 +314,7 @@ func groupJobs(jobs []store.MetricJob) [][]store.MetricJob {
 
 // gone reports whether the account's own post listing no longer holds the
 // action's media: the post was deleted on Threads. A failed listing proves nothing.
-// ponytail: the listing holds the newest 100 threads; an older post would read as gone.
+// Limit: the listing holds the newest 100 threads; an older post would read as gone.
 func (p *Processor) gone(ctx context.Context, backend threads.Backend, actionID int64) bool {
 	action, ok, err := p.opts.Store.ConfirmedAction(ctx, p.opts.Template.ID, actionID)
 	if err != nil || !ok || action.MediaID == "" {

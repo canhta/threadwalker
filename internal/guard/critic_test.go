@@ -12,6 +12,7 @@ import (
 
 	"github.com/canhta/threadz/internal/guard"
 	"github.com/canhta/threadz/internal/quality"
+	"github.com/canhta/threadz/internal/stdx"
 	"github.com/canhta/threadz/internal/store"
 	"github.com/canhta/threadz/internal/threads"
 )
@@ -293,7 +294,7 @@ func TestTraceKeepsTheBriefAndEveryDraftBounded(t *testing.T) {
 	if b == nil || b.Kind != "reply" || b.Angle != "góc nhìn" || b.Fact != "một con số" || b.Hook != "trend_detail" || len(b.Rough) != 1 || b.Rough[0] != "nháp thô" {
 		t.Fatalf("brief %+v", b)
 	}
-	if n := utf8.RuneCountInString(b.Parent); n != store.MaxSeenText {
+	if n := utf8.RuneCountInString(b.Parent); n != stdx.MaxThreadsPostRunes {
 		t.Fatalf("parent kept %d runes", n)
 	}
 	if len(d.Tries) != 4 || len(d.Tries[0].Texts) != 0 || d.Tries[1].Texts[0] != "bản nháp đầu" || utf8.RuneCountInString(d.Tries[3].Texts[0]) != store.MaxTraceText || d.Tries[3].Pass {

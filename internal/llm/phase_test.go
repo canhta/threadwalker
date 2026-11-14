@@ -63,18 +63,36 @@ func phaseClient(t *testing.T, requests *int, ledger llm.Ledger, opts llm.Option
 	return client
 }
 
-func TestDreamSpendIsBoundedByItsOwnCapAndExcludedFromDailyCap(t *testing.T) {
-	ledger := &phaseLedger{agent: llm.Usage{CostUSD: 0.9}, dream: llm.Usage{CostUSD: 0.5}, daily: llm.Usage{CostUSD: 1.4}}
+func TestDreamHasItsOwnCapAndEveryPhaseCountsTowardTheDailyCap(t *testing.T) {
+	// Dream spend has reached its own cap, so a dream request is refused.
+	ledger := &phaseLedger{agent: llm.Usage{CostUSD: 0.4}, dream: llm.Usage{CostUSD: 0.5}, daily: llm.Usage{CostUSD: 0.9}}
 	requests := 0
 	client := phaseClient(t, &requests, ledger, llm.Options{Phase: "dream", CapUSD: 0.5})
 	if _, err := client.Run(context.Background(), "agent", 1, nil, nil, nil); !errors.Is(err, llm.ErrBudget) || requests != 0 {
 		t.Fatalf("dream cap: err=%v requests=%d", err, requests)
 	}
-	// The same ledger still allows a normal wake: dream spend is not daily spend.
+	// Under the daily cap of 1, the agent and the critic still run.
+	for _, phase := range []string{"agent", "critic"} {
+		requests = 0
+		client = phaseClient(t, &requests, ledger, llm.Options{Phase: phase})
+		if _, err := client.Run(context.Background(), "agent", 1, nil, nil, nil); err != nil || requests != 1 {
+			t.Fatalf("%s wake: err=%v requests=%d", phase, err, requests)
+		}
+	}
+	// Dream and critic spend count too: the day total is over the cap even
+	// though the agent phase alone is far below it.
+	ledger = &phaseLedger{agent: llm.Usage{CostUSD: 0.1}, dream: llm.Usage{CostUSD: 0.3}, daily: llm.Usage{CostUSD: 1.2}}
+	for _, phase := range []string{"agent", "critic"} {
+		requests = 0
+		client = phaseClient(t, &requests, ledger, llm.Options{Phase: phase})
+		if _, err := client.Run(context.Background(), "agent", 1, nil, nil, nil); !errors.Is(err, llm.ErrBudget) || requests != 0 {
+			t.Fatalf("%s over the day total: err=%v requests=%d", phase, err, requests)
+		}
+	}
 	requests = 0
-	client = phaseClient(t, &requests, ledger, llm.Options{Phase: "agent"})
-	if _, err := client.Run(context.Background(), "agent", 1, nil, nil, nil); err != nil || requests != 1 {
-		t.Fatalf("agent wake: err=%v requests=%d", err, requests)
+	client = phaseClient(t, &requests, ledger, llm.Options{Phase: "dream", CapUSD: 5})
+	if _, err := client.Run(context.Background(), "agent", 1, nil, nil, nil); !errors.Is(err, llm.ErrBudget) || requests != 0 {
+		t.Fatalf("dream over the day total: err=%v requests=%d", err, requests)
 	}
 }
 

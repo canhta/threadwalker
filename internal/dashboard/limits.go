@@ -141,12 +141,6 @@ func (c *pageCache) evictOldestLocked() {
 	}
 }
 
-func (c *pageCache) len() int {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	return len(c.entries)
-}
-
 func etagFor(body []byte) string {
 	sum := sha256.Sum256(body)
 	return `W/"` + hex.EncodeToString(sum[:9]) + `"`

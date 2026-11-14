@@ -6,6 +6,7 @@ import (
 
 	"github.com/canhta/threadz/internal/config"
 	"github.com/canhta/threadz/internal/quality"
+	"github.com/canhta/threadz/internal/stdx"
 	"github.com/canhta/threadz/internal/store"
 )
 
@@ -35,7 +36,7 @@ type episodeView struct {
 }
 
 func viewOf(e store.Episode, redactor *config.Redactor, full bool) episodeView {
-	v := episodeView{ID: e.ActionID, Text: store.CapRunes(redactor.String(e.Text), exampleTextRunes), Views: e.Views, Likes: e.Likes, Replies: e.Replies, ParentReplies: e.ParentReplies, ParentAgeMin: e.ParentAgeMinutes}
+	v := episodeView{ID: e.ActionID, Text: stdx.CapRunes(redactor.String(e.Text), exampleTextRunes), Views: e.Views, Likes: e.Likes, Replies: e.Replies, ParentReplies: e.ParentReplies, ParentAgeMin: e.ParentAgeMinutes}
 	if full {
 		v.Kind, v.Hook, v.Angle, v.Fact = e.Kind, redactor.String(e.Hook), redactor.String(e.Angle), redactor.String(e.Fact)
 		v.Window, v.Band = e.Window, e.Band

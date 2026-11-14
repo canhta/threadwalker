@@ -6,6 +6,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/canhta/threadz/internal/stdx"
 	"github.com/canhta/threadz/internal/store"
 )
 
@@ -49,9 +50,6 @@ func promotedLinks(text string) map[string]bool {
 	return out
 }
 
-// threadsHosts is the only place a reply may go, without the www. prefix.
-var threadsHosts = map[string]bool{"threads.com": true, "threads.net": true}
-
 func (g *Guard) ownURL(raw string) bool {
 	if !strings.Contains(raw, "://") {
 		raw = "https://" + raw
@@ -61,7 +59,7 @@ func (g *Guard) ownURL(raw string) bool {
 		return false
 	}
 	host := strings.TrimPrefix(strings.ToLower(u.Hostname()), "www.")
-	known := threadsHosts[host]
+	_, known := stdx.ThreadsHost(host)
 	if base, e := url.Parse(g.opts.Template.Threads.BaseURL); e == nil && base.Hostname() != "" {
 		known = known || strings.EqualFold(host, strings.TrimPrefix(base.Hostname(), "www."))
 	}
@@ -127,8 +125,8 @@ func publicationKeys(raw string) map[string]bool {
 	}
 	u.RawQuery = ""
 	u.ForceQuery = false
-	if host := strings.TrimPrefix(strings.ToLower(u.Hostname()), "www."); host == "threads.com" || host == "threads.net" {
-		u.Host = "threads.net"
+	if host, ok := stdx.ThreadsHost(u.Hostname()); ok {
+		u.Host = host
 	}
 	return promotedLinks(u.String())
 }

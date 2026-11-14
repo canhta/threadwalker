@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/canhta/threadz/internal/agentbrowser"
+	"unicode/utf8"
 )
 
 const (
@@ -327,7 +328,7 @@ func (d *agentBrowserDriver) threadsSubmitLive(ctx context.Context, text string)
 	refuse := func(stage string, err error) (bool, error) {
 		return false, errors.Join(ErrWriteRefused, &StageError{Stage: stage, Err: err})
 	}
-	if strings.TrimSpace(text) == "" || len([]rune(text)) > 500 {
+	if strings.TrimSpace(text) == "" || utf8.RuneCountInString(text) > stdx.MaxThreadsPostRunes {
 		return refuse(StageType, ErrMalformedPage)
 	}
 	snapshot, err := d.take(ctx)

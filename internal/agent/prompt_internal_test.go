@@ -1,13 +1,32 @@
 package agent
 
 import (
+	"fmt"
 	"regexp"
 	"strings"
 	"testing"
 
 	"github.com/canhta/threadz/internal/config"
 	"github.com/canhta/threadz/internal/guard"
+	"github.com/canhta/threadz/internal/store"
 )
+
+// The numbers in the code-owned prompts are the constants that enforce them.
+func TestPromptNumbersComeFromTheirConstants(t *testing.T) {
+	for _, want := range []string{
+		fmt.Sprintf("at most %d characters", store.MaxLessonRunes),
+		"(window_h is 1, 6 or 24)",
+		fmt.Sprintf("likes plus %d times replies", store.ReplyScoreWeight),
+		fmt.Sprintf("last %d actions", store.RankPool),
+	} {
+		if !strings.Contains(dreamPrompt, want) {
+			t.Errorf("dream prompt lacks %q", want)
+		}
+	}
+	if want := fmt.Sprintf("your last %d texts", recentRows); !strings.Contains(wakeRules, want) {
+		t.Errorf("wake rules lack %q", want)
+	}
+}
 
 func viralTemplate(t *testing.T) config.Template {
 	t.Helper()

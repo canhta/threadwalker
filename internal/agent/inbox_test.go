@@ -26,6 +26,12 @@ type inboxRig struct {
 
 func newInboxRig(t *testing.T, poll int) *inboxRig {
 	t.Helper()
+	return newInboxRigWith(t, poll, func(*config.Template) {})
+}
+
+// newInboxRigWith is newInboxRig with the template changed by edit.
+func newInboxRigWith(t *testing.T, poll int, edit func(*config.Template)) *inboxRig {
+	t.Helper()
 	ctx := context.Background()
 	st, err := store.Open(ctx, filepath.Join(t.TempDir(), "inbox.db"))
 	if err != nil {
@@ -36,6 +42,7 @@ func newInboxRig(t *testing.T, poll int) *inboxRig {
 	rig.mem.Pages[threads.OpReadReplies] = threads.Page{Kind: "replies"}
 	tmpl := agent.OfflineTemplate()
 	tmpl.Inbox = config.InboxConfig{PollMinutes: poll, MinMinutesAfterWake: 5}
+	edit(&tmpl)
 	fixture := agent.NewOfflineFixture(func() time.Time { return rig.now })
 	rig.fixture = fixture
 	rig.r, err = agent.New(agent.Options{Store: st, Template: tmpl, Now: func() time.Time { return rig.now }, HTTPClient: fixture.Client(), FetchTrends: fixture.Trends,
@@ -123,6 +130,31 @@ func TestPollInboxHonoursThePollIntervalAndTheGapAfterAWake(t *testing.T) {
 	g.poll(t)
 	if g.mem.Count(threads.OpReadReplies) != calls {
 		t.Fatal("polled again before inbox.poll_minutes passed")
+	}
+}
+
+// An early wake for a reply still waits out the quiet window.
+func TestPollInboxWakeEarlyWaitsOutQuietHours(t *testing.T) {
+	g := newInboxRigWith(t, 10, func(tmpl *config.Template) {
+		tmpl.Schedule = config.ScheduleConfig{Timezone: "UTC", QuietFrom: "11:00", QuietUntil: "13:30"}
+	})
+	g.reply("a1", "alice")
+	if next, want := g.poll(t), time.Date(2026, 1, 1, 13, 30, 0, 0, time.UTC); !next.Equal(want) {
+		t.Fatalf("wake at %v, want the end of the quiet window %v", next, want)
+	}
+}
+
+// A capped day (daily USD spent) takes no early wake before it resets.
+func TestPollInboxWakeEarlyWaitsOutACappedDay(t *testing.T) {
+	g := newInboxRig(t, 10)
+	if _, err := g.st.DB().Exec(`INSERT INTO ledger_phases(agent_id,day,phase,cost_usd) VALUES('synthetic-offline','2026-01-01','critic',5)`); err != nil {
+		t.Fatal(err)
+	}
+	g.reply("a1", "alice")
+	g.farm = g.now.Add(30 * time.Hour)
+	g.park(t)
+	if next, want := g.poll(t), time.Date(2026, 1, 2, 0, 0, 0, 0, time.UTC); !next.Equal(want) {
+		t.Fatalf("wake at %v, want the next day %v", next, want)
 	}
 }
 

@@ -282,9 +282,7 @@ func RunIsolationSoak(ctx context.Context, dbPath string, hours int, logger *slo
 			if err != nil {
 				return e, err
 			}
-			if agentUsage, err := st.LLMUsageForDayPhases(ctx, t.ID, day, "agent"); err != nil {
-				return e, err
-			} else if state.Status == "running" && agentUsage.CostUSD >= t.Limits.MaxUSDPerDay {
+			if state.Status == "running" && usage.CostUSD >= t.Limits.MaxUSDPerDay {
 				if state.NextWake.Before(dayEnd) {
 					e.BudgetIsolated = false
 				}

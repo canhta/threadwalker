@@ -16,8 +16,6 @@ import (
 type PostingContext struct {
 	// TargetScoreJSON is a reply target's numeric score parts.
 	TargetScoreJSON string
-	// TopicHeat is the heat of the topic the action is anchored to.
-	TopicHeat *float64
 	// ParentReplies and ParentAgeMinutes describe the replied-to post.
 	ParentReplies, ParentAgeMinutes *int64
 }
@@ -140,9 +138,8 @@ func TopicFacts(h Heat, now time.Time) ItemFacts {
 	}
 	heat := round2(sum / float64(len(terms)))
 	return ItemFacts{
-		PostingContext: PostingContext{TopicHeat: &heat},
-		Line:           fmt.Sprintf("[topic heat %.2f · %s]", heat, strings.Join(line, " · ")),
-		Score:          heat,
+		Line:  fmt.Sprintf("[topic heat %.2f · %s]", heat, strings.Join(line, " · ")),
+		Score: heat,
 	}
 }
 

@@ -21,6 +21,12 @@ func persona() config.PersonaConfig {
 	}
 }
 
+// guardLimits are the template limits the scorer reads: a 120 character reply
+// and the units after which a number is a claim about the account.
+func guardLimits() config.GuardConfig {
+	return config.GuardConfig{ReplyMaxRunes: 120, SelfStatUnits: []string{"$", "cent", "đô", "view", "follower", "reply", "token"}}
+}
+
 func failed(checks []Check) string {
 	var ids []string
 	for _, c := range checks {
@@ -44,7 +50,8 @@ func TestScore(t *testing.T) {
 		{"clean post", Post, "gớm, build xong trong 4 phút.", Verdict{}, ""},
 		{"reply over limit", Reply, strings.Repeat("a", 121), Verdict{}, MaxRunes},
 		{"reply at limit", Reply, strings.Repeat("a", 120), Verdict{}, ""},
-		{"post over limit", Post, strings.Repeat("a", 301), Verdict{}, MaxRunes},
+		{"post over limit", Post, strings.Repeat("a", MaxPostRunes+1), Verdict{}, MaxRunes},
+		{"post at limit", Post, strings.Repeat("a", MaxPostRunes), Verdict{}, ""},
 		{"post too many lines", Post, "a\nb\nc\nd", Verdict{}, MaxLines},
 		{"reply lines unchecked", Reply, "a\nb\nc\nd", Verdict{}, ""},
 		{"style avoid folded", Post, "TUY NHIÊN, không", Verdict{}, StyleAvoid},
@@ -63,7 +70,7 @@ func TestScore(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := failed(Score(r, persona(), tt.kind, tt.text, wake, said, tt.verdict)); got != tt.want {
+			if got := failed(Score(r, persona(), guardLimits(), tt.kind, tt.text, wake, said, tt.verdict)); got != tt.want {
 				t.Fatalf("failed checks = %q, want %q", got, tt.want)
 			}
 		})
@@ -72,7 +79,7 @@ func TestScore(t *testing.T) {
 
 func TestScoreToleratesMalformedWake(t *testing.T) {
 	r, _ := DefaultRubric()
-	if got := failed(Score(r, persona(), Post, "9 view", "not json", nil, Verdict{})); got != UngroundedNumber {
+	if got := failed(Score(r, persona(), guardLimits(), Post, "9 view", "not json", nil, Verdict{})); got != UngroundedNumber {
 		t.Fatalf("failed = %q", got)
 	}
 }

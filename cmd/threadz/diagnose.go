@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/canhta/threadz/internal/guard"
+	"github.com/canhta/threadz/internal/stdx"
 	"github.com/canhta/threadz/internal/store"
 )
 
@@ -204,8 +205,8 @@ func diagnosedArgs(raw json.RawMessage) map[string]any {
 }
 
 func cutRunes(s string, n int) string {
-	if r := []rune(s); len(r) > n {
-		return string(r[:n]) + "..."
+	if cut := stdx.CapRunes(s, n); cut != s {
+		return cut + "..."
 	}
 	return s
 }

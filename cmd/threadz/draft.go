@@ -33,7 +33,7 @@ type draftResult struct {
 	Error  string        `json:"error,omitempty"`
 }
 
-const defaultAngle = "give one take a Vietnamese dev would agree with, argue with or save"
+const defaultAngle = "react in the persona's own voice with one take that readers following this would answer or share"
 
 // ctlDraft runs the writer and the critic on a fixed set of items without
 // publishing: no guard, no Threads, a scratch database for the spend ledger.

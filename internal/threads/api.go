@@ -14,6 +14,7 @@ import (
 	"unicode"
 
 	"github.com/canhta/threadz/internal/config"
+	"github.com/canhta/threadz/internal/stdx"
 )
 
 // APIBaseURL is the Threads Graph API origin and version.
@@ -434,10 +435,7 @@ func TopicTag(s string) string {
 		return r
 	}, s)
 	s = strings.Join(strings.Fields(s), " ")
-	if r := []rune(s); len(r) > 50 {
-		s = strings.TrimSpace(string(r[:50]))
-	}
-	return s
+	return strings.TrimSpace(stdx.CapRunes(s, 50))
 }
 
 // Reply publishes a reply to the media id replyTo.

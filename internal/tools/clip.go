@@ -60,7 +60,7 @@ func clipResult(result string, max int) string {
 		out, _ := json.Marshal(root)
 		return string(out)
 	}
-	// ponytail: re-encodes after every dropped item; fine for lists of tens.
+	// Limit: re-encodes after every dropped item; fine for lists of tens.
 	for out := render(); ; out = render() {
 		if len(out) <= max {
 			return out

@@ -5,12 +5,11 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strconv"
 	"time"
-)
 
-// MaxSeenText bounds the text kept of a post: a Threads post is at most 500
-// characters, so this keeps all of it.
-const MaxSeenText = 500
+	"github.com/canhta/threadz/internal/stdx"
+)
 
 // SeenPost is a post a read returned, kept under a durable per-agent id (the
 // p<id> the model passes to reply). Likes, Replies and AgeMinutes are nil when
@@ -27,6 +26,9 @@ type SeenPost struct {
 	ReadAt     time.Time
 }
 
+// PostRef is the ref of a stored post: p followed by its durable id.
+func PostRef(id int64) string { return "p" + strconv.FormatInt(id, 10) }
+
 // NoteSeenPost records a post read and returns its id; the same URL keeps its
 // id. A later read fills a missing media id and refreshes the figures: an age
 // with its read time, likes and replies when shown. A read that shows no age
@@ -36,7 +38,7 @@ func (s *Store) NoteSeenPost(ctx context.Context, agentID string, p SeenPost) (i
 	if err != nil {
 		return 0, err
 	}
-	text := CapRunes(p.Text, MaxSeenText)
+	text := stdx.CapRunes(p.Text, stdx.MaxThreadsPostRunes)
 	var id int64
 	err = s.db.QueryRowContext(ctx, `INSERT INTO seen_posts(agent_id,url,media_id,author,text,likes,replies,age_minutes,read_at) VALUES(?,?,?,?,?,?,?,?,?)
 		ON CONFLICT(agent_id,url) DO UPDATE SET

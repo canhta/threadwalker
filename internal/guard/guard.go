@@ -19,6 +19,7 @@ import (
 	"github.com/canhta/threadz/internal/config"
 	"github.com/canhta/threadz/internal/logging"
 	"github.com/canhta/threadz/internal/quality"
+	"github.com/canhta/threadz/internal/stdx"
 	"github.com/canhta/threadz/internal/store"
 	"github.com/canhta/threadz/internal/trends"
 )
@@ -428,12 +429,12 @@ func (g *Guard) review(ctx context.Context, a Attempt, intent *actionIntent) (re
 	capAll := func(in []string, n int) []string {
 		out := make([]string, len(in))
 		for i, s := range in {
-			out[i] = store.CapRunes(redact(s), n)
+			out[i] = stdx.CapRunes(redact(s), n)
 		}
 		return out
 	}
-	intent.brief = &store.BriefTrace{Kind: a.Tool, Angle: store.CapRunes(redact(intent.Angle), store.MaxTraceText), Fact: store.CapRunes(redact(intent.Fact), store.MaxTraceText), Hook: intent.Hook,
-		Rough: capAll(intent.texts(), store.MaxTraceText), Parent: store.CapRunes(redact(parent), store.MaxTraceParent), Recent: capAll(recent, store.MaxTraceRecent)}
+	intent.brief = &store.BriefTrace{Kind: a.Tool, Angle: stdx.CapRunes(redact(intent.Angle), store.MaxTraceText), Fact: stdx.CapRunes(redact(intent.Fact), store.MaxTraceText), Hook: intent.Hook,
+		Rough: capAll(intent.texts(), store.MaxTraceText), Parent: stdx.CapRunes(redact(parent), store.MaxTraceParent), Recent: capAll(recent, store.MaxTraceRecent)}
 	source := "agent"
 	if g.opts.Writer != nil {
 		source = "writer"
@@ -463,9 +464,7 @@ func (g *Guard) review(ctx context.Context, a Attempt, intent *actionIntent) (re
 	clean := make([]string, 0, len(last.Verdict.Problems))
 	for _, p := range last.Verdict.Problems {
 		p = strings.Join(strings.Fields(p), " ")
-		if r := []rune(p); len(r) > 200 {
-			p = string(r[:200])
-		}
+		p = stdx.CapRunes(p, 200)
 		if p != "" {
 			clean = append(clean, p)
 		}
@@ -488,7 +487,7 @@ func draftTrace(source string, texts []string, v *quality.CriticVerdict) store.T
 		t.Pass = v.Pass
 		for i, p := range v.Problems {
 			if i < 8 {
-				t.Problems = append(t.Problems, store.CapRunes(p, 300))
+				t.Problems = append(t.Problems, stdx.CapRunes(p, 300))
 			}
 		}
 		if v.Scores != (quality.CriticScores{}) {
@@ -500,10 +499,7 @@ func draftTrace(source string, texts []string, v *quality.CriticVerdict) store.T
 
 // capLine keeps a stored first line to 120 runes.
 func capLine(s string) string {
-	if r := []rune(s); len(r) > 120 {
-		return string(r[:120])
-	}
-	return s
+	return stdx.CapRunes(s, 120)
 }
 
 // listCounts is the length of each list in a tool result, looking inside the

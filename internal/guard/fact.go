@@ -9,7 +9,7 @@ import (
 // factAnchors are the tokens of a brief's fact the draft must keep at least one
 // of: numbers, names (an uppercase first letter, after the first word) and the
 // longer words of a quoted line. A fact with none (all lower-case prose) is not
-// checked. ponytail: token match without a diacritic fold; add one if a writer
+// checked. Limit: token match without a diacritic fold; add one if a writer
 // ever drops marks from a name.
 func factAnchors(fact string) []string {
 	var anchors []string

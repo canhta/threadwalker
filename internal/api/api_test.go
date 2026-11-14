@@ -22,7 +22,7 @@ import (
 type fakeStore struct {
 	mu     sync.Mutex
 	events map[string]bool
-	woken  []string
+	woken  []string // agents with a newly recorded event
 }
 
 func (f *fakeStore) RecordWebhookEvent(_ context.Context, agent, field, id string, _ time.Time) (bool, error) {
@@ -34,12 +34,10 @@ func (f *fakeStore) RecordWebhookEvent(_ context.Context, agent, field, id strin
 	k := agent + field + id
 	fresh := !f.events[k]
 	f.events[k] = true
+	if fresh {
+		f.woken = append(f.woken, agent)
+	}
 	return fresh, nil
-}
-
-func (f *fakeStore) WakeOnWebhook(_ context.Context, agent string, _ time.Time, _ time.Duration) error {
-	f.woken = append(f.woken, agent)
-	return nil
 }
 
 type fakeTokens struct {
@@ -94,7 +92,7 @@ func newRig(t *testing.T, userID string) *rig {
 	}))
 	t.Cleanup(r.graph.Close)
 	srv, err := New(Options{
-		Agents: []Agent{{ID: "a1", UserID: "42", Username: "bot", MinWakeGap: time.Hour}}, AppID: "app", AppSecret: config.NewSecret("app-secret"),
+		Agents: []Agent{{ID: "a1", UserID: "42", Username: "bot"}}, AppID: "app", AppSecret: config.NewSecret("app-secret"),
 		VerifyToken: config.NewSecret("verify"), PublicURL: "https://api.example.com", GraphURL: r.graph.URL, AuthorizeURL: "https://consent.example/authorize",
 		Store: r.store, Tokens: r.tokens, Now: func() time.Time { return r.now }, Rand: &counter{},
 	})
@@ -274,7 +272,7 @@ func TestWebhookSignature(t *testing.T) {
 	}
 }
 
-func TestWebhookEventWakesAndStoresIDsOnly(t *testing.T) {
+func TestWebhookEventIsRecordedOnceAndStoresIDsOnly(t *testing.T) {
 	r := newRig(t, "42")
 	reply := fixture(t, "reply.json")
 	post := func(body string) int {

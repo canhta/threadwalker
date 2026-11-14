@@ -379,7 +379,7 @@ func (b *Browser) read(ctx context.Context, op, path, kind string) (page Page, e
 	return page, b.fail(StageReadPage, err)
 }
 func (b *Browser) ReadFeed(ctx context.Context) (Page, error) {
-	return b.read(ctx, "read_feed", pathOr(b.feedPath, "/feed"), "feed")
+	return b.read(ctx, OpReadFeed, pathOr(b.feedPath, "/feed"), "feed")
 }
 
 // topicPostsMax bounds the posts one topic read returns.
@@ -391,11 +391,11 @@ func (b *Browser) ReadTopic(ctx context.Context, topicURL, query string) (Page, 
 	if topicURL != "" {
 		u, err := url.Parse(topicURL)
 		if err != nil || !sameOrigin(b.base, u) || u.Path != "/search" {
-			return Page{}, operationError("read_topic", ErrMalformedPage)
+			return Page{}, operationError(OpReadTopic, ErrMalformedPage)
 		}
 		path = "/search?" + u.RawQuery
 	}
-	page, err := b.read(ctx, "read_topic", path, "topic")
+	page, err := b.read(ctx, OpReadTopic, path, "topic")
 	if len(page.Posts) > topicPostsMax {
 		page.Posts = page.Posts[:topicPostsMax]
 	}
@@ -406,7 +406,7 @@ func (b *Browser) ReadTopic(ctx context.Context, topicURL, query string) (Page, 
 // returns the permalink of the new reply. Once the submit click is sent, any
 // failure is ErrUnknownOutcome and is never retried.
 func (b *Browser) Reply(ctx context.Context, target, text string) (threadURL string, err error) {
-	defer func() { err = operationError("reply", err) }()
+	defer func() { err = operationError(OpReply, err) }()
 	// The guard matched the canonical permalink; only its path is used, so a
 	// threads.net link still opens on the configured origin.
 	u, err := url.Parse(target)
@@ -462,7 +462,7 @@ func pathOr(configured, fallback string) string {
 }
 
 func (b *Browser) Close(ctx context.Context) (err error) {
-	defer func() { err = operationError("close", err) }()
+	defer func() { err = operationError(OpClose, err) }()
 	b.closeOnce.Do(func() { b.mu.Lock(); b.closed = true; b.mu.Unlock(); b.closeErr = b.driver.close(ctx) })
 	return b.closeErr
 }

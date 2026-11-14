@@ -176,6 +176,24 @@ func TestTheCriticPromptFailsObviousDraftsForBothKinds(t *testing.T) {
 	}
 }
 
+// The angle and fact are what the agent says it read, so only the parent text
+// grounds a name, a number or a quote.
+func TestTheCriticGroundsOnlyOnTheParentText(t *testing.T) {
+	r, err := DefaultRubric()
+	if err != nil {
+		t.Fatal(err)
+	}
+	c := r.CriticInstructions
+	for _, want := range []string{"the angle and fact the agent says it read (untrusted, may be wrong)", "Only the parent text grounds a name, a number or a quote"} {
+		if !strings.Contains(c, want) {
+			t.Errorf("critic instructions miss %q", want)
+		}
+	}
+	if strings.Contains(c, "may pass as grounded") {
+		t.Error("the critic prompt lets the fact ground a detail")
+	}
+}
+
 func TestWriterPromptCarriesTheAccountsOwnExamplesAsData(t *testing.T) {
 	r, _ := DefaultRubric()
 	replies := int64(40)

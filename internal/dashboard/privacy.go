@@ -5,6 +5,8 @@ import (
 	"io"
 	"net/url"
 	"strings"
+
+	"github.com/canhta/threadz/internal/stdx"
 )
 
 // The publication path must bind the selected own username. Queries, fragments,
@@ -23,9 +25,7 @@ func ownURL(raw, username string) string {
 	if err != nil || u.User != nil || u.RawQuery != "" || u.ForceQuery || u.Fragment != "" || u.RawPath != "" || u.Opaque != "" || (u.Scheme != "https" && u.Scheme != "http") {
 		return ""
 	}
-	switch strings.ToLower(u.Host) {
-	case "threads.net", "www.threads.net", "threads.com", "www.threads.com":
-	default:
+	if _, ok := stdx.ThreadsHost(u.Host); !ok {
 		return ""
 	}
 	parts := strings.Split(u.Path, "/")

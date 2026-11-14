@@ -3,9 +3,30 @@ package main
 import (
 	"bytes"
 	"context"
+	"runtime"
 	"testing"
 	"time"
 )
+
+func TestUpdateRefusesPlatformsWithoutTheLinuxService(t *testing.T) {
+	const message = "self-update manages the Linux service; on macOS download the darwin_arm64 bundle from the release"
+	if err := checkUpdateSupported("linux"); err != nil {
+		t.Fatalf("linux refused: %v", err)
+	}
+	for _, goos := range []string{"darwin", "windows"} {
+		if err := checkUpdateSupported(goos); err == nil || err.Error() != message {
+			t.Fatalf("%s: %v", goos, err)
+		}
+	}
+	if runtime.GOOS == "linux" {
+		return
+	}
+	// On this host the command stops before it reads a release or touches the binary.
+	var out, errOut bytes.Buffer
+	if code := runUpdate(context.Background(), []string{"--check"}, func(string) string { return "" }, &out, &errOut); code != exitFailure || errOut.String() != message+"\n" || out.Len() != 0 {
+		t.Fatalf("code %d, stdout %q, stderr %q", code, out.String(), errOut.String())
+	}
+}
 
 func TestScheduledAllowed(t *testing.T) {
 	at := func(h int) time.Time { return time.Date(2026, 11, 13, h, 0, 0, 0, time.Local) }

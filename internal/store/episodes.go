@@ -24,6 +24,8 @@ const (
 	MinRankPool = 8
 	topRank     = 0.75
 	bottomRank  = 0.25
+	// ReplyScoreWeight is how many likes one reply is worth in an episode's score.
+	ReplyScoreWeight = 2
 )
 
 // Episode is one live, confirmed, non-failed own action and what was measured
@@ -40,7 +42,7 @@ type Episode struct {
 	// Window is the completed metric_jobs target in hours: 1, 6 or 24.
 	Window                int
 	Views, Likes, Replies int64
-	// Score is Likes + 2*Replies at Window.
+	// Score is Likes + ReplyScoreWeight*Replies at Window.
 	Score int64
 	// Rank is the percentile among the pool, 0 to 1; Pool is the pool size.
 	// Both are zero when Band is unranked.
@@ -97,7 +99,7 @@ func (s *Store) Episodes(ctx context.Context, agentID string, q EpisodeQuery) ([
 		if e.MeasuredAt, err = parseTime(measured); err != nil {
 			return nil, fmt.Errorf("reading episode %d: %w", e.ActionID, err)
 		}
-		e.Score = e.Likes + 2*e.Replies
+		e.Score = e.Likes + ReplyScoreWeight*e.Replies
 		if at, ok := longAt[e.ActionID]; e.Window >= 6 && (!ok || e.MeasuredAt.Before(at)) {
 			longAt[e.ActionID] = e.MeasuredAt
 		}

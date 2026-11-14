@@ -91,7 +91,7 @@ func runQualityCase(ctx context.Context, c Case, p Profile, repeat int, opts Opt
 		r.Reason = "judge_verdict_invalid"
 		return r
 	}
-	r.Quality = quality.Score(rubric, tmpl.Persona, q.Kind, draft, wake[1].Content, q.Said, verdict)
+	r.Quality = quality.Score(rubric, tmpl.Persona, tmpl.Guard, q.Kind, draft, wake[1].Content, q.Said, verdict)
 	r.Passed, r.Reason = qualityOutcome(opts.Mode, r.Quality, q.Fails)
 	return r
 }

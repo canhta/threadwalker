@@ -163,7 +163,7 @@ func New(opts Options) (*Runtime, error) {
 	if opts.Template.Limits.MinMinutesBetweenWakes <= 0 || opts.Template.Limits.MinMinutesBetweenWakes > 1440 {
 		return nil, errors.New("configuring runtime: wake minimum must be within 1..1440 minutes")
 	}
-	// ponytail: the check clock lives in memory, so a restart waits a full day
+	// Limit: the check clock lives in memory, so a restart waits a full day
 	// before its next check; persist it in the store if restarts become frequent.
 	r := &Runtime{opts: opts, canPublish: canPublish, session: &sessionClock{due: opts.Now().Add(sessionCheckEvery)}, failure: &failureClock{}, inbox: &inboxClock{seen: map[string]bool{}}}
 	processor, err := metrics.New(metrics.Options{Store: opts.Store, Template: opts.Template, Now: opts.Now, Logger: opts.Logger, ThreadsFactory: opts.ThreadsFactory, Owner: opts.Owner, Redactor: opts.Redactor, FetchTrends: opts.FetchTrends, SearchWeb: opts.SearchWeb})
@@ -463,7 +463,7 @@ func (r *Runtime) execute(ctx context.Context, wake WakeResult, phase string, ca
 			if boardErr != nil {
 				return result, boardErr
 			}
-			stopCheck = board.stopCheck(hidden, func() []string { return r.openCandidates(ctx) }, r.opts.Template.Limits.MaxUSDPerDay-board.SpendToday)
+			stopCheck = board.stopCheck(hidden, func() []string { return r.openCandidates(ctx, dispatcher.Guard()) }, r.opts.Template.Limits.MaxUSDPerDay-board.SpendToday)
 		}
 		client, err := llm.New(r.opts.Template.LLM, r.opts.Template.Limits, r.opts.Store, dispatcher.ConfigureClient(llm.Options{StopCheck: stopCheck, Logger: r.opts.Logger, Now: r.opts.Now, Sleep: r.opts.Wait, HTTPClient: r.opts.HTTPClient, ReasoningEffort: r.opts.Template.LLM.ReasoningEffort, Phase: phase, CapUSD: capUSD, MaxSteps: maxSteps, Transcript: func(ctx context.Context, kind, body string) { r.appendTranscript(ctx, phase, result.ID, kind, body) }}))
 		if err != nil {
@@ -714,7 +714,7 @@ func (s Scheduler) Run(ctx context.Context, once bool) error {
 		}
 		var selected *Work
 		for _, r := range s.Agents {
-			if err := r.opts.Store.WakeOnWebhook(ctx, r.opts.Template.ID, now, time.Duration(r.opts.Template.Limits.MinMinutesBetweenWakes)*time.Minute); err != nil {
+			if err := r.opts.Store.WakeOnWebhook(ctx, r.opts.Template.ID, now, time.Duration(r.opts.Template.Limits.MinMinutesBetweenWakes)*time.Minute, r.settleWake(ctx, now)); err != nil {
 				return err
 			}
 			if err := r.PollInbox(ctx, now); err != nil {
@@ -889,10 +889,6 @@ func NewReviewer(o ReviewerOptions, wakeID int64) Reviewer {
 		criticCfg = t.LLM
 	}
 	judge, write := call(criticCfg), call(t.Writer)
-	writePost := write
-	if t.PostWriter.Model != "" {
-		writePost = call(t.PostWriter)
-	}
 	var rv Reviewer
 	rv.Critic = func(ctx context.Context, in quality.CriticInput) (quality.CriticVerdict, error) {
 		rubric, err := quality.DefaultRubric()
@@ -917,11 +913,7 @@ func NewReviewer(o ReviewerOptions, wakeID int64) Reviewer {
 			if in.Examples, err = writerExamples(ctx, o.Store, t.ID, o.Now(), in.Kind, o.Redactor); err != nil {
 				return nil, err
 			}
-			draft := write
-			if in.Kind == quality.Post {
-				draft = writePost
-			}
-			out, err := draft(ctx, quality.WriterMessages(rubric, t.Persona, in))
+			out, err := write(ctx, quality.WriterMessages(rubric, t.Persona, in))
 			if err != nil {
 				return nil, err
 			}
@@ -951,16 +943,21 @@ func NewReviewer(o ReviewerOptions, wakeID int64) Reviewer {
 	return rv
 }
 
-// openCandidates names the open reply candidates for the stop check: the same
-// list the data message shows. A failed read names none.
-func (r *Runtime) openCandidates(ctx context.Context) []string {
+// openCandidates names the open reply candidates for the stop check. The list
+// is rebuilt at the end of the wake, so it keeps only refs g issued this wake
+// (the candidates handed out and the posts read); a post that became a
+// candidate meanwhile has no ref the wake could reply to. A failed read names
+// none.
+func (r *Runtime) openCandidates(ctx context.Context, g *guard.Guard) []string {
 	candidates, err := guard.OpenCandidates(ctx, r.opts.Store, r.opts.Template, r.opts.OwnUsernames, r.opts.Now())
 	if err != nil {
 		return nil
 	}
-	refs := make([]string, len(candidates))
-	for i, c := range candidates {
-		refs[i] = c.Ref
+	var refs []string
+	for _, c := range candidates {
+		if g.Issued(c.Ref) {
+			refs = append(refs, c.Ref)
+		}
 	}
 	return refs
 }

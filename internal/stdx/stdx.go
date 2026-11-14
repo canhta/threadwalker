@@ -34,3 +34,11 @@ func TruncateUTF8(s string, limit int) (string, bool) {
 	}
 	return s, true
 }
+
+// CapRunes cuts s to at most n runes.
+func CapRunes(s string, n int) string {
+	if r := []rune(s); len(r) > n {
+		return string(r[:n])
+	}
+	return s
+}

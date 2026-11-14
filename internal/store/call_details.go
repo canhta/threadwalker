@@ -76,14 +76,6 @@ type BriefTrace struct {
 	Recent []string `json:"recent,omitempty"`
 }
 
-// CapRunes cuts s to n runes.
-func CapRunes(s string, n int) string {
-	if r := []rune(s); len(r) > n {
-		return string(r[:n])
-	}
-	return s
-}
-
 // RecordCallArgs stores the redacted, capped arguments of an audited call.
 func (s *Store) RecordCallArgs(ctx context.Context, agentID string, wakeID, callID int64, argsJSON string, at time.Time) error {
 	if _, err := s.db.ExecContext(ctx, `INSERT INTO tool_call_details(tool_call_id,agent_id,wake_id,args_json,at) VALUES(?,?,?,?,?)`, callID, agentID, wakeID, argsJSON, formatTime(at)); err != nil {

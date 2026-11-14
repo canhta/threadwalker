@@ -5,8 +5,12 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"slices"
 	"time"
 )
+
+// MetricWindows are the hours after publication at which an action is measured.
+var MetricWindows = []int{1, 6, 24}
 
 // MetricValues contains counters measured together for one published action.
 // A nil Quotes, Shares, Followers or AuthorReplied is unavailable, never zero.
@@ -77,7 +81,7 @@ func (s *Store) SeedMetricJobs(ctx context.Context, agentID string, now time.Tim
 			return fmt.Errorf("reading metric actions: %w", err)
 		}
 		for _, a := range actions {
-			for _, hours := range []int{1, 6, 24} {
+			for _, hours := range MetricWindows {
 				due := formatTime(a.at.Add(time.Duration(hours) * time.Hour))
 				r, err := conn.ExecContext(ctx, `INSERT INTO metric_jobs(agent_id,action_id,window_hours,due_at,not_before) VALUES(?,?,?,?,?) ON CONFLICT(agent_id,action_id,window_hours) DO NOTHING`, agentID, a.id, hours, due, due)
 				if err != nil {
@@ -199,7 +203,7 @@ func metricClaims(ctx context.Context, conn *sql.Conn, jobs []MetricJob, at time
 	}
 	wanted := make(map[int]MetricJob, len(jobs))
 	for _, job := range jobs {
-		if job.AgentID != first.AgentID || job.ActionID != first.ActionID || job.ClaimVersion != first.ClaimVersion || (job.WindowHours != 1 && job.WindowHours != 6 && job.WindowHours != 24) {
+		if job.AgentID != first.AgentID || job.ActionID != first.ActionID || job.ClaimVersion != first.ClaimVersion || !slices.Contains(MetricWindows, job.WindowHours) {
 			return false, ErrMetricClaim
 		}
 		if _, ok := wanted[job.WindowHours]; ok {

@@ -5,6 +5,8 @@ import (
 	"strconv"
 	"strings"
 	"unicode"
+
+	"github.com/canhta/threadz/internal/stdx"
 )
 
 const (
@@ -19,9 +21,8 @@ func isThreadsHost(u *url.URL) bool {
 	if u == nil || !strings.EqualFold(u.Scheme, "https") {
 		return false
 	}
-	host := strings.ToLower(u.Hostname())
-	host = strings.TrimPrefix(host, "www.")
-	return host == "threads.com" || host == "threads.net"
+	_, ok := stdx.ThreadsHost(u.Hostname())
+	return ok
 }
 
 // IsTopicURL reports whether raw opens a Threads topic or search page, the

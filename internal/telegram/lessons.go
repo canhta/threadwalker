@@ -10,6 +10,7 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/canhta/threadz/internal/stdx"
 	"github.com/canhta/threadz/internal/store"
 )
 
@@ -23,10 +24,10 @@ const (
 // clip shortens text to n runes for a list line.
 func clip(text string, n int) string {
 	text = strings.Join(strings.Fields(text), " ")
-	if utf8.RuneCountInString(text) <= n {
-		return text
+	if cut := stdx.CapRunes(text, n-1); utf8.RuneCountInString(text) > n {
+		return cut + "…"
 	}
-	return string([]rune(text)[:n-1]) + "…"
+	return text
 }
 
 func rankText(r float64) string { return fmt.Sprintf("%.2f", r) }

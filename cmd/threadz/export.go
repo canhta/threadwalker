@@ -9,7 +9,6 @@ import (
 	"io"
 	"path/filepath"
 	"slices"
-	"strconv"
 
 	"github.com/canhta/threadz/internal/eval"
 	"github.com/canhta/threadz/internal/llm"
@@ -132,7 +131,7 @@ func exportWake(ctx context.Context, st *store.Store, agentID string, id int64, 
 			}
 			for _, ref := range postRefs(output) {
 				if _, ok := numbering[ref]; !ok {
-					numbering[ref] = "p" + strconv.Itoa(len(numbering)+1)
+					numbering[ref] = store.PostRef(int64(len(numbering) + 1))
 				}
 			}
 			step.Output = output

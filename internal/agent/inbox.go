@@ -92,7 +92,7 @@ func (r *Runtime) PollInbox(ctx context.Context, now time.Time) error {
 	if fresh == 0 {
 		return nil
 	}
-	return r.opts.Store.WakeEarly(ctx, t.ID, now, time.Duration(t.Inbox.MinMinutesAfterWake)*time.Minute)
+	return r.opts.Store.WakeEarly(ctx, t.ID, now, time.Duration(t.Inbox.MinMinutesAfterWake)*time.Minute, r.settleWake(ctx, now))
 }
 
 // readInbox polls only for a running agent; a paused or killed one asks for no wake.

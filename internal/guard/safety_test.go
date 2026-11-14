@@ -38,6 +38,14 @@ func TestHardContentRulesBlockAndStyleAvoidNever(t *testing.T) {
 		{"comment bait", "comment ngay để nhận quà", "engagement_bait"},
 		{"tag bait", "tag a friend who needs this", "engagement_bait"},
 		{"share bait", "like và share nhé", "engagement_bait"},
+		{"heart ask", "thả tim cho mình nha", "engagement_bait"},
+		{"heart ask, short", "tim đi mn", "engagement_bait"},
+		{"heart ask, command", "thả tim đi", "engagement_bait"},
+		{"heart ask, begging", "cho mình xin 1 tim", "engagement_bait"},
+		{"follow ask", "nhớ follow mình nha", "engagement_bait"},
+		{"follow ask, Vietnamese", "theo dõi mình để xem tiếp", "engagement_bait"},
+		{"share ask", "share ngay cho bạn bè", "engagement_bait"},
+		{"a heart that is not asked for", "mình đã thả tim bài này, tim mình tan chảy", ""},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			_, opts := setup(t)

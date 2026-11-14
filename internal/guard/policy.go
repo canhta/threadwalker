@@ -118,7 +118,7 @@ func (g *Guard) notePost(ctx context.Context, p threads.Post, inbox bool, root s
 // target, trend anchor and critic text lookups all read what it sets. Its
 // facts are the target score of its figures aged to now.
 func (g *Guard) register(row store.SeenPost) string {
-	ref := "p" + strconv.FormatInt(row.ID, 10)
+	ref := store.PostRef(row.ID)
 	post := threads.Post{Likes: row.Likes, Replies: row.Replies}
 	if row.AgeMinutes != nil {
 		age := *row.AgeMinutes + int64(max(g.opts.Now().Sub(row.ReadAt), 0)/time.Minute)
@@ -144,8 +144,14 @@ func (g *Guard) post(raw string) (store.SeenPost, bool) {
 	}
 	g.mu.Lock()
 	defer g.mu.Unlock()
-	row, ok := g.posts["p"+m[1]]
+	row, ok := g.posts[strings.ToLower(strings.TrimSpace(raw))]
 	return row, ok
+}
+
+// Issued reports whether ref is a p ref this wake issued.
+func (g *Guard) Issued(ref string) bool {
+	_, ok := g.post(ref)
+	return ok
 }
 
 // IsOwn reports whether username is one of the operator-declared own accounts.
@@ -201,7 +207,7 @@ func factKey(ref string) string {
 }
 
 // NoteFacts records the numbers a read showed for an item: its target score,
-// or its topic heat. Seen shows them and an action built on the item stores them.
+// or its topic heat. Seen shows them and a reply stores its target's.
 func (g *Guard) NoteFacts(ref string, f trends.ItemFacts) {
 	g.mu.Lock()
 	defer g.mu.Unlock()
@@ -209,12 +215,8 @@ func (g *Guard) NoteFacts(ref string, f trends.ItemFacts) {
 }
 
 // overlayFacts fills the context of an action from what this wake's reads
-// showed: the figures of the replied-to post and the heat of the anchored topic.
+// showed: the figures of the replied-to post.
 func (g *Guard) overlayFacts(pc *trends.PostingContext, intent *actionIntent, tool string) {
-	ref, ok := g.Trend(intent.Trend)
-	if !ok {
-		ref = intent.Trend
-	}
 	g.mu.Lock()
 	defer g.mu.Unlock()
 	if f, ok := g.facts[factKey(intent.TargetURL)]; ok && tool == "reply" && f.TargetScoreJSON != "" {
@@ -225,9 +227,6 @@ func (g *Guard) overlayFacts(pc *trends.PostingContext, intent *actionIntent, to
 		if f.ParentAgeMinutes != nil {
 			pc.ParentAgeMinutes = f.ParentAgeMinutes
 		}
-	}
-	if f, ok := g.facts[factKey(ref)]; ok && f.TopicHeat != nil {
-		pc.TopicHeat = f.TopicHeat
 	}
 }
 
@@ -282,7 +281,7 @@ func capRunes(s string) string {
 // threadAuthor extracts the author from a canonical https://threads.<tld>/@author/post/<id> URL.
 func threadAuthor(thread string) (author, reason string) {
 	u, err := url.Parse(thread)
-	if err != nil || !threadsHosts[u.Hostname()] {
+	if _, ok := stdx.ThreadsHost(u.Hostname()); err != nil || !ok {
 		return "", "reply_target_host"
 	}
 	parts := strings.Split(strings.TrimPrefix(u.Path, "/"), "/")
@@ -294,6 +293,27 @@ func threadAuthor(thread string) (author, reason string) {
 		return "", "invalid_tool_arguments"
 	}
 	return author, ""
+}
+
+// lengthBreak names the length limit text breaks, as "N of MAX unit", or is
+// empty. The platform caps every text; a reply is also held to the template's
+// guard.reply_max_runes and a post to the post limits the quality scorer shares.
+func lengthBreak(tool, text string, replyMax int) string {
+	n := utf8.RuneCountInString(text)
+	limit := stdx.MaxThreadsPostRunes
+	switch {
+	case tool == "reply" && replyMax > 0:
+		limit = min(limit, replyMax)
+	case tool == "post":
+		limit = min(limit, quality.MaxPostRunes)
+		if lines := quality.Lines(text); lines > quality.MaxPostLines {
+			return strconv.Itoa(lines) + " of " + strconv.Itoa(quality.MaxPostLines) + " lines"
+		}
+	}
+	if n > limit {
+		return strconv.Itoa(n) + " of " + strconv.Itoa(limit) + " characters"
+	}
+	return ""
 }
 
 // content checks a post or reply. A draft the writer will rewrite skips the
@@ -315,7 +335,7 @@ func (g *Guard) content(ctx context.Context, a Attempt, draft bool) (*actionInte
 	if a.Tool == "post" && g.opts.Template.Guard.TrendAnchor {
 		first, _, _ := strings.Cut(strings.TrimSpace(intent.Text), "\n")
 		if n := utf8.RuneCountInString(first); n > MaxHookRunes && !draft {
-			intent.detail = strconv.Itoa(n) + " of " + strconv.Itoa(MaxHookRunes) + " in the first line"
+			intent.detail = strconv.Itoa(n) + " of " + strconv.Itoa(MaxHookRunes) + " characters in the first line"
 			return &intent, "text_length", nil
 		}
 		if intent.Hook == "" || strings.TrimSpace(intent.Rationale) == "" || strings.ContainsAny(intent.Rationale, "\r\n") || utf8.RuneCountInString(intent.Rationale) > MaxRationaleRunes {
@@ -332,12 +352,8 @@ func (g *Guard) content(ctx context.Context, a Attempt, draft bool) (*actionInte
 		if strings.TrimSpace(text) == "" {
 			return nil, "invalid_tool_arguments", nil
 		}
-		if n := utf8.RuneCountInString(text); n > 500 && !draft {
-			intent.detail = strconv.Itoa(n) + " of 500"
-			return &intent, "text_length", nil
-		}
-		if n, max := utf8.RuneCountInString(text), g.opts.Template.Guard.ReplyMaxRunes; a.Tool == "reply" && max > 0 && n > max && !draft {
-			intent.detail = strconv.Itoa(n) + " of " + strconv.Itoa(max)
+		if detail := lengthBreak(a.Tool, text, g.opts.Template.Guard.ReplyMaxRunes); detail != "" && !draft {
+			intent.detail = detail
 			return &intent, "text_length", nil
 		}
 		if reason, detail := contentBlock(g.opts.Template.Guard.BlockedPhrases, text); reason != "" {
@@ -467,7 +483,7 @@ func (g *Guard) reserve(ctx context.Context, a Attempt, intent *actionIntent, au
 			return nil
 		}
 		if reason == "" {
-			if id, err = tx.InsertIntent(ctx, store.NewIntent{AgentID: agent, Kind: a.Tool, Text: intent.Text, TargetURL: intent.TargetURL, TargetUsername: intent.TargetUsername, Hook: intent.Hook, Rationale: intent.Rationale, TrendRef: strings.TrimSpace(intent.Trend), AnswersNote: intent.AnswersNote, Angle: intent.Angle, Fact: intent.Fact, LessonIDs: intent.LessonIDs, CriticJSON: intent.criticJSON, RootURL: intent.root, Parts: intent.Parts, TargetScoreJSON: intent.posting.TargetScoreJSON, TopicHeat: intent.posting.TopicHeat, ParentReplies: intent.posting.ParentReplies, ParentAgeMinutes: intent.posting.ParentAgeMinutes, DryRun: g.opts.Template.DryRun, Browser: intent.browser, At: now}); err != nil {
+			if id, err = tx.InsertIntent(ctx, store.NewIntent{AgentID: agent, Kind: a.Tool, Text: intent.Text, TargetURL: intent.TargetURL, TargetUsername: intent.TargetUsername, Hook: intent.Hook, Rationale: intent.Rationale, Trend: strings.TrimSpace(intent.Trend), AnswersNote: intent.AnswersNote, Angle: intent.Angle, Fact: intent.Fact, LessonIDs: intent.LessonIDs, CriticJSON: intent.criticJSON, RootURL: intent.root, Parts: intent.Parts, TargetScoreJSON: intent.posting.TargetScoreJSON, ParentReplies: intent.posting.ParentReplies, ParentAgeMinutes: intent.posting.ParentAgeMinutes, DryRun: g.opts.Template.DryRun, Browser: intent.browser, At: now}); err != nil {
 				return err
 			}
 			if a.Tool == "reply" {
@@ -522,7 +538,7 @@ func (g *Guard) repeatTopic(ctx context.Context, tx store.ReservationTx, intent 
 	ref := strings.TrimSpace(intent.Trend)
 	hook := hookWords(intent.Text)
 	for _, p := range recent {
-		if (ref != "" && p.TrendRef == ref) || similarHooks(hook, hookWords(p.Text)) {
+		if (ref != "" && p.Trend == ref) || similarHooks(hook, hookWords(p.Text)) {
 			return "repeat_topic", nil
 		}
 	}
@@ -542,7 +558,7 @@ func hookWords(text string) map[string]bool {
 }
 
 // similarHooks is true when at least two words, and half of the smaller word set, are shared.
-// ponytail: word overlap, not meaning; compare embeddings if paraphrases slip through.
+// Limit: word overlap, not meaning; compare embeddings if paraphrases slip through.
 func similarHooks(a, b map[string]bool) bool {
 	shared := 0
 	for w := range a {

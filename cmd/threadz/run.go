@@ -294,7 +294,7 @@ func newAPIServer(st *store.Store, tokens *threads.Tokens, templates []config.Te
 	var agents []api.Agent
 	for _, t := range templates {
 		if t.Threads.Backend == "api" {
-			agents = append(agents, api.Agent{ID: t.ID, UserID: t.Threads.UserID, Username: t.Threads.Username, MinWakeGap: time.Duration(t.Limits.MinMinutesBetweenWakes) * time.Minute})
+			agents = append(agents, api.Agent{ID: t.ID, UserID: t.Threads.UserID, Username: t.Threads.Username})
 		}
 	}
 	srv, err := api.New(api.Options{Agents: agents, AppID: getenv("THREADS_APP_ID"), AppSecret: secret, VerifyToken: verify, PublicURL: publicURL, Store: st, Tokens: tokens, Now: now, Rand: rand.Reader, Logger: logger})

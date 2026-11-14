@@ -55,7 +55,7 @@ var hints = map[string]string{
 	"agent_not_running":           "the agent is not running; end the wake",
 	"wake_not_open":               "this wake has ended; stop calling tools",
 	"phase_read_only":             "this tool is not allowed in the current phase; use a read tool",
-	"text_length":                 "too long: %s characters; cut it to one short idea and send it again",
+	"text_length":                 "too long: %s; cut it to one short idea and send it again",
 	"blocked_phrase":              "remove the phrase \"%s\" and rewrite",
 	"identity_targeting":          "do not target a person's identity (appearance, gender, region, age, private life); rewrite about the idea instead",
 	"political_recommendation":    "do not recommend a political choice; rewrite without it",

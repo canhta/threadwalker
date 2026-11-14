@@ -170,8 +170,8 @@ func TestPageCacheCollapsesCapsAndServesStaleWithinItsBound(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	if c.len() > 2 {
-		t.Fatalf("cache size = %d", c.len())
+	if len(c.entries) > 2 {
+		t.Fatalf("cache size = %d", len(c.entries))
 	}
 	if renders != 3 {
 		t.Fatalf("renders = %d", renders)

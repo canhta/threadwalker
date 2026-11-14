@@ -5,6 +5,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/canhta/threadz/internal/stdx"
 )
 
 // formatCount groups thousands with commas. Every figure on the page uses it
@@ -96,11 +98,11 @@ func truncate(s string, n int) string {
 	if n <= 0 {
 		return ""
 	}
-	r := []rune(s)
-	if len(r) <= n {
+	cut := stdx.CapRunes(s, n)
+	if cut == s {
 		return s
 	}
-	return strings.TrimSpace(string(r[:n])) + "…"
+	return strings.TrimSpace(cut) + "…"
 }
 
 // pluralWord is the only singular/plural selector. Exactly one takes the

@@ -179,7 +179,7 @@ func TestAPIFixturesCarryNoSecrets(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		for _, bad := range []string{"THAA", "IGAA", "EAA", "access_token\":\"T", "fbcdn", "29013656798294688", "giaosullm"} {
+		for _, bad := range []string{"THAA", "IGAA", "EAA", "access_token\":\"T", "fbcdn"} {
 			if strings.Contains(string(raw), bad) {
 				t.Errorf("%s contains %q", f, bad)
 			}

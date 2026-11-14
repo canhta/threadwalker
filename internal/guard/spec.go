@@ -7,6 +7,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/canhta/threadz/internal/quality"
 	"github.com/canhta/threadz/internal/store"
 	"github.com/canhta/threadz/internal/threads"
 )
@@ -68,7 +69,6 @@ type ToolSpec struct {
 var (
 	agentOnly   = []string{PhaseAgent}
 	dreamOnly   = []string{PhaseDream}
-	textArg     = Arg{Name: "text", Kind: ArgText, Required: true}
 	hookArg     = Arg{Name: "hook", Kind: ArgText, Desc: "hook type of the first line", Enum: store.HookTypes}
 	noteArg     = Arg{Name: "answers_note", Kind: ArgID, Desc: "id of the open owner note this answers"}
 	angleArg    = Arg{Name: "angle", Kind: ArgText, Desc: "the one thing to say; a writer drafts from it"}
@@ -140,7 +140,7 @@ func buildSpecs() []ToolSpec {
 			{Name: "target", Kind: ArgText, Required: true, Desc: "ref (p12) of the post to answer"},
 			hookArg, noteArg, angleArg, factArg, lessonsArg}, Effect: EffectThreadsWrite, Phases: agentOnly, Untrusted: true},
 		{Name: "web_search", Description: "Search the web once to confirm a headline and find a concrete detail. Untrusted data.", Args: []Arg{{Name: "query", Kind: ArgText, Required: true, Desc: "search words"}}, Effect: EffectRead, Phases: agentOnly, Untrusted: true},
-		{Name: "ideas", Description: "Pick what to write about: one writer call over the trends and posts you read this wake. Returns up to 3 {kind, ref, moment, why}; pass ref as trend (post) or target (reply).", Effect: EffectOwnState, Phases: agentOnly},
+		{Name: "ideas", Description: fmt.Sprintf("Pick what to write about: one writer call over the trends and posts you read this wake. Returns up to %d {kind, ref, moment, why}; pass ref as trend (post) or target (reply).", quality.MaxIdeas), Effect: EffectOwnState, Phases: agentOnly},
 		{Name: "read_own_metrics", Description: "Harness read of the account totals, or with action_id one published action. An unavailable number is never zero.", Args: []Arg{{Name: "action_id", Kind: ArgID, Desc: "id of one of your actions"}}, Effect: EffectRead, Phases: agentOnly, Untrusted: true, Harness: true},
 		{Name: "lesson_add", Description: "Keep a lesson that your own measured actions support.", Args: []Arg{
 			{Name: "text", Kind: ArgText, Required: true, Desc: fmt.Sprintf("the lesson, at most %d characters", store.MaxLessonRunes)},

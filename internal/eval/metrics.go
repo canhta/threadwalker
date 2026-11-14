@@ -71,7 +71,7 @@ func runMetricsCase(ctx context.Context, c Case, p Profile, repeat int, opts Opt
 	expectedSamples, expectedTargets := 1, 1
 	switch c.Scenario {
 	case "windows":
-		for _, h := range []int{1, 6, 24} {
+		for _, h := range store.MetricWindows {
 			now = start.Add(time.Duration(h) * time.Hour)
 			got, e := proc.RunDue(ctx)
 			if e != nil || got.Samples != 1 || got.ClaimedJobs != 1 {

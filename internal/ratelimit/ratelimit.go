@@ -79,12 +79,6 @@ func (l *Limiter) evictOldestLocked() {
 	}
 }
 
-func (l *Limiter) len() int {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-	return len(l.buckets)
-}
-
 // ClientIP names the visitor. Both servers listen on loopback behind the
 // Cloudflare tunnel, so a loopback peer is cloudflared and CF-Connecting-IP
 // is trusted; from any other peer the header is ignored.

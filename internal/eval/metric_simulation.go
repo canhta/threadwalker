@@ -200,7 +200,7 @@ func RunMetricSimulation(ctx context.Context, path string, hours int, logger *sl
 	}
 	expectedTargets := 3
 	for posted := 0; posted < hours; posted += 24 {
-		for _, window := range []int{1, 6, 24} {
+		for _, window := range store.MetricWindows {
 			if posted+window <= hours {
 				expectedTargets += 2
 			}

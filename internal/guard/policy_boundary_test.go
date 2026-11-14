@@ -14,6 +14,7 @@ import (
 	"github.com/canhta/threadz/internal/config"
 	"github.com/canhta/threadz/internal/guard"
 	"github.com/canhta/threadz/internal/llm"
+	"github.com/canhta/threadz/internal/quality"
 	"github.com/canhta/threadz/internal/store"
 	"github.com/canhta/threadz/internal/threads"
 	"github.com/canhta/threadz/internal/tools"
@@ -272,29 +273,28 @@ func TestPolicyForbiddenPhraseIsCaseInsensitive(t *testing.T) {
 	})
 }
 
-func TestPolicyTextLengthCountsRunesAt500And501(t *testing.T) {
-	text500 := strings.Repeat("ế", 500)
-	text501 := strings.Repeat("ế", 501)
-	if utf8.RuneCountInString(text500) != 500 || len(text500) <= 500 {
-		t.Fatalf("fixture is not 500 multi-byte runes: runes=%d bytes=%d", utf8.RuneCountInString(text500), len(text500))
+// A reply is capped by the platform at 500 characters and a post by the
+// quality limit at 300 (and 3 lines); both count runes, not bytes.
+func TestPolicyTextLengthCountsRunesAtTheLimits(t *testing.T) {
+	text := func(n int) string { return strings.Repeat("ế", n) }
+	if utf8.RuneCountInString(text(500)) != 500 || len(text(500)) <= 500 {
+		t.Fatal("fixture is not 500 multi-byte runes")
 	}
-	if utf8.RuneCountInString(text501) != 501 {
-		t.Fatalf("fixture is not 501 runes: %d", utf8.RuneCountInString(text501))
-	}
-
 	h := newPolicyHarness(t, nil)
-	h.allow("post", map[string]any{"text": text500})
+	h.allow("post", map[string]any{"text": text(quality.MaxPostRunes)})
 	h.clock.Advance(time.Second)
-	h.blocked("post", map[string]any{"text": text501}, ruleTextLength)
+	h.blocked("post", map[string]any{"text": text(quality.MaxPostRunes + 1)}, ruleTextLength)
+	h.clock.Advance(time.Second)
+	h.blocked("post", map[string]any{"text": "một\nhai\nba\nbốn"}, ruleTextLength)
 
 	h.clock.Advance(time.Second)
 	h.allow("reply", map[string]any{
-		"text": text500,
+		"text": text(500),
 		"read": "https://threads.com/@alice/post/1",
 	})
 	h.clock.Advance(time.Second)
 	h.blocked("reply", map[string]any{
-		"text": text501,
+		"text": text(501),
 		"read": "https://threads.com/@bob/post/2",
 	}, ruleTextLength)
 }

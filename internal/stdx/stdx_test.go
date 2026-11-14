@@ -26,3 +26,14 @@ func TestFiniteNonNegative(t *testing.T) {
 		}
 	}
 }
+
+func TestThreadsHostAndCapRunes(t *testing.T) {
+	for host, want := range map[string]string{"threads.com": "threads.com", "WWW.Threads.NET": "threads.com", "threads.net": "threads.com", "example.com": "", "threads.com.evil.io": ""} {
+		if got, ok := ThreadsHost(host); got != want || ok != (want != "") {
+			t.Errorf("%s: got %q, %v", host, got, ok)
+		}
+	}
+	if got := CapRunes("đủ ba chữ", 4); got != "đủ b" || CapRunes("ngắn", 10) != "ngắn" {
+		t.Errorf("CapRunes cut at %q", got)
+	}
+}

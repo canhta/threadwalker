@@ -46,10 +46,6 @@ func clamp0(n int64) int64 {
 	return n
 }
 
-func (c counts) at(s metricSample) counts {
-	return counts{s.Views, s.Likes, s.Replies, s.Reposts}
-}
-
 func latestAt(samples []metricSample, from, to time.Time) (counts, bool) {
 	var (
 		end   *metricSample
@@ -164,21 +160,6 @@ func countDeltaShort(cur, prior int64) string {
 		return "+" + formatSignedPercent(change)
 	}
 	return "-" + formatSignedPercent(-change)
-}
-
-func rateDeltaShort(cur, prior float64, curOK, priorOK bool) string {
-	if !curOK || !priorOK {
-		return ""
-	}
-	points := (cur - prior) * 100
-	switch {
-	case math.Abs(points) < 0.05:
-		return "no change"
-	case points > 0:
-		return "+" + formatPoints(points) + " points"
-	default:
-		return "-" + formatPoints(-points) + " points"
-	}
 }
 
 func formatPoints(v float64) string {

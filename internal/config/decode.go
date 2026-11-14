@@ -7,6 +7,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/canhta/threadz/internal/stdx"
 )
 
 // decoder accumulates every field error of one template file, so an operator
@@ -107,7 +109,7 @@ func (d *decoder) guard(t *Template) {
 		d.nonEmpty("guard.blocked_phrases", t.Guard.BlockedPhrases, "phrases")
 	}
 	t.Guard.TrendAnchor = d.boolean("guard.trend_anchor")
-	t.Guard.ReplyMaxRunes = d.boundedInt("guard.reply_max_runes", 0, 0, 500)
+	t.Guard.ReplyMaxRunes = d.boundedInt("guard.reply_max_runes", 0, 0, stdx.MaxThreadsPostRunes)
 	if d.has("guard.self_stat_units") {
 		t.Guard.SelfStatUnits = d.list("guard.self_stat_units")
 		d.nonEmpty("guard.self_stat_units", t.Guard.SelfStatUnits, "units")
@@ -154,17 +156,11 @@ func (d *decoder) critic(t *Template) {
 	}
 }
 
-// writer reads the optional writer.llm and writer.post_llm blocks. Unlike the critic it has no
+// writer reads the optional writer.llm block. Unlike the critic it has no
 // fallback: without the block the agent's own text is published as written.
 func (d *decoder) writer(t *Template) {
 	if d.has("writer.llm") {
 		d.llmBlock("writer.llm", &t.Writer)
-	}
-	if d.has("writer.post_llm") {
-		if !d.has("writer.llm") {
-			d.fail("writer.post_llm", "requires writer.llm")
-		}
-		d.llmBlock("writer.post_llm", &t.PostWriter)
 	}
 }
 
@@ -429,11 +425,11 @@ func (d *decoder) threads(t *Template) {
 		th.BaseURL = d.str("threads.base_url")
 		th.ExecutablePath = d.str("threads.executable_path")
 		u, err := url.Parse(th.BaseURL)
-		host := ""
+		_, threadsHost := "", false
 		if err == nil && u != nil {
-			host = strings.TrimPrefix(strings.ToLower(u.Hostname()), "www.")
+			_, threadsHost = stdx.ThreadsHost(u.Hostname())
 		}
-		if err != nil || u == nil || u.Scheme != "https" || (host != "threads.com" && host != "threads.net") || u.User != nil || u.Opaque != "" || (u.Path != "" && u.Path != "/") || u.RawQuery != "" || u.Fragment != "" || u.ForceQuery {
+		if err != nil || u == nil || u.Scheme != "https" || !threadsHost || u.User != nil || u.Opaque != "" || (u.Path != "" && u.Path != "/") || u.RawQuery != "" || u.Fragment != "" || u.ForceQuery {
 			d.fail("threads.base_url", "must be an HTTPS threads.com or threads.net origin without credentials, path, query or fragment")
 		}
 		th.AgentBrowserPath = d.str("threads.agent_browser_path")
@@ -497,9 +493,6 @@ func (d *decoder) secrets(t *Template, opts Options) {
 	}
 	if t.Writer.Model != "" {
 		t.Writer.APIKey = resolve("writer.llm.api_key_env", t.Writer.APIKeyEnv)
-	}
-	if t.PostWriter.Model != "" {
-		t.PostWriter.APIKey = resolve("writer.post_llm.api_key_env", t.PostWriter.APIKeyEnv)
 	}
 	if t.Threads.Backend == "api" {
 		if opts.Getenv != nil {

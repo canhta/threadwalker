@@ -13,6 +13,8 @@ import (
 	"unicode/utf8"
 
 	"golang.org/x/text/unicode/norm"
+
+	"github.com/canhta/threadz/internal/stdx"
 )
 
 const (
@@ -274,7 +276,7 @@ func (s *Store) ConfirmLesson(ctx context.Context, agentID string, lessonID int6
 // or RetiredByExpiry. An owner retirement is the tombstone that keeps the
 // same sentence from being added again.
 func (s *Store) RetireLesson(ctx context.Context, agentID string, lessonID int64, by, reason string, now time.Time) error {
-	res, err := s.db.ExecContext(ctx, `UPDATE lessons SET retired_at=?,retired_by=?,retire_reason=? WHERE agent_id=? AND id=? AND retired_at IS NULL`, formatStoreTimestamp(now), by, CapRunes(strings.TrimSpace(reason), MaxLessonRunes), agentID, lessonID)
+	res, err := s.db.ExecContext(ctx, `UPDATE lessons SET retired_at=?,retired_by=?,retire_reason=? WHERE agent_id=? AND id=? AND retired_at IS NULL`, formatStoreTimestamp(now), by, stdx.CapRunes(strings.TrimSpace(reason), MaxLessonRunes), agentID, lessonID)
 	if err != nil {
 		return fmt.Errorf("retiring lesson: %w", err)
 	}

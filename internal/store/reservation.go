@@ -5,6 +5,8 @@ import (
 	"database/sql"
 	"fmt"
 	"time"
+
+	"github.com/canhta/threadz/internal/stdx"
 )
 
 // ReservationTx is the guard's single writer transaction: the check, the
@@ -97,8 +99,8 @@ type NewIntent struct {
 	Parts []string
 	// Rationale is the one-line pre-publish check of a post: trend, hook, why a reader replies.
 	Rationale string
-	// TrendRef is the trend a post anchored to; AnswersNote the open owner note it answers, or 0.
-	TrendRef    string
+	// Trend is the trend a post anchored to; AnswersNote the open owner note it answers, or 0.
+	Trend       string
 	AnswersNote int64
 	// Angle and Fact are the agent's brief to the writer; LessonIDs are the
 	// active lessons it says it applied, validated by LessonsFit.
@@ -112,16 +114,14 @@ type NewIntent struct {
 	DryRun, Browser bool
 	At              time.Time
 	// TargetScoreJSON describes a reply's target; empty when it was never read.
-	// TopicHeat and the parent figures are the posting context; nil when not
-	// observed.
+	// The parent figures are the posting context; nil when not observed.
 	TargetScoreJSON                 string
 	ParentReplies, ParentAgeMinutes *int64
-	TopicHeat                       *float64
 }
 
 // InsertIntent records the reservation and returns its action id.
 func (t ReservationTx) InsertIntent(ctx context.Context, n NewIntent) (int64, error) {
-	res, err := t.conn.ExecContext(ctx, `INSERT INTO actions(agent_id,kind,text,target_url,target_username,dry_run,posted_at,thread_url,target_score_json,topic_heat,followers_at_post,parent_replies,parent_age_minutes,hook,rationale,browser,trend_ref,answers_note,critic_json,root_url,angle,fact) VALUES(?,?,?,?,?,?,?,?,?,?,(SELECT followers FROM account_followers WHERE agent_id=?),?,?,?,?,?,?,?,?,?,?,?)`, n.AgentID, n.Kind, n.Text, n.TargetURL, n.TargetUsername, n.DryRun, n.At.Format(time.RFC3339Nano), "", n.TargetScoreJSON, n.TopicHeat, n.AgentID, n.ParentReplies, n.ParentAgeMinutes, n.Hook, n.Rationale, n.Browser, n.TrendRef, n.AnswersNote, n.CriticJSON, n.RootURL, CapRunes(n.Angle, MaxTraceText), CapRunes(n.Fact, MaxTraceText))
+	res, err := t.conn.ExecContext(ctx, `INSERT INTO actions(agent_id,kind,text,target_url,target_username,dry_run,posted_at,thread_url,target_score_json,followers_at_post,parent_replies,parent_age_minutes,hook,rationale,browser,trend,answers_note,critic_json,root_url,angle,fact) VALUES(?,?,?,?,?,?,?,?,?,(SELECT followers FROM account_followers WHERE agent_id=?),?,?,?,?,?,?,?,?,?,?,?)`, n.AgentID, n.Kind, n.Text, n.TargetURL, n.TargetUsername, n.DryRun, n.At.Format(time.RFC3339Nano), "", n.TargetScoreJSON, n.AgentID, n.ParentReplies, n.ParentAgeMinutes, n.Hook, n.Rationale, n.Browser, n.Trend, n.AnswersNote, n.CriticJSON, n.RootURL, stdx.CapRunes(n.Angle, MaxTraceText), stdx.CapRunes(n.Fact, MaxTraceText))
 	if err != nil {
 		return 0, fmt.Errorf("reserving action intent: %w", err)
 	}
@@ -186,11 +186,11 @@ func (s *Store) RecordToolResult(ctx context.Context, id int64, resultJSON strin
 }
 
 // RecentPost is an own post of the last day: the trend it anchored to and its text.
-type RecentPost struct{ TrendRef, Text string }
+type RecentPost struct{ Trend, Text string }
 
 // RecentPosts lists the agent's own posts of one mode published since the given time.
 func (t ReservationTx) RecentPosts(ctx context.Context, agentID string, dryRun bool, since time.Time) ([]RecentPost, error) {
-	rows, err := t.conn.QueryContext(ctx, `SELECT trend_ref,text FROM actions WHERE agent_id=? AND kind='post' AND failed=0 AND dry_run=? AND julianday(posted_at)>julianday(?)`, agentID, dryRun, since.UTC().Format(time.RFC3339Nano))
+	rows, err := t.conn.QueryContext(ctx, `SELECT trend,text FROM actions WHERE agent_id=? AND kind='post' AND failed=0 AND dry_run=? AND julianday(posted_at)>julianday(?)`, agentID, dryRun, since.UTC().Format(time.RFC3339Nano))
 	if err != nil {
 		return nil, fmt.Errorf("reading recent posts: %w", err)
 	}
@@ -198,7 +198,7 @@ func (t ReservationTx) RecentPosts(ctx context.Context, agentID string, dryRun b
 	var out []RecentPost
 	for rows.Next() {
 		var p RecentPost
-		if err = rows.Scan(&p.TrendRef, &p.Text); err != nil {
+		if err = rows.Scan(&p.Trend, &p.Text); err != nil {
 			return nil, fmt.Errorf("reading recent post: %w", err)
 		}
 		out = append(out, p)

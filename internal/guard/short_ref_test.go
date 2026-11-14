@@ -51,8 +51,8 @@ func TestPostAnchorsByShortRefAndStoresTheURL(t *testing.T) {
 		t.Fatal(err)
 	}
 	var stored string
-	if err := st.DB().QueryRow(`SELECT trend_ref FROM actions WHERE kind='post'`).Scan(&stored); err != nil || stored != googleNews {
-		t.Fatalf("stored trend_ref %q, want the URL: %v", stored, err)
+	if err := st.DB().QueryRow(`SELECT trend FROM actions WHERE kind='post'`).Scan(&stored); err != nil || stored != googleNews {
+		t.Fatalf("stored trend %q, want the URL: %v", stored, err)
 	}
 	if got := blockedReason(t, post(g, strings.Replace(args, `"`+ref+`"`, `"t9"`, 1))); got != "no_trend_anchor" {
 		t.Fatalf("unknown ref: %q", got)

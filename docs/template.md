@@ -50,9 +50,9 @@ All required unless noted. A phrase in both `guard.blocked_phrases` and `persona
 
 ## LLM blocks
 
-`llm` is required. `writer.llm`, `writer.post_llm` and `critic.llm` are optional and use the same shape. A `profile` key is an error; model names, endpoints, key variable names and reasoning values are operator inputs with no vendor or model allowlist. The [model catalog](evals.md#model-catalog) is eval-only.
+`llm` is required. `writer.llm` and `critic.llm` are optional and use the same shape. A `profile` key is an error; model names, endpoints, key variable names and reasoning values are operator inputs with no vendor or model allowlist. The [model catalog](evals.md#model-catalog) is eval-only.
 
-| Key (prefix `llm.`, `writer.llm.`, `writer.post_llm.`, `critic.llm.`) | Type | Default | Owner | Effect |
+| Key (prefix `llm.`, `writer.llm.`, `critic.llm.`) | Type | Default | Owner | Effect |
 |---|---|---|---|---|
 | `protocol` | `openai` or `anthropic` | `openai` | code | Wire adapter ([architecture.md](architecture.md)) |
 | `base_url` | string | required | ops | API endpoint |
@@ -65,7 +65,6 @@ All required unless noted. A phrase in both `guard.blocked_phrases` and `persona
 | Block | Effect |
 |---|---|
 | `writer.llm` | Enables the writer and the `ideas` tool: `post` and `reply` take `angle` and `fact`, and a tool-free call drafts the text. Without it the agent's text goes to the critic as written |
-| `writer.post_llm` | Model for the writer of a `post` or series; replies and `ideas` keep `writer.llm`. Requires `writer.llm`. Its requests are billed to the same ledger phase at its own prices |
 | `critic.llm` | Model for the critic. Without it the critic uses `llm` |
 
 

@@ -78,7 +78,7 @@ func OpenCandidates(ctx context.Context, st *store.Store, t config.Template, own
 			continue
 		}
 		text, _ := stdx.TruncateUTF8(strings.Join(strings.Fields(row.Text), " "), candidateClip)
-		out = append(out, Candidate{Ref: "p" + strconv.FormatInt(row.ID, 10), Author: row.Author, AgeMinutes: age, Likes: row.Likes, Replies: row.Replies, Text: text, Score: facts.Score})
+		out = append(out, Candidate{Ref: store.PostRef(row.ID), Author: row.Author, AgeMinutes: age, Likes: row.Likes, Replies: row.Replies, Text: text, Score: facts.Score})
 	}
 	slices.SortStableFunc(out, func(a, b Candidate) int { return cmp.Compare(b.Score, a.Score) })
 	return out[:min(len(out), MaxCandidates)], nil

@@ -75,6 +75,7 @@ type Ledger interface {
 
 var ErrStepLimit = errors.New("wake request limit reached")
 var ErrBudget = errors.New("daily LLM budget spent")
+var errInvalidLedgerCost = errors.New("ledger cost is not a finite non-negative number")
 
 type Options struct {
 	Logger *slog.Logger
@@ -87,11 +88,11 @@ type Options struct {
 	Transcript func(ctx context.Context, kind, body string)
 	ProviderID string
 	ProfileID  string
-	// Phase selects phase-scoped accounting: agent (default), critic or dream.
-	// Dream spend is measured against CapUSD, not limits.MaxUSDPerDay.
+	// Phase labels the spend: agent (default), critic or dream. Every phase
+	// counts toward limits.MaxUSDPerDay.
 	Phase string
-	// CapUSD overrides the spend cap for this phase. Zero uses
-	// limits.MaxUSDPerDay (agent, critic) or requires a positive value for dream.
+	// CapUSD is the extra cap on dream spend alone; dream requires it, other
+	// phases ignore it.
 	CapUSD float64
 	// MaxSteps overrides limits.MaxStepsPerWake when positive; a step is one model request.
 	MaxSteps int
@@ -158,7 +159,7 @@ func New(cfg config.LLMConfig, limits config.LimitsConfig, ledger Ledger, opts O
 	if !stdx.FiniteNonNegative(cfg.PricePerMTokInUSD) || !stdx.FiniteNonNegative(cfg.PricePerMTokOutUSD) || (cfg.PricePerMTokCachedInUSD != nil && !stdx.FiniteNonNegative(*cfg.PricePerMTokCachedInUSD)) || !stdx.FiniteNonNegative(limits.MaxUSDPerDay) || limits.MaxUSDPerDay == 0 || limits.MaxStepsPerWake <= 0 {
 		return nil, errors.New("configuring LLM client: invalid prices or limits")
 	}
-	phase, capUSD, err := resolvePhase(opts, limits)
+	phase, capUSD, err := resolvePhase(opts)
 	if err != nil {
 		return nil, err
 	}
@@ -441,14 +442,14 @@ func (c *Client) requestAttempt(ctx context.Context, agentID string, wakeID int6
 		c.event(ctx, level, logging.LLMRequestFinished, agentID, wakeID, requestIndex, attempt, started, outcome, reason, usage, status, 0)
 	}()
 	day := c.limits.Day(started)
-	spent, err := c.spentForBudget(ctx, agentID, day)
+	left, err := c.budgetLeft(ctx, agentID, day)
+	if errors.Is(err, errInvalidLedgerCost) {
+		return completion{}, 0, 0, failure("checking daily LLM budget", "invalid_ledger_cost", nil)
+	}
 	if err != nil {
 		return completion{}, 0, 0, failure("checking daily LLM budget", "accounting_read_failed", err)
 	}
-	if !stdx.FiniteNonNegative(spent.CostUSD) {
-		return completion{}, 0, 0, failure("checking daily LLM budget", "invalid_ledger_cost", nil)
-	}
-	if spent.CostUSD >= c.capUSD {
+	if left <= 0 {
 		return completion{}, 0, 0, fmt.Errorf("requesting chat completion: %w", ErrBudget)
 	}
 	response, status, retryAfter, err = c.attempt(ctx, body)
@@ -493,7 +494,7 @@ func (c *Client) requestAttempt(ctx context.Context, agentID string, wakeID int6
 	if status == http.StatusOK && response.Usage == nil {
 		return completion{}, status, 0, failure("accounting chat response", "missing_usage", nil)
 	}
-	response.usdLeft = max(0, c.capUSD-spent.CostUSD-usage.CostUSD)
+	response.usdLeft = max(0, left-usage.CostUSD)
 	return response, status, retryAfter, nil
 }
 func (c *Client) attempt(ctx context.Context, body []byte) (completion, int, time.Duration, error) {
@@ -528,34 +529,43 @@ func (c *Client) attempt(ctx context.Context, body []byte) (completion, int, tim
 	return response, res.StatusCode, retryAfter, nil
 }
 
-// PhaseLedger is implemented by stores that split spend by wake phase. Agent
-// spend counts toward limits.max_usd_per_day; dream spend uses its own cap.
+// PhaseLedger is implemented by stores that split spend by wake phase. It is
+// needed only by the dream phase, which has a spend cap of its own.
 type PhaseLedger interface {
 	LLMUsageForDayPhases(context.Context, string, string, ...string) (Usage, error)
 }
 
-func (c *Client) spentForBudget(ctx context.Context, agentID, day string) (Usage, error) {
-	return spentForPhase(ctx, c.ledger, c.phase, agentID, day)
-}
-
-func spentForPhase(ctx context.Context, l Ledger, phase, agentID, day string) (Usage, error) {
-	ledger, ok := l.(PhaseLedger)
+// budgetLeft is how much this client may still spend today. Every phase of the
+// day (agent, writer, critic, dream) counts toward limits.max_usd_per_day. A
+// dream client is also held to its own cap, measured on dream spend alone.
+func (c *Client) budgetLeft(ctx context.Context, agentID, day string) (float64, error) {
+	all, err := c.ledger.LLMUsageForDay(ctx, agentID, day)
+	if err != nil {
+		return 0, err
+	}
+	if !stdx.FiniteNonNegative(all.CostUSD) {
+		return 0, errInvalidLedgerCost
+	}
+	left := c.limits.MaxUSDPerDay - all.CostUSD
+	if c.phase != "dream" {
+		return left, nil
+	}
+	phases, ok := c.ledger.(PhaseLedger)
 	if !ok {
-		if phase == "dream" {
-			return Usage{}, errors.New("phase accounting unavailable for dream")
-		}
-		return l.LLMUsageForDay(ctx, agentID, day)
+		return 0, errors.New("phase accounting unavailable for dream")
 	}
-	phases := []string{"agent"}
-	if phase == "dream" {
-		phases = []string{"dream"}
+	dream, err := phases.LLMUsageForDayPhases(ctx, agentID, day, "dream")
+	if err != nil {
+		return 0, err
 	}
-	return ledger.LLMUsageForDayPhases(ctx, agentID, day, phases...)
+	if !stdx.FiniteNonNegative(dream.CostUSD) {
+		return 0, errInvalidLedgerCost
+	}
+	return min(left, c.capUSD-dream.CostUSD), nil
 }
 
-// resolvePhase validates the phase and its spend cap, shared by every
-// component that spends against the ledger.
-func resolvePhase(opts Options, limits config.LimitsConfig) (string, float64, error) {
+// resolvePhase validates the phase and, for dream, its own spend cap.
+func resolvePhase(opts Options) (string, float64, error) {
 	phase := opts.Phase
 	if phase == "" {
 		phase = "agent"
@@ -563,30 +573,12 @@ func resolvePhase(opts Options, limits config.LimitsConfig) (string, float64, er
 	if phase != "agent" && phase != "dream" && phase != "critic" {
 		return "", 0, errors.New("configuring LLM client: unknown phase")
 	}
-	capUSD := opts.CapUSD
-	if phase == "dream" && capUSD <= 0 {
+	if phase == "dream" && (!stdx.FiniteNonNegative(opts.CapUSD) || opts.CapUSD <= 0) {
 		return "", 0, errors.New("configuring LLM client: dream phase requires a positive spend cap")
 	}
-	if capUSD == 0 {
-		capUSD = limits.MaxUSDPerDay
-	}
-	if !stdx.FiniteNonNegative(capUSD) || capUSD <= 0 {
-		return "", 0, errors.New("configuring LLM client: invalid phase spend cap")
-	}
-	return phase, capUSD, nil
+	return phase, opts.CapUSD, nil
 }
 
-// Errors from transports and bodies may contain credentials or reflected provider
-// content. Preserve cancellation identity, but never include untrusted error text.
-func safeHTTPError(operation string, err error) error {
-	if errors.Is(err, context.Canceled) {
-		return fmt.Errorf("%s: %w", operation, context.Canceled)
-	}
-	if errors.Is(err, context.DeadlineExceeded) {
-		return fmt.Errorf("%s: %w", operation, context.DeadlineExceeded)
-	}
-	return fmt.Errorf("%s: transport or response failure", operation)
-}
 func (c *Client) redactMessage(m Message) Message {
 	redact := c.redactor.String
 	m.Content = redact(m.Content)

@@ -37,6 +37,21 @@ func NewPhaseSchedule(schedule config.ScheduleConfig) (*PhaseSchedule, error) {
 	return s, nil
 }
 
+// NextQuietFrom is the next start of the quiet window at or after at; false
+// when there is no window.
+func (s *PhaseSchedule) NextQuietFrom(at time.Time) (time.Time, bool) {
+	if s == nil || s.quietFrom == "" {
+		return time.Time{}, false
+	}
+	local := at.In(s.loc)
+	h, m := clock(s.quietFrom)
+	from := time.Date(local.Year(), local.Month(), local.Day(), h, m, 0, 0, s.loc)
+	if from.Before(local) {
+		from = time.Date(local.Year(), local.Month(), local.Day()+1, h, m, 0, 0, s.loc)
+	}
+	return from, true
+}
+
 // AfterQuiet returns at, or the end of the local quiet window when at falls
 // inside it. A window may cross midnight (01:00-07:00 or 23:00-07:00).
 func (s *PhaseSchedule) AfterQuiet(at time.Time) time.Time {

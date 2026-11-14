@@ -10,8 +10,22 @@ import (
 	"testing"
 )
 
+// fixturePersonaSHA256 is the hash of the fixture's persona block after the script's
+// sentence rewrites. The fixture is a trimmed copy of the v0.2.1 live template with
+// placeholder names, so its hash is not the one the script knows for the live persona;
+// the script takes this one from KNOWN_PERSONA_SHA256. When the fixture's persona
+// changes, the script's warning "block differs" means this value needs the new hash.
+const fixturePersonaSHA256 = "95016ad2f4689b2af926884cbc39d1bd946f53a8bceb3e69e1a3684c129b391f"
+
+// patchCommand runs the script as the deploy does, with the fixture's persona hash.
+func patchCommand(py, script string, args ...string) *exec.Cmd {
+	cmd := exec.Command(py, append([]string{script}, args...)...)
+	cmd.Env = append(os.Environ(), "KNOWN_PERSONA_SHA256="+fixturePersonaSHA256)
+	return cmd
+}
+
 // The v0.3.0 deploy patches the live v0.2.1 yaml with deploy/patch-template-v13.py.
-// testdata/v0.2.1 is the live template as the v0.2.0 deploy left it, with dry_run off.
+// testdata/v0.2.1 holds the parts of that live template the patch touches, with dry_run off.
 func TestPatchTemplateV13(t *testing.T) {
 	py, err := exec.LookPath("python3")
 	if err != nil {
@@ -27,7 +41,7 @@ func TestPatchTemplateV13(t *testing.T) {
 	}
 	script := filepath.Join("..", "..", "deploy", "patch-template-v13.py")
 	run := func(path string) string {
-		out, err := exec.Command(py, script, path, viralTemplatePath()).CombinedOutput()
+		out, err := patchCommand(py, script, path, viralTemplatePath()).CombinedOutput()
 		if err != nil {
 			t.Fatalf("patch: %v\n%s", err, out)
 		}
@@ -78,7 +92,7 @@ func TestPatchTemplateV13(t *testing.T) {
 	if err := os.WriteFile(edited, []byte(strings.Replace(string(raw), "Đọc read_feed, rồi read_topic", "Xem read_feed trước, rồi read_topic", 1)), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if out, err := exec.Command(py, script, edited, viralTemplatePath()).CombinedOutput(); err != nil || !strings.Contains(string(out), "WARNING line") {
+	if out, err := patchCommand(py, script, edited, viralTemplatePath()).CombinedOutput(); err != nil || !strings.Contains(string(out), "WARNING line") {
 		t.Fatalf("hand-edited line not reported: %v %s", err, out)
 	}
 

@@ -8,6 +8,8 @@ import (
 	"net/url"
 	"strings"
 	"time"
+
+	"github.com/canhta/threadz/internal/stdx"
 )
 
 // PublishedAction is a confirmed live own post or reply that people can reply to.
@@ -105,14 +107,19 @@ func (s *Store) MetricsWakeReady(ctx context.Context, agentID string) (bool, err
 }
 
 // CanonicalThread normalizes a Threads post URL to one comparable form: https,
-// no www, no query, fragment or trailing slash.
+// host threads.com (threads.net and www. map to it, so one post has one
+// address and one p ref), no query, fragment or trailing slash.
 func CanonicalThread(raw string) (string, error) {
 	u, err := url.Parse(raw)
 	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Hostname() == "" || u.User != nil || u.Opaque != "" {
 		return "", errors.New("invalid thread URL")
 	}
 	u.Scheme = "https"
-	u.Host = strings.TrimPrefix(strings.ToLower(u.Host), "www.")
+	if host, ok := stdx.ThreadsHost(u.Hostname()); ok {
+		u.Host = host
+	} else {
+		u.Host = strings.TrimPrefix(strings.ToLower(u.Host), "www.")
+	}
 	u.RawQuery = ""
 	u.ForceQuery = false
 	u.Fragment = ""

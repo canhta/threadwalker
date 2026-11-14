@@ -41,15 +41,15 @@ func (d *Dispatcher) browserRead(ctx context.Context, tool, operation string, a 
 		page, err = d.opts.Threads.ReadTopic(ctx, a.Text("url"), a.Text("query"))
 	case threads.OpSearch:
 		page, err = d.opts.Threads.Search(ctx, a.Text("query"), a.Bool("recent"))
-	case "profile":
+	case threads.OpProfile:
 		return d.opts.Threads.ProfileLookup(ctx, a.Text("username"))
 	case threads.OpProfilePosts:
 		page, err = d.opts.Threads.ProfilePosts(ctx, a.Text("username"))
-	case "read_post":
+	case threads.OpReadPost:
 		page, err = d.opts.Threads.ReadPost(ctx, a.Text("id"))
-	case "read_replies":
+	case threads.OpReadReplies:
 		page, err = d.opts.Threads.ReadReplies(ctx, a.Text("id"))
-	case "read_own_metrics":
+	case threads.OpReadOwnMetrics:
 		if a.Int("action_id") > 0 {
 			return d.actionMetrics(ctx, a.Int("action_id"))
 		}
@@ -70,11 +70,11 @@ func (d *Dispatcher) browserRead(ctx context.Context, tool, operation string, a 
 }
 
 func (d *Dispatcher) observeStops(ctx context.Context, operation string, page threads.Page) error {
-	if operation != "read_post" && operation != "read_replies" {
+	if operation != threads.OpReadPost && operation != threads.OpReadReplies {
 		return nil
 	}
 	for _, post := range page.Posts {
-		if !post.IsReply && operation != "read_replies" {
+		if !post.IsReply && operation != threads.OpReadReplies {
 			continue
 		}
 		if _, err := d.guard.ObserveStopRequest(ctx, post.Username, post.Text, post.AddressedToAgent); err != nil {
@@ -85,7 +85,7 @@ func (d *Dispatcher) observeStops(ctx context.Context, operation string, page th
 }
 
 // ActionMetrics retains the local action binding in the untrusted result. The
-// processor verifies it before committing code-owned outcomes. AuthorReplied is
+// processor verifies it before committing metric samples. AuthorReplied is
 // nil unless the action is a reply whose target author's answer could be read.
 type ActionMetrics struct {
 	ActionID int64 `json:"action_id"`
@@ -121,7 +121,7 @@ func (d *Dispatcher) actionMetrics(ctx context.Context, actionID int64) (any, er
 	out := ActionMetrics{ActionID: actionID, Metrics: values}
 	if action.Kind == "reply" && action.TargetUsername != "" {
 		if page, readErr := d.opts.Threads.ReadReplies(call, action.MediaID); readErr == nil {
-			if err = d.observeStops(ctx, "read_replies", page); err != nil {
+			if err = d.observeStops(ctx, threads.OpReadReplies, page); err != nil {
 				return nil, err
 			}
 			replied := false
@@ -138,7 +138,7 @@ func (d *Dispatcher) browserAction(ctx context.Context, operation string, a argu
 	started := d.opts.Now()
 	defer func() { err = d.browserResult(ctx, operation, operation, started, err) }()
 	var published threads.Published
-	if operation == "post" {
+	if operation == threads.OpPost {
 		published, err = d.opts.Threads.Post(ctx, a.Text("text"), a.Text("topic_tag"))
 	} else {
 		// A post with an API id is replied to through the API; one only a browser
@@ -285,7 +285,7 @@ func (d *Dispatcher) redact(data any) any {
 // ReconcileUnpublished marks live post intents that never recorded a media id
 // as failed when the account's own thread listing shows no post with their
 // text. A failed listing proves nothing and leaves every intent counted.
-// ponytail: the listing holds the newest 100 threads; an older unconfirmed intent is not proven.
+// Limit: the listing holds the newest 100 threads; an older unconfirmed intent is not proven.
 func (d *Dispatcher) ReconcileUnpublished(ctx context.Context) {
 	pending, err := d.opts.Store.UnpublishedPosts(ctx, d.opts.Template.ID)
 	if err != nil || len(pending) == 0 {

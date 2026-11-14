@@ -207,6 +207,11 @@ func TestCappedDayWaitsForTheNextUTCDayWithoutAZone(t *testing.T) {
 				t.Fatal(err)
 			}
 		}, tomorrow},
+		{"critic and dream spend count toward the daily USD", func(t *testing.T, st *store.Store) {
+			if _, err := st.DB().Exec(`INSERT INTO ledger_phases(agent_id,day,phase,cost_usd) VALUES('synthetic-offline','2026-01-01','critic',0.5),('synthetic-offline','2026-01-01','dream',0.5)`); err != nil {
+				t.Fatal(err)
+			}
+		}, tomorrow},
 		{"posts and replies both used", func(t *testing.T, st *store.Store) {
 			for i := 0; i < 15; i++ {
 				seedToday(t, st, "reply", i)
@@ -283,6 +288,27 @@ func TestCappedSpendWaitsForLocalMidnight(t *testing.T) {
 				t.Fatalf("next wake %v, want %v (err %v)", state.NextWake, tc.want, err)
 			}
 		})
+	}
+}
+
+// Budget pacing: $0.62 spent over 5 wakes today (the wake that just ran counts)
+// is $0.124 a wake; $0.38 is left for the 12 hours to midnight, so the next wake
+// is 12h * 0.124 / 0.38 = about 235 minutes away, not the 20 minute minimum.
+func TestBehindAgentPacesItsBudgetOverTheRestOfTheDay(t *testing.T) {
+	r, st, fixture := kpiRuntime(t, 9*time.Hour, 3)
+	fixture.Calls = []llm.ToolCall{agent.SyntheticCall("find_posts", `{"source":"feed"}`)}
+	if _, err := st.DB().Exec(`INSERT INTO ledger_phases(agent_id,day,phase,cost_usd) VALUES('synthetic-offline','2026-01-01','critic',0.5)`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := r.Wake(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	state, err := st.AgentState(context.Background(), "synthetic-offline")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := state.NextWake.Sub(kpiNow); got < 234*time.Minute || got > 236*time.Minute {
+		t.Fatalf("next wake in %v, want about 235 minutes", got)
 	}
 }
 

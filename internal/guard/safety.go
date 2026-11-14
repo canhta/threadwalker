@@ -34,7 +34,14 @@ var safetyRules = []struct {
 		`|(?:ngoại tình|ly hôn|chồng|vợ|người yêu)\s+(?:của\s+)?(?:mày|bạn|ông|bà|anh|chị|nó|hắn)` +
 		`)` + edgeEnd)},
 	{reasonPolitical, regexp.MustCompile(`(?i)` + edgeStart + `(?:vote\s+(?:for|against)|(?:nên|hãy|đừng)\s+(?:bầu|bỏ phiếu)|bầu\s+cho|ủng hộ\s+(?:đảng|ứng viên|ông|bà))` + edgeEnd)},
-	{reasonBait, regexp.MustCompile(`(?i)` + edgeStart + `(?:comment\s+(?:ngay|\S{1,12}\s+(?:để|if|below|nếu))|cmt\s+(?:ngay|\S+\s+để)|tag\s+(?:a\s+|một\s+)?(?:friend|bạn|người)|like\s+(?:và|&|and)\s+share|share\s+ngay|follow\s+(?:me|mình|tôi)|reply\s+\S{1,6}\s+(?:để|if|to get))` + edgeEnd)},
+	{reasonBait, regexp.MustCompile(`(?i)` + edgeStart + `(?:` +
+		// Asks to comment, tag, or like and share.
+		`comment\s+(?:ngay|\S{1,12}\s+(?:để|if|below|nếu))|cmt\s+(?:ngay|\S+\s+để)|tag\s+(?:a\s+|một\s+)?(?:friend|bạn|người)|like\s+(?:và|&|and)\s+share|reply\s+\S{1,6}\s+(?:để|if|to get)` +
+		// Vietnamese asks for a heart: "thả tim cho mình", "tim đi mn", "xin tim".
+		`|thả\s+tim\s+(?:cho|đi|nhé|nha|giúp)|tim\s+(?:đi|nhé|nha|cho\s+(?:mình|t|tui|em|anh|chị))|(?:xin|cho\s+(?:mình|t|tui)|tặng\s+(?:mình|t|tui))\s+(?:một\s+|1\s+)?tim` +
+		// Asks to follow or share.
+		`|(?:follow|theo\s+dõi)\s+(?:me|mình|tôi|t|tui|em|kênh|page|acc)|bấm\s+(?:follow|theo\s+dõi)|share\s+(?:ngay|đi|nhé|nha|cho)|chia\s+sẻ\s+(?:ngay|bài\s+này|cho)` +
+		`)` + edgeEnd)},
 }
 
 // contentBlock returns the reason code of the first hard rule the text breaks

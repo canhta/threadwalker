@@ -54,7 +54,7 @@ func TestTopicFactsNormalisesHeat(t *testing.T) {
 	posts := func(n int64) *int64 { return &n }
 	prev := func(n int) *int { return &n }
 	hot := TopicFacts(Heat{Posts: posts(2100), Sources: 3, FirstSeen: at(-120), Rank: 0, PrevRank: prev(3)}, at(0))
-	if hot.Line != "[topic heat 0.72 · 2.1K posts · 3 sources · seen 2h · up 3]" || *hot.TopicHeat != hot.Score {
+	if hot.Line != "[topic heat 0.72 · 2.1K posts · 3 sources · seen 2h · up 3]" {
 		t.Fatalf("%+v", hot)
 	}
 	for name, cooler := range map[string]Heat{
@@ -70,7 +70,7 @@ func TestTopicFactsNormalisesHeat(t *testing.T) {
 	if got := TopicFacts(Heat{Posts: posts(5)}, at(0)); strings.Contains(got.Line, "sources") || strings.Contains(got.Line, "seen") || got.Score >= 0.1 {
 		t.Errorf("only the post count is known: %+v", got)
 	}
-	if got := TopicFacts(Heat{}, at(0)); got.Line != "" || got.TopicHeat != nil {
+	if got := TopicFacts(Heat{}, at(0)); got.Line != "" {
 		t.Errorf("no evidence, no facts: %+v", got)
 	}
 }

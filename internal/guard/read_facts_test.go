@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/canhta/threadz/internal/config"
 	"github.com/canhta/threadz/internal/guard"
@@ -32,9 +31,6 @@ func TestActionStoresFeaturesOfWhatTheWakeRead(t *testing.T) {
 		t.Fatalf("%+v %v", facts, err)
 	}
 	g.NoteFacts(target, facts)
-	now := opts.Now()
-	topic := "https://www.threads.com/search?q=x&serp_type=trends&trend_fbid=1"
-
 	var id int64
 	// The permalink arrives with a query.
 	ref := readPost(t, g, target+"?x=1", "tid", "")
@@ -53,21 +49,6 @@ func TestActionStoresFeaturesOfWhatTheWakeRead(t *testing.T) {
 		if !strings.Contains(scoreJSON, want) {
 			t.Errorf("%s missing %s", scoreJSON, want)
 		}
-	}
-
-	opts.Now = func() time.Time { return now.Add(time.Hour) }
-	if g, err = guard.New(opts); err != nil {
-		t.Fatal(err)
-	}
-	topicRef := g.NoteTrendText(topic, "topic")
-	g.NoteFacts(topic, trends.TopicFacts(trends.Heat{Posts: n64(2000)}, now))
-	var post int64
-	if _, err := g.Execute(context.Background(), guard.Attempt{Tool: "post", Arguments: `{"text":"Synthetic post","trend":"` + topicRef + `"}`, ReservedActionID: &post}, func() (string, error) { return "", nil }); err != nil {
-		t.Fatal(err)
-	}
-	var heat sql.NullFloat64
-	if err := st.DB().QueryRow(`SELECT topic_heat FROM actions WHERE id=?`, post).Scan(&heat); err != nil || !heat.Valid || heat.Float64 <= 0 {
-		t.Fatalf("topic heat %+v %v", heat, err)
 	}
 }
 

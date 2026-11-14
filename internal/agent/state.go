@@ -14,7 +14,7 @@ import (
 
 // maxWakeSpan is the longest a wake is expected to run. A gate that opens
 // inside it is worth keeping the tool for; one that stays shut past it is not.
-// ponytail: a wake has no deadline of its own; derive this from one if it gets one.
+// Limit: a wake has no deadline of its own; derive this from one if it gets one.
 const maxWakeSpan = 30 * time.Minute
 
 // wakeState is what the write gates allow at the start of a wake, from the

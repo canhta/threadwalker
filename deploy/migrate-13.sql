@@ -2,7 +2,8 @@
 -- the database:  sqlite3 -bail threadz.db < migrate-13.sql
 -- -bail is required: it stops the script at the first error. The file refuses
 -- to run on any other schema version and is one transaction: it applies
--- completely or not at all. It only adds a table; no row changes.
+-- completely or not at all. It adds a table, drops actions.topic_heat (never
+-- read) and renames actions.trend_ref to actions.trend; no other row changes.
 --
 -- The store test (TestMigrate13MatchesFreshSchema) builds v12 from
 -- internal/store/testdata/schema-v12.sql, applies this file and compares the
@@ -34,6 +35,12 @@ CREATE TABLE seen_posts (
 CREATE UNIQUE INDEX seen_posts_url ON seen_posts(agent_id,url);
 
 CREATE INDEX seen_posts_recent ON seen_posts(agent_id,read_at DESC);
+
+-- actions.topic_heat was written and never read.
+ALTER TABLE actions DROP COLUMN topic_heat;
+
+-- "ref" now means the p and t ids; the stored anchor is the trend itself.
+ALTER TABLE actions RENAME COLUMN trend_ref TO trend;
 
 -- Append further v13 changes above this line.
 

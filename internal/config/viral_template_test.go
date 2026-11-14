@@ -42,8 +42,8 @@ func TestLoadFile_ViralTemplate(t *testing.T) {
 	if tmpl.Inbox.PollMinutes != 10 || tmpl.Inbox.MinMinutesAfterWake != 5 {
 		t.Errorf("Inbox = %+v", tmpl.Inbox)
 	}
-	if tmpl.Threads.Username != "giaosullm" {
-		t.Errorf("Threads.Username = %q, want %q", tmpl.Threads.Username, "giaosullm")
+	if tmpl.Threads.Username != "your_threads_username" {
+		t.Errorf("Threads.Username = %q, want %q", tmpl.Threads.Username, "your_threads_username")
 	}
 	if tmpl.Persona.Name != "Hóng Hớt" {
 		t.Errorf("Persona.Name = %q, want %q", tmpl.Persona.Name, "Hóng Hớt")
