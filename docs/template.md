@@ -81,6 +81,10 @@ The `OPENAI_API_KEY` environment variable is also required at load for memory em
 | `limits.replies_per_conversation` | int 0..100 | 2 | code | Own replies under one root post (the post, its replies and ours); 0 is off. Lifted for a conversation whose first reply of ours has reached `limits.conversation_hot_likes` likes or `limits.conversation_hot_replies` replies in its newest stored metric |
 | `limits.conversation_hot_likes` | int > 0 | 5 | code | Likes on the first reply that lift the conversation cap |
 | `limits.conversation_hot_replies` | int > 0 | 3 | code | Replies to the first reply that lift the conversation cap |
+| `limits.replies_per_hour` | int 0..1000 | 6 | code | Own replies in any 60 minutes, template's mode, failed rows excluded; 0 is off |
+| `limits.breaker_min_likes` | int 0..1000000 | 2 | code | Outcome breaker: when the newest `limits.breaker_actions` own actions that have a metric sample earned fewer likes plus replies than this in total (newest sample each), replies are refused (`reply_breaker`) for `limits.breaker_hours` and one owner notice is queued; posts stay allowed. 0 is off |
+| `limits.breaker_actions` | int 1..100 | 15 | code | Measured actions the breaker judges; it does not trip on fewer |
+| `limits.breaker_hours` | int 1..168 | 6 | code | Length of the reply pause |
 | `limits.browser_replies_per_day` | int > 0 | 5 | code | Cap on replies to feed posts (browser path) |
 | `limits.critic_rejections_per_wake` | int 1–20 | 2 | code | Drafts the critic may reject in one wake before further posts and replies are refused (`critic_limit`) |
 | `limits.min_seconds_between_actions` | int > 0 | required | code | Spacing between actions |

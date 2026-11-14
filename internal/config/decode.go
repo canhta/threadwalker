@@ -213,6 +213,10 @@ func (d *decoder) limits(t *Template) {
 	if d.has("limits.browser_replies_per_day") {
 		l.BrowserRepliesPerDay = d.posInt("limits.browser_replies_per_day")
 	}
+	l.RepliesPerHour = d.boundedInt("limits.replies_per_hour", 6, 0, 1000)
+	l.BreakerMinLikes = d.boundedInt("limits.breaker_min_likes", 2, 0, 1000000)
+	l.BreakerActions = d.boundedInt("limits.breaker_actions", 15, 1, 100)
+	l.BreakerHours = d.boundedInt("limits.breaker_hours", 6, 1, 168)
 	l.MinSecondsBetweenActions = d.posInt("limits.min_seconds_between_actions")
 	if d.has("limits.min_minutes_between_posts") {
 		l.MinMinutesBetweenPosts = d.posInt("limits.min_minutes_between_posts")

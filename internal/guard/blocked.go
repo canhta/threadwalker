@@ -57,6 +57,8 @@ var hints = map[string]string{
 	"invalid_hypothesis":          "hypothesis_ids must be at most 5 distinct hypotheses you are testing",
 	"shared_promotion_link":       "remove the link and rewrite",
 	"do_not_contact":              "this user asked not to be contacted; pick another target",
+	"replies_per_hour":            "you already replied the maximum times in the last hour; the next reply is allowed at %s; post something instead, or wait",
+	"reply_breaker":               "replies are paused until %s because your recent replies earned nothing; post something better, or wait",
 	"replies_per_user_7d":         "you have replied to this user the maximum times this week; pick another target",
 	"replies_per_conversation":    "you already replied %s times in this conversation; let it end unless your first reply there took off",
 	"thread_per_day":              "you already replied in this thread today; pick another thread",

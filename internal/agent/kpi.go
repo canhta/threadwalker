@@ -100,43 +100,37 @@ func (s scoreboard) text() string {
 	b.WriteString(s.gap() + "\n")
 	b.WriteString("Pressure means: try more and better ideas, never lower quality. The critic still decides and the caps still hold.")
 	if s.Behind() {
-		b.WriteString(" You may not end this wake idle: call ideas (when you have it), try at least one post or reply, and if nothing is published end with a one-line note_write saying why.")
+		b.WriteString(" Behind is not a reason to reply: call ideas (when you have it) and publish only what is worth publishing; if nothing is, end with a one-line note_write saying why.")
 	}
 	return b.String() + "\n\n"
 }
 
-// stopCheck is the extra turn an agent gets when it stops early. A behind
-// agent may not stop idle. Any agent that wants to stop while posts it read
-// still score well and today's budget is not spent is shown those posts and
-// the money left; it decides which deserve a reply, or says why none do. No
-// count is imposed: the budget and what it read set the volume. Empty when the
-// stop is allowed. hidden lists tools this wake does not offer.
+// stopCheck is the one extra turn a behind agent gets when it stops early:
+// it lists the posts it read that still score well and it has not answered,
+// and what a wake owes (ideas, a post or a note). An agent on target is never
+// asked. The turn is sent once per wake (llm.MaxStopNudges) and imposes no
+// reply count. Empty when the stop is allowed. hidden lists tools this wake
+// does not offer.
 func (s scoreboard) stopCheck(hidden []string, open func() []string, usdLeft float64) func(called map[string]bool, succeeded map[string]int) string {
 	return func(called map[string]bool, succeeded map[string]int) string {
+		if !s.Behind() {
+			return ""
+		}
 		var todo []string
-		if s.Behind() {
-			if !called["ideas"] && !slices.Contains(hidden, "ideas") {
-				todo = append(todo, "call ideas")
-			}
-			if !called["post"] && !called["reply"] {
-				todo = append(todo, "try at least one post or reply")
-			}
+		if !called["ideas"] && !slices.Contains(hidden, "ideas") {
+			todo = append(todo, "call ideas")
 		}
 		if refs := open(); len(refs) > 0 && usdLeft >= minUSDToContinue {
 			shown := refs[:min(len(refs), 8)]
-			todo = append(todo, fmt.Sprintf("%d posts you read still score well and you have not answered them (%s); $%.2f of today's budget is left: reply to each one you have a real angle for, and stop only when none of them is worth it, saying why in note_write", len(refs), strings.Join(shown, ", "), usdLeft))
+			todo = append(todo, fmt.Sprintf("%d posts you read still score well and you have not answered them (%s); reply only to one you have a real angle for", len(refs), strings.Join(shown, ", ")))
 		}
-		if s.Behind() && succeeded["post"] == 0 && succeeded["reply"] == 0 && succeeded["note_write"] == 0 {
+		if succeeded["post"] == 0 && succeeded["reply"] == 0 && succeeded["note_write"] == 0 {
 			todo = append(todo, "write a one-line note_write saying why nothing was published")
 		}
 		if len(todo) == 0 {
 			return ""
 		}
-		prefix := "Before you stop: "
-		if s.Behind() {
-			prefix = "You are " + s.gap() + ". Before you stop: "
-		}
-		return prefix + strings.Join(todo, ", then ") + "."
+		return "You are " + s.gap() + ". Before you stop: " + strings.Join(todo, ", then ") + "."
 	}
 }
 

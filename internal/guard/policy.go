@@ -473,6 +473,14 @@ func (g *Guard) content(a Attempt, draft bool) (*actionIntent, string) {
 // would refuse costs no model calls; it writes nothing.
 func (g *Guard) reserve(ctx context.Context, a Attempt, intent *actionIntent, auditID int64, now time.Time, checkOnly bool) (id int64, reason string, err error) {
 	agent := g.opts.Template.ID
+	// The breaker reads and queues outside the reservation transaction; its
+	// refusal is audited inside it like any other.
+	paused := ""
+	if a.Tool == "reply" {
+		if paused, err = g.replyBreaker(ctx, intent, now); err != nil {
+			return 0, "", err
+		}
+	}
 	err = g.opts.Store.Reserve(ctx, func(tx store.ReservationTx) error {
 		running, open, err := tx.AgentWakeOpen(ctx, agent, g.opts.WakeID)
 		if err != nil {
@@ -482,6 +490,9 @@ func (g *Guard) reserve(ctx context.Context, a Attempt, intent *actionIntent, au
 			reason = "agent_not_running"
 		} else if !open {
 			reason = "wake_not_open"
+		}
+		if reason == "" {
+			reason = paused
 		}
 		var actions []store.ReservedAction
 		if reason == "" {
@@ -650,7 +661,8 @@ func (g *Guard) quotas(ctx context.Context, tx store.ReservationTx, actions []st
 	from := now.Add(-7 * 24 * time.Hour)
 	posts, replies, browserReplies, contact := 0, 0, 0, 0
 	threadUsed := false
-	var latest, latestPost time.Time
+	var latest, latestPost, oldestHour time.Time
+	hourReplies := 0
 	counts := map[string]int{}
 	for _, row := range actions {
 		if row.Agent != g.opts.Template.ID {
@@ -683,6 +695,12 @@ func (g *Guard) quotas(ctx context.Context, tx store.ReservationTx, actions []st
 		normalized, err := store.NormalizeUsername(row.TargetUsername)
 		if err != nil {
 			return "", errors.New("invalid stored contact")
+		}
+		if at.After(now.Add(-time.Hour)) {
+			if hourReplies == 0 || at.Before(oldestHour) {
+				oldestHour = at
+			}
+			hourReplies++
 		}
 		inWindow := at.After(from) && !at.After(now)
 		if normalized == intent.TargetUsername && inWindow {
@@ -729,6 +747,10 @@ func (g *Guard) quotas(ctx context.Context, tx store.ReservationTx, actions []st
 	}
 	if kind == "reply" && replies >= l.RepliesPerDay {
 		return "replies_per_day", nil
+	}
+	if kind == "reply" && l.RepliesPerHour > 0 && hourReplies >= l.RepliesPerHour {
+		intent.detail = oldestHour.Add(time.Hour).UTC().Format(time.RFC3339)
+		return "replies_per_hour", nil
 	}
 	if kind == "reply" && intent.browser && browserReplies >= l.BrowserRepliesPerDay {
 		return "browser_replies_per_day", nil
@@ -777,4 +799,41 @@ func (g *Guard) ObserveStopRequest(ctx context.Context, username, text string, a
 		}
 	}
 	return false, nil
+}
+
+// BreakerPrefix starts the event key of the owner notice a tripped reply
+// breaker queues; the newest such notice's time is when the pause began.
+const BreakerPrefix = "notice:reply_breaker:"
+
+// replyBreaker refuses a reply while replies are paused. Replies pause when
+// the newest limits.breaker_actions own actions with a metric sample earned
+// fewer than limits.breaker_min_likes likes plus replies in total, judging
+// only actions posted after the last pause began. The trip time is the queued
+// owner notice, so it survives a restart. It trips only on a full window.
+func (g *Guard) replyBreaker(ctx context.Context, intent *actionIntent, now time.Time) (string, error) {
+	l := g.opts.Template.Limits
+	if l.BreakerMinLikes <= 0 {
+		return "", nil
+	}
+	agent := g.opts.Template.ID
+	pause := time.Duration(l.BreakerHours) * time.Hour
+	began, err := g.opts.Store.LastOwnerEvent(ctx, agent, BreakerPrefix)
+	if err != nil {
+		return "", err
+	}
+	if !began.IsZero() && now.Before(began.Add(pause)) {
+		intent.detail = began.Add(pause).UTC().Format(time.RFC3339)
+		return "reply_breaker", nil
+	}
+	count, likes, newest, err := g.opts.Store.MeasuredEngagement(ctx, store.ActionScope{AgentID: agent, DryRun: g.opts.Template.DryRun}, began, l.BreakerActions)
+	if err != nil || count < l.BreakerActions || likes >= l.BreakerMinLikes {
+		return "", err
+	}
+	until := now.Add(pause).UTC().Format(time.RFC3339)
+	text := "Replies paused until " + until + ": the newest " + strconv.Itoa(count) + " measured actions earned " + strconv.Itoa(likes) + " likes and replies in total. Posts continue."
+	if _, err = g.opts.Store.QueueOwner(ctx, agent, "notice", text, BreakerPrefix+strconv.FormatInt(newest, 10), now); err != nil {
+		return "", err
+	}
+	intent.detail = until
+	return "reply_breaker", nil
 }

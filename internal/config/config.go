@@ -268,8 +268,14 @@ type LimitsConfig struct {
 	// ConversationHotReplies replies is exempt.
 	RepliesPerConversation, ConversationHotLikes, ConversationHotReplies int
 	// BrowserRepliesPerDay caps replies to feed posts, which go through the browser.
-	BrowserRepliesPerDay     int
-	MinSecondsBetweenActions int
+	BrowserRepliesPerDay int
+	// RepliesPerHour caps own replies in any 60 minutes; 0 is off.
+	RepliesPerHour int
+	// BreakerMinLikes pauses replies for BreakerHours when the newest
+	// BreakerActions measured actions earned fewer likes plus replies than this
+	// in total; 0 is off.
+	BreakerMinLikes, BreakerActions, BreakerHours int
+	MinSecondsBetweenActions                      int
 	// MinMinutesBetweenPosts spaces posts (not replies) apart; 0 is off.
 	MinMinutesBetweenPosts int
 	MaxStepsPerWake        int

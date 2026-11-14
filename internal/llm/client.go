@@ -202,7 +202,7 @@ func New(cfg config.LLMConfig, limits config.LimitsConfig, ledger Ledger, opts O
 var noteTools = map[string]bool{"memory_add": true, "note_write": true}
 
 // MaxStopNudges bounds the extra turns a run gets when it stops early.
-const MaxStopNudges = 3
+const MaxStopNudges = 1
 
 // nudgeText is the single reminder sent when a wake ends in text without a note.
 const nudgeText = "Save what you learned with memory_add, then stop."

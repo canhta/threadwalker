@@ -145,13 +145,13 @@ func TestBehindAgentGetsBoundedExtraTurnsWhenItStopsIdle(t *testing.T) {
 	fixture.Observe = func(messages []llm.Message) {
 		nudges = 0
 		for _, m := range messages[2:] {
-			if m.Role == "user" && strings.Contains(m.Content, "Before you stop: try at least one post or reply, then write a one-line note_write") {
+			if m.Role == "user" && strings.Contains(m.Content, "Before you stop:") && strings.Contains(m.Content, "one-line note_write") {
 				nudges++
 			}
 		}
 	}
 	wake, err := r.Wake(context.Background())
-	if err != nil || wake.EndReason != "completed" || nudges != llm.MaxStopNudges {
+	if err != nil || wake.EndReason != "completed" || nudges != 1 || llm.MaxStopNudges != 1 {
 		t.Fatalf("wake %+v err %v nudges %d", wake, err, nudges)
 	}
 }
