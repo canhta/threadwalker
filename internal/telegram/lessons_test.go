@@ -176,3 +176,24 @@ func TestDailyReportNamesEpisodesAndLessonChanges(t *testing.T) {
 		}
 	}
 }
+
+func TestLessonsCommandFitsOneTelegramMessageWhenFull(t *testing.T) {
+	svc, st, bot := lessonsService(t, "/lessons")
+	long := strings.Repeat("ồ ", 120)
+	for i := 0; i < 15; i++ {
+		var retired any
+		if i >= 10 {
+			retired = lessonsNow.Add(-time.Minute).Format(time.RFC3339Nano)
+		}
+		if _, err := st.DB().Exec(`INSERT INTO lessons(agent_id,kind,polarity,text,evidence_json,created_at,confirmed_at,retired_at,retired_by,retire_reason) VALUES('one','reply','do',?,'[1,2]',?,?,?,?,'')`, fmt.Sprintf("%d %s", i, long), lessonsNow.Format(time.RFC3339Nano), lessonsNow.Format(time.RFC3339Nano), retired, nullIfEmpty(map[bool]string{true: store.RetiredByDream}[retired != nil])); err != nil {
+			t.Fatal(err)
+		}
+	}
+	run(t, svc, bot)
+	if len(bot.texts) != 1 {
+		t.Fatalf("replies %d, want 1", len(bot.texts))
+	}
+	if n := len([]rune(bot.texts[0])); n > 4096 {
+		t.Fatalf("message is %d runes", n)
+	}
+}
