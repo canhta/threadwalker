@@ -382,6 +382,9 @@ func (g *Guard) review(ctx context.Context, a Attempt, intent *actionIntent) (re
 		if why, d := g.recheck(a, texts); why != "" {
 			return []string{Hint(why, d)}
 		}
+		if p := factProblem(intent.Fact, texts); p != "" {
+			return []string{p}
+		}
 		if p := repetitionProblem(texts[len(texts)-1], recent); p != "" {
 			return []string{p}
 		}

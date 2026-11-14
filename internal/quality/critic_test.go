@@ -158,19 +158,20 @@ func TestPromptsCarryTheTemplatesAudienceAndLearnedPosts(t *testing.T) {
 	}
 }
 
-func TestAFlatPostGoesBackToTheWriterButAReplyPasses(t *testing.T) {
-	flat := CriticVerdict{Pass: true, Scores: CriticScores{Hook: 4, NaturalVietnamese: 5, Specificity: 4, ForcedSelfReference: 5, TargetFit: 5, Novelty: 3, Clarity: 5}}
-	judge := func(context.Context, CriticInput) (CriticVerdict, error) { return flat, nil }
-	if _, ok, _ := Revise(context.Background(), nil, judge, nil, WriterInput{Kind: Post, Draft: []string{"x"}}, 0); ok {
-		t.Fatal("a novelty 3 post passed")
+// The bar for a safe, obvious or outsider draft lives in the critic prompt and
+// the persona's rules, for posts and replies alike; code adds no score gate.
+func TestTheCriticPromptFailsObviousDraftsForBothKinds(t *testing.T) {
+	r, err := DefaultRubric()
+	if err != nil {
+		t.Fatal(err)
 	}
-	if _, ok, _ := Revise(context.Background(), nil, judge, nil, WriterInput{Kind: Reply, Draft: []string{"x"}}, 0); !ok {
-		t.Fatal("a novelty 3 reply was failed")
+	c := r.CriticInstructions
+	for _, want := range []string{"obvious or safe", "outsider", "explains its own joke", "for posts and replies alike"} {
+		if !strings.Contains(c, want) {
+			t.Errorf("critic instructions miss %q", want)
+		}
 	}
-	sharp := flat
-	sharp.Scores.Novelty = 4
-	judge = func(context.Context, CriticInput) (CriticVerdict, error) { return sharp, nil }
-	if _, ok, _ := Revise(context.Background(), nil, judge, nil, WriterInput{Kind: Post, Draft: []string{"x"}}, 0); !ok {
-		t.Fatal("a hook 4, novelty 4 post failed")
+	if strings.Contains(c, "Never fail a draft for being obvious") {
+		t.Error("the critic prompt still forgives obvious drafts")
 	}
 }

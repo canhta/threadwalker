@@ -208,7 +208,6 @@ func Revise(ctx context.Context, write func(context.Context, WriterInput) ([]str
 		} else if v, err = judge(ctx, CriticInput{Kind: in.Kind, Texts: texts, Parent: in.Parent, Recent: in.Recent}); err != nil {
 			return tries, false, err
 		}
-		postBar(in.Kind, &v)
 		tries = append(tries, Try{texts, v})
 		if v.Pass {
 			return tries, true, nil
@@ -216,20 +215,6 @@ func Revise(ctx context.Context, write func(context.Context, WriterInput) ([]str
 		in.Draft, in.Problems = texts, v.Problems
 	}
 	return tries, false, nil
-}
-
-// minPostHook and minPostNovelty are the bar for the account's own posts. The
-// critic passed every draft of the first live night at novelty 3, and the post
-// it passed at hook 3 and novelty 3 was the flattest of them; a post stands
-// alone on the profile, so a safe observation goes back to the writer. Replies
-// keep the critic's own verdict: agreeing with a post is their job.
-const minPostHook, minPostNovelty = 4, 4
-
-func postBar(kind string, v *CriticVerdict) {
-	if kind == Post && v.Pass && (v.Scores.Hook < minPostHook || v.Scores.Novelty < minPostNovelty) {
-		v.Pass = false
-		v.Problems = append(v.Problems, "this post is a safe observation anyone could write; take a stance someone would argue with, or ask the one question everyone following this story wants answered, about its concrete detail")
-	}
 }
 
 func checkOf(check func([]string) []string, texts []string) []string {
