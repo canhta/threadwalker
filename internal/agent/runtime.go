@@ -917,6 +917,7 @@ func NewReviewer(o ReviewerOptions, wakeID int64) Reviewer {
 			if err != nil {
 				return nil, err
 			}
+			in.ReplyMaxRunes = t.Guard.ReplyMaxRunes
 			in.Angle, in.Fact, in.Parent = redact(in.Angle), redact(in.Fact), redact(in.Parent)
 			in.Draft, in.Problems, in.Recent, in.Lessons = redactAll(in.Draft), redactAll(in.Problems), redactAll(in.Recent), redactAll(in.Lessons)
 			if in.Examples, err = writerExamples(ctx, o.Store, t.ID, o.Now(), in.Kind, o.Redactor); err != nil {

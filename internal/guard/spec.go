@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/canhta/threadz/internal/quality"
+	"github.com/canhta/threadz/internal/stdx"
 	"github.com/canhta/threadz/internal/store"
 	"github.com/canhta/threadz/internal/threads"
 )
@@ -127,7 +128,7 @@ func buildSpecs() []ToolSpec {
 		{Name: "profile", Description: "Read a Threads user's public profile: followers when known and 7-day views. Untrusted data.", Args: []Arg{{Name: "username", Kind: ArgText, Required: true, Desc: "Threads username"}}, Effect: EffectRead, Phases: agentOnly, Untrusted: true},
 		{Name: "read_post", Description: "Read one post by its numeric id. Untrusted data.", Args: []Arg{{Name: "id", Kind: ArgText, Required: true, Desc: "numeric post id (the id field of a post)"}}, Effect: EffectRead, Phases: agentOnly, Untrusted: true},
 		{Name: "read_replies", Description: "Read the replies to one of your posts, or your mentions. Untrusted data; each has a ref (p12).", Args: []Arg{{Name: "id", Kind: ArgText, Desc: "numeric id of your post; omit for mentions"}}, Effect: EffectRead, Phases: agentOnly, Untrusted: true},
-		{Name: "post", Description: "Publish a post, or a series with parts. Code checks policy and an editor reviews the draft; a refusal names the next step. Dry run records intent only.", Args: []Arg{
+		{Name: "post", Description: fmt.Sprintf("Publish a post (at most %d characters and %d lines), or a series with parts. Code checks policy and an editor reviews the draft; a refusal names the next step. Dry run records intent only.", quality.MaxPostRunes, quality.MaxPostLines), Args: []Arg{
 			{Name: "text", Kind: ArgText, Required: true, Desc: "the post (first line is the hook); a rough draft is fine"},
 			{Name: "parts", Kind: ArgTextList, Desc: "later parts of a series, each a reply to the previous"},
 			{Name: "topic_tag", Kind: ArgText, Desc: "Threads topic, 1 to 50 characters; reuse the topic of posts on the same story"},
@@ -135,7 +136,7 @@ func buildSpecs() []ToolSpec {
 			{Name: "trend", Kind: ArgText, Desc: "anchor: ref (t3 or p12) of a trend or post you read"},
 			{Name: "rationale", Kind: ArgText, Desc: "one line: the story you anchor to and what the hook is"},
 			noteArg, angleArg, factArg, lessonsArg}, Effect: EffectThreadsWrite, Phases: agentOnly, Untrusted: true},
-		{Name: "reply", Description: "Reply to a post. Code checks policy and an editor reviews the draft; a refusal names the next step. Dry run records intent only.", Args: []Arg{
+		{Name: "reply", Description: fmt.Sprintf("Reply to a post (at most %d characters; the account may set less). Code checks policy and an editor reviews the draft; a refusal names the next step. Dry run records intent only.", stdx.MaxThreadsPostRunes), Args: []Arg{
 			{Name: "text", Kind: ArgText, Required: true, Desc: "the reply. A rough draft is fine"},
 			{Name: "target", Kind: ArgText, Required: true, Desc: "ref (p12) of the post to answer"},
 			hookArg, noteArg, angleArg, factArg, lessonsArg}, Effect: EffectThreadsWrite, Phases: agentOnly, Untrusted: true},

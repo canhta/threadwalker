@@ -300,15 +300,9 @@ func threadAuthor(thread string) (author, reason string) {
 // guard.reply_max_runes and a post to the post limits the quality scorer shares.
 func lengthBreak(tool, text string, replyMax int) string {
 	n := utf8.RuneCountInString(text)
-	limit := stdx.MaxThreadsPostRunes
-	switch {
-	case tool == "reply" && replyMax > 0:
-		limit = min(limit, replyMax)
-	case tool == "post":
-		limit = min(limit, quality.MaxPostRunes)
-		if lines := quality.Lines(text); lines > quality.MaxPostLines {
-			return strconv.Itoa(lines) + " of " + strconv.Itoa(quality.MaxPostLines) + " lines"
-		}
+	limit, maxLines := quality.Limit(tool, replyMax)
+	if lines := quality.Lines(text); maxLines > 0 && lines > maxLines {
+		return strconv.Itoa(lines) + " of " + strconv.Itoa(maxLines) + " lines"
 	}
 	if n > limit {
 		return strconv.Itoa(n) + " of " + strconv.Itoa(limit) + " characters"

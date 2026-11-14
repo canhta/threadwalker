@@ -134,7 +134,7 @@
     "type": "function",
     "function": {
       "name": "post",
-      "description": "Publish a post, or a series with parts. Code checks policy and an editor reviews the draft; a refusal names the next step. Dry run records intent only.",
+      "description": "Publish a post (at most 300 characters and 3 lines), or a series with parts. Code checks policy and an editor reviews the draft; a refusal names the next step. Dry run records intent only.",
       "parameters": {
         "additionalProperties": false,
         "properties": {
@@ -203,7 +203,7 @@
     "type": "function",
     "function": {
       "name": "reply",
-      "description": "Reply to a post. Code checks policy and an editor reviews the draft; a refusal names the next step. Dry run records intent only.",
+      "description": "Reply to a post (at most 500 characters; the account may set less). Code checks policy and an editor reviews the draft; a refusal names the next step. Dry run records intent only.",
       "parameters": {
         "additionalProperties": false,
         "properties": {

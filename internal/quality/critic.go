@@ -119,6 +119,8 @@ type WriterInput struct {
 	Endings  []string  // closing tokens of the account's last texts, newest first
 	Examples []Example // the account's best and worst recent actions of this kind
 	Lessons  []string  // texts of the active lessons the agent says it applies
+	// ReplyMaxRunes is the template's guard.reply_max_runes, the limit the writer is told for a reply.
+	ReplyMaxRunes int
 }
 
 // Example is one of the account's own recent actions and how it did.
@@ -193,7 +195,16 @@ func WriterMessages(r Rubric, p config.PersonaConfig, in WriterInput) []llm.Mess
 	for _, t := range in.Recent {
 		fmt.Fprintf(&b, "- %q\n", t)
 	}
-	return []llm.Message{{Role: "system", Content: r.WriterInstructions}, {Role: "user", Content: b.String()}}
+	return []llm.Message{{Role: "system", Content: r.WriterInstructions + " " + lengthRule(in)}, {Role: "user", Content: b.String()}}
+}
+
+// lengthRule tells the writer the limits code enforces on the finished text.
+func lengthRule(in WriterInput) string {
+	runes, lines := Limit(in.Kind, in.ReplyMaxRunes)
+	if lines == 0 {
+		return fmt.Sprintf("Keep each %s text to at most %d characters; a longer text is sent back.", in.Kind, runes)
+	}
+	return fmt.Sprintf("Keep each %s text to at most %d characters and %d lines (blank lines do not count); a longer text is sent back.", in.Kind, runes, lines)
 }
 
 // ParseWriter decodes the writer's reply: one to max non-empty texts.

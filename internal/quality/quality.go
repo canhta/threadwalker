@@ -66,8 +66,26 @@ func DefaultRubric() (Rubric, error) {
 	return r, nil
 }
 
-// Lines is the number of lines of a text, ignoring surrounding blank space.
-func Lines(text string) int { return len(strings.Split(strings.TrimSpace(text), "\n")) }
+// Lines is the number of non-blank lines of a text: blank-line spacing is free.
+func Lines(text string) int {
+	n := 0
+	for _, line := range strings.Split(text, "\n") {
+		if strings.TrimSpace(line) != "" {
+			n++
+		}
+	}
+	return n
+}
+
+// Limit is the most characters a text of a kind may have, and the most lines
+// (0 for no limit on lines). A reply's characters are the template's
+// guard.reply_max_runes, or the platform cap when that is 0.
+func Limit(kind string, replyMaxRunes int) (runes, lines int) {
+	if kind == Post {
+		return MaxPostRunes, MaxPostLines
+	}
+	return cmp.Or(replyMaxRunes, stdx.MaxThreadsPostRunes), 0
+}
 
 // RubricJSON is the raw rubric, for fingerprinting.
 func RubricJSON() []byte { return rubricJSON }
@@ -124,12 +142,9 @@ func JudgeMessages(r Rubric, p config.PersonaConfig, kind, text string) []llm.Me
 func Score(r Rubric, p config.PersonaConfig, g config.GuardConfig, kind, text, wake string, said []string, v Verdict) []Check {
 	var out []Check
 	add := func(id string, pass bool) { out = append(out, Check{id, pass}) }
-	limit := MaxPostRunes
-	if kind == Reply {
-		limit = cmp.Or(g.ReplyMaxRunes, stdx.MaxThreadsPostRunes)
-	}
-	add(MaxRunes, utf8.RuneCountInString(text) <= limit)
-	add(MaxLines, kind != Post || Lines(text) <= MaxPostLines)
+	runes, lines := Limit(kind, g.ReplyMaxRunes)
+	add(MaxRunes, utf8.RuneCountInString(text) <= runes)
+	add(MaxLines, lines == 0 || Lines(text) <= lines)
 	add(StyleAvoid, !containsAny(text, p.StyleAvoid))
 	var facts []float64
 	var tree any
