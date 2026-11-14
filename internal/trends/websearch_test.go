@@ -3,6 +3,7 @@ package trends_test
 import (
 	"context"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -114,5 +115,33 @@ func TestSearchWebSendsLowContextAndLocationAndRefusesALongQuery(t *testing.T) {
 	long := strings.Repeat("a", 201)
 	if _, err := search(context.Background(), trends.WebSearchRequest{BaseURL: server.URL, Model: "m", APIKey: "key", Query: long, MaxOutput: 64, Timeout: 3 * time.Second}); err == nil {
 		t.Fatal("a query past the cap was sent")
+	}
+}
+
+// A turn that ends with no message is asked once more; a second empty turn and
+// any other failure are not retried.
+func TestSearchWebRetriesOneEmptyResponse(t *testing.T) {
+	empty := `{"output":[{"type":"web_search_call"}],"usage":{"input_tokens":5,"output_tokens":0}}`
+	answer := `{"output":[{"content":[{"type":"output_text","text":"an answer"}]}],"usage":{"input_tokens":5,"output_tokens":3}}`
+	for _, tc := range []struct {
+		name    string
+		bodies  []string
+		calls   int
+		wantErr bool
+	}{
+		{"empty then answer", []string{empty, answer}, 2, false},
+		{"empty twice", []string{empty, empty, answer}, 2, true},
+		{"answer first", []string{answer, answer}, 1, false},
+	} {
+		calls := 0
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			io.WriteString(w, tc.bodies[calls])
+			calls++
+		}))
+		result, err := trends.NewWebSearcher(server.Client())(context.Background(), trends.WebSearchRequest{BaseURL: server.URL, Model: "m", APIKey: "key", Query: "q", MaxOutput: 256, Timeout: time.Second})
+		server.Close()
+		if calls != tc.calls || (err != nil) != tc.wantErr || (!tc.wantErr && result.Answer != "an answer") {
+			t.Errorf("%s: calls %d, err %v, answer %q", tc.name, calls, err, result.Answer)
+		}
 	}
 }

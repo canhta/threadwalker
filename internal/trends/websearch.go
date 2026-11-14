@@ -61,7 +61,13 @@ func NewWebSearcher(client *http.Client) WebSearcher {
 	copied := *client
 	copied.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
 	return func(ctx context.Context, req WebSearchRequest) (WebSearchResult, error) {
-		return searchWeb(ctx, &copied, req)
+		result, err := searchWeb(ctx, &copied, req)
+		// The Responses API sometimes ends a web_search turn with no message at all;
+		// one more call usually answers. Other failures are returned as they are.
+		if errors.Is(err, errEmptyResponse) {
+			result, err = searchWeb(ctx, &copied, req)
+		}
+		return result, err
 	}
 }
 
@@ -171,7 +177,7 @@ func searchWeb(ctx context.Context, client *http.Client, req WebSearchRequest) (
 		}
 	}
 	if result.Answer == "" && len(result.Sources) == 0 {
-		return WebSearchResult{}, errors.New("web search: empty response")
+		return WebSearchResult{}, errEmptyResponse
 	}
 	if decoded.Usage.InputTokens == nil || decoded.Usage.OutputTokens == nil {
 		return WebSearchResult{}, errors.New("web search: missing usage")
@@ -182,6 +188,8 @@ func searchWeb(ctx context.Context, client *http.Client, req WebSearchRequest) (
 	result.Usage = store.LLMUsage{TokensIn: *decoded.Usage.InputTokens, TokensOut: *decoded.Usage.OutputTokens}
 	return result, nil
 }
+
+var errEmptyResponse = errors.New("web search: empty response")
 
 type httpStatusError struct{ code int }
 

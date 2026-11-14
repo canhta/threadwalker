@@ -199,7 +199,7 @@ web_search:                       # optional bounded OpenAI Responses web search
   enabled: true
   model: gpt-6-luna
   max_results: 5
-  max_output_tokens: 512
+  max_output_tokens: 1024
 threads:
   username: your_threads_username # operator-owned throwaway account; never inferred from the persona name.
   backend: stub # Live use is backend: api with THREADS_ACCESS_TOKEN, THREADS_USER_ID and THREADZ_SECRET_KEY set.

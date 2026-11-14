@@ -91,7 +91,7 @@ web_search:                  # optional; reuses the template's OpenAI key
   enabled: true
   model: gpt-6-luna
   max_results: 5
-  max_output_tokens: 512
+  max_output_tokens: 1024
 ```
 
 The dream is read-only: `post`, `reply`, owner messages and schedule changes are refused with
