@@ -10,3 +10,4 @@ data/
 .DS_Store
 # replay inputs built from a live database (may hold other people's text)
 live-briefs*.json
+__pycache__/
