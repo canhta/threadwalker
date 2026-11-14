@@ -62,7 +62,7 @@ func TestLLMUsagePhaseTagsDreamAndExcludesItFromDailyCap(t *testing.T) {
 	}
 }
 
-func TestBeginPhaseWakeOncePerKeyAndCount(t *testing.T) {
+func TestBeginPhaseWakeOncePerKey(t *testing.T) {
 	ctx := context.Background()
 	st := openPhaseStore(t)
 	if err := st.EnsureAgent(ctx, "a"); err != nil {
@@ -77,10 +77,6 @@ func TestBeginPhaseWakeOncePerKeyAndCount(t *testing.T) {
 	}
 	if err := st.FinishWake(ctx, 1, now.Add(time.Minute), 2, "completed"); err != nil {
 		t.Fatal(err)
-	}
-	count, err := st.CountPhaseWakes(ctx, "a", store.WakeDream, now.Add(-time.Hour), now.Add(time.Hour))
-	if err != nil || count != 1 {
-		t.Fatalf("count=%d err=%v", count, err)
 	}
 	last, ok, err := st.LastPhaseWake(ctx, "a", store.WakeDream)
 	if err != nil || !ok || !last.Equal(now) {

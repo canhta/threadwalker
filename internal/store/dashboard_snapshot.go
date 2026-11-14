@@ -48,8 +48,8 @@ type DashboardSnapshot struct {
 }
 
 // DashboardPublication is a real (not dry-run) action, newest first. URL is
-// empty when the stored link is longer than 512 bytes. Text is set only when
-// the query asks for content.
+// empty when the stored link is longer than 512 bytes. Text is the post text, cut to a bounded
+// length.
 type DashboardPublication struct {
 	ID              int64
 	Kind            string

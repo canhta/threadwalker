@@ -79,8 +79,8 @@ func TestEvidenceSeedsAndReadsBack(t *testing.T) {
 		t.Fatalf("blocked=%q %v", blocked, err)
 	}
 
-	posts := []SeededPost{{Text: "p", URL: "https://x.invalid/p", PostedAt: at, Measured: at.Add(24 * time.Hour), Likes: 5}}
-	if err = st.SeedMeasuredPosts(ctx, "a", posts); err != nil {
+	seed := func() error { return seedMeasuredPost(st, at) }
+	if err = seed(); err != nil {
 		t.Fatal(err)
 	}
 	if got, err := st.MetricTally(ctx, "a"); err != nil || got != (MetricTally{Samples: 1, CompletedJobs: 3}) {
@@ -99,13 +99,13 @@ func TestEvidenceSeedsAndReadsBack(t *testing.T) {
 	if err = st.FailMetricInserts(ctx, true); err != nil {
 		t.Fatal(err)
 	}
-	if err = st.SeedMeasuredPosts(ctx, "a", posts); err == nil {
+	if err = seed(); err == nil {
 		t.Fatal("metric insert succeeded while failing")
 	}
 	if err = st.FailMetricInserts(ctx, false); err != nil {
 		t.Fatal(err)
 	}
-	if err = st.SeedMeasuredPosts(ctx, "a", posts); err != nil {
+	if err = seed(); err != nil {
 		t.Fatalf("metric insert failed after clearing: %v", err)
 	}
 	if n, err := st.StopRequestContacts(ctx, "a"); err != nil || n != 0 {
@@ -144,4 +144,30 @@ func TestReadOnlyProbeRejectsWritesOnReadOnlyStore(t *testing.T) {
 	if u, s := rw.ReadOnlyProbe(ctx); u || s {
 		t.Fatalf("writable store rejected a write: update=%v schema=%v", u, s)
 	}
+}
+
+// seedMeasuredPost inserts one live post with a 24h metric sample and
+// completed 1h, 6h and 24h targets, in one transaction.
+func seedMeasuredPost(st *Store, at time.Time) error {
+	tx, err := st.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	res, err := tx.Exec(`INSERT INTO actions(agent_id,kind,text,dry_run,posted_at,thread_url) VALUES('a','post','p',0,?,'https://x.invalid/p')`, at.Format(time.RFC3339Nano))
+	if err != nil {
+		return err
+	}
+	id, _ := res.LastInsertId()
+	measured := at.Add(24 * time.Hour).Format(time.RFC3339Nano)
+	if _, err = tx.Exec(`INSERT INTO metrics(agent_id,action_id,measured_at,views,likes) VALUES('a',?,?,100,5)`, id, measured); err != nil {
+		return err
+	}
+	for _, h := range []int{1, 6, 24} {
+		due := at.Add(time.Duration(h) * time.Hour).Format(time.RFC3339Nano)
+		if _, err = tx.Exec(`INSERT INTO metric_jobs(agent_id,action_id,window_hours,due_at,not_before,completed_at) VALUES('a',?,?,?,?,?)`, id, h, due, due, measured); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
 }

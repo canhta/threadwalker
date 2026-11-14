@@ -39,20 +39,6 @@ func (s *Store) LastPhaseWake(ctx context.Context, agentID, kind string) (time.T
 	return at, true, nil
 }
 
-// CountPhaseWakes returns the number of phase wakes that started inside the
-// half-open interval.
-func (s *Store) CountPhaseWakes(ctx context.Context, agentID, kind string, start, end time.Time) (int, error) {
-	if agentID == "" || kind != WakeDream || !end.After(start) {
-		return 0, errors.New("counting phase wakes: agent, dream kind and interval required")
-	}
-	var count int
-	err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM wakes WHERE agent_id=? AND kind=? AND julianday(started_at)>=julianday(?) AND julianday(started_at)<julianday(?)`, agentID, kind, start.UTC().Format(time.RFC3339Nano), end.UTC().Format(time.RFC3339Nano)).Scan(&count)
-	if err != nil {
-		return 0, fmt.Errorf("counting phase wakes: %w", err)
-	}
-	return count, nil
-}
-
 // BeginPhaseWake inserts one dream session without touching the agent's normal
 // next wake. phaseKey is the local-day identity; the partial unique index makes
 // a second run impossible even across concurrent schedulers and restarts.

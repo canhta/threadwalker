@@ -69,11 +69,11 @@ func TestFetchSourcesCoversEveryConfiguredSourceKind(t *testing.T) {
 	}
 	for _, want := range []string{"google_news_vn", "the_verge", "hacker_news", "github_trending", "google_news_topics", "vnexpress"} {
 		if sources[want] == 0 {
-			t.Fatalf("source %s missing from %v (failed=%v skipped=%v)", want, sources, feed.Failed, feed.Skipped)
+			t.Fatalf("source %s missing from %v (failed=%v)", want, sources, feed.Failed)
 		}
 	}
-	if len(feed.Failed) != 0 || len(feed.Skipped) != 0 {
-		t.Fatalf("failed=%v skipped=%v", feed.Failed, feed.Skipped)
+	if len(feed.Failed) != 0 {
+		t.Fatalf("failed=%v", feed.Failed)
 	}
 	seenTitle := false
 	for _, item := range feed.Items {

@@ -20,12 +20,7 @@ func round2(x float64) float64 { return math.Round(x*100) / 100 }
 // TargetParts are the numeric reasons a post is worth a reply. They hold no
 // text and no author data.
 type TargetParts struct {
-	ReplyVelocity  float64 `json:"reply_velocity"`
-	AgeMinutes     int64   `json:"age_minutes"`
-	AlreadyReplied bool    `json:"already_replied"`
-	// JokeSaturation counts other observed posts that share a bigram with the
-	// parent's snippet; reply text is not observed.
-	JokeSaturation int `json:"joke_saturation"`
+	AgeMinutes int64 `json:"age_minutes"`
 	// Replies, Likes and LikesPerHour are nil when not observed. Outside names
 	// the knobs of the template's targets block the post breaks: "age",
 	// "replies", "likes_per_hour", "likes". AgeMinutes is -1 when unknown.
@@ -51,12 +46,11 @@ type TargetScore struct {
 	outside string
 }
 
-// Size tiers of an author relative to our follower count.
+// The author's size and how crowded the angle is are not observed, so those
+// two terms of the score are neutral.
 const (
-	TierUnknown = "unknown"
-	TierNear    = "near"
-	TierTarget  = "target"
-	TierMega    = "mega"
+	neutralSize    = 0.5
+	neutralNovelty = 1.0
 )
 
 func clamp01(x float64) float64 { return math.Max(0, math.Min(1, x)) }
@@ -64,13 +58,9 @@ func clamp01(x float64) float64 { return math.Max(0, math.Min(1, x)) }
 // scoreTarget averages, each in 0..1: freshness against targets.max_age_minutes
 // (neutral when the age is unknown), room in the replies against
 // targets.max_replies (when known), momentum (likes per hour against
-// targets.min_likes_per_hour, else observed reply velocity), size tier
-// and novelty. A post that breaks a knob is flagged in Outside and scores
-// 0; it is never removed.
-func scoreTarget(p TargetParts, tier string, k config.TargetsConfig) TargetScore {
-	if p.AlreadyReplied {
-		return TargetScore{TargetParts: p}
-	}
+// targets.min_likes_per_hour) and the two neutral terms. A post that breaks a
+// knob is flagged in Outside and scores 0; it is never removed.
+func scoreTarget(p TargetParts, k config.TargetsConfig) TargetScore {
 	p.Outside = nil
 	var broken []string
 	outside := func(knob, figure string) {
@@ -91,7 +81,7 @@ func scoreTarget(p TargetParts, tier string, k config.TargetsConfig) TargetScore
 			outside(outsideReplies, fmt.Sprintf("replies %d > max_replies %d", *p.Replies, k.MaxReplies))
 		}
 	}
-	momentum := unit(p.ReplyVelocity, 3)
+	momentum := 0.0
 	if p.LikesPerHour != nil {
 		momentum = unit(*p.LikesPerHour, k.MinLikesPerHour)
 		if *p.LikesPerHour < k.MinLikesPerHour {
@@ -104,8 +94,7 @@ func scoreTarget(p TargetParts, tier string, k config.TargetsConfig) TargetScore
 	if len(broken) > 0 {
 		return TargetScore{TargetParts: p, outside: strings.Join(broken, ", ")}
 	}
-	size := map[string]float64{TierUnknown: 0.5, TierNear: 0.6, TierTarget: 1, TierMega: 0.2}[tier]
-	terms = append(terms, momentum, size, 1/float64(1+p.JokeSaturation))
+	terms = append(terms, momentum, neutralSize, neutralNovelty)
 	sum := 0.0
 	for _, term := range terms {
 		sum += term

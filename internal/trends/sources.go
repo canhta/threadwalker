@@ -31,9 +31,8 @@ type SourceOptions struct {
 
 // SourceFeed is the fail-soft result of one fetch.
 type SourceFeed struct {
-	Items   []Trend  `json:"items"`
-	Failed  []string `json:"failed_sources,omitempty"`
-	Skipped []string `json:"skipped_sources,omitempty"`
+	Items  []Trend  `json:"items"`
+	Failed []string `json:"failed_sources,omitempty"`
 }
 
 const (
@@ -80,7 +79,6 @@ type sourceResult struct {
 	source string
 	items  []Trend
 	failed bool
-	skip   bool
 }
 
 // FetchSources fetches every enabled source with a per-source deadline and
@@ -122,10 +120,8 @@ func FetchSources(ctx context.Context, opts SourceOptions) (SourceFeed, error) {
 			defer wg.Done()
 			sem <- struct{}{}
 			defer func() { <-sem }()
-			items, skip, err := fetchSource(ctx, client, opts, source, endpoint(source), timeout)
+			items, err := fetchSource(ctx, client, opts, source, endpoint(source), timeout)
 			switch {
-			case skip:
-				results[index].skip = true
 			case err != nil:
 				results[index].failed = true
 			default:
@@ -134,11 +130,9 @@ func FetchSources(ctx context.Context, opts SourceOptions) (SourceFeed, error) {
 		}(index, source)
 	}
 	wg.Wait()
-	feed := SourceFeed{Items: []Trend{}, Failed: []string{}, Skipped: []string{}}
+	feed := SourceFeed{Items: []Trend{}, Failed: []string{}}
 	for _, result := range results {
 		switch {
-		case result.skip:
-			feed.Skipped = append(feed.Skipped, result.source)
 		case result.failed:
 			feed.Failed = append(feed.Failed, result.source)
 		default:
@@ -151,16 +145,16 @@ func FetchSources(ctx context.Context, opts SourceOptions) (SourceFeed, error) {
 	return feed, nil
 }
 
-func fetchSource(ctx context.Context, client *http.Client, opts SourceOptions, source, endpoint string, timeout time.Duration) ([]Trend, bool, error) {
+func fetchSource(ctx context.Context, client *http.Client, opts SourceOptions, source, endpoint string, timeout time.Duration) ([]Trend, error) {
 	sourceCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 	switch source {
 	case "hacker_news":
 		items, err := fetchHackerNews(sourceCtx, client, endpoint, opts.MaxItemsPerSource)
-		return items, false, err
+		return items, err
 	case "github_trending":
 		items, err := fetchGitHubTrending(sourceCtx, client, endpoint, opts.MaxItemsPerSource)
-		return items, false, err
+		return items, err
 	case "google_news_topics":
 		var all []Trend
 		if len(opts.Queries) == 0 {
@@ -181,7 +175,7 @@ func fetchSource(ctx context.Context, client *http.Client, opts SourceOptions, s
 			items, err := fetchSourceRSS(sourceCtx, client, raw, source, opts.MaxItemsPerSource-len(all))
 			if err != nil {
 				if len(all) == 0 {
-					return nil, false, err
+					return nil, err
 				}
 				break
 			}
@@ -190,13 +184,13 @@ func fetchSource(ctx context.Context, client *http.Client, opts SourceOptions, s
 				break
 			}
 		}
-		return all, false, nil
+		return all, nil
 	default:
 		if endpoint == "" {
-			return nil, false, errors.New("fetch source: no endpoint")
+			return nil, errors.New("fetch source: no endpoint")
 		}
 		items, err := fetchSourceRSS(sourceCtx, client, endpoint, source, opts.MaxItemsPerSource)
-		return items, false, err
+		return items, err
 	}
 }
 

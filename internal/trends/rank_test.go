@@ -54,10 +54,3 @@ func TestRankStoriesClustersTheSameStoryAcrossSources(t *testing.T) {
 		t.Fatalf("single story=%+v", stories[1])
 	}
 }
-
-func TestAvoided(t *testing.T) {
-	avoid := []string{"crypto", "airdrop"}
-	if !Avoided("Crypto airdrop season", avoid) || Avoided("Local LLM benchmark", avoid) {
-		t.Fatal("Avoided misjudged a title")
-	}
-}

@@ -181,44 +181,6 @@ func (s *Store) SeedAction(ctx context.Context, a SeededAction) (int64, error) {
 	return res.LastInsertId()
 }
 
-// SeededPost is a synthetic post with a finished 24h measurement.
-type SeededPost struct {
-	Text, URL          string
-	PostedAt, Measured time.Time
-	Likes              int
-}
-
-// SeedMeasuredPosts inserts posts with a metric sample and completed 1h, 6h
-// and 24h measurement jobs in one transaction.
-func (s *Store) SeedMeasuredPosts(ctx context.Context, agentID string, posts []SeededPost) error {
-	tx, err := s.db.BeginTx(ctx, nil)
-	if err != nil {
-		return fmt.Errorf("seeding measured posts: %w", err)
-	}
-	defer tx.Rollback()
-	for _, p := range posts {
-		res, err := tx.ExecContext(ctx, `INSERT INTO actions(agent_id,kind,text,dry_run,posted_at,thread_url) VALUES(?,'post',?,0,?,?)`, agentID, p.Text, p.PostedAt.Format(time.RFC3339Nano), p.URL)
-		if err != nil {
-			return fmt.Errorf("seeding measured posts: %w", err)
-		}
-		id, err := res.LastInsertId()
-		if err != nil {
-			return fmt.Errorf("seeding measured posts: %w", err)
-		}
-		measured := p.Measured.Format(time.RFC3339Nano)
-		if _, err = tx.ExecContext(ctx, `INSERT INTO metrics(agent_id,action_id,measured_at,views,likes) VALUES(?,?,?,100,?)`, agentID, id, measured, p.Likes); err != nil {
-			return fmt.Errorf("seeding measured posts: %w", err)
-		}
-		for _, h := range []int{1, 6, 24} {
-			due := p.PostedAt.Add(time.Duration(h) * time.Hour).Format("2006-01-02T15:04:05.000000000Z")
-			if _, err = tx.ExecContext(ctx, `INSERT INTO metric_jobs(agent_id,action_id,window_hours,due_at,not_before,completed_at) VALUES(?,?,?,?,?,?)`, agentID, id, h, due, due, measured); err != nil {
-				return fmt.Errorf("seeding measured posts: %w", err)
-			}
-		}
-	}
-	return tx.Commit()
-}
-
 // FailMetricInserts makes every metric insert abort while on, to exercise the
 // processor's persistence-failure path.
 func (s *Store) FailMetricInserts(ctx context.Context, on bool) error {

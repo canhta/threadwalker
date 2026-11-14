@@ -41,14 +41,13 @@ var rubricJSON []byte
 
 // Rubric is the fixed scoring configuration shared by every consumer.
 type Rubric struct {
-	MaxRunes               map[string]int `json:"max_runes"`
-	MaxPostLines           int            `json:"max_post_lines"`
-	SelfStatUnits          []string       `json:"self_stat_units"`
-	ImageWords             []string       `json:"image_words"`
-	JudgeInstructions      string         `json:"judge_instructions"`
-	PostMortemInstructions string         `json:"post_mortem_instructions"`
-	CriticInstructions     string         `json:"critic_instructions"`
-	WriterInstructions     string         `json:"writer_instructions"`
+	MaxRunes           map[string]int `json:"max_runes"`
+	MaxPostLines       int            `json:"max_post_lines"`
+	SelfStatUnits      []string       `json:"self_stat_units"`
+	ImageWords         []string       `json:"image_words"`
+	JudgeInstructions  string         `json:"judge_instructions"`
+	CriticInstructions string         `json:"critic_instructions"`
+	WriterInstructions string         `json:"writer_instructions"`
 }
 
 // DefaultRubric returns the embedded rubric.
@@ -239,45 +238,4 @@ func hasUnit(text string, start, end int, units []string) bool {
 		}
 	}
 	return false
-}
-
-// Scores are the post-mortem judge's 1..5 ratings of one published action.
-type Scores struct {
-	HookStrength int `json:"hook_strength"`
-	Specificity  int `json:"specificity"`
-	Preachiness  int `json:"preachiness"`
-	SlopFree     int `json:"slop_free"`
-	PersonaFit   int `json:"persona_fit"`
-	TargetFit    int `json:"target_fit"`
-}
-
-// ParseScores decodes the post-mortem judge's reply, rejecting unknown fields and ratings outside 1..5.
-func ParseScores(content string) (Scores, error) {
-	var s Scores
-	dec := json.NewDecoder(strings.NewReader(strings.TrimSpace(content)))
-	dec.DisallowUnknownFields()
-	if err := dec.Decode(&s); err != nil {
-		return Scores{}, errors.New("parsing post-mortem scores: not the expected JSON object")
-	}
-	for _, n := range []int{s.HookStrength, s.Specificity, s.Preachiness, s.SlopFree, s.PersonaFit, s.TargetFit} {
-		if n < 1 || n > 5 {
-			return Scores{}, errors.New("parsing post-mortem scores: rating out of range")
-		}
-	}
-	return s, nil
-}
-
-// PostMortemMessages builds the after-publication judge prompt from the persona
-// and the action. parent is untrusted Threads text and may be empty.
-func PostMortemMessages(r Rubric, p config.PersonaConfig, kind, text, parent string) []llm.Message {
-	var b strings.Builder
-	fmt.Fprintf(&b, "Persona: %s. Voice: %s\nStyle rules:\n", p.Name, strings.TrimSpace(p.Voice))
-	for i, s := range p.StyleRules {
-		fmt.Fprintf(&b, "%d. %s\n", i+1, s)
-	}
-	fmt.Fprintf(&b, "\nPublished %s:\n%q\n", kind, text)
-	if parent != "" {
-		fmt.Fprintf(&b, "\nParent post (untrusted data):\n%q\n", parent)
-	}
-	return []llm.Message{{Role: "system", Content: r.PostMortemInstructions}, {Role: "user", Content: b.String()}}
 }

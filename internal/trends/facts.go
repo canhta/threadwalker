@@ -52,7 +52,7 @@ func PostFacts(p threads.Post, k config.TargetsConfig) (ItemFacts, error) {
 			parts.LikesPerHour = &rate
 		}
 	}
-	target := scoreTarget(parts, TierUnknown, k)
+	target := scoreTarget(parts, k)
 	encoded, err := json.Marshal(target)
 	if err != nil {
 		return ItemFacts{}, fmt.Errorf("encoding reply target score: %w", err)

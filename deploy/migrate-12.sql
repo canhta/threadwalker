@@ -1,8 +1,8 @@
 -- Schema v11 -> v12. One-off; run against a STOPPED service, after backing up
 -- the database:  sqlite3 -bail threadz.db < migrate-12.sql
--- -bail is required: it stops the script at the first error. The file refuses
--- to run on any other schema version and is one
--- transaction: it applies completely or not at all.
+-- Needs sqlite3 3.35.0 or later (ALTER TABLE ... DROP COLUMN). -bail is required:
+-- it stops the script at the first error. The file refuses to run on any other
+-- schema version and is one transaction: it applies completely or not at all.
 --
 -- The store test (TestMigrate12MatchesFreshSchema) builds v11 from
 -- internal/store/testdata/schema-v11.sql, applies this file and compares the

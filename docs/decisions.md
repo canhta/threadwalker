@@ -19,7 +19,7 @@ Each row is one decision with a one-line reason. A change to a decision edits it
 | Host | Local development; a VPS is optional | The harness is verified with offline tests, synthetic fixtures and injected-time soaks |
 | Several agents | Supported | Every table carries `agent_id`; wakes share one serial loop |
 | Codebase | One version of each thing: a change that replaces code deletes the old code; no shims, legacy paths or second implementations | Keeps each decision stated once |
-| Schema | No in-place upgrade; a database with another version is refused | A fresh file on deploy ([data.md](data.md)) |
+| Schema | No in-place upgrade at startup; a database with another version is refused. A schema change ships a one-off `deploy/migrate-N.sql`, run on a stopped service | The binary never alters a database it did not create ([data.md](data.md)) |
 | Crash safety | An interrupted wake is never replayed; an unknown publish outcome is recorded as sent and never retried | A crash must not double-post ([wake.md](wake.md)) |
 | Telegram outbox | A claimed message is never retried after restart | A message may be lost but is never duplicated |
 | Operator access | Unix socket, mode 0600, no network listener; remote use over SSH | Nothing is exposed for an attacker to reach |

@@ -239,23 +239,3 @@ func trendKeywordScore(title string, tokens []string, keyword string) int {
 	}
 	return 0
 }
-
-// TopStories returns at most limit stories.
-func TopStories(stories []Story, limit int) []Story {
-	if len(stories) > limit {
-		return stories[:limit]
-	}
-	return stories
-}
-
-// Avoided reports whether title matches any avoid keyword, scored as RankStories does.
-func Avoided(title string, avoid []string) bool {
-	title = normalizeTrendText(title)
-	tokens := trendTokens(title)
-	for _, keyword := range cleanKeywords(avoid) {
-		if trendKeywordScore(title, tokens, keyword) > 0 {
-			return true
-		}
-	}
-	return false
-}
