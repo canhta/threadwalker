@@ -17,7 +17,7 @@ The whole schema is [`internal/store/schema.sql`](../internal/store/schema.sql);
 | `action_parts` | Later parts (2 to 5) of a series: text, `thread_url`, `media_id`. A part with an empty `thread_url` was never published | Dispatcher |
 | `metric_jobs` | Durable +1h/+6h/+24h targets: lease, fence, attempts, `completed_at`, `reason` | Metrics |
 | `metrics` | Repeated measurements per action (views, likes, replies, reposts, quotes, shares, followers, `author_replied`; the last four nullable) | Metrics |
-| `account_followers` | Latest own follower count per agent | `read_own_metrics` |
+| `account_followers` | Latest own follower count per agent, read from the own profile page at the start of each agent wake; a metrics batch stamps its samples with this row | `read_own_metrics` |
 | `contacts` | Username, `reply_count_7d`, `do_not_contact`, `reason`. Rate limiting only; no description of the person | Guard |
 | `ledger_phases` | The only spend record: per agent, local day (date in `schedule.timezone`) and phase (`agent`, `dream`, `critic`), token and USD totals. A daily total is a SUM over phases | LLM client |
 | `trend_stories` | Ranked external stories from `fetch_trends` | Trends |

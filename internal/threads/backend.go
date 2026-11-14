@@ -81,6 +81,7 @@ func NewBackend(tmpl config.Template, now func() time.Time, tokens *Tokens) (Fac
 type Live struct {
 	*API
 	openBrowser func(context.Context) (*Browser, error)
+	username    string // own account; empty leaves the follower count to the API
 	mu          sync.Mutex
 	browser     *Browser
 }
@@ -99,7 +100,7 @@ func openLive(ctx context.Context, tmpl config.Template, now func() time.Time, t
 		return nil, err
 	}
 	th := tmpl.Threads
-	return &Live{API: api, openBrowser: func(ctx context.Context) (*Browser, error) {
+	return &Live{API: api, username: th.Username, openBrowser: func(ctx context.Context) (*Browser, error) {
 		return NewAgentBrowser(ctx, AgentBrowserOptions{AgentID: tmpl.ID, BaseURL: th.BaseURL, ProfileDir: th.ProfileDir, ExecutablePath: th.ExecutablePath, AgentBrowserPath: th.AgentBrowserPath, Timeout: operationTimeout, StartupTimeout: startupTimeout, Now: now, NoSandbox: th.NoSandbox})
 	}}, nil
 }
@@ -160,6 +161,34 @@ func (l *Live) Reply(ctx context.Context, target, text string) (Published, error
 		}
 	}
 	return Published{URL: threadURL, ID: id}, nil
+}
+
+// Reason codes for where the follower count came from.
+const (
+	FollowersFromBrowser = "followers_browser"
+	FollowersFromAPI     = "followers_api_fallback"
+)
+
+// ReadOwnMetrics takes the account insights from the API and the follower count
+// from the own profile page, which is the source of truth: the API figure lags
+// or is wrong. The API count stays only when the page gave none.
+func (l *Live) ReadOwnMetrics(ctx context.Context) (Metrics, error) {
+	m, err := l.API.ReadOwnMetrics(ctx)
+	if err != nil {
+		return m, err
+	}
+	m.FollowersSource = FollowersFromAPI
+	if l.username == "" {
+		return m, nil
+	}
+	b, err := l.session(ctx)
+	if err != nil {
+		return m, nil
+	}
+	if n, err := b.ReadFollowers(ctx, l.username); err == nil && n != nil {
+		m.Followers, m.FollowersSource = n, FollowersFromBrowser
+	}
+	return m, nil
 }
 
 // Close closes the browser only if the wake opened one.
@@ -380,6 +409,13 @@ func (b *Browser) read(ctx context.Context, op, path, kind string) (page Page, e
 }
 func (b *Browser) ReadFeed(ctx context.Context) (Page, error) {
 	return b.read(ctx, OpReadFeed, pathOr(b.feedPath, "/feed"), "feed")
+}
+
+// ReadFollowers reads the follower count the own profile page shows; nil when
+// it showed none.
+func (b *Browser) ReadFollowers(ctx context.Context, username string) (*int64, error) {
+	page, err := b.read(ctx, OpReadOwnMetrics, "/@"+username, "profile")
+	return page.Followers, err
 }
 
 // topicPostsMax bounds the posts one topic read returns.

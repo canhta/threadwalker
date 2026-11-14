@@ -400,8 +400,8 @@ func TestPipelineCoversThreeWindowsForMultipleActionsAndAgents(t *testing.T) {
 		}
 	}
 
-	if h.source.aggregateCount() != h.factories {
-		t.Fatalf("follower reads = %d, want one per batch (%d)", h.source.aggregateCount(), h.factories)
+	if h.source.aggregateCount() != 0 {
+		t.Fatalf("account reads = %d, want none: the batch takes the recorded count", h.source.aggregateCount())
 	}
 	if h.source.writeCount() != 0 {
 		t.Fatalf("action writes = %d", h.source.writeCount())
@@ -540,8 +540,8 @@ func TestPipelineDefersMissingUnavailableOrInvalidSourceWithoutSample(t *testing
 			if h.source.readCount() != tc.wantReads {
 				t.Fatalf("action reads = %d, want %d", h.source.readCount(), tc.wantReads)
 			}
-			if h.source.aggregateCount() != 1 {
-				t.Fatalf("account reads = %d, want the one follower read and no fallback", h.source.aggregateCount())
+			if h.source.aggregateCount() != 0 {
+				t.Fatalf("account reads = %d, want none", h.source.aggregateCount())
 			}
 			if len(h.samples("pipeline-defer")) != 0 {
 				t.Fatal("source failure fabricated a metric sample")
@@ -774,8 +774,8 @@ func TestPipelineUsesGuardedMetricsWakeAuditAndRedactedLogs(t *testing.T) {
 	if err := rows.Err(); err != nil {
 		t.Fatal(err)
 	}
-	if len(audit) != 2 {
-		t.Fatalf("read_own_metrics audit rows = %d, want the follower read and the action read", len(audit))
+	if len(audit) != 1 {
+		t.Fatalf("read_own_metrics audit rows = %d, want the action read", len(audit))
 	}
 	if audit[0].kind != "metrics" {
 		t.Fatalf("audit wake kind = %q, want metrics", audit[0].kind)
@@ -804,7 +804,7 @@ func TestPipelineUsesGuardedMetricsWakeAuditAndRedactedLogs(t *testing.T) {
 			t.Fatalf("logs contain %q: %s", sensitive, logs)
 		}
 	}
-	if h.source.aggregateCount() != 1 || h.source.writeCount() != 0 {
+	if h.source.aggregateCount() != 0 || h.source.writeCount() != 0 {
 		t.Fatalf("aggregate reads=%d writes=%d", h.source.aggregateCount(), h.source.writeCount())
 	}
 	if h.source.closeCount() != h.factories {

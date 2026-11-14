@@ -74,6 +74,9 @@ type Metrics struct {
 	Quotes    *int64 `json:"quotes,omitempty"`
 	Shares    *int64 `json:"shares,omitempty"`
 	Followers *int64 `json:"followers_count,omitempty"`
+	// FollowersSource is the reason code of where Followers came from: the
+	// own profile page or, when that gave no count, the insights API.
+	FollowersSource string `json:"-"`
 }
 
 // Profile is a public profile read by username. Followers is nil when the API
@@ -108,6 +111,8 @@ type Page struct {
 	// ThreadURL is the permalink of a submitted reply; Form is a post page's reply form.
 	ThreadURL string `json:"thread_url,omitempty"`
 	Form      *Form  `json:"form,omitempty"`
+	// Followers is the follower count a profile page shows; nil when it showed none.
+	Followers *int64 `json:"-"`
 	// LimitedAccess explains an empty result the Meta app's access level may
 	// cause; it is set only on such a result.
 	LimitedAccess string `json:"limited_access,omitempty"`
@@ -142,6 +147,8 @@ func operationForExpectedKind(kind string) (string, bool) {
 		return "read_topic", true
 	case "post":
 		return "read_post", true
+	case "profile":
+		return "read_profile", true
 	case "submitted":
 		return "submit", true
 	case "logged_out", "captcha":

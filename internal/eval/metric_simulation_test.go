@@ -18,7 +18,7 @@ func TestMultiDaySimulationUsesActualCodeAndDatabaseRestart(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !got.Synthetic || got.TimingKind != "logical_time" || got.Restarts != 1 || got.ConfirmedActions != 7 || got.Samples != 19 || got.CompletedTargets != 21 || got.SourceReads != 37 || got.FollowerReads != 17 || got.ExpectedSamples != 19 {
+	if !got.Synthetic || got.TimingKind != "logical_time" || got.Restarts != 1 || got.ConfirmedActions != 7 || got.Samples != 19 || got.CompletedTargets != 21 || got.SourceReads != 20 || got.ExpectedSamples != 19 {
 		t.Fatalf("%+v", got)
 	}
 	if measured, targets := strings.Count(logs.String(), `"event":"metrics.measured"`), strings.Count(logs.String(), `"event":"metrics.target.completed"`); measured != 19 || targets != 21 {

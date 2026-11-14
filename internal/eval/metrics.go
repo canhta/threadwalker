@@ -26,7 +26,7 @@ func runMetricsCase(ctx context.Context, c Case, p Profile, repeat int, opts Opt
 	logger, logs := run.Logger, &run.Logs
 	if c.Scenario == "logical_soak" {
 		e, err := RunMetricSimulation(ctx, run.Path("metrics.db"), 72, logger)
-		if err != nil || e.Samples != 19 || e.CompletedTargets != 21 || e.Restarts != 1 || e.SourceReads != 20+e.FollowerReads {
+		if err != nil || e.Samples != 19 || e.CompletedTargets != 21 || e.Restarts != 1 || e.SourceReads != 20 {
 			return fail("metric_simulation_failed")
 		}
 		r.LogicalHours = e.LogicalHours

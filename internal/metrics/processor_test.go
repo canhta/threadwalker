@@ -67,6 +67,10 @@ func TestProcessorThreeWindowsAndCatchupUseActualObservation(t *testing.T) {
 	if _, err = st.DB().Exec(`INSERT INTO actions(id,agent_id,kind,text,dry_run,posted_at,thread_url,media_id) VALUES(1,'own','post','',0,?,'https://fixture.test/own','own')`, start.Format(time.RFC3339Nano)); err != nil {
 		t.Fatal(err)
 	}
+	// The batch stamps the follower count an agent wake recorded; it reads none itself.
+	if err = st.RecordFollowers(ctx, tmpl.ID, 7, start); err != nil {
+		t.Fatal(err)
+	}
 	source := processorSource()
 	makeProcessor := func() *metrics.Processor {
 		p, e := metrics.New(metrics.Options{Store: st, Template: tmpl, Now: func() time.Time { return now }, FetchTrends: metricTrends, ThreadsFactory: func(context.Context, config.Template) (threads.Backend, error) { return source, nil }})
@@ -90,8 +94,11 @@ func TestProcessorThreeWindowsAndCatchupUseActualObservation(t *testing.T) {
 	if e := st.DB().QueryRow(`SELECT COUNT(*) FROM metrics WHERE action_id=1`).Scan(&n); e != nil || n != 2 {
 		t.Fatalf("samples=%d %v", n, e)
 	}
-	if source.Count(threads.OpReadOwnMetrics) != 4 || source.Count(threads.OpClose) != 2 {
+	if source.Count(threads.OpReadOwnMetrics) != 2 || source.Count(threads.OpClose) != 2 {
 		t.Fatalf("reads=%d closed=%d", source.Count(threads.OpReadOwnMetrics), source.Count(threads.OpClose))
+	}
+	if e := st.DB().QueryRow(`SELECT COUNT(*) FROM metrics WHERE action_id=1 AND followers=7`).Scan(&n); e != nil || n != 2 {
+		t.Fatalf("samples stamped with the recorded followers=%d %v", n, e)
 	}
 	var at string
 	if e := st.DB().QueryRow(`SELECT measured_at FROM metrics WHERE action_id=1 ORDER BY measured_at DESC LIMIT 1`).Scan(&at); e != nil {

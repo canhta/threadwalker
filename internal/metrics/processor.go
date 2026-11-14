@@ -208,9 +208,13 @@ func (p *Processor) RunDue(ctx context.Context) (result Result, runErr error) {
 	if err != nil {
 		return result, metricError("configuring metric tools", err)
 	}
-	followers, err := dispatcher.ReadFollowers(ctx, fmt.Sprintf("followers-%d", wakeID))
-	if err != nil {
-		return result, metricError("reading guarded followers", err)
+	// Agent wakes read the follower count from the profile page and record it;
+	// a batch stamps the newest one rather than opening the browser again.
+	var followers *int64
+	if n, ok, err := p.opts.Store.LatestFollowers(ctx, p.opts.Template.ID); err != nil {
+		return result, metricError("reading recorded followers", err)
+	} else if ok {
+		followers = &n
 	}
 	for _, group := range groups {
 		if err := ctx.Err(); err != nil {

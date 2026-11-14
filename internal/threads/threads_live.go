@@ -1,7 +1,9 @@
 package threads
 
 import (
+	"math"
 	"net/url"
+	"regexp"
 	"strconv"
 	"strings"
 	"unicode"
@@ -184,6 +186,12 @@ func parseThreadsPage(snapshot, pageURL, expectedKind, baseURL string) (Page, er
 		return Page{}, snapshotError(operation, ErrLoggedOut)
 	}
 
+	if expectedKind == "profile" {
+		if !authenticated || threadsUserFromPath(page.Path) == "" {
+			return Page{}, snapshotError(operation, ErrUnknownPage)
+		}
+		return Page{Kind: "profile", Followers: threadsFollowers(root)}, nil
+	}
 	switch {
 	case expectedKind == "feed" && authenticated && threadsFeedPath(page.Path):
 	case expectedKind == "topic" && authenticated && page.Path == "/search":
@@ -214,6 +222,48 @@ func parseThreadsPage(snapshot, pageURL, expectedKind, baseURL string) (Page, er
 		result.Form = &form
 	}
 	return result, nil
+}
+
+// followersLabel matches a profile's follower count in an accessible name, such
+// as "1 follower", "1.2K followers" or "1,2K người theo dõi". "Net followers"
+// carries no number and never matches.
+var followersLabel = regexp.MustCompile(`(?i)(\d[\d.,]*)\s*([km])?\s*(?:followers?\b|người theo dõi)`)
+
+// threadsFollowers returns the first follower count the page names, or nil.
+func threadsFollowers(root *axNode) *int64 {
+	var found *int64
+	root.walk(func(n *axNode) bool {
+		if found == nil {
+			found = parseFollowers(n.name)
+		}
+		return found == nil
+	})
+	return found
+}
+
+// parseFollowers reads the count in a label. A comma or dot is a decimal
+// separator only before K or M; elsewhere it groups thousands.
+func parseFollowers(label string) *int64 {
+	m := followersLabel.FindStringSubmatch(label)
+	if m == nil {
+		return nil
+	}
+	var n int64
+	if m[2] == "" {
+		v, err := strconv.ParseInt(strings.NewReplacer(".", "", ",", "").Replace(m[1]), 10, 64)
+		if err != nil || v > snapshotMaxMetric {
+			return nil
+		}
+		n = v
+	} else {
+		v, err := strconv.ParseFloat(strings.ReplaceAll(m[1], ",", "."), 64)
+		unit := map[string]float64{"k": 1e3, "m": 1e6}[strings.ToLower(m[2])]
+		if err != nil || v*unit > snapshotMaxMetric {
+			return nil
+		}
+		n = int64(math.Round(v * unit))
+	}
+	return &n
 }
 
 // threadsTrendsMax bounds the Trending-now items one read returns.

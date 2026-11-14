@@ -10,9 +10,6 @@
         "tools": [
           "read_own_metrics",
           "read_own_metrics",
-          "read_own_metrics",
-          "read_own_metrics",
-          "read_own_metrics",
           "read_own_metrics"
         ]
       }
@@ -24,7 +21,6 @@
       "expect": {
         "end_reason": "completed",
         "tools": [
-          "read_own_metrics",
           "read_own_metrics"
         ]
       }
@@ -36,7 +32,6 @@
       "expect": {
         "end_reason": "completed",
         "tools": [
-          "read_own_metrics",
           "read_own_metrics",
           "read_own_metrics"
         ]
@@ -60,7 +55,6 @@
       "expect": {
         "end_reason": "completed",
         "tools": [
-          "read_own_metrics",
           "read_own_metrics"
         ]
       }
@@ -72,8 +66,6 @@
       "expect": {
         "end_reason": "persistence_error",
         "tools": [
-          "read_own_metrics",
-          "read_own_metrics",
           "read_own_metrics",
           "read_own_metrics"
         ]

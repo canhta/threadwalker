@@ -299,6 +299,11 @@ func (d *agentBrowserDriver) threadsSnapshot(ctx context.Context, kind string) (
 				if page.Form != nil {
 					return page, nil
 				}
+			} else if kind == "profile" {
+				// The count renders after the navigation; wait for it.
+				if page.Followers != nil {
+					return page, nil
+				}
 			} else if len(page.Posts) > 0 || !threadsLoadingText(snapshot.Text) {
 				return page, nil
 			}

@@ -8,6 +8,7 @@ Code measures outcomes and ranks them; the agent never counts its own results. M
 |---|---|
 | Seeding | Each own confirmed publication seeds durable targets at `posted_at` + 1 h, + 6 h, + 24 h. Dry-run and unconfirmed or unknown intents seed none; only actions of the last 29 days are seeded |
 | Scheduling | Independent of the agent's chosen wake, serialized with agent sessions, owner state rechecked. Audit scope `wakes.kind='metrics'` ([wake.md](wake.md)) |
+| Followers | A sample's `followers` is the newest `account_followers` row, which each agent wake records from the own profile page ([threads.md](threads.md)); a batch makes no account read and opens no browser for it. No row yet leaves it absent |
 | Coalescing | Targets are approximate. Late or restarted work coalesces all ready windows of an action into one read and one sample at the actual time; each completed target references that sample time. Completed targets are never re-read |
 | Claims | Default 10 action groups per batch, five-minute lease, five-minute retry. Atomic claims exclude active leases; expiry increments a fencing version. Only the complete fresh claim set can insert the sample and complete its targets. A failed transaction keeps no partial sample |
 | Deferral | Unavailable reads defer with a fixed reason and no sample. The delay doubles with each deferral that counts (not `cancelled`, `auth_required`, `source_unavailable`); the eighth ends the job with its reason |

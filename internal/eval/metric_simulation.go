@@ -28,7 +28,6 @@ type MetricSimulationEvidence struct {
 	Samples          int                      `json:"samples"`
 	CompletedTargets int                      `json:"completed_targets"`
 	SourceReads      int                      `json:"source_reads"`
-	FollowerReads    int                      `json:"follower_reads"`
 	AuditReads       int                      `json:"audit_reads"`
 	MaintenanceWakes int                      `json:"maintenance_wakes"`
 	Observations     []MetricSimulationSample `json:"observations"`
@@ -189,9 +188,6 @@ func RunMetricSimulation(ctx context.Context, path string, hours int, logger *sl
 				return e, err
 			}
 			e.Samples += result.Samples
-			if result.ClaimedJobs > 0 {
-				e.FollowerReads++
-			}
 			again, err := p.RunDue(ctx)
 			if err != nil || again.Samples != 0 || again.ClaimedJobs != 0 {
 				return e, errors.New("metric simulation: duplicate target execution")
@@ -225,7 +221,7 @@ func RunMetricSimulation(ctx context.Context, path string, hours int, logger *sl
 	if e.MaintenanceWakes, err = st.MetricsWakeCount(ctx); err != nil {
 		return e, err
 	}
-	if e.Samples != e.ExpectedSamples || tally.Samples != e.ExpectedSamples || e.CompletedTargets != expectedTargets || e.SourceReads != e.ExpectedSamples+1+e.FollowerReads || e.AuditReads != e.SourceReads {
+	if e.Samples != e.ExpectedSamples || tally.Samples != e.ExpectedSamples || e.CompletedTargets != expectedTargets || e.SourceReads != e.ExpectedSamples+1 || e.AuditReads != e.SourceReads {
 		return e, errors.New("metric simulation: sample, target or guarded read counts failed")
 	}
 	for _, tmpl := range templates {

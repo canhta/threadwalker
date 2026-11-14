@@ -341,8 +341,8 @@ At 72 logical hours the simulation has seven confirmed synthetic actions, 21 com
 19 stored samples. An initially overdue action coalesces three targets into one actual observation.
 
 One guarded read before a simulated crash is repeated safely after a file DB close and reopen with
-an expired lease. That run audits 37 source reads: 19 action reads, the crash read, and 17 account
-follower reads, one per batch that claimed targets. It takes one restart, with no duplicate
+an expired lease. That run audits 20 source reads: 19 action reads and the crash read. A batch reads no account
+metrics; it stamps samples with the recorded follower count. It takes one restart, with no duplicate
 checkpoint or sample and no change to agent scheduling.
 
 One `metrics.measured` event corresponds to one sample, and `metrics.target.completed` records each

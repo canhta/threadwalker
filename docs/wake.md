@@ -125,7 +125,7 @@ The agent has no tool to schedule a wake.
 
 ## Metrics phase
 
-A `wakes.kind='metrics'` scope calls the guarded `read_own_metrics` route with no model call, token spend or write tool, and never changes `next_wake_at`. Paused and killed agents perform no reads. A pass that claims nothing leaves no `wakes` row. Job mechanics: [learning.md](learning.md).
+A `wakes.kind='metrics'` scope calls the guarded `read_own_metrics` route (per action; samples carry the newest `account_followers` row an agent wake recorded) with no model call, token spend or write tool, and never changes `next_wake_at`. Paused and killed agents perform no reads. A pass that claims nothing leaves no `wakes` row. Job mechanics: [learning.md](learning.md).
 
 ## Offline and soak
 

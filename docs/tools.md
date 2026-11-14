@@ -24,7 +24,7 @@ Phases: `A` agent, `D` dream. Effect classes: `read`, `own-state`, `threads-writ
 | `notify_owner` | A | owner | `text*` | Telegram enabled; secret check | Queued locally, returns immediately |
 | `ask_owner` | A | owner | `text*` | Telegram enabled; never blocks the wake | Queued; the answer enters a later wake |
 
-`read_own_metrics` is a harness read, not a model tool: its `Specs` entry is flagged `Harness`, so no phase is offered it and a model call to it is refused as `unknown_tool`. The metrics wake and the follower count at the start of an agent wake call it through the same guard and audit with `DispatchHarness`; it returns the account metrics, or with `action_id` the action's counters and (reply) `author_replied` ([learning.md](learning.md)).
+`read_own_metrics` is a harness read, not a model tool: its `Specs` entry is flagged `Harness`, so no phase is offered it and a model call to it is refused as `unknown_tool`. The metrics wake calls it with `action_id` and the start of an agent wake without, through the same guard and audit with `DispatchHarness`. Without `action_id` it returns the account metrics, the follower count read from the own profile page (the one browser read an agent wake starts with; a metrics wake never opens the browser for it); with `action_id`, the action's counters and (reply) `author_replied` ([learning.md](learning.md)).
 
 ## Rules that apply to every tool
 
