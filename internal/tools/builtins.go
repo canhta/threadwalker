@@ -295,7 +295,7 @@ func (d *Dispatcher) noteRead(data any) {
 	}
 	for _, p := range page.Posts {
 		d.guard.NoteRead(p.ID, p.URL, p.Text)
-		if facts, err := trends.PostFacts(p, d.trendProfile.Include, d.opts.Template.Targets); err == nil && facts.Line != "" {
+		if facts, err := trends.PostFacts(p, d.opts.Template.Targets); err == nil && facts.Line != "" {
 			d.guard.NoteFacts(p.URL, facts)
 		}
 	}

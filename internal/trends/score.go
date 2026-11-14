@@ -155,7 +155,6 @@ func bigrams(tokens []string) map[bigram]bool {
 type TargetParts struct {
 	ReplyVelocity  float64 `json:"reply_velocity"`
 	AgeMinutes     int64   `json:"age_minutes"`
-	OnTopic        bool    `json:"on_topic"`
 	AlreadyReplied bool    `json:"already_replied"`
 	// JokeSaturation counts other observed posts that share a bigram with the
 	// parent's snippet; reply text is not observed.
@@ -214,8 +213,8 @@ func clamp01(x float64) float64 { return math.Max(0, math.Min(1, x)) }
 // scoreTarget averages, each in 0..1: freshness against targets.max_age_minutes
 // (neutral when the age is unknown), room in the replies against
 // targets.max_replies (when known), momentum (likes per hour against
-// targets.min_likes_per_hour, else observed reply velocity), size tier, topic
-// match and novelty. A post that breaks a knob is flagged in Outside and scores
+// targets.min_likes_per_hour, else observed reply velocity), size tier
+// and novelty. A post that breaks a knob is flagged in Outside and scores
 // 0; it is never removed.
 func scoreTarget(p TargetParts, tier string, k config.TargetsConfig) TargetScore {
 	if p.AlreadyReplied {
@@ -255,11 +254,7 @@ func scoreTarget(p TargetParts, tier string, k config.TargetsConfig) TargetScore
 		return TargetScore{TargetParts: p, outside: strings.Join(broken, ", ")}
 	}
 	size := map[string]float64{TierUnknown: 0.5, TierNear: 0.6, TierTarget: 1, TierMega: 0.2}[tier]
-	topic := 0.0
-	if p.OnTopic {
-		topic = 1
-	}
-	terms = append(terms, momentum, size, topic, 1/float64(1+p.JokeSaturation))
+	terms = append(terms, momentum, size, 1/float64(1+p.JokeSaturation))
 	sum := 0.0
 	for _, term := range terms {
 		sum += term

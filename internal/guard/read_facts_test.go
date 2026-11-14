@@ -27,7 +27,7 @@ func TestActionStoresFeaturesOfWhatTheWakeRead(t *testing.T) {
 		t.Fatal(err)
 	}
 	target := "https://threads.com/@fixture_author/post/read1"
-	facts, err := trends.PostFacts(threads.Post{Username: "fixture_author", Text: "t", URL: target, Likes: n64(120), Replies: n64(8), AgeMinutes: n64(45)}, nil, config.DefaultTargets)
+	facts, err := trends.PostFacts(threads.Post{Username: "fixture_author", Text: "t", URL: target, Likes: n64(120), Replies: n64(8), AgeMinutes: n64(45)}, config.DefaultTargets)
 	if err != nil || facts.Line == "" {
 		t.Fatalf("%+v %v", facts, err)
 	}
@@ -105,7 +105,7 @@ func TestReplyToAnOutsideWindowTargetIsRefusedUnlessInbox(t *testing.T) {
 		return err
 	}
 	dead := "https://threads.com/@fixture_author/post/dead1"
-	facts, err := trends.PostFacts(threads.Post{Username: "fixture_author", Text: "t", URL: dead, Likes: n64(1), Replies: n64(0), AgeMinutes: n64(60)}, nil, opts.Template.Targets)
+	facts, err := trends.PostFacts(threads.Post{Username: "fixture_author", Text: "t", URL: dead, Likes: n64(1), Replies: n64(0), AgeMinutes: n64(60)}, opts.Template.Targets)
 	if err != nil || facts.Outside == "" {
 		t.Fatalf("%+v %v", facts, err)
 	}

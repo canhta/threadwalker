@@ -35,7 +35,6 @@ func TestComputeThreadsBriefUsesDeltasKeywordsAndAvoidTopics(t *testing.T) {
 	brief := trends.Compute(trends.Input{
 		Observations: observations,
 		Stories:      stories,
-		Include:      []string{"AI", "benchmark"},
 		Avoid:        []string{"crypto", "airdrop"},
 		OwnUsernames: []string{"giaosullm"},
 		DoNotContact: map[string]bool{"dnc": true},
@@ -58,9 +57,6 @@ func TestComputeThreadsBriefUsesDeltasKeywordsAndAvoidTopics(t *testing.T) {
 	}
 	if len(brief.HotPosts) != 1 || brief.HotPosts[0].Author != "hot" || brief.HotPosts[0].ReplyVelocity != 13.33 {
 		t.Fatalf("hot posts=%+v", brief.HotPosts)
-	}
-	if !brief.HotPosts[0].OnTopic {
-		t.Fatalf("on-topic post flagged off: %+v", brief.HotPosts[0])
 	}
 	if len(brief.Formats) == 0 {
 		t.Fatal("missing format counts")

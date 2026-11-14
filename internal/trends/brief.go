@@ -39,7 +39,7 @@ func loadInput(ctx context.Context, st *store.Store, tmpl config.Template, ownUs
 			replied[canonical] = true
 		}
 	}
-	include, avoid := tmpl.TrendKeywords()
+	_, avoid := tmpl.TrendKeywords()
 	dnc := map[string]bool{}
 	seen := map[string]bool{}
 	for _, observation := range observations {
@@ -55,7 +55,7 @@ func loadInput(ctx context.Context, st *store.Store, tmpl config.Template, ownUs
 			dnc[observation.Author] = true
 		}
 	}
-	return Input{Observations: observations, Stories: stories, Include: include, Avoid: avoid, OwnUsernames: ownUsernames, DoNotContact: dnc, Replied: replied, Targets: tmpl.Targets, Now: now}, nil
+	return Input{Observations: observations, Stories: stories, Avoid: avoid, OwnUsernames: ownUsernames, DoNotContact: dnc, Replied: replied, Targets: tmpl.Targets, Now: now}, nil
 }
 
 // PostingContext is what the stored observations say about an action when it is

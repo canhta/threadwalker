@@ -29,11 +29,11 @@ const minAgeHours = 10.0 / 60
 
 // PostFacts scores a post read from Threads as a reply target. A post that
 // shows no age, likes or replies has no facts.
-func PostFacts(p threads.Post, include []string, k config.TargetsConfig) (ItemFacts, error) {
+func PostFacts(p threads.Post, k config.TargetsConfig) (ItemFacts, error) {
 	if p.AgeMinutes == nil && p.Likes == nil && p.Replies == nil {
 		return ItemFacts{}, nil
 	}
-	parts := TargetParts{AgeMinutes: -1, Replies: p.Replies, Likes: p.Likes, OnTopic: onTopic(p.Text, include)}
+	parts := TargetParts{AgeMinutes: -1, Replies: p.Replies, Likes: p.Likes}
 	if p.AgeMinutes != nil {
 		parts.AgeMinutes = *p.AgeMinutes
 		if p.Likes != nil {

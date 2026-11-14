@@ -30,7 +30,6 @@ type HotPost struct {
 	Replies       int64   `json:"replies"`
 	ReplyVelocity float64 `json:"reply_velocity_per_hour"`
 	AgeHours      float64 `json:"age_hours"`
-	OnTopic       bool    `json:"on_topic"`
 	ThreadsOnly   bool    `json:"threads_only"`
 	// Target scores this post as a reply target; SizeTier is transient and
 	// never persisted.
@@ -71,7 +70,6 @@ type Brief struct {
 type Input struct {
 	Observations []store.ThreadsObservation
 	Stories      []store.TrendStory
-	Include      []string
 	Avoid        []string
 	OwnUsernames []string
 	DoNotContact map[string]bool
@@ -388,7 +386,6 @@ func hotPostOf(list []store.ThreadsObservation, in Input, angles map[string]map[
 		URL: latest.PostURL, Author: latest.Author, Snippet: latest.Snippet,
 		ReplyVelocity: math.Round(velocity*100) / 100,
 		AgeHours:      math.Round(in.Now.Sub(latest.ObservedAt).Hours()*10) / 10,
-		OnTopic:       onTopic(latest.Snippet, in.Include),
 		firstSeen:     first.ObservedAt,
 	}
 	if latest.Replies != nil {
@@ -413,19 +410,9 @@ func hotPostOf(list []store.ThreadsObservation, in Input, angles map[string]map[
 	hot.SizeTier = sizeTier(in.AuthorFollowers[strings.ToLower(latest.Author)], in.OwnFollowers)
 	hot.Target = scoreTarget(TargetParts{
 		ReplyVelocity: hot.ReplyVelocity, AgeMinutes: int64(in.Now.Sub(first.ObservedAt).Minutes()),
-		OnTopic: hot.OnTopic, AlreadyReplied: in.Replied[canonical], JokeSaturation: joke, Replies: latest.Replies, Likes: latest.Likes,
+		AlreadyReplied: in.Replied[canonical], JokeSaturation: joke, Replies: latest.Replies, Likes: latest.Likes,
 	}, hot.SizeTier, in.Targets)
 	return hot, samples
-}
-
-func onTopic(text string, include []string) bool {
-	lower := strings.ToLower(text)
-	for _, keyword := range include {
-		if keyword != "" && strings.Contains(lower, strings.ToLower(keyword)) {
-			return true
-		}
-	}
-	return false
 }
 
 func splitSources(value string) []string {

@@ -12,8 +12,8 @@ func TestPostFactsScoresTheWindow(t *testing.T) {
 	post := func(age, likes, replies int64) threads.Post {
 		return threads.Post{Text: "x", AgeMinutes: &age, Likes: &likes, Replies: &replies}
 	}
-	good, err := PostFacts(post(45, 120, 8), nil, targets)
-	if err != nil || good.Score != 0.67 || good.Line != "[45m old · 120 likes · 8 replies · target score 0.67]" {
+	good, err := PostFacts(post(45, 120, 8), targets)
+	if err != nil || good.Score != 0.8 || good.Line != "[45m old · 120 likes · 8 replies · target score 0.80]" {
 		t.Fatalf("%+v %v", good, err)
 	}
 	if strings.Contains(good.Line, "outside") {
@@ -25,12 +25,12 @@ func TestPostFactsScoresTheWindow(t *testing.T) {
 		"unliked":  post(600, 2, 8),
 		"too slow": post(45, 0, 8),
 	} {
-		got, _ := PostFacts(worse, nil, targets)
+		got, _ := PostFacts(worse, targets)
 		if got.Score >= good.Score || !strings.Contains(got.Line, "outside window") {
 			t.Errorf("%s: %+v vs %v", name, got, good.Score)
 		}
 	}
-	old, _ := PostFacts(post(900, 120, 400), nil, targets)
+	old, _ := PostFacts(post(900, 120, 400), targets)
 	if !strings.Contains(old.Line, "outside window: age, replies") {
 		t.Errorf("%s", old.Line)
 	}
@@ -40,11 +40,11 @@ func TestPostFactsScoresTheWindow(t *testing.T) {
 }
 
 func TestPostFactsKeepsAbsentAbsent(t *testing.T) {
-	if f, err := PostFacts(threads.Post{Text: "x"}, nil, targets); err != nil || f.Line != "" || f.Score != 0 || f.TargetScoreJSON != "" {
+	if f, err := PostFacts(threads.Post{Text: "x"}, targets); err != nil || f.Line != "" || f.Score != 0 || f.TargetScoreJSON != "" {
 		t.Fatalf("no figures, no facts: %+v %v", f, err)
 	}
 	likes := int64(30)
-	f, _ := PostFacts(threads.Post{Likes: &likes}, nil, targets)
+	f, _ := PostFacts(threads.Post{Likes: &likes}, targets)
 	if f.ParentAgeMinutes != nil || f.ParentReplies != nil || strings.Contains(f.Line, "old") || strings.Contains(f.Line, "replies") || strings.Contains(f.TargetScoreJSON, "likes_per_hour") {
 		t.Fatalf("invented a figure: %+v", f)
 	}

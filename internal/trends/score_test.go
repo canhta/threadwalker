@@ -95,17 +95,16 @@ func TestSizeTier(t *testing.T) {
 }
 
 func TestScoreTarget(t *testing.T) {
-	best := TargetParts{ReplyVelocity: 30, AgeMinutes: 20, OnTopic: true}
+	best := TargetParts{ReplyVelocity: 30, AgeMinutes: 20}
 	fresh := scoreTarget(best, TierTarget, targets)
 	if fresh.Score < 0.9 {
 		t.Fatalf("best target %+v", fresh)
 	}
 	for name, worse := range map[string]TargetScore{
-		"old":       scoreTarget(TargetParts{ReplyVelocity: 30, AgeMinutes: 600, OnTopic: true}, TierTarget, targets),
-		"saturated": scoreTarget(TargetParts{ReplyVelocity: 30, AgeMinutes: 20, OnTopic: true, JokeSaturation: 9}, TierTarget, targets),
-		"off topic": scoreTarget(TargetParts{ReplyVelocity: 30, AgeMinutes: 20}, TierTarget, targets),
+		"old":       scoreTarget(TargetParts{ReplyVelocity: 30, AgeMinutes: 600}, TierTarget, targets),
+		"saturated": scoreTarget(TargetParts{ReplyVelocity: 30, AgeMinutes: 20, JokeSaturation: 9}, TierTarget, targets),
 		"mega":      scoreTarget(best, TierMega, targets),
-		"slow":      scoreTarget(TargetParts{ReplyVelocity: 0.1, AgeMinutes: 20, OnTopic: true}, TierTarget, targets),
+		"slow":      scoreTarget(TargetParts{ReplyVelocity: 0.1, AgeMinutes: 20}, TierTarget, targets),
 	} {
 		if worse.Score >= fresh.Score {
 			t.Errorf("%s: %v not below %v", name, worse.Score, fresh.Score)
@@ -128,16 +127,16 @@ func TestScoreTargetOutsideWindowScoresZero(t *testing.T) {
 		parts TargetParts
 		want  string
 	}{
-		{"slow", TargetParts{AgeMinutes: 60, Likes: n(1), LikesPerHour: rate(1), Replies: n(0), OnTopic: true}, "likes_per_hour"},
-		{"crowded", TargetParts{AgeMinutes: 20, Likes: n(500), LikesPerHour: rate(1500), Replies: n(31), OnTopic: true}, "replies"},
-		{"old", TargetParts{AgeMinutes: 241, Likes: n(5000), LikesPerHour: rate(1245), Replies: n(2), OnTopic: true}, "age"},
+		{"slow", TargetParts{AgeMinutes: 60, Likes: n(1), LikesPerHour: rate(1), Replies: n(0)}, "likes_per_hour"},
+		{"crowded", TargetParts{AgeMinutes: 20, Likes: n(500), LikesPerHour: rate(1500), Replies: n(31)}, "replies"},
+		{"old", TargetParts{AgeMinutes: 241, Likes: n(5000), LikesPerHour: rate(1245), Replies: n(2)}, "age"},
 	} {
 		got := scoreTarget(tc.parts, TierTarget, targets)
 		if got.Score != 0 || len(got.Outside) != 1 || got.Outside[0] != tc.want || !strings.Contains(got.outside, tc.want) {
 			t.Errorf("%s: %+v %q", tc.name, got, got.outside)
 		}
 	}
-	fresh := TargetParts{AgeMinutes: 10, Likes: n(2), LikesPerHour: rate(12), Replies: n(0), OnTopic: true}
+	fresh := TargetParts{AgeMinutes: 10, Likes: n(2), LikesPerHour: rate(12), Replies: n(0)}
 	k := targets
 	k.MinLikesPerHour = 10
 	if got := scoreTarget(fresh, TierTarget, k); got.Score == 0 || len(got.Outside) != 0 {
@@ -159,7 +158,6 @@ func TestComputeLifecycleAndTargets(t *testing.T) {
 	in := Input{
 		Now:     at(0),
 		Targets: targets,
-		Include: []string{"ai"},
 		Observations: []store.ThreadsObservation{
 			post("1", "hot", "ai agent thay dev xong", -50, 2), post("1", "hot", "ai agent thay dev xong", -10, 22),
 			post("2", "b", "ai agent thay dev luôn", -30, 0),
