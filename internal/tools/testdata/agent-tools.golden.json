@@ -48,7 +48,7 @@
             "type": "boolean"
           },
           "source": {
-            "description": "feed: home feed. topic: a topic page or search page. search: keyword search. profile: one author's posts",
+            "description": "feed: home feed. topic: a topic page or search page. search: keyword search, may return only your own posts. profile: one author's posts",
             "enum": [
               "feed",
               "topic",
@@ -147,7 +147,7 @@
             "type": "integer"
           },
           "fact": {
-            "description": "the verified detail it rests on",
+            "description": "the detail it rests on, as you read it: a number, name or quote",
             "type": "string"
           },
           "hook": {
@@ -216,7 +216,7 @@
             "type": "integer"
           },
           "fact": {
-            "description": "the verified detail it rests on",
+            "description": "the detail it rests on, as you read it: a number, name or quote",
             "type": "string"
           },
           "hook": {

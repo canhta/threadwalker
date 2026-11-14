@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/canhta/threadz/internal/config"
+	"github.com/canhta/threadz/internal/guard"
 	"github.com/canhta/threadz/internal/store"
 )
 
@@ -35,23 +36,28 @@ func (s scoreboard) hoursSincePublish() int {
 	return int(s.Now.Sub(s.LastPublish).Hours())
 }
 
-// Behind: engagements under target, or no publish for longer than the maximum.
-// A template without a kpi block is never behind.
+// Behind: engagements under target, followers gained under the weekly target,
+// or no publish for longer than the maximum. Followers is the gain over the
+// last 7 days, compared with the full weekly target and not pro-rated: the
+// window is rolling, so there is no partial week to scale by. With under a week
+// of readings (or none) it reads behind. A template without a kpi block is
+// never behind.
 func (s scoreboard) Behind() bool {
 	if !s.KPI.Enabled() {
 		return false
 	}
 	h := s.hoursSincePublish()
-	return s.Engagements < int64(s.KPI.EngagementsPerDay) || h < 0 || h >= s.KPI.MaxHoursWithoutPublish
+	return s.Engagements < int64(s.KPI.EngagementsPerDay) || s.Followers < int64(s.KPI.FollowersPerWeek) || h < 0 || h >= s.KPI.MaxHoursWithoutPublish
 }
 
 // gap is the one blunt line that ends the numbers.
 func (s scoreboard) gap() string {
 	h := s.hoursSincePublish()
+	numbers := fmt.Sprintf("%d of %d engagements in 24h, %d of %d followers gained in 7 days", s.Engagements, s.KPI.EngagementsPerDay, s.Followers, s.KPI.FollowersPerWeek)
 	if !s.Behind() {
-		return fmt.Sprintf("on target: %d of %d engagements in 24h; last published %dh ago", s.Engagements, s.KPI.EngagementsPerDay, h)
+		return fmt.Sprintf("on target: %s; last published %dh ago", numbers, h)
 	}
-	line := fmt.Sprintf("behind: %d of %d engagements in 24h after $%.2f and %d wakes today", s.Engagements, s.KPI.EngagementsPerDay, s.SpendToday, s.WakesToday)
+	line := fmt.Sprintf("behind: %s, after $%.2f and %d wakes today", numbers, s.SpendToday, s.WakesToday)
 	switch {
 	case h < 0:
 		line += "; nothing published yet"
@@ -101,7 +107,7 @@ func (s scoreboard) stopCheck(hidden []string, open func() []string, usdLeft flo
 			todo = append(todo, "call ideas")
 		}
 		if refs := open(); len(refs) > 0 && !slices.Contains(hidden, "reply") && usdLeft >= minUSDToContinue {
-			shown := refs[:min(len(refs), 8)]
+			shown := refs[:min(len(refs), guard.MaxCandidates)]
 			todo = append(todo, fmt.Sprintf("%d posts you read still score well and you have not answered them (%s); reply only to one you have a real angle for", len(refs), strings.Join(shown, ", ")))
 		}
 		if len(todo) == 0 {

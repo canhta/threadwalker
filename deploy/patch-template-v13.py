@@ -1,15 +1,27 @@
 #!/usr/bin/env python3
 """Patch a live agent yaml for threadz v0.3.0 (config v13), in place.
 
-Usage: patch-template-v13.py AGENT.yaml
+Usage: patch-template-v13.py AGENT.yaml [TEMPLATE.yaml]
+TEMPLATE.yaml defaults to templates/viral.agent.yaml next to this script.
+
 v0.3.0 replaces the tools read_feed, read_topic, search and profile_posts with
 find_posts, takes reply's target (a p ref) in place of target_url, target_id
-and target_username, and post's trend in place of trend_ref. This rewrites the
-persona sentences that name the old tools and arguments, writes AGENT.yaml.bak
-first, prints every change and touches nothing else (dry_run included). A
-second run changes nothing. A line that still names a removed tool or argument
-after the rewrite is printed as a warning: edit it by hand.
+and target_username, and post's trend in place of trend_ref. It also cuts the
+persona: each rule now lives in one section, and the agent prompt no longer
+carries style_rules, style_avoid, bad_examples or critic_rules.
+
+This script does two things to AGENT.yaml:
+ 1. Rewrites the persona sentences that name a removed tool or argument.
+ 2. Replaces the whole persona: block with the template's, but only when the
+    live block (after step 1) is exactly the v0.2.x repo persona, checked by
+    sha256. A block the owner edited is left alone with a warning: merge it by
+    hand.
+It writes AGENT.yaml.bak first, prints every change and touches nothing else
+(dry_run included). A second run changes nothing. A line that still names a
+removed tool or argument is printed as a warning: edit it by hand.
 """
+import hashlib
+import os
 import re
 import shutil
 import sys
@@ -25,13 +37,47 @@ REWRITES = [
 ]
 REMOVED = re.compile(r"\b(read_feed|read_topic|profile_posts|target_url|target_id|target_username|trend_ref)\b|\bsearch\b(?=[ ,.)])")
 
+# sha256 of the persona: block of templates/viral.agent.yaml at v0.2.x (commit 3094fc1), the only block this script replaces.
+OLD_PERSONA_SHA256 = "7d37b4ca52ac78f836b7c54a43abaad05e194fdb489cb5f87303d22c7a212214"
+DEFAULT_TEMPLATE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "templates", "viral.agent.yaml")
 
-def patch(text):
+
+def persona_span(lines):
+    """Line range of the top-level persona: block, without trailing blank lines; None when absent."""
+    start = next((i for i, l in enumerate(lines) if l.startswith("persona:")), None)
+    if start is None:
+        return None
+    end = next((i for i in range(start + 1, len(lines)) if lines[i].strip() and lines[i][0] not in " \t#"), len(lines))
+    while end > start + 1 and not lines[end - 1].strip():
+        end -= 1
+    return start, end
+
+
+def replace_persona(text, template_text, log):
+    lines = text.splitlines(keepends=True)
+    span = persona_span(lines)
+    new_span = persona_span(template_text.splitlines(keepends=True))
+    if span is None or new_span is None:
+        log.append("WARNING no persona: block in the live yaml or the template; edit by hand")
+        return text
+    new = "".join(template_text.splitlines(keepends=True)[new_span[0]:new_span[1]])
+    old = "".join(lines[span[0]:span[1]])
+    if old == new:
+        return text
+    if hashlib.sha256(old.encode("utf-8")).hexdigest() != OLD_PERSONA_SHA256:
+        log.append("WARNING persona: block differs from the known v0.2.x persona (edited by hand?); left unchanged. Merge templates/viral.agent.yaml by hand")
+        return text
+    log.append("replaced persona: block (%d bytes -> %d bytes)" % (len(old.encode("utf-8")), len(new.encode("utf-8"))))
+    return "".join(lines[:span[0]]) + new + "".join(lines[span[1]:])
+
+
+def patch(text, template_text):
     log = []
     for old, new in REWRITES:
         if old in text:
             text = text.replace(old, new)
             log.append("rewrote: " + old[:60] + "...")
+    text = replace_persona(text, template_text, log)
     for number, line in enumerate(text.splitlines(), 1):
         if REMOVED.search(line):
             log.append("WARNING line %d still names a removed tool or argument, edit it by hand: %s..." % (number, line.strip()[:70]))
@@ -40,9 +86,12 @@ def patch(text):
 
 def main():
     path = sys.argv[1]
+    template = sys.argv[2] if len(sys.argv) > 2 else DEFAULT_TEMPLATE
     with open(path, encoding="utf-8", newline="") as f:
         text = f.read()
-    patched, log = patch(text)
+    with open(template, encoding="utf-8", newline="") as f:
+        template_text = f.read()
+    patched, log = patch(text, template_text)
     if patched == text and not log:
         print("no changes")
         return

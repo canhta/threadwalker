@@ -420,7 +420,7 @@ func (r *Runtime) execute(ctx context.Context, wake WakeResult, phase string, ca
 	}
 	reviewer := r.Reviewer(result.ID)
 	if reviewer.Ideas == nil {
-		hidden = append(hidden, "ideas") // no writer block: the wake text must not name the tool
+		hidden = append(hidden, "ideas") // no writer block: the tool is not offered
 	}
 	dispatcher, err := tools.NewDispatcher(tools.Options{Hidden: hidden, Scope: guard.Scope{Store: r.opts.Store, Template: r.opts.Template, OwnUsernames: r.opts.OwnUsernames, WakeID: result.ID, Phase: phase, Now: r.opts.Now, Logger: r.opts.Logger, AllowLive: r.canPublish, Critic: reviewer.Critic, Writer: reviewer.Writer, Ideas: reviewer.Ideas, Sleep: r.opts.Wait}, FetchTrends: r.opts.FetchTrends, SearchWeb: r.opts.SearchWeb, Owner: r.opts.Owner, Threads: backend, Redactor: r.redactor(), EvidenceDir: r.opts.EvidenceDir})
 	if err != nil {

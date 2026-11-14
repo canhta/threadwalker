@@ -27,7 +27,7 @@ sequenceDiagram
 | Step | Fact |
 |---|---|
 | 1. Wake | The harness wakes the agent at the time code set last wake, within the frequency limit |
-| 2. Context | One builder assembles every phase. System prompt from the template in fixed sections: who you are, starting voice, examples (rejected drafts labelled), hard limits, the phase's job and tools, harness rules. The hard limits are the only blocks |
+| 2. Context | One builder assembles every phase. System prompt: the template's goal, `identity`, `voice`, `topics`, `research_focus`, `avoid_topics`, the guard's blocked phrases and `good_posts` and `good_replies`, about 1 KB of code-owned text (a role line, one precedence line, how a wake and the data message work). The precedence line is: hard limits (enforced by code) > owner notes > persona > lessons > examples. The prompt names no tool and carries no time or per-wake data, so one template sends the same bytes on every step and wake; tool policy lives in the tool schemas and the guard's refusals. `style_rules`, `style_avoid` and `bad_examples` belong to the writer and `critic_rules` to the critic, never to this prompt |
 | 3. Inbox | Before the first request code reads the conversation inbox ([threads.md](threads.md)). When it is not empty, the data message starts with an `inbox` section above everything else: per reply its `ref` (a `p` ref, the `target` of `reply`), `author`, `text` (untrusted, redacted), `replying_to` (first line of our text it answered) and `age_minutes`, newest first, at most 10; replies of a conversation already at `limits.replies_per_conversation` ([guards.md](guards.md)) are left out. The wake text tells the agent to answer these first, each at most once, and to skip one that needs no answer. The writer and critic run as for any reply |
 | 4. Data message | One JSON object in a fixed order, what changes once a day first: `lessons`, `examples` (best and worst 3 of each kind of the last 48 hours), `recent` (the last 10 episodes as compact rows), `owner_answers`, `facts`, `remaining_usd`, `counters` (today against the caps) and `said` (the first 160 bytes of the last 10 own texts, measured or not). Then the scoreboard (when `kpi:` exists), the limits now, the inbox, the open reply candidates and the open owner notes as first task ([learning.md](learning.md)). The candidates are up to 8 posts read in the last 6 hours, not answered, not the account's own, inside the `targets.*` window with their age advanced to now and scoring at least 0.5, best score first, each `{ref, author, age_min, likes, replies, text}`; they are listed only when `reply` is offered. The stop check names the same list ([tools.md](tools.md)) |
 | 5. Loop | The agent calls tools until it ends or hits the request or token limit. A step is one model request, however many tool calls it returns; `wakes.steps` counts them. Results enter the conversation clipped to 6 KB: a list drops whole items from its end and the result carries `clipped_lists`, per list the items shown and the items in total (`{"shown":{"data.posts":18},"total":{"data.posts":60}}`); the longest list is trimmed first, ties by name |
@@ -66,13 +66,14 @@ Optional `kpi:` block: `engagements_per_day`, `followers_per_week`, `max_hours_w
 | Followers | Account followers gained in the last 7 days: the newest follower count measured in that window minus the oldest (never negative), against `followers_per_week` |
 | Next post | When the newest own post plus `limits.min_minutes_between_posts` has not passed, the local time and minutes until a post is allowed (the guard's own rule); when today's `posts_per_day` is used, a line saying no more posts today; otherwise no line |
 | Cost per engagement | Spend today over engagements in 24 hours |
-| Gap line | `behind: 3 of 40 engagements in 24h after $0.12 and 4 wakes today; nothing published for 9h`, or `on target: ...` |
+| Gap line | `behind: 3 of 40 engagements in 24h, 5 of 5 followers gained in 7 days, after $0.12 and 4 wakes today; nothing published for 9h`, or `on target: ...` |
 
 The text says that pressure means more and better ideas, never lower quality: the critic still decides and the caps still hold.
 
 | Condition | Behind when |
 |---|---|
 | Engagements | Under the daily target |
+| Followers | Gained in the last 7 days under `followers_per_week`. The gain is the newest follower reading in the last 7 days minus the oldest, and the full weekly target applies, not pro-rated: with under a week of readings, or none (a failed follower read counts as 0 gained), the agent reads behind and wakes at `limits.min_minutes_between_wakes`, bounded by `limits.max_usd_per_day` |
 | Never published | True |
 | Publish age | `max_hours_without_publish` old or older |
 
@@ -80,7 +81,7 @@ An agent on target is never sent a stop check. A behind agent gets one extra tur
 
 ## Limits now and nothing to do
 
-The data message carries a `Limits now (computed by code)` block: posts and replies left today and this hour, when the next post is allowed, and when replies resume after the breaker. A write tool whose gate stays shut for longer than 30 minutes (no posts left, no replies left, the hourly cap used up with none left at the end of the wake, or a pause or post gap past 30 minutes) is left out of the tool list and the wake text, and a call to it is refused as `tool_hidden`. When both `post` and `reply` are closed the wake makes no model call and ends as `nothing_to_do`, even with an inbox, since nobody could be answered; it is not counted as a failed run. When only `reply` is closed the inbox section and the instructions to answer are left out.
+The data message carries a `Limits now (computed by code)` block: posts and replies left today and this hour, when the next post is allowed, and when replies resume after the breaker. A write tool whose gate stays shut for longer than 30 minutes (no posts left, no replies left, the hourly cap used up with none left at the end of the wake, or a pause or post gap past 30 minutes) is left out of the tool list, and a call to it is refused as `tool_hidden`. When both `post` and `reply` are closed the wake makes no model call and ends as `nothing_to_do`, even with an inbox, since nobody could be answered; it is not counted as a failed run. When only `reply` is closed the inbox section and the open reply candidates are left out.
 
 ## Cadence
 

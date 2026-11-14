@@ -26,7 +26,7 @@ func TestPhaseContextsDifferInPromptAndData(t *testing.T) {
 		t.Fatal(err)
 	}
 	agentMsgs, err := r.wakeContext(ctx, guard.PhaseAgent, 0, "", noIssue)
-	if err != nil || !strings.Contains(agentMsgs[0].Content, "A normal wake") || !strings.Contains(agentMsgs[1].Content, `"counters"`) {
+	if err != nil || !strings.Contains(agentMsgs[0].Content, "# How you work") || !strings.Contains(agentMsgs[1].Content, `"counters"`) {
 		t.Fatalf("agent context: %v", err)
 	}
 	dreamMsgs, err := r.wakeContext(ctx, guard.PhaseDream, 0, "", noIssue)
@@ -54,20 +54,6 @@ func TestSystemPromptNeverForcesAWriteOrNamesARemovedTool(t *testing.T) {
 			if strings.Contains(prompt, removed) {
 				t.Errorf("%s prompt names the removed %q", phase, removed)
 			}
-		}
-	}
-}
-
-func TestHiddenToolsLeaveTheWakeInstructions(t *testing.T) {
-	tmpl := OfflineTemplate()
-	full := systemPrompt(tmpl, guard.PhaseAgent)
-	if !strings.Contains(full, "target = its ref") || !strings.Contains(full, "Threads search hit") || strings.Contains(full, "profile_posts") || strings.Contains(full, "read_post,") {
-		t.Fatal("full prompt should mention search and the permalink reply path only")
-	}
-	hidden := systemPrompt(tmpl, guard.PhaseAgent, "find_posts:search")
-	for _, word := range []string{"profile_posts", "Threads search hit"} {
-		if strings.Contains(hidden, word) {
-			t.Fatalf("hidden prompt still mentions %q", word)
 		}
 	}
 }

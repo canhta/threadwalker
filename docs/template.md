@@ -35,18 +35,18 @@ All required unless noted. A phrase in both `guard.blocked_phrases` and `persona
 | `persona.name` | string | template | Display name; also used in owner-facing copy |
 | `persona.language` | string | template | Language of the account; used in the system prompt. Owner copy on Telegram is always English |
 | `persona.bio_must_include` | string | template | The AI label the live bio must carry (the account states it is an AI experiment) |
-| `persona.identity` | string | template | Who the account is; read by the agent, writer and `ideas` |
-| `persona.voice` | string | template | Voice of the account |
+| `persona.identity` | string | template | Who the account is, and that it says so when asked it is an AI; read by the agent, writer and `ideas` |
+| `persona.voice` | string | template | How it sounds: pronouns, register, caps, emoticons, whose it teases; read by the agent and writer |
 | `persona.audience` | string | template | Who it writes for, one paragraph; read by writer, critic and `ideas` |
-| `persona.critic_rules` | list | template | Numbered conditions under which the critic fails a draft |
-| `persona.research_focus` | list | template | What to search, read and track across wakes; also seeds `fetch_trends` keywords |
-| `persona.style_rules` | list | template | Craft guidance for the agent and writer; also scored by `internal/quality` |
+| `persona.critic_rules` | list | template | Numbered conditions under which the critic fails a draft; critic only, at most 6 in the viral template |
+| `persona.research_focus` | list | template | What to favour when reading across wakes, without naming tools; agent only, also seeds `fetch_trends` keywords when `trends.include_keywords` is omitted |
+| `persona.style_rules` | list | template | The writer's craft rules, each stated once; writer only (the agent prompt does not carry them); also scored by `internal/quality` |
 | `persona.topics` | list | template | Topics; seed `fetch_trends` keywords |
 | `persona.avoid_topics` | list | template | Off-limits subjects; seed `fetch_trends` avoid keywords |
 | `persona.good_posts` | list | template | Starting examples of posts for the agent and writer |
 | `persona.good_replies` | list | template | Starting examples of replies |
-| `persona.bad_examples` | list | template | Rejected drafts, labelled in the system prompt |
-| `persona.style_avoid` | list | template | Phrases to steer clear of; shown to the agent and the writer, never blocks |
+| `persona.bad_examples` | list | template | Rejected drafts, one distinct flaw each; read by the quality judge |
+| `persona.style_avoid` | list | template | The one list of literal phrases the writer steers clear of; shown to the writer and checked by `internal/quality`, never blocks (a refusal needs `guard.blocked_phrases`). Engagement asks are the guard's `engagement_bait`, not listed here |
 
 ## LLM blocks
 

@@ -54,7 +54,9 @@ func kpiRuntimeFull(t *testing.T, zone string, publishedAgo time.Duration, engag
 		t.Fatal(err)
 	}
 	for _, q := range []string{
-		`INSERT INTO metrics(agent_id,action_id,measured_at,likes) VALUES(?1,` + itoa(id) + `,'2026-01-01T11:00:00Z',` + itoa(int64(engagements)) + `)`,
+		// The account gained exactly the weekly follower target: 100 at the first read, 105 at the newest.
+		`INSERT INTO metrics(agent_id,action_id,measured_at,likes,followers) VALUES(?1,` + itoa(id) + `,'2025-12-30T00:00:00Z',0,100)`,
+		`INSERT INTO metrics(agent_id,action_id,measured_at,likes,followers) VALUES(?1,` + itoa(id) + `,'2026-01-01T11:00:00Z',` + itoa(int64(engagements)) + `,105)`,
 		`INSERT INTO ledger_phases(agent_id,day,phase,tokens_in,tokens_out,cost_usd) VALUES(?1,'2026-01-01','agent',1000,500,0.12)`,
 		`INSERT INTO wakes(agent_id,started_at,ended_at) VALUES(?1,'2026-01-01T01:00:00Z','2026-01-01T01:01:00Z'),(?1,'2026-01-01T03:00:00Z','2026-01-01T03:01:00Z'),(?1,'2026-01-01T06:00:00Z','2026-01-01T06:01:00Z'),(?1,'2026-01-01T09:00:00Z','2026-01-01T09:01:00Z')`,
 	} {
@@ -113,9 +115,9 @@ func TestScoreboardTopsTheWakeAndStatesTheGap(t *testing.T) {
 		"# Scoreboard (computed by code)\n",
 		"Spend: today $0.12 (1500 tokens), last 7 days $0.12 (1500 tokens). Wakes today: 4.",
 		"Last published action: 9h ago (most you may go: 8h).",
-		"Engagements (likes, replies, reposts, quotes on your actions) in 24h: 3 of 10. Followers gained in 7 days: 0 of 5.",
+		"Engagements (likes, replies, reposts, quotes on your actions) in 24h: 3 of 10. Followers gained in 7 days: 5 of 5.",
 		"Cost per engagement: $0.040",
-		"behind: 3 of 10 engagements in 24h after $0.12 and 4 wakes today; nothing published for 9h\n",
+		"behind: 3 of 10 engagements in 24h, 5 of 5 followers gained in 7 days, after $0.12 and 4 wakes today; nothing published for 9h\n",
 		"never lower quality. The critic still decides and the caps still hold.",
 	} {
 		if !strings.Contains(user, want) {
@@ -134,7 +136,7 @@ func TestScoreboardOnTargetHasNoStopRule(t *testing.T) {
 		t.Fatal(err)
 	}
 	user := messages[1].Content
-	if !strings.Contains(user, "on target: 12 of 10 engagements in 24h; last published 1h ago") || strings.Contains(user, "may not end this wake idle") {
+	if !strings.Contains(user, "on target: 12 of 10 engagements in 24h, 5 of 5 followers gained in 7 days; last published 1h ago") || strings.Contains(user, "may not end this wake idle") {
 		t.Fatalf("on-target scoreboard:\n%.900s", user)
 	}
 }
@@ -310,17 +312,17 @@ func TestWakeContextHasNoTimestamps(t *testing.T) {
 	}
 }
 
-func TestLimitsStateHidesTheClosedWriteToolsAndSkipsAnIdleWake(t *testing.T) {
+func TestLimitsStateShowsWhatIsLeftAndAnIdleWakeIsSkipped(t *testing.T) {
 	ctx := context.Background()
 	for _, tc := range []struct {
 		name                string
 		posts, replies, gap int
-		wantTools, wantLine string
+		wantLine            string
 	}{
-		{"open", 0, 0, 0, "ideas, post, reply,", "- Posts: 3 of 3 left today.\n- Replies: 15 of 15 left today."},
-		{"posts used", 3, 0, 0, "ideas, reply,", "- Posts: 0 of 3 left today.\n"},
-		{"post gap outlasts the wake", 1, 0, 600, "ideas, reply,", "next post allowed at"},
-		{"replies used", 0, 15, 0, "ideas, post,", "- Replies: 0 of 15 left today."},
+		{"open", 0, 0, 0, "- Posts: 3 of 3 left today.\n- Replies: 15 of 15 left today."},
+		{"posts used", 3, 0, 0, "- Posts: 0 of 3 left today.\n"},
+		{"post gap outlasts the wake", 1, 0, 600, "next post allowed at"},
+		{"replies used", 0, 15, 0, "- Replies: 0 of 15 left today."},
 	} {
 		r, st, _ := kpiRuntimeFull(t, "", 24*time.Hour, 3, tc.gap)
 		if _, err := st.DB().Exec(`DELETE FROM actions`); err != nil {
@@ -336,8 +338,8 @@ func TestLimitsStateHidesTheClosedWriteToolsAndSkipsAnIdleWake(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if !strings.Contains(messages[0].Content, tc.wantTools) || !strings.Contains(messages[1].Content, tc.wantLine) {
-			t.Errorf("%s: tools %q / line %q missing:\n%s\n%s", tc.name, tc.wantTools, tc.wantLine, messages[0].Content, messages[1].Content)
+		if !strings.Contains(messages[1].Content, tc.wantLine) {
+			t.Errorf("%s: line %q missing:\n%s", tc.name, tc.wantLine, messages[1].Content)
 		}
 	}
 
@@ -358,5 +360,30 @@ func TestLimitsStateHidesTheClosedWriteToolsAndSkipsAnIdleWake(t *testing.T) {
 	state, err := st.AgentState(ctx, "synthetic-offline")
 	if err != nil || !state.NextWake.After(kpiNow) {
 		t.Fatalf("next wake %v err %v", state.NextWake, err)
+	}
+}
+
+// Engagements over target with followers under the weekly target is still
+// behind, so the wake cadence stays at the template minimum.
+func TestFollowersUnderTheWeeklyTargetAreBehind(t *testing.T) {
+	r, st, fixture := kpiRuntime(t, time.Hour, 30)
+	if _, err := st.DB().Exec(`UPDATE metrics SET followers=100 WHERE measured_at='2026-01-01T11:00:00Z'`); err != nil {
+		t.Fatal(err)
+	}
+	messages, err := r.Context(context.Background(), "agent")
+	if err != nil {
+		t.Fatal(err)
+	}
+	user := messages[1].Content
+	if want := "behind: 30 of 10 engagements in 24h, 0 of 5 followers gained in 7 days, after $0.12 and 4 wakes today\n"; !strings.Contains(user, want) || strings.Contains(user, "on target") {
+		t.Fatalf("scoreboard lacks %q in:\n%.900s", want, user)
+	}
+	fixture.Calls = []llm.ToolCall{{Type: "function", Function: llm.CallFunction{Name: "find_posts", Arguments: `{"source":"feed"}`}}}
+	if _, err = r.Wake(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	state, err := st.AgentState(context.Background(), "synthetic-offline")
+	if want := kpiNow.Add(20 * time.Minute); err != nil || !state.NextWake.Equal(want) {
+		t.Fatalf("next wake %v, want the template minimum %v (err %v)", state.NextWake, want, err)
 	}
 }

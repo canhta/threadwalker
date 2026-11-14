@@ -34,7 +34,7 @@ A Trending-now topic joins the wake as a trend item whose ref is its topic URL a
 
 | Rule | Fact |
 |---|---|
-| Brief | `post` and `reply` take `angle` (the one thing to say) and `fact` (the verified detail it rests on: a number, name or quote read this wake). With a writer, text is rewritten from them, so the agent's `text` may be rough |
+| Brief | `post` and `reply` take `angle` (the one thing to say) and `fact` (the detail it rests on, as the agent read it: a number, name or quote read this wake). With a writer, text is rewritten from them, so the agent's `text` may be rough |
 | Pre-critic check | The writer's text meets the content rules (blocked phrases, length, links) before the critic sees it; a violation goes back as a problem |
 | Revisions | A failed draft returns to the writer with the critic's problems, up to 2 revisions inside the same tool call |
 | Pass | Only a passing draft reaches the reservation; its text is what is published and stored |
@@ -55,13 +55,15 @@ Code picks up to 3 of the account's own live posts (or replies, by kind) of the 
 
 | Prompt or text | Code owns | Template owns |
 |---|---|---|
-| Agent system prompt | Section order, hard-limits block, harness rules, phase job and tool list | Goal, persona identity, voice, examples, `style_avoid` |
+| Agent system prompt | Role line, the precedence line, how a wake and the data message work (about 1 KB, no tool names, no volatile data) | Goal, `identity`, `voice`, `topics`, `research_focus`, `avoid_topics`, `good_posts`, `good_replies` |
 | `ideas` | Role and JSON shape | `persona.audience`, identity, voice (the reader and topics to follow) |
-| Writer | Role, JSON shape, series limit, untrusted-data rule | `persona.audience`, identity, voice, `style_rules`, good examples, `style_avoid`, model and `reasoning_effort` |
+| Writer | Role, JSON shape, series limit, untrusted-data rule | `persona.audience`, identity, voice, `style_rules`, good examples, `style_avoid`, `avoid_topics`, model and `reasoning_effort` |
 | Critic | Role, JSON shape and score axes, the repeated-image rule, untrusted-data rule | `persona.audience`, numbered `persona.critic_rules`, model and `reasoning_effort` |
 | Owner-facing copy | All of it: English plain text with counts, limits and times (the model never writes them) | `persona.name` names the agent in a shared bot and in `/start` |
 
 The role prompts say nothing about the audience, the language or the style: those come from the template. The viral template carries the Vietnamese GenZ text and the research rules of `.research/viral-threads-vn.md`.
+
+Each rule has one owner: who and what in `identity`, `voice`, `audience` and `topics`; the writer's style in `style_rules`; what the critic fails in `critic_rules` (at most 6); literal phrases in `style_avoid`; hard refusals in the guard (`guard.blocked_phrases` and the built-in categories). Tests pin it: the viral persona stays under 6 KB with a cap per section, no two rule texts share a run of 6 words, the persona names no tool, and the agent prompt stays under 8 KB and byte-identical across steps and wakes.
 
 ## Hooks, series and the comment loop
 

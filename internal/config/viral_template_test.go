@@ -1,12 +1,15 @@
 package config_test
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"unicode"
 
 	"github.com/canhta/threadz/internal/config"
+	"github.com/canhta/threadz/internal/guard"
 )
 
 // viralEnv supplies only the inline LLM key the live template names. The test
@@ -60,21 +63,17 @@ func TestLoadFile_ViralTemplate(t *testing.T) {
 	if !strings.Contains(tmpl.Persona.Voice, "mình") {
 		t.Errorf("Persona.Voice = %q, want the mình register", tmpl.Persona.Voice)
 	}
-	for _, rule := range tmpl.Persona.StyleRules {
-		if strings.Contains(rule, "không 'tao'") {
-			goto avoided
-		}
+	if !strings.Contains(tmpl.Persona.Voice, `không "tao"`) {
+		t.Error("Voice does not avoid the tao/mày self-address")
 	}
-	t.Error("StyleRules do not avoid the tao/mày self-address")
-avoided:
-	if len(tmpl.Persona.ResearchFocus) != 3 {
-		t.Errorf("len(ResearchFocus) = %d, want 3", len(tmpl.Persona.ResearchFocus))
+	if len(tmpl.Persona.ResearchFocus) != 2 {
+		t.Errorf("len(ResearchFocus) = %d, want 2", len(tmpl.Persona.ResearchFocus))
 	}
 	if len(tmpl.Persona.StyleRules) < 5 {
 		t.Errorf("len(StyleRules) = %d, want at least 5", len(tmpl.Persona.StyleRules))
 	}
-	if len(tmpl.Persona.Topics) != 3 {
-		t.Errorf("len(Topics) = %d, want 3", len(tmpl.Persona.Topics))
+	if len(tmpl.Persona.Topics) != 2 {
+		t.Errorf("len(Topics) = %d, want 2", len(tmpl.Persona.Topics))
 	}
 	if len(tmpl.Persona.AvoidTopics) != 4 {
 		t.Errorf("len(AvoidTopics) = %d, want 4", len(tmpl.Persona.AvoidTopics))
@@ -105,7 +104,7 @@ avoided:
 		}
 	}
 	preachy := strings.Join(tmpl.Persona.BadExamples, "\n")
-	for _, marker := range []string{"chưa phải", "Ai chịu trách nhiệm"} {
+	for _, marker := range []string{"khởi tố chưa đồng nghĩa có tội", "mình chốt"} {
 		if !strings.Contains(preachy, marker) {
 			t.Errorf("BadExamples do not keep the rejected preachy draft marker %q", marker)
 		}
@@ -179,6 +178,103 @@ func TestViralTemplateHasWriterCriticAndNoStartupPersona(t *testing.T) {
 			if strings.Contains(rule, banned) {
 				t.Errorf("persona keeps %q: %s", banned, rule)
 			}
+		}
+	}
+}
+
+// personaSizes is every persona text field's bytes as the prompts carry them.
+func personaSizes(p config.PersonaConfig) (total int, bySection map[string]int) {
+	sections := map[string][]string{
+		"identity": {p.Identity}, "voice": {p.Voice}, "audience": {p.Audience},
+		"critic_rules": p.CriticRules, "research_focus": p.ResearchFocus, "style_rules": p.StyleRules,
+		"topics": p.Topics, "avoid_topics": p.AvoidTopics, "good_posts": p.GoodPosts, "good_replies": p.GoodReplies,
+		"bad_examples": p.BadExamples, "style_avoid": p.StyleAvoid,
+	}
+	bySection = map[string]int{}
+	for name, items := range sections {
+		for _, s := range items {
+			bySection[name] += len(strings.TrimSpace(s))
+		}
+		total += bySection[name]
+	}
+	return total, bySection
+}
+
+// The persona is the one place for who the account is and how it writes; a
+// section that grows past its cap holds a rule that belongs somewhere else.
+func TestViralPersonaStaysUnderItsByteCaps(t *testing.T) {
+	tmpl, err := loadOne(viralTemplatePath(), viralEnv())
+	if err != nil {
+		t.Fatal(err)
+	}
+	total, by := personaSizes(tmpl.Persona)
+	caps := map[string]int{
+		"identity": 560, "voice": 760, "audience": 280, "critic_rules": 820, "research_focus": 300, "style_rules": 2200,
+		"topics": 450, "avoid_topics": 560, "good_posts": 200, "good_replies": 150, "bad_examples": 450, "style_avoid": 560,
+	}
+	for name, limit := range caps {
+		if by[name] > limit {
+			t.Errorf("persona.%s is %d bytes, cap %d", name, by[name], limit)
+		}
+	}
+	if total > 6*1024 {
+		t.Errorf("persona is %d bytes, cap %d: %v", total, 6*1024, by)
+	}
+	if n := len(tmpl.Persona.CriticRules); n > 6 {
+		t.Errorf("%d critic_rules, at most 6", n)
+	}
+	if n := len(tmpl.Persona.BadExamples); n > 6 {
+		t.Errorf("%d bad_examples, at most 6", n)
+	}
+}
+
+// words lowercases text and keeps its letters and digits as words.
+func words(s string) []string {
+	return strings.FieldsFunc(strings.ToLower(s), func(r rune) bool { return !unicode.IsLetter(r) && !unicode.IsNumber(r) })
+}
+
+// A rule lives in one persona section: no two rule texts share a run of
+// duplicateRun words. Examples and the literal-phrase list are not rules.
+func TestViralPersonaStatesEachRuleOnce(t *testing.T) {
+	const duplicateRun = 6
+	tmpl, err := loadOne(viralTemplatePath(), viralEnv())
+	if err != nil {
+		t.Fatal(err)
+	}
+	p := tmpl.Persona
+	rules := map[string][]string{"identity": {p.Identity}, "voice": {p.Voice}, "audience": {p.Audience}, "topics": p.Topics, "avoid_topics": p.AvoidTopics,
+		"style_rules": p.StyleRules, "critic_rules": p.CriticRules, "research_focus": p.ResearchFocus}
+	seen := map[string]string{}
+	for _, section := range []string{"identity", "voice", "audience", "topics", "avoid_topics", "style_rules", "critic_rules", "research_focus"} {
+		for i, text := range rules[section] {
+			where := fmt.Sprintf("%s[%d]", section, i)
+			w := words(text)
+			here := map[string]bool{}
+			for j := 0; j+duplicateRun <= len(w); j++ {
+				run := strings.Join(w[j:j+duplicateRun], " ")
+				if first, ok := seen[run]; ok && first != where {
+					t.Errorf("%q appears in %s and %s", run, first, where)
+				}
+				here[run] = true
+			}
+			for run := range here {
+				seen[run] = where
+			}
+		}
+	}
+}
+
+// Tool policy lives in the tool specs and the guard's refusals, not the persona.
+func TestViralPersonaNamesNoTool(t *testing.T) {
+	tmpl, err := loadOne(viralTemplatePath(), viralEnv())
+	if err != nil {
+		t.Fatal(err)
+	}
+	p := tmpl.Persona
+	text := strings.Join(append(append(append([]string{p.Identity, p.Voice, p.Audience}, p.Topics...), p.ResearchFocus...), append(p.StyleRules, p.CriticRules...)...), "\n")
+	for _, spec := range guard.Specs() {
+		if strings.Contains(spec.Name, "_") && strings.Contains(text, spec.Name) {
+			t.Errorf("persona names the tool %s", spec.Name)
 		}
 	}
 }

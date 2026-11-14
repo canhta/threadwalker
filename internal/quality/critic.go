@@ -111,7 +111,7 @@ func ParseCritic(content string) (CriticVerdict, error) {
 type WriterInput struct {
 	Kind     string
 	Angle    string    // what the agent wants to say
-	Fact     string    // the verified fact it rests on
+	Fact     string    // the detail the agent says it read
 	Parent   string    // the post a reply answers, or the trend a post anchors to
 	Draft    []string  // the agent's rough text, or the writer's last try
 	Problems []string  // the editor's problems with Draft; empty on the first try

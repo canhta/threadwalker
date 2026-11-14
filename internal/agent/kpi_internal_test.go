@@ -30,12 +30,34 @@ func TestStopCheckShowsOpenTargetsToABehindAgentWhileBudgetIsLeft(t *testing.T) 
 
 func TestStopCheckNeverAsksAnAgentOnTarget(t *testing.T) {
 	onTarget := behindSB
-	onTarget.Engagements = 12
+	onTarget.Engagements, onTarget.Followers = 12, 5
 	onTarget.LastPublish = testNow.Add(-time.Hour)
 	if onTarget.Behind() {
 		t.Fatal("fixture is behind")
 	}
 	if ask := onTarget.stopCheck(nil, func() []string { return []string{"p1", "p2"} }, 5)(nil, nil); ask != "" {
 		t.Fatalf("on-target agent asked: %q", ask)
+	}
+}
+
+func TestBehindCountsFollowersAgainstTheWeeklyTarget(t *testing.T) {
+	sb := behindSB
+	sb.Engagements, sb.LastPublish = 12, testNow.Add(-time.Hour)
+	for _, tc := range []struct {
+		followers int64
+		behind    bool
+	}{{0, true}, {4, true}, {5, false}, {9, false}} {
+		sb.Followers = tc.followers
+		if sb.Behind() != tc.behind {
+			t.Errorf("followers %d: Behind() = %v, want %v", tc.followers, sb.Behind(), tc.behind)
+		}
+	}
+	sb.Followers = 2
+	if gap := sb.gap(); !strings.HasPrefix(gap, "behind: 12 of 10 engagements in 24h, 2 of 5 followers gained in 7 days, after $0.00") {
+		t.Errorf("gap %q", gap)
+	}
+	sb.KPI = config.KPIConfig{}
+	if sb.Behind() {
+		t.Error("a template without a kpi block is never behind")
 	}
 }

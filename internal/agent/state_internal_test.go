@@ -16,15 +16,6 @@ func TestStopCheckNeverNudgesTowardAHiddenTool(t *testing.T) {
 	}
 }
 
-func TestAgentJobDoesNotSendAHiddenReplyToTheInbox(t *testing.T) {
-	if job := agentJob(nil); !strings.Contains(job, "answer those people first") {
-		t.Fatalf("open reply lost its inbox text: %s", job)
-	}
-	if job := agentJob([]string{"reply"}); strings.Contains(job, "answer those people first") || strings.Contains(job, "To reply to a feed post") {
-		t.Fatalf("hidden reply still told to answer: %s", job)
-	}
-}
-
 func TestNothingToDoWhenNoWriteToolIsUsable(t *testing.T) {
 	if !(wakeState{}).nothingToDo() {
 		t.Fatal("post and reply both closed, inbox or not: nothing to do")

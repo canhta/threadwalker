@@ -34,7 +34,7 @@ Phases: `A` agent, `D` dream. Effect classes: `read`, `own-state`, `threads-writ
 | Trailer | Every result ends with `{"steps_left": N, "usd_left": X}`; steps are model requests ([wake.md](wake.md)) |
 | Clipping | A result is clipped to 6 KB (`tools.MaxResultBytes`) by dropping whole list items from the end; the top level then carries `clipped_lists` with `shown` and `total` per list path (such as `data.posts`). Every post read is stored whether or not the clip showed it. A result with no list to drop becomes `{"clipped": true, ...}` |
 | Read caps | Per normal wake: `find_posts` source `topic` 3 and `feed` 2, `web_search` 3, `fetch_trends` 1; the call past a cap is refused `limit_per_wake` |
-| Hidden | Tools and `find_posts` sources named in `refused_tools` (24 h), `ideas` without a writer, and owner tools with Telegram off are absent from the list and from wake text; a call to a closed source is refused `tool_hidden` |
+| Hidden | Tools and `find_posts` sources named in `refused_tools` (24 h), `ideas` without a writer, and owner tools with Telegram off are absent from the tool list (the system prompt names no tool); a call to a closed source is refused `tool_hidden` |
 | Size | The agent phase's tool definitions are at most 6 KB (5.9 KB now) and each description at most 300 characters, pinned by `TestAgentToolDefinitionsGolden` and `internal/tools/testdata/agent-tools.golden.json`. A description says what the tool does and each argument is described in the JSON schema; policy (caps, spacing, repeat and anchor rules, owner-note rules) lives in guard code and is stated only in the refusal hint |
 | Owner mode | Disabled owner integrations expose neither owner tool and create no Bot API client |
 | Audit | The pre-effect row in `tool_calls` holds only the argument byte count and validity, never arguments |
@@ -52,5 +52,5 @@ The data message lists up to 8 open reply candidates (`guard.OpenCandidates`): p
 | `trend` | A `t` or `p` ref of a trend, source or post this wake issued; the action stores the item's URL or title, never the ref |
 | `rationale` | One line, at most 300 characters, no newline: the trend, the hook, why a Vietnamese dev would reply |
 | `answers_note` | Id of an open owner note |
-| `angle`, `fact` | The brief for the writer: the one thing to say, and the verified detail it rests on ([content.md](content.md)) |
+| `angle`, `fact` | The brief for the writer: the one thing to say, and the detail it rests on, as read ([content.md](content.md)) |
 | `target` | The `p` ref of the post to answer. The action stores the permalink and the author of the stored post |
