@@ -87,11 +87,11 @@ All required unless noted. A phrase in both `guard.blocked_phrases` and `persona
 | `limits.critic_rejections_per_wake` | int 1–20 | 2 | code | Drafts the critic may reject in one wake before further posts and replies are refused (`critic_limit`) |
 | `limits.min_seconds_between_actions` | int > 0 | required | code | Spacing between actions |
 | `limits.min_minutes_between_posts` | int > 0 | off | code | Spacing between posts; replies only follow `min_seconds_between_actions` |
-| `limits.max_steps_per_wake` | int > 0 | required | code | Step limit of an agent wake |
+| `limits.max_steps_per_wake` | int > 0 | required | code | Model requests an agent wake may make; a request that returns several tool calls costs one |
 | `limits.max_usd_per_day` | number > 0 | required | code | Daily spend cap shared by the agent and critic phases; the day runs 00:00 to 24:00 in `schedule.timezone` |
 | `limits.min_minutes_between_wakes` | int 1..1440 | required | code | Wake spacing when behind, and the minimum cadence ([wake.md](wake.md)) |
 | `limits.max_usd_per_dream` | number > 0 | 0.30 | code | Dream spend cap, outside the daily cap |
-| `limits.max_steps_per_dream` | int > 0 | 8 | code | Dream step cap |
+| `limits.max_steps_per_dream` | int > 0 | 8 | code | Model requests the dream may make |
 
 ## kpi
 

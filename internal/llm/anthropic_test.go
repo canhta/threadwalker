@@ -326,7 +326,7 @@ func TestAnthropicToolErrorsBecomeNativeToolResults(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if result.Content != "recovered" || result.Steps != 4 {
+	if result.Content != "recovered" || result.Steps != 2 {
 		t.Fatalf("result=%+v", result)
 	}
 	if len(calls) != 1 || calls[0].ID != "toolu_failed" {
@@ -631,7 +631,7 @@ func TestAnthropicOutputStepAndBudgetLimits(t *testing.T) {
 		if !errors.Is(err, llm.ErrStepLimit) {
 			t.Fatalf("step limit error: %v", err)
 		}
-		if result.Steps != 1 || calls != 1 || recorder.count() != 1 {
+		if result.Steps != 1 || calls != 2 || recorder.count() != 1 {
 			t.Fatalf("steps=%d calls=%d requests=%d", result.Steps, calls, recorder.count())
 		}
 	})

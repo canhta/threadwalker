@@ -157,11 +157,21 @@ func TestStepLimitAndMalformedTools(t *testing.T) {
 				t.Fatal(err)
 			}
 			result, err := client.Run(context.Background(), "agent", 1, []llm.Message{{Role: "user", Content: "go"}}, []llm.Tool{{Type: "function", Function: llm.Function{Name: "echo", Parameters: json.RawMessage(`{"type":"object"}`)}}}, refusing(&calls, "ok", "echo"))
-			if !errors.Is(err, llm.ErrStepLimit) || result.Steps != tc.limit || requests != 1 {
+			// A step is one model request: both calls of the first answer run, and
+			// only the budget decides whether a second request is made.
+			if tc.limit == 1 {
+				if !errors.Is(err, llm.ErrStepLimit) || result.Steps != 1 || requests != 1 {
+					t.Fatalf("result=%+v requests=%d err=%v", result, requests, err)
+				}
+			} else if err != nil || result.Steps != 2 || requests != 2 || result.Content != "done" {
 				t.Fatalf("result=%+v requests=%d err=%v", result, requests, err)
 			}
-			if calls != 1 {
-				t.Fatalf("dispatches=%d want=1", calls)
+			want := 1
+			if tc.limit == 1 {
+				want = 2 // both calls are well formed
+			}
+			if calls != want {
+				t.Fatalf("dispatches=%d want=%d", calls, want)
 			}
 		})
 	}
@@ -195,7 +205,7 @@ func TestMalformedToolErrorsReachModel(t *testing.T) {
 		calls++
 		return "", errors.New("blocked by fake guard")
 	}), "echo"))
-	if err != nil || result.Content != "recovered" || result.Steps != 4 || calls != 1 {
+	if err != nil || result.Content != "recovered" || result.Steps != 2 || calls != 1 {
 		t.Fatalf("result=%+v calls=%d err=%v", result, calls, err)
 	}
 }

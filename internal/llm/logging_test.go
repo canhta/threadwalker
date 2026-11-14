@@ -526,7 +526,7 @@ func TestLoggingMalformedToolCallsDoNotEchoPayloads(t *testing.T) {
 			dispatches++
 			return "", errors.New("fake guard rejected: " + loggingFakeToolResult)
 		}), "web_search"))
-	if err != nil || result.Content != "recovered" || result.Steps != 5 || dispatches != 1 {
+	if err != nil || result.Content != "recovered" || result.Steps != 2 || dispatches != 1 {
 		t.Fatalf("result = %+v dispatches = %d err = %v", result, dispatches, err)
 	}
 

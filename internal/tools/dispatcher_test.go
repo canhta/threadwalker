@@ -151,49 +151,39 @@ func TestExternalWrappersAndDryRunActions(t *testing.T) {
 		t.Fatal("external body persisted in audit")
 	}
 }
-func repeatDispatcher(t *testing.T, changing bool) (*store.Store, *tools.Dispatcher) {
-	fetches := 0
+
+// repeatDispatcher serves search from its Memory backend; the repeat tests use
+// it because the read tools capped per wake would end the wake on their own.
+func repeatDispatcher(t *testing.T) (*store.Store, *tools.Dispatcher, *threads.Memory) {
 	st, opts, _ := setup(t)
-	opts.FetchTrends = func(context.Context) ([]trends.Trend, error) {
-		fetches++
-		if changing {
-			return []trends.Trend{{Title: fmt.Sprint("t", fetches)}}, nil
-		}
-		return nil, nil
-	}
+	mem := opts.Threads.(*threads.Memory)
 	opts.Scope = guard.Scope{Store: st, Template: opts.Template, WakeID: 1, Now: opts.Now}
 	d, _ := tools.NewDispatcher(opts)
-	return st, d
-}
-func failingDispatcher(t *testing.T) (*store.Store, *tools.Dispatcher) {
-	st, opts, _ := setup(t)
-	opts.FetchTrends = func(context.Context) ([]trends.Trend, error) { return nil, errors.New("source down") }
-	opts.Scope = guard.Scope{Store: st, Template: opts.Template, WakeID: 1, Now: opts.Now}
-	d, _ := tools.NewDispatcher(opts)
-	return st, d
+	return st, d, mem
 }
 func TestRepeatGuard(t *testing.T) {
-	const fail = "{}"
 	blockedCount := func(st *store.Store, reason string) (n int) {
 		st.DB().QueryRow(`SELECT COUNT(*) FROM tool_calls WHERE blocked_by=?`, reason).Scan(&n)
 		return
 	}
 	t.Run("changing results never stop", func(t *testing.T) {
-		_, d := repeatDispatcher(t, true)
+		_, d, mem := repeatDispatcher(t)
 		for i := 0; i < 25; i++ {
-			if _, err := d.Dispatch(context.Background(), call("fetch_trends", "{}")); err != nil {
+			mem.Pages[threads.OpSearch] = threads.Page{Kind: "search", Posts: []threads.Post{{ID: fmt.Sprint("id", i), URL: fmt.Sprint("https://www.threads.com/@a/post/p", i), Username: "a", Text: fmt.Sprint("t", i)}}}
+			if _, err := d.Dispatch(context.Background(), call("search", `{"query":"q"}`)); err != nil {
 				t.Fatalf("call %d: %v", i, err)
 			}
 		}
 	})
 	t.Run("three identical failures refuse without ending", func(t *testing.T) {
-		st, d := failingDispatcher(t)
+		st, d, mem := repeatDispatcher(t)
+		mem.Errors[threads.OpSearch] = errors.New("source down")
 		for i := 0; i < 3; i++ {
-			if _, err := d.Dispatch(context.Background(), call("fetch_trends", fail)); err == nil || errors.Is(err, tools.ErrStallStop) {
+			if _, err := d.Dispatch(context.Background(), call("search", `{"query":"q"}`)); err == nil || errors.Is(err, tools.ErrStallStop) {
 				t.Fatalf("failure %d: %v", i, err)
 			}
 		}
-		_, err := d.Dispatch(context.Background(), call("fetch_trends", ` {} `))
+		_, err := d.Dispatch(context.Background(), call("search", ` {"query":"q"} `))
 		var b *guard.BlockedError
 		if !errors.As(err, &b) || b.Reason != "repeat_refused" || errors.Is(err, tools.ErrStallStop) {
 			t.Fatalf("want one refusal, got %v", err)
@@ -206,9 +196,10 @@ func TestRepeatGuard(t *testing.T) {
 		}
 	})
 	t.Run("two refusals end the wake", func(t *testing.T) {
-		st, d := failingDispatcher(t)
+		st, d, mem := repeatDispatcher(t)
+		mem.Errors[threads.OpSearch] = errors.New("source down")
 		for i := 0; i < 5; i++ {
-			d.Dispatch(context.Background(), call("fetch_trends", fail))
+			d.Dispatch(context.Background(), call("search", `{"query":"q"}`))
 		}
 		_, err := d.Dispatch(context.Background(), call("read_feed", "{}"))
 		if !errors.Is(err, tools.ErrStallStop) {
@@ -219,9 +210,9 @@ func TestRepeatGuard(t *testing.T) {
 		}
 	})
 	t.Run("ten identical successes end the wake", func(t *testing.T) {
-		_, d := repeatDispatcher(t, false)
+		_, d, _ := repeatDispatcher(t)
 		for i := 1; i <= 10; i++ {
-			_, err := d.Dispatch(context.Background(), call("fetch_trends", "{}"))
+			_, err := d.Dispatch(context.Background(), call("search", `{"query":"q"}`))
 			if (i == 10) != errors.Is(err, tools.ErrStallStop) || (i < 10 && err != nil) {
 				t.Fatalf("call %d: %v", i, err)
 			}
@@ -311,7 +302,7 @@ func TestGuardClientAuditsRejectedAndRefusesRepeatedFailures(t *testing.T) {
 			}
 			var count, blocked int
 			st.DB().QueryRow(`SELECT COUNT(*) FROM tool_calls`).Scan(&count)
-			st.DB().QueryRow(`SELECT COUNT(*) FROM tool_calls WHERE blocked_by='repeat_refused'`).Scan(&blocked)
+			st.DB().QueryRow(`SELECT COUNT(*) FROM tool_calls WHERE blocked_by='tool_closed'`).Scan(&blocked)
 			if count != 5 || blocked != 2 {
 				t.Fatalf("audits %d stall %d", count, blocked)
 			}

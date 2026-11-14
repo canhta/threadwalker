@@ -61,7 +61,7 @@ func TestWakeStoresRedactedBoundedTranscript(t *testing.T) {
 		t.Fatal(err)
 	}
 	var kinds []string
-	truncated := false
+	clipped := false
 	for _, e := range entries {
 		kinds = append(kinds, e.Kind)
 		if strings.Contains(e.Body, secret) {
@@ -80,7 +80,8 @@ func TestWakeStoresRedactedBoundedTranscript(t *testing.T) {
 			if err := json.Unmarshal([]byte(e.Body), &body); err != nil || len(body.Output) > llm.MaxTranscriptToolBytes {
 				t.Fatalf("tool result not capped: %d err=%v", len(body.Output), err)
 			}
-			truncated = truncated || body.Truncated
+			// The dispatcher clips a result far below the transcript cap, dropping whole items.
+			clipped = clipped || strings.Contains(body.Output, `"shown":0`)
 			if !body.Untrusted {
 				t.Fatalf("%s untrusted=%v", body.Tool, body.Untrusted)
 			}
@@ -101,8 +102,8 @@ func TestWakeStoresRedactedBoundedTranscript(t *testing.T) {
 			t.Fatalf("%s entries=%d want %d (kinds=%v)", kind, got, n, kinds)
 		}
 	}
-	if !truncated {
-		t.Fatal("oversized tool result was not marked truncated")
+	if !clipped {
+		t.Fatal("oversized tool result was not clipped")
 	}
 	var end struct {
 		Reason string

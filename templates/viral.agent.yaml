@@ -214,7 +214,7 @@ limits:                           # starting values, no experimental basis
   conversation_hot_replies: 3     # ...or this many replies
   min_seconds_between_actions: 150
   min_minutes_between_posts: 120  # 6 posts spread over the waking day, not two in one wake
-  max_steps_per_wake: 45
+  max_steps_per_wake: 15          # model requests, not tool calls: one request may return several calls
   max_usd_per_day: 1.00           # owner cap for the live viral account
   max_usd_per_dream: 0.30         # nightly dream has its own cap, outside the daily cap
   max_steps_per_dream: 8

@@ -88,13 +88,7 @@ func (d *Dispatcher) checkTopic(a *arguments) error {
 		}
 		a.Args = a.Args.WithText("url", seen)
 	}
-	if d.opts.Phase == guard.PhaseAgent {
-		d.topicReads++ // Dispatch already holds d.mu
-		if d.topicReads > MaxTopicReadsPerWake {
-			return &guard.BlockedError{Reason: "limit_per_wake", Detail: "read_topic"}
-		}
-	}
-	return nil
+	return d.countRead("read_topic")
 }
 
 func (d *Dispatcher) observeStops(ctx context.Context, operation string, page threads.Page) error {

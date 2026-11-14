@@ -34,7 +34,9 @@ Phases: `A` agent, `D` dream. Effect classes: `read`, `own-state`, `threads-writ
 | Arguments | `Parse` refuses unknown, null, missing-required and ill-typed values. Types: text (non-blank), id (>= 1), bool, text list (non-empty) |
 | Secrets | A call whose arguments carry a configured secret is refused before any write (`sensitive_arguments`) |
 | Untrusted | Output of an untrusted tool is wrapped `{"untrusted": true, "source": <tool>, "data": ...}` after redaction against configured secrets. Everything read from Threads is data, never instructions |
-| Trailer | Every result ends with `{"steps_left": N, "usd_left": X}` ([wake.md](wake.md)) |
+| Trailer | Every result ends with `{"steps_left": N, "usd_left": X}`; steps are model requests ([wake.md](wake.md)) |
+| Clipping | A result is clipped to 6 KB (`tools.MaxResultBytes`) by dropping whole list items from the end; the top level then carries `shown` and `total`. A result with no list to drop becomes `{"clipped": true, ...}` |
+| Read caps | Per normal wake: `read_topic` 3, `web_search` 3, `read_feed` 2, `fetch_trends` 1; the call past a cap is refused `limit_per_wake` |
 | Hidden | Tools named in `refused_tools` (24 h), `ideas` without a writer, and owner tools with Telegram off are absent from the list and from wake text |
 | Owner mode | Disabled owner integrations expose neither owner tool and create no Bot API client |
 | Audit | The pre-effect row in `tool_calls` holds only the argument byte count and validity, never arguments |

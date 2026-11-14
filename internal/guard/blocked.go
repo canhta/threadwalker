@@ -8,7 +8,12 @@ import (
 // BlockedError is the guard's refusal of one tool call. Detail is the one
 // variable fact its hint names; it is never model or Threads text, except the
 // critic's problems, which come from the separate editor model.
-type BlockedError struct{ Reason, Detail string }
+type BlockedError struct {
+	Reason, Detail string
+	// Next is one more sentence for a refusal the model keeps provoking: the
+	// next valid action, or that the tool is closed.
+	Next string
+}
 
 func (e *BlockedError) Error() string {
 	return "executing guarded tool: " + e.Reason + ": " + ErrBlocked.Error()
@@ -17,10 +22,14 @@ func (e *BlockedError) Unwrap() error { return ErrBlocked }
 
 // ModelResult is the tool result the model reads after a refusal.
 func (e *BlockedError) ModelResult() string {
+	hint := Hint(e.Reason, e.Detail)
+	if e.Next != "" {
+		hint += ". " + e.Next
+	}
 	out, _ := json.Marshal(struct {
 		Blocked string `json:"blocked"`
 		Hint    string `json:"hint"`
-	}{e.Reason, Hint(e.Reason, e.Detail)})
+	}{e.Reason, hint})
 	return string(out)
 }
 
@@ -31,6 +40,7 @@ const reasonTargetOutsideWindow = "target_outside_window"
 // hints holds the fixed model-facing text per reason code; %s is Detail.
 var hints = map[string]string{
 	reasonTargetOutsideWindow:     "this post is outside the reply window (%s); pick a young, rising post with room in its replies",
+	"tool_closed":                 "this tool was refused 3 times for the same reason and is closed for the rest of the wake; use another tool or end the wake",
 	"repeat_refused":              "this exact call already failed 3 times the same way and was not run; use different inputs, try another approach, or say what blocks you",
 	"unknown_tool":                "no such tool; call one from the tool list",
 	"unsupported_tool_type":       "only function tool calls are supported",
@@ -93,4 +103,20 @@ var hints = map[string]string{
 // Hint returns the fixed text for reason with detail filled in.
 func Hint(reason, detail string) string {
 	return strings.ReplaceAll(hints[reason], "%s", detail)
+}
+
+// nextActions is the sentence a second refusal for the same reason adds.
+var nextActions = map[string]string{
+	"critic_rejected":     "Do not redraft this idea: choose another topic or a reply target, or end the wake",
+	"no_trend_anchor":     "Call fetch_trends or read_feed once and use a ref it returns",
+	"reply_target_unread": "Read the target with read_post or read_topic first, or reply to another post you already read",
+	"text_length":         "Send a text under the limit in one short sentence",
+}
+
+// NextAction names what to do instead after a repeated refusal.
+func NextAction(reason string) string {
+	if s, ok := nextActions[reason]; ok {
+		return s
+	}
+	return "Do not repeat this; take a different action or end the wake"
 }

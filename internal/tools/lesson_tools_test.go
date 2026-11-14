@@ -116,8 +116,9 @@ func TestLessonToolsAreOfferedOnlyToTheDream(t *testing.T) {
 
 func TestLessonAddGates(t *testing.T) {
 	f := newDreamFixture(t, guard.PhaseDream)
+	// A tool refused three times for one reason closes, so each gate gets its own wake.
 	add := func(text, kind, polarity string, ids ...int) string {
-		_, reason := f.call("lesson_add", map[string]any{"text": text, "kind": kind, "polarity": polarity, "action_ids": ids})
+		_, reason := newDreamFixture(t, guard.PhaseDream).call("lesson_add", map[string]any{"text": text, "kind": kind, "polarity": polarity, "action_ids": ids})
 		return reason
 	}
 	for _, tc := range []struct {

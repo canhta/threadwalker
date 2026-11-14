@@ -8,7 +8,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/canhta/threadz/internal/guard"
 	"github.com/canhta/threadz/internal/logging"
 	"github.com/canhta/threadz/internal/threads"
 	"github.com/canhta/threadz/internal/trends"
@@ -23,6 +22,9 @@ func (d *Dispatcher) executors() map[string]executor {
 			return map[string]bool{"do_not_contact": true}, nil
 		},
 		"fetch_trends": func(ctx context.Context, a arguments) (any, error) {
+			if err := d.countRead("fetch_trends"); err != nil {
+				return nil, err
+			}
 			fetched, err := d.opts.FetchTrends(ctx)
 			d.event(ctx, logging.TrendsFetched, outcome(err), failureReason(err), "fetch_trends", time.Time{})
 			if err != nil {
@@ -58,6 +60,11 @@ func (d *Dispatcher) executors() map[string]executor {
 					return nil, err
 				}
 			}
+			if name == "read_feed" {
+				if err := d.countRead(name); err != nil {
+					return nil, err
+				}
+			}
 			data, err := d.browserRead(ctx, name, a)
 			if err == nil && name != "profile" {
 				d.noteRead(data)
@@ -88,11 +95,8 @@ func (d *Dispatcher) executors() map[string]executor {
 	}
 	if d.opts.Template.WebSearch.Enabled {
 		tools["web_search"] = func(ctx context.Context, a arguments) (any, error) {
-			if d.opts.Phase == guard.PhaseAgent {
-				d.webSearches++ // Dispatch already holds d.mu
-				if d.webSearches > MaxWebSearchesPerWake {
-					return nil, &guard.BlockedError{Reason: "limit_per_wake", Detail: "web_search"}
-				}
+			if err := d.countRead("web_search"); err != nil {
+				return nil, err
 			}
 			result, err := d.webSearch(ctx, a.Text("query"))
 			if err == nil {

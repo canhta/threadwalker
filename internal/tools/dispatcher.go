@@ -78,8 +78,9 @@ type Dispatcher struct {
 	stopped      error
 	redactor     *config.Redactor
 	trendProfile trends.TrendProfile
-	webSearches  int
-	topicReads   int
+	reads        map[string]int
+	refused      map[string]int // refusals per tool and reason
+	closed       map[string]bool
 }
 
 // MaxTopicReadsPerWake bounds read_topic in a normal wake: each opens a page in
@@ -89,6 +90,61 @@ const MaxTopicReadsPerWake = 3
 // MaxWebSearchesPerWake bounds web_search in a normal wake; each call also
 // counts against the daily budget.
 const MaxWebSearchesPerWake = 3
+
+// MaxFeedReadsPerWake and MaxTrendFetchesPerWake: the home feed and the trend
+// list are snapshots, so a second look in the same wake is retry room at most.
+const (
+	MaxFeedReadsPerWake    = 2
+	MaxTrendFetchesPerWake = 1
+)
+
+// MaxResultBytes clips every tool result the model reads.
+const MaxResultBytes = 6 << 10
+
+// readCaps are the per-wake call caps of the read tools that have one.
+var readCaps = map[string]int{
+	"read_topic":   MaxTopicReadsPerWake,
+	"web_search":   MaxWebSearchesPerWake,
+	"read_feed":    MaxFeedReadsPerWake,
+	"fetch_trends": MaxTrendFetchesPerWake,
+}
+
+// countRead counts one call of a capped read tool in a normal wake and refuses
+// the one past its cap. Dispatch already holds d.mu.
+func (d *Dispatcher) countRead(name string) error {
+	if d.opts.Phase != guard.PhaseAgent {
+		return nil
+	}
+	if d.reads[name]++; d.reads[name] > readCaps[name] {
+		return &guard.BlockedError{Reason: "limit_per_wake", Detail: name}
+	}
+	return nil
+}
+
+// A tool refused the third time for the same reason is closed for the wake.
+// The second refusal also names the next valid action.
+const closeAtRefusals = 3
+
+// uncounted are refusals the dispatcher itself raises about the wake or the
+// repeat, not about what the model asked for.
+var uncounted = []string{"tool_closed", "repeat_refused", "stall_stop", "browser_stopped", "audit_failure"}
+
+// countRefusal tallies a refusal by (tool, reason), annotating it on the 2nd
+// and closing the tool on the 3rd.
+func (d *Dispatcher) countRefusal(tool string, err error) {
+	var blocked *guard.BlockedError
+	if !errors.As(err, &blocked) || slices.Contains(uncounted, blocked.Reason) {
+		return
+	}
+	key := tool + "\x00" + blocked.Reason
+	switch d.refused[key]++; {
+	case d.refused[key] == 2:
+		blocked.Next = guard.NextAction(blocked.Reason)
+	case d.refused[key] >= closeAtRefusals:
+		d.closed[tool] = true
+		blocked.Next = "this tool is closed for the rest of the wake"
+	}
+}
 
 func NewDispatcher(opts Options) (*Dispatcher, error) {
 	if opts.Phase == "" {
@@ -113,7 +169,7 @@ func NewDispatcher(opts Options) (*Dispatcher, error) {
 	if opts.FetchTrends == nil || (opts.Template.WebSearch.Enabled && opts.SearchWeb == nil) {
 		return nil, errors.New("configuring tools: injected trend and web-search fetchers required")
 	}
-	d := &Dispatcher{guard: g, opts: opts, registry: map[string]executor{}, seen: map[[32]byte]seenCall{}}
+	d := &Dispatcher{guard: g, opts: opts, registry: map[string]executor{}, seen: map[[32]byte]seenCall{}, reads: map[string]int{}, refused: map[string]int{}, closed: map[string]bool{}}
 	include, avoid := opts.Template.TrendKeywords()
 	d.trendProfile = trends.TrendProfile{Include: include, Avoid: avoid}
 	d.redactor = config.NewRedactor(opts.Redactor, opts.Template)
@@ -229,8 +285,14 @@ func (d *Dispatcher) Dispatch(ctx context.Context, call llm.ToolCall) (string, e
 		} else {
 			block = "audit_failure"
 		}
+	} else if d.closed[safeTool] {
+		block = "tool_closed"
 	} else if prior := d.seen[key]; !prior.ok && prior.streak >= repeatFailures {
 		block = "repeat_refused"
+	}
+	// A call to a closed tool or a thrice-failed call is refused without
+	// running; the second such refusal ends the wake.
+	if block == "tool_closed" || block == "repeat_refused" {
 		if d.refusals++; d.refusals >= stallRefusals {
 			d.stopped = ErrStallStop
 		}
@@ -282,6 +344,7 @@ func (d *Dispatcher) Dispatch(ctx context.Context, call llm.ToolCall) (string, e
 	if errors.Is(err, guard.ErrAudit) {
 		d.stopped = err
 	}
+	d.countRefusal(safeTool, err)
 	if block != "repeat_refused" {
 		answer := sha256.Sum256([]byte(output))
 		if err != nil {
@@ -311,6 +374,9 @@ func (d *Dispatcher) Dispatch(ctx context.Context, call llm.ToolCall) (string, e
 		}
 	}
 	d.event(ctx, logging.ToolFinished, outcome(err), why, safeTool, started)
+	if harness, _ := ctx.Value(harnessKey{}).(bool); !harness && err == nil {
+		output = clipResult(output, MaxResultBytes)
+	}
 	return output, err
 }
 func (d *Dispatcher) containsSecret(raw string, a guard.Args) bool {

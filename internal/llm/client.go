@@ -73,7 +73,7 @@ type Ledger interface {
 	RecordLLMUsage(context.Context, string, int64, string, Usage) error
 }
 
-var ErrStepLimit = errors.New("wake step limit reached")
+var ErrStepLimit = errors.New("wake request limit reached")
 var ErrBudget = errors.New("daily LLM budget spent")
 
 type Options struct {
@@ -93,7 +93,7 @@ type Options struct {
 	// CapUSD overrides the spend cap for this phase. Zero uses
 	// limits.MaxUSDPerDay (agent, critic) or requires a positive value for dream.
 	CapUSD float64
-	// MaxSteps overrides limits.MaxStepsPerWake when positive.
+	// MaxSteps overrides limits.MaxStepsPerWake when positive; a step is one model request.
 	MaxSteps int
 	// StopCheck runs when the model stops calling tools. It gets the tools called
 	// so far and how many calls of each succeeded; a non-empty return is sent to
@@ -248,7 +248,7 @@ func (c *Client) Run(ctx context.Context, agentID string, wakeID int64, messages
 		result.Messages[i] = c.redactMessage(message)
 	}
 	c.recordContext(ctx, result.Messages)
-	nudges := 0
+	nudges, toolCalls := 0, 0
 	called, succeeded := map[string]bool{}, map[string]int{}
 	for result.Steps < c.maxSteps {
 		requestIndex++
@@ -296,10 +296,11 @@ func (c *Client) Run(ctx context.Context, agentID string, wakeID int64, messages
 			}
 			ids[call.ID] = true
 		}
+		// A step is one answered model request, however many tool calls it returns.
+		result.Steps++
 		result.Messages = append(result.Messages, message)
 		c.recordAssistant(ctx, requestIndex, message)
 		if len(message.ToolCalls) == 0 {
-			result.Steps++
 			if response.FinishReason != "stop" {
 				return result, failure("reading chat response", "incomplete_response", nil)
 			}
@@ -322,10 +323,7 @@ func (c *Client) Run(ctx context.Context, agentID string, wakeID int64, messages
 			if err := ctx.Err(); err != nil {
 				return result, fmt.Errorf("dispatching tool call: %w", err)
 			}
-			if result.Steps >= c.maxSteps {
-				return result, fmt.Errorf("running chat loop: %w", ErrStepLimit)
-			}
-			result.Steps++
+			toolCalls++
 			toolStarted := c.now()
 			outcome, reason := "success", "completed"
 			safeTool := ""
@@ -349,7 +347,7 @@ func (c *Client) Run(ctx context.Context, agentID string, wakeID int64, messages
 			if outcome == "error" {
 				level = slog.LevelError
 			}
-			logging.Emit(ctx, c.logger, level, logging.Record{Event: logging.LLMToolFinished, AgentID: agentID, Phase: c.phase, WakeID: wakeID, Request: requestIndex, ToolCallID: fmt.Sprintf("%d/%d", wakeID, result.Steps), Tool: safeTool, ProviderID: c.providerID, ProfileID: c.profileID, Model: c.config.Model, Protocol: c.config.Protocol, Operation: "dispatch", Outcome: outcome, Reason: reason, DurationMS: c.now().Sub(toolStarted).Milliseconds(), Steps: result.Steps})
+			logging.Emit(ctx, c.logger, level, logging.Record{Event: logging.LLMToolFinished, AgentID: agentID, Phase: c.phase, WakeID: wakeID, Request: requestIndex, ToolCallID: fmt.Sprintf("%d/%d", wakeID, toolCalls), Tool: safeTool, ProviderID: c.providerID, ProfileID: c.profileID, Model: c.config.Model, Protocol: c.config.Protocol, Operation: "dispatch", Outcome: outcome, Reason: reason, DurationMS: c.now().Sub(toolStarted).Milliseconds(), Steps: result.Steps})
 			called[safeTool] = true
 			if toolErr == nil {
 				succeeded[safeTool]++

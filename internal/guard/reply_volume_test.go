@@ -56,12 +56,12 @@ func TestBreakerPausesRepliesNotPostsAndQueuesOneNotice(t *testing.T) {
 	})
 	seedMeasured(t, h, 15, 0)
 	h.blocked("reply", volumeReply(1), "reply_breaker")
-	h.blocked("reply", volumeReply(2), "reply_breaker")
-	if n := breakerNotices(t, h); n != 1 {
-		t.Fatalf("notices %d, want 1", n)
-	}
+	// The second refusal of the wake; a third would close the reply tool.
 	if hint := h.lastHint(t); !strings.Contains(hint, "2026-11-11T16:00:00Z") {
 		t.Fatalf("hint %q", hint)
+	}
+	if n := breakerNotices(t, h); n != 1 {
+		t.Fatalf("notices %d, want 1", n)
 	}
 	h.allow("post", postArgs(1))
 	h.clock.Advance(6*time.Hour + time.Minute)

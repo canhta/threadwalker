@@ -48,12 +48,6 @@ func TestReadTopicAfterTrendingPanel(t *testing.T) {
 	h.next()
 	h.mustCall("reply", `{"text":"Synthetic reply","target_url":"`+permalink+`","target_username":"synthetic_viet"}`)
 
-	for _, args := range []string{`{}`, `{"url":"` + topic + `","query":"x"}`} {
-		h.next()
-		if _, err := h.call("read_topic", args); err == nil || !strings.Contains(err.Error(), "topic_args") {
-			t.Fatalf("args %s: %v", args, err)
-		}
-	}
 	for i := 0; i < tools.MaxTopicReadsPerWake; i++ {
 		h.next()
 		_, _ = h.call("read_topic", `{"query":"more"}`)
@@ -61,6 +55,16 @@ func TestReadTopicAfterTrendingPanel(t *testing.T) {
 	h.next()
 	if _, err := h.call("read_topic", `{"query":"over"}`); err == nil || !strings.Contains(err.Error(), "limit_per_wake") {
 		t.Fatalf("cap not enforced: %v", err)
+	}
+}
+
+func TestReadTopicNeedsExactlyOneArgument(t *testing.T) {
+	h := newBrowserHarness(t, true)
+	for _, args := range []string{`{}`, `{"url":"r1","query":"x"}`} {
+		h.next()
+		if _, err := h.call("read_topic", args); err == nil || !strings.Contains(err.Error(), "topic_args") {
+			t.Fatalf("args %s: %v", args, err)
+		}
 	}
 }
 

@@ -196,8 +196,8 @@ func TestRuntimeCLIOnceOfflineWakePersistsCompletedAudit(t *testing.T) {
 	if err != nil {
 		t.Fatalf("wake started_at %q is not RFC3339: %v", startedRaw, err)
 	}
-	if steps < 4 {
-		t.Errorf("wake steps = %d, want the four guarded tool calls to be counted", steps)
+	if steps < 2 {
+		t.Errorf("wake steps = %d, want one step per model request", steps)
 	}
 
 	rows, err := st.DB().Query(`SELECT tool, args_json, result_json FROM tool_calls ORDER BY id`)

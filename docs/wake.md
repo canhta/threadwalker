@@ -15,8 +15,8 @@ sequenceDiagram
   R->>DB: reserve fallback next_wake_at (now + 60 min)
   R->>D: reconcile unpublished intents, read followers
   R->>L: messages (system, data, scoreboard)
-  loop until end, step limit or cap
-    L->>D: tool call
+  loop until end, request limit or cap
+    L->>D: tool calls of one model request
     D->>DB: audit, then rules, then effect
     D-->>L: result + steps_left, usd_left
   end
@@ -30,7 +30,7 @@ sequenceDiagram
 | 2. Context | One builder assembles every phase. System prompt from the template in fixed sections: who you are, starting voice, examples (rejected drafts labelled), hard limits, the phase's job and tools, harness rules. The hard limits are the only blocks |
 | 3. Inbox | Before the first request code reads the conversation inbox ([threads.md](threads.md)). When it is not empty, the data message starts with an `inbox` section above everything else: per reply its `ref`, `target_id`, `author`, `text` (untrusted, redacted), `replying_to` (first line of our text it answered) and `age_minutes`, newest first, at most 10; replies of a conversation already at `limits.replies_per_conversation` ([guards.md](guards.md)) are left out. The wake text tells the agent to answer these first, each at most once, and to skip one that needs no answer. The writer and critic run as for any reply |
 | 4. Data message | One JSON object in a fixed order, what changes once a day first: `lessons`, `examples` (best and worst 3 of each kind of the last 48 hours), `recent` (the last 10 episodes as compact rows), `owner_answers`, `facts`, `remaining_usd`, `counters` (today against the caps) and `said` (the first 160 bytes of the last 10 own texts, measured or not). Then the scoreboard (when `kpi:` exists), the inbox and the open owner notes as first task ([learning.md](learning.md)) |
-| 5. Loop | The agent calls tools until it ends or hits the step or token limit. Results enter the conversation verbatim |
+| 5. Loop | The agent calls tools until it ends or hits the request or token limit. A step is one model request, however many tool calls it returns; `wakes.steps` counts them. Results enter the conversation clipped to 6 KB: a list drops whole items from its end and the result carries `shown` and `total` |
 | 6. Every call | Passes the guards, is written to the audit log, then executes ([guards.md](guards.md)) |
 | 7. End | The agent ends in text. Code sets `next_wake_at` |
 
@@ -46,7 +46,7 @@ Measured on the VPS dry-run database: 9 wakes of 9 to 15 steps carry 9,883 to 75
 | Phase | Trigger | Tools | Writes | Spend |
 |---|---|---|---|---|
 | `agent` | `next_wake_at`; a fresh webhook reply or mention | All, see [tools.md](tools.md) | Threads, owner | `limits.max_usd_per_day` |
-| `dream` | `schedule.dream_at`, once per local day | Reads | None to Threads or owner | `limits.max_usd_per_dream` (default 0.30), `limits.max_steps_per_dream` (default 8), excluded from the daily cap |
+| `dream` | `schedule.dream_at`, once per local day | Reads | None to Threads or owner | `limits.max_usd_per_dream` (default 0.30), `limits.max_steps_per_dream` (default 8 model requests), excluded from the daily cap |
 | `metrics` | Due metric targets | None (no model call) | Metric samples only | None |
 
 A dream wake uses `wakes.kind` and a durable `phase_key`; a partial unique index makes one dream per local day unrepeatable, restarts included. A dream missed while the process was down runs once on the next start. A dream does not move `next_wake_at`. Spend rows carry the phase, so the dashboard and the daily report show wake and dream spend separately. `critic` is a third ledger phase for the pre-publish review ([content.md](content.md)).
@@ -100,6 +100,7 @@ The agent has no tool to schedule a wake.
 | Restart | Closes open agent wakes as `interrupted`; retires unfinished tool audit outcomes as unknown/assumed sent with retry disabled; moves the schedule to at least the fallback. Never reloads the conversation or executes pending intent. Paused and killed agents stay stopped |
 | No replay | An interrupted wake is never re-run. A `post` or `reply` with an unknown outcome is recorded as sent and never retried |
 | Stall stop | Calls are keyed by tool name and canonical arguments; the dispatcher hashes each result. A call that failed the same way 3 times is refused without running (`repeat_refused`). The wake ends (`stall_stop`) at the second refusal, or when one call returns the same successful result 10 times. A different result resets the count |
+| Refusals | Per wake, the second refusal of a tool for the same reason adds one sentence naming the next valid action; the third closes the tool for the rest of the wake (`tool_closed`, no writer or critic call). A call to a closed tool counts toward `stall_stop` like `repeat_refused` |
 | Result trailer | Every tool result ends with `{"steps_left": N, "usd_left": X}` (steps left and USD left under the phase's daily cap) |
 | Browser | At most one browser per wake, started on the first `read_feed`, closed on every exit. A close failure is logged as `wake.cleanup.failed` and does not change `end_reason` ([threads.md](threads.md)) |
 
@@ -134,4 +135,4 @@ Implementation: [`internal/agent/isolation_soak.go`](../internal/agent/isolation
 
 A chat request retries up to 3 attempts: on 429 and 5xx it waits the provider's `Retry-After` (seconds or HTTP date, at most 60 s), else 1 s then 2 s plus up to 25% jitter; one transport error or request timeout is retried once, which can at worst pay for the same completion twice (publishing is guarded by the dispatcher, not the model call). Each retry is a `llm.request.retry` event.
 
-Client events cover run start/finish/stop, request start/finish/retry, usage accounting and dispatcher results. Correlation uses operator-configured agent/provider/profile/model/protocol IDs, wake ID, a local request sequence, the attempt and a locally derived tool call ID (wake/step), never a provider ID. `threads.Reason` is the single mapping from backend errors to reason codes (`cancelled`, `timeout`, `logged_out`, `captcha`, `write_refused`, ...); the dispatcher and the wake end add only their own. The dispatcher emits one `browser.operation.finished` per configured-backend operation. Allowlist: [guards.md](guards.md).
+Client events cover run start/finish/stop, request start/finish/retry, usage accounting and dispatcher results. Correlation uses operator-configured agent/provider/profile/model/protocol IDs, wake ID, a local request sequence, the attempt and a locally derived tool call ID (wake/call number), never a provider ID. `threads.Reason` is the single mapping from backend errors to reason codes (`cancelled`, `timeout`, `logged_out`, `captcha`, `write_refused`, ...); the dispatcher and the wake end add only their own. The dispatcher emits one `browser.operation.finished` per configured-backend operation. Allowlist: [guards.md](guards.md).
