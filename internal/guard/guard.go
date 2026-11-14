@@ -72,7 +72,9 @@ type Guard struct {
 	posts map[string]store.SeenPost
 	// inbox holds the canonical threads of replies to the account noted this
 	// wake, each with the root post of its conversation.
-	inbox     map[string]string
+	inbox map[string]string
+	// addressed holds the usernames that replied to or mentioned the account in what this wake read.
+	addressed map[string]bool
 	readText  map[string]string
 	trendText map[string]string
 	facts     map[string]trends.ItemFacts
@@ -177,7 +179,7 @@ func New(opts Scope) (*Guard, error) {
 		own[user] = true
 	}
 	opts.OwnUsernames = users
-	g := &Guard{opts: opts, stopPhrases: append([]string(nil), phrases...), own: own, posts: map[string]store.SeenPost{}, inbox: map[string]string{}, readText: map[string]string{}, trendText: map[string]string{}, facts: map[string]trends.ItemFacts{}, shortRef: map[string]string{}, refItem: map[string]string{}}
+	g := &Guard{opts: opts, stopPhrases: append([]string(nil), phrases...), own: own, posts: map[string]store.SeenPost{}, inbox: map[string]string{}, addressed: map[string]bool{}, readText: map[string]string{}, trendText: map[string]string{}, facts: map[string]trends.ItemFacts{}, shortRef: map[string]string{}, refItem: map[string]string{}}
 	if units := opts.Template.Guard.SelfStatUnits; len(units) > 0 {
 		g.statPattern = statPattern(units)
 	}

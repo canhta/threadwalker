@@ -35,6 +35,8 @@ flowchart TD
 | `tool_hidden` | The tool or `find_posts` source is not offered this wake (a closed write gate, a source the Meta app may not use); a call to it is refused. Does not feed `stall_stop`; the identical call repeated still ends the wake through `repeat_refused` | code | dispatcher |
 | `tool_call_cap` | The wake made 40 tool calls; the first call past it is refused, the second ends the wake (`end_reason` `tool_call_cap`) | code | dispatcher |
 | `limit_per_wake` | A capped tool was called past its per-wake cap: `find_posts` source `topic` 3 and `feed` 2, `web_search` 3, `fetch_trends` 1, `notify_owner` 2, `ask_owner` 1, `mark_do_not_contact` 3, `ideas` 3 | code | executor |
+| `limit_per_day` | `notify_owner` was called a fourth time or `ask_owner` a third time in the local day, across wakes; the service's own notices do not count | code | executor |
+| `not_addressed` | `mark_do_not_contact` named a username that did not reply to or mention the agent in anything this wake read (an inbox item, `read_post` or `read_replies` result addressed to the agent); stop requests the phrase list misses are the only use | code | executor |
 | `browser_stopped` | Browser logged out or captcha already stopped the agent | code | dispatcher |
 | `audit_failure` | Audit write failed; fail closed | code | dispatcher |
 | `agent_not_running` | Agent paused or killed | code | guard, reserve |

@@ -101,6 +101,8 @@ var hints = map[string]string{
 	"lesson_secret":               "the lesson looks like it contains a secret; remove it",
 	"stale_ref":                   "the text names a p or t ref, which is an id and not content; name the post or story in words instead",
 	"budget":                      "today's budget is spent; stop calling paid tools this wake",
+	"not_addressed":               "only someone who replied to or mentioned you can be marked; skip posts you don't want to answer",
+	"limit_per_day":               "%s is used up for today; do not call it again",
 	"limit_per_wake":              "%s is used up for this wake; do not call it again, work with what you already read",
 	"too_many_parts":              "a series has at most " + strconv.Itoa(store.MaxSeriesParts-1) + " later parts; send fewer parts",
 	"unknown_target":              "target must be a p ref (such as p12) that this wake showed you; pick one from the open reply candidates or the inbox, or read posts with find_posts first and use a ref it returns",

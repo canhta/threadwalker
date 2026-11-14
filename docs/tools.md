@@ -20,9 +20,9 @@ Phases: `A` agent, `D` dream. Effect classes: `read`, `own-state`, `threads-writ
 | `lesson_add` | D | own-state | `text*`, `kind*`, `polarity*`, `action_ids*` | Dream only; text, citation and count rules in [learning.md](learning.md#lessons) | The stored lesson id, or a refusal |
 | `lesson_confirm` | D | own-state | `id*`, `action_ids*` | Dream only; at least one new action meeting the same rule | The renewed lesson |
 | `lesson_retire` | D | own-state | `id*`, `reason*` | Dream only | The retired lesson |
-| `mark_do_not_contact` | A | own-state | `username*` | Add-only; fixed reason code | Permanent entry |
-| `notify_owner` | A | owner | `text*` | Telegram enabled; secret check | Queued locally, returns immediately |
-| `ask_owner` | A | owner | `text*` | Telegram enabled; never blocks the wake | Queued; the answer enters a later wake |
+| `mark_do_not_contact` | A | own-state | `username*` | Add-only; fixed reason code; only for a username that replied to or mentioned the agent in what the wake read, else `not_addressed` | Permanent entry |
+| `notify_owner` | A | owner | `text*` | Telegram enabled; secret check; 3 a local day, counting only the agent's own calls, past that `limit_per_day` | Queued locally, returns immediately |
+| `ask_owner` | A | owner | `text*` | Telegram enabled; never blocks the wake; 2 a local day, past that `limit_per_day` | Queued; the answer enters a later wake |
 
 `read_own_metrics` is a harness read, not a model tool: its `Specs` entry is flagged `Harness`, so no phase is offered it and a model call to it is refused as `unknown_tool`. The metrics wake calls it with `action_id` and the start of an agent wake without, through the same guard and audit with `DispatchHarness`. Without `action_id` it returns the account metrics, the follower count read from the own profile page (the one browser read an agent wake starts with; a metrics wake never opens the browser for it); with `action_id`, the action's counters and (reply) `author_replied` ([learning.md](learning.md)).
 
@@ -38,7 +38,7 @@ Phases: `A` agent, `D` dream. Effect classes: `read`, `own-state`, `threads-writ
 | Clipping | A result is clipped to 6 KB (`tools.MaxResultBytes`) by dropping whole list items from the end; the top level then carries `clipped_lists` with `shown` and `total` per list path (such as `data.posts`). Every post read is stored whether or not the clip showed it. A result with no list to drop becomes `{"clipped": true, ...}` |
 | Per-wake caps | `limit_per_wake` in [guards.md](guards.md) lists every cap |
 | Hidden | Tools and `find_posts` sources named in `refused_tools` (24 h), `ideas` without a writer, and owner tools with Telegram off are absent from the tool list (the system prompt names no tool); a call to a closed source is refused `tool_hidden` |
-| Size | The agent phase's tool definitions are at most 6 KB (5.9 KB now) and each description at most 300 characters, pinned by `TestAgentToolDefinitionsGolden` and `internal/tools/testdata/agent-tools.golden.json`. A description says what the tool does and each argument is described in the JSON schema; policy (caps, spacing, repeat and anchor rules, owner-note rules) lives in guard code and is stated only in the refusal hint |
+| Size | The agent phase's tool definitions are at most 6400 bytes (6275 now) and each description at most 300 characters, pinned by `TestAgentToolDefinitionsGolden` and `internal/tools/testdata/agent-tools.golden.json`. A description says what the tool does and each argument is described in the JSON schema; policy (caps, spacing, repeat and anchor rules, owner-note rules) lives in guard code and is stated only in the refusal hint |
 | Owner mode | Disabled owner integrations expose neither owner tool and create no Bot API client |
 | Audit | The pre-effect row in `tool_calls` holds only the argument byte count and validity, never arguments |
 

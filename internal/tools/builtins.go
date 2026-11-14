@@ -21,6 +21,9 @@ func (d *Dispatcher) executors() map[string]executor {
 			if err := d.countCall("mark_do_not_contact"); err != nil {
 				return nil, err
 			}
+			if !d.guard.Addressed(a.Text("username")) {
+				return nil, &guard.BlockedError{Reason: "not_addressed"}
+			}
 			if err := d.opts.Store.MarkDoNotContact(ctx, d.opts.Template.ID, a.Text("username"), "agent_request"); err != nil {
 				return nil, errors.New("marking do not contact: failed")
 			}
@@ -106,6 +109,14 @@ func (d *Dispatcher) executors() map[string]executor {
 			tools[name] = func(ctx context.Context, a arguments) (any, error) {
 				if err := d.countCall(name); err != nil {
 					return nil, err
+				}
+				start, end, _ := d.opts.Template.Limits.DayBounds(d.opts.Now())
+				sent, err := d.opts.Store.ToolOwnerMessages(ctx, d.opts.Template.ID, question, start, end)
+				if err != nil {
+					return nil, errors.New("counting owner messages: failed")
+				}
+				if sent >= ownerDayCaps[name] {
+					return nil, &guard.BlockedError{Reason: "limit_per_day", Detail: name}
 				}
 				id, err := d.opts.Owner.QueueOwner(ctx, d.opts.Template.ID, a.Text("text"), question)
 				if err != nil {

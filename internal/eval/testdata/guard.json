@@ -884,6 +884,14 @@
       "guard": {
         "steps": [
           {
+            "observe": {
+              "username": "fixture_author",
+              "text": "Synthetic reply with no listed phrase",
+              "addressed": true,
+              "expected_matched": false
+            }
+          },
+          {
             "offset_ns": 0,
             "call": {
               "type": "function",

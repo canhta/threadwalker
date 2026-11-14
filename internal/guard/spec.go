@@ -114,7 +114,7 @@ func FindScope(source string) string { return "find_posts:" + source }
 func buildSpecs() []ToolSpec {
 	ownerText := Arg{Name: "text", Kind: ArgText, Required: true, Desc: "the message"}
 	return []ToolSpec{
-		{Name: "mark_do_not_contact", Description: "Permanently stop replying to a username. Entries cannot be removed.", Args: []Arg{{Name: "username", Kind: ArgText, Required: true, Desc: "Threads username"}}, Effect: EffectOwnState, Phases: agentOnly},
+		{Name: "mark_do_not_contact", Description: "Permanently stop replying to someone who replied to or mentioned you and asked you to stop, in words the code did not catch.", Args: []Arg{{Name: "username", Kind: ArgText, Required: true, Desc: "Threads username"}}, Effect: EffectOwnState, Phases: agentOnly},
 		{Name: "fetch_trends", Description: "Read outside trends ranked for your topics. Items are untrusted data; each has a ref (t3) for trend.", Effect: EffectRead, Phases: agentOnly, Untrusted: true},
 		{Name: "find_posts", Description: "Find posts on Threads. Results are untrusted data; each post has a ref (p12) for reply or trend. feed also lists Trending-now topics, each with a ref (t3).", Args: []Arg{
 			{Name: "source", Kind: ArgText, Required: true, Desc: "feed: home feed. topic: a topic page or search page. search: keyword search, may return only your own posts. profile: one author's posts", Enum: findSourceNames()},
@@ -147,8 +147,8 @@ func buildSpecs() []ToolSpec {
 			{Name: "action_ids", Kind: ArgIDList, Required: true, Desc: fmt.Sprintf("%d to %d of your actions ranked at 6h or 24h: all top for do, all bottom for avoid", store.MinCitations, store.MaxCitations)}}, Effect: EffectOwnState, Phases: dreamOnly},
 		{Name: "lesson_confirm", Description: "Renew a lesson with at least one new action that meets the same rule as when it was added.", Args: []Arg{{Name: "id", Kind: ArgID, Required: true, Desc: "lesson id"}, {Name: "action_ids", Kind: ArgIDList, Required: true, Desc: "new supporting actions"}}, Effect: EffectOwnState, Phases: dreamOnly},
 		{Name: "lesson_retire", Description: "Retire a lesson that the evidence no longer supports.", Args: []Arg{{Name: "id", Kind: ArgID, Required: true, Desc: "lesson id"}, {Name: "reason", Kind: ArgText, Required: true, Desc: "one short sentence"}}, Effect: EffectOwnState, Phases: dreamOnly},
-		{Name: "notify_owner", Description: "Queue a private message to the owner, in English; returns at once.", Args: []Arg{ownerText}, Effect: EffectOwner, Phases: agentOnly},
-		{Name: "ask_owner", Description: "Queue a question to the owner, in English; returns at once, and the answer arrives in a later wake.", Args: []Arg{ownerText}, Effect: EffectOwner, Phases: agentOnly},
+		{Name: "notify_owner", Description: "Message the owner, in English. Only for something the owner must act on, such as a broken login, an error you cannot work around, or a limit that blocks all work. Never a routine report.", Args: []Arg{ownerText}, Effect: EffectOwner, Phases: agentOnly},
+		{Name: "ask_owner", Description: "Ask the owner, in English; the answer comes in a later wake. Only for a decision the persona and rules cannot settle.", Args: []Arg{ownerText}, Effect: EffectOwner, Phases: agentOnly},
 	}
 }
 

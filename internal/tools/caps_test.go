@@ -146,6 +146,9 @@ func TestToolCallCap(t *testing.T) {
 func TestPermanentToolsAreCappedPerWake(t *testing.T) {
 	_, _, d := setup(t)
 	for i := 1; i <= 4; i++ {
+		if _, err := d.Guard().ObserveStopRequest(context.Background(), fmt.Sprintf("user%d", i), "hello", true); err != nil {
+			t.Fatal(err)
+		}
 		_, err := d.Dispatch(context.Background(), call("mark_do_not_contact", fmt.Sprintf(`{"username":"user%d"}`, i)))
 		if (i == 4) != (err != nil) {
 			t.Fatalf("call %d: %v", i, err)

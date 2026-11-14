@@ -54,6 +54,21 @@ func (s *Store) QueueOwner(ctx context.Context, agentID, kind, text, key string,
 	return id, nil
 }
 
+// ToolOwnerMessages counts the notifications (or questions) the agent's tools
+// queued in [start, end). Event-keyed rows are the service's own notices.
+func (s *Store) ToolOwnerMessages(ctx context.Context, agentID string, question bool, start, end time.Time) (int, error) {
+	kind := "notification"
+	if question {
+		kind = "question"
+	}
+	var n int
+	err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM owner_msgs WHERE agent_id=? AND direction='out' AND kind=? AND event_key IS NULL AND julianday(at)>=julianday(?) AND julianday(at)<julianday(?)`, agentID, kind, formatStoreTimestamp(start), formatStoreTimestamp(end)).Scan(&n)
+	if err != nil {
+		return 0, fmt.Errorf("counting owner messages: %w", err)
+	}
+	return n, nil
+}
+
 func (s *Store) PendingOwner(ctx context.Context, ids []string) ([]OwnerMessage, error) {
 	out := []OwnerMessage{}
 	for _, id := range ids {

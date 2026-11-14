@@ -22,7 +22,7 @@ import (
 // sends with each model request: descriptions say what a tool does, argument
 // descriptions live in the schema, and policy lives in guard code and its hints.
 const (
-	maxToolDefinitionBytes = 6 << 10
+	maxToolDefinitionBytes = 6400
 	maxDescriptionBytes    = 300
 )
 

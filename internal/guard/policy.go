@@ -108,6 +108,7 @@ func (g *Guard) notePost(ctx context.Context, p threads.Post, inbox bool, root s
 		}
 		g.mu.Lock()
 		g.inbox[thread] = root
+		g.addressed[author] = true
 		delete(g.trendText, thread) // an inbox reply is not an idea source
 		g.mu.Unlock()
 	}
@@ -711,11 +712,25 @@ func (g *Guard) quotas(ctx context.Context, tx store.ReservationTx, actions []st
 	return "", nil
 }
 
+// Addressed reports whether username replied to or mentioned the account in
+// something this wake read.
+func (g *Guard) Addressed(username string) bool {
+	user, err := store.NormalizeUsername(username)
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	return err == nil && g.addressed[user]
+}
+
 // ObserveStopRequest is harness ingestion, never a model tool. Inbound text is
 // transient data; only a normalized identifier and fixed source code persist.
 func (g *Guard) ObserveStopRequest(ctx context.Context, username, text string, addressedToAgent bool) (bool, error) {
 	if !addressedToAgent {
 		return false, nil
+	}
+	if user, err := store.NormalizeUsername(username); err == nil {
+		g.mu.Lock()
+		g.addressed[user] = true
+		g.mu.Unlock()
 	}
 	for _, phrase := range g.stopPhrases {
 		if strings.Contains(config.FoldCase(text), config.FoldCase(phrase)) {

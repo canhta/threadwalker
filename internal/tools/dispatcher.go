@@ -146,6 +146,10 @@ var wakeCaps = map[string]int{
 	"ideas":               3,
 }
 
+// ownerDayCaps are the per-local-day caps of the owner messages the model
+// sends, counted across wakes; the service's own notices never count.
+var ownerDayCaps = map[string]int{"notify_owner": 3, "ask_owner": 2}
+
 // callScope is what a refusal counter, a close and a hide apply to: the tool,
 // or for find_posts the tool and its source, so a closed feed leaves topic open.
 func callScope(tool, arguments string) string {

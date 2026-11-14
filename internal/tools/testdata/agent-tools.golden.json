@@ -3,7 +3,7 @@
     "type": "function",
     "function": {
       "name": "mark_do_not_contact",
-      "description": "Permanently stop replying to a username. Entries cannot be removed.",
+      "description": "Permanently stop replying to someone who replied to or mentioned you and asked you to stop, in words the code did not catch.",
       "parameters": {
         "additionalProperties": false,
         "properties": {
@@ -290,7 +290,7 @@
     "type": "function",
     "function": {
       "name": "notify_owner",
-      "description": "Queue a private message to the owner, in English; returns at once.",
+      "description": "Message the owner, in English. Only for something the owner must act on, such as a broken login, an error you cannot work around, or a limit that blocks all work. Never a routine report.",
       "parameters": {
         "additionalProperties": false,
         "properties": {
@@ -310,7 +310,7 @@
     "type": "function",
     "function": {
       "name": "ask_owner",
-      "description": "Queue a question to the owner, in English; returns at once, and the answer arrives in a later wake.",
+      "description": "Ask the owner, in English; the answer comes in a later wake. Only for a decision the persona and rules cannot settle.",
       "parameters": {
         "additionalProperties": false,
         "properties": {
