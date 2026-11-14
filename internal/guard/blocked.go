@@ -81,6 +81,8 @@ var hints = map[string]string{
 	"lesson_enum":                 "kind is post, reply or any; polarity is do or avoid",
 	"lesson_number_mismatch":      "a number in the lesson is not a counter measured on the cited action; quote the measured value or drop it",
 	"lesson_foreign_url":          "a url in the lesson is not one of your action urls; remove it",
+	"lesson_has_ref":              "the lesson names a date or an action id; say what to do in words, without dates or ids",
+	"lesson_old_episode":          "action_id %s was posted before this lesson was last confirmed; confirm only with newer actions",
 	"lesson_secret":               "the lesson looks like it contains a secret; remove it",
 	"stale_ref":                   "refs such as r58 only live for one wake and point at a different post next time; name the post or story in words instead",
 	"budget":                      "today's budget is spent; stop calling paid tools this wake",

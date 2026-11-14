@@ -8,6 +8,8 @@ import (
 	"testing"
 	"time"
 
+	"golang.org/x/text/unicode/norm"
+
 	"github.com/canhta/threadz/internal/store"
 )
 
@@ -106,29 +108,45 @@ func TestLessonCapDuplicatesAndTombstones(t *testing.T) {
 		t.Errorf("owner-forgotten lesson came back: %v", err)
 	}
 	// A lesson the dream retired may be written again.
-	id, err = f.add(t, "Hỏi một câu ngắn.", "post", "do", f.top[:2]...)
+	// Another spelling, NFD against NFC, is the same sentence.
+	if _, err = f.add(t, norm.NFD.String("Mở bằng một con số cụ thể."), "post", "do", f.top[1:]...); reason(err) != "lesson_forgotten" {
+		t.Errorf("NFD variant of a forgotten lesson came back: %v", err)
+	}
+	// A reworded lesson resting on two of the same actions is the same lesson.
+	if _, err = f.add(t, "Bắt đầu bài bằng số liệu thật.", "post", "do", f.top[:2]...); reason(err) != "lesson_forgotten" {
+		t.Errorf("reworded forgotten lesson with the same evidence came back: %v", err)
+	}
+	// One shared action is not enough to call it the same.
+	one, err := f.add(t, "Bắt đầu bài bằng số liệu thật.", "post", "do", f.top[1:]...)
+	if err != nil {
+		t.Errorf("one shared action refused: %v", err)
+	}
+	if err = f.st.RetireLesson(ctx, "a", one, store.RetiredByDream, "room", now); err != nil {
+		t.Fatal(err)
+	}
+	id, err = f.add(t, "Hỏi một câu ngắn.", "post", "do", f.top[1:]...)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if err = f.st.RetireLesson(ctx, "a", id, store.RetiredByDream, "no longer holds", now); err != nil {
 		t.Fatal(err)
 	}
-	if _, err = f.add(t, "hỏi một câu ngắn", "post", "do", f.top[:2]...); err != nil {
+	if _, err = f.add(t, "hỏi một câu ngắn", "post", "do", f.top[1:]...); err != nil {
 		t.Errorf("dream-retired lesson refused: %v", err)
 	}
 	// Ten active lessons is the cap.
 	for i := range store.MaxLessons - 1 {
-		if _, err = f.add(t, "lesson number "+strings.Repeat("x", i+1), "post", "do", f.top[:2]...); err != nil {
+		if _, err = f.add(t, "lesson number "+strings.Repeat("x", i+1), "post", "do", f.top[1:]...); err != nil {
 			t.Fatalf("lesson %d: %v", i, err)
 		}
 	}
-	if _, err = f.add(t, "one too many", "post", "do", f.top[:2]...); reason(err) != "lessons_full" {
+	if _, err = f.add(t, "one too many", "post", "do", f.top[1:]...); reason(err) != "lessons_full" {
 		t.Fatalf("eleventh: %v", err)
 	}
 	if err = f.st.RetireLesson(ctx, "a", id+1, store.RetiredByDream, "make room", now); err != nil {
 		t.Fatal(err)
 	}
-	if _, err = f.add(t, "one too many", "post", "do", f.top[:2]...); err != nil {
+	if _, err = f.add(t, "one too many", "post", "do", f.top[1:]...); err != nil {
 		t.Fatalf("after retiring: %v", err)
 	}
 	// The same sentence is another agent's own.
@@ -140,7 +158,8 @@ func TestLessonCapDuplicatesAndTombstones(t *testing.T) {
 func TestConfirmRetireAndForget(t *testing.T) {
 	f := newLessonFixture(t)
 	ctx := context.Background()
-	id, err := f.add(t, "Mở bằng số.", "post", "do", f.top[:2]...)
+	// Created before every episode was posted, so each counts as new evidence.
+	id, err := f.st.AddLesson(ctx, "a", "post", "do", "Mở bằng số.", f.top[:2], epoch)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -164,7 +183,7 @@ func TestConfirmRetireAndForget(t *testing.T) {
 		t.Fatal(err)
 	}
 	got, _ := f.st.Lessons(ctx, "a", false)
-	if len(got) != 1 || !slices.Equal(got[0].Evidence, f.top) || !got[0].ConfirmedAt.Equal(later) || !got[0].CreatedAt.Equal(now) {
+	if len(got) != 1 || !slices.Equal(got[0].Evidence, f.top) || !got[0].ConfirmedAt.Equal(later) || !got[0].CreatedAt.Equal(epoch) {
 		t.Fatalf("after confirm: %+v", got)
 	}
 	if err = f.st.RetireLesson(ctx, "a", id, store.RetiredByDream, "contradicted", later); err != nil {
@@ -183,6 +202,23 @@ func TestConfirmRetireAndForget(t *testing.T) {
 	all, _ := f.st.Lessons(ctx, "a", true)
 	if len(active) != 0 || len(all) != 1 || all[0].RetiredBy != "dream" || all[0].RetireReason != "contradicted" || !all[0].RetiredAt.Equal(later) {
 		t.Fatalf("active %d, all %+v", len(active), all)
+	}
+}
+
+func TestConfirmRefusesEpisodesPostedBeforeTheLastConfirmation(t *testing.T) {
+	f := newLessonFixture(t)
+	ctx := context.Background()
+	id, err := f.add(t, "Mở bằng số.", "post", "do", f.top[:2]...) // confirmed at now, after every episode
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = f.st.ConfirmLesson(ctx, "a", id, f.top[2:], now.Add(time.Hour)); reason(err) != "lesson_old_episode" {
+		t.Fatalf("old episode confirmed: %v", err)
+	}
+	fresh := seed(t, f.st, "a", "post", 100, 100, 0, []int{6}, 6*time.Hour)
+	postedAt(t, f.st, fresh, now.Add(time.Hour))
+	if err = f.st.ConfirmLesson(ctx, "a", id, []int64{fresh}, now.Add(2*time.Hour)); err != nil {
+		t.Fatalf("a newer episode: %v", err)
 	}
 }
 

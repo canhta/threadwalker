@@ -11,6 +11,8 @@ import (
 	"time"
 	"unicode"
 	"unicode/utf8"
+
+	"golang.org/x/text/unicode/norm"
 )
 
 const (
@@ -57,6 +59,10 @@ func (e *LessonRefusal) Error() string { return "lesson refused: " + e.Reason }
 func refuse(reason string, detail ...any) error {
 	return &LessonRefusal{reason, strings.TrimSpace(fmt.Sprint(detail...))}
 }
+
+// appliedAction is what makes an action count as having applied a lesson: it
+// went live, did not fail and is confirmed on Threads.
+const appliedAction = `a.dry_run=0 AND a.failed=0 AND a.thread_url<>'' AND a.media_id<>''`
 
 const lessonColumns = `id,agent_id,kind,polarity,text,evidence_json,created_at,confirmed_at,retired_at,retired_by,retire_reason`
 
@@ -108,7 +114,8 @@ func (s *Store) Lessons(ctx context.Context, agentID string, withRetired bool) (
 	return queryLessons(ctx, s.db, where, agentID)
 }
 
-// normalizeLesson makes two spellings of one sentence equal: lowercase,
+// normalizeLesson makes two spellings of one sentence equal: composed form
+// (NFC), lowercase,
 // punctuation as space, runs of space collapsed.
 func normalizeLesson(text string) string {
 	return strings.Join(strings.Fields(strings.Map(func(r rune) rune {
@@ -116,13 +123,14 @@ func normalizeLesson(text string) string {
 			return unicode.ToLower(r)
 		}
 		return ' '
-	}, text)), " ")
+	}, norm.NFC.String(text))), " ")
 }
 
 // citations checks that every id is one of the agent's own episodes ranked at
 // the 6h or 24h window, of the lesson's kind, and in the band its polarity
-// needs: top for do, bottom for avoid.
-func (s *Store) citations(ctx context.Context, agentID, kind, polarity string, ids []int64) error {
+// needs: top for do, bottom for avoid. Each must also have been posted after
+// `after`, unless that is zero.
+func (s *Store) citations(ctx context.Context, agentID, kind, polarity string, ids []int64, after time.Time) error {
 	eps, err := s.Episodes(ctx, agentID, EpisodeQuery{})
 	if err != nil {
 		return err
@@ -146,6 +154,8 @@ func (s *Store) citations(ctx context.Context, agentID, kind, polarity string, i
 			return refuse("lesson_kind_mismatch", kind)
 		case e.Band != want:
 			return refuse("lesson_band", id)
+		case !e.PostedAt.After(after):
+			return refuse("lesson_old_episode", id)
 		}
 	}
 	return nil
@@ -157,7 +167,7 @@ func (s *Store) CheckCitations(ctx context.Context, agentID, kind, polarity stri
 	if n := len(ids); n < MinCitations || n > MaxCitations || len(slices.Compact(slices.Sorted(slices.Values(ids)))) != n {
 		return refuse("lesson_citations")
 	}
-	return s.citations(ctx, agentID, kind, polarity, ids)
+	return s.citations(ctx, agentID, kind, polarity, ids, time.Time{})
 }
 
 // AddLesson stores a lesson after every rule has passed: citations, text
@@ -178,15 +188,15 @@ func (s *Store) AddLesson(ctx context.Context, agentID, kind, polarity, text str
 		if err != nil {
 			return err
 		}
-		active, norm := 0, normalizeLesson(text)
+		active, same := 0, normalizeLesson(text)
 		for _, l := range all {
 			if l.Active() {
 				active++
 			}
-			if normalizeLesson(l.Text) == norm {
-				if l.Active() {
-					return refuse("lesson_duplicate", l.ID)
-				}
+			switch {
+			case normalizeLesson(l.Text) == same && l.Active():
+				return refuse("lesson_duplicate", l.ID)
+			case normalizeLesson(l.Text) == same, !l.Active() && sharedCount(l.Evidence, ids) >= 2:
 				return refuse("lesson_forgotten")
 			}
 		}
@@ -204,8 +214,21 @@ func (s *Store) AddLesson(ctx context.Context, agentID, kind, polarity, text str
 	return id, err
 }
 
+// sharedCount is how many ids of b are in a.
+func sharedCount(a, b []int64) int {
+	n := 0
+	for _, id := range b {
+		if slices.Contains(a, id) {
+			n++
+		}
+	}
+	return n
+}
+
 // ConfirmLesson adds actions that agree with an active lesson to its evidence
-// and renews it. At least one must be new; each must qualify as for AddLesson.
+// and renews it. At least one must be new; each must qualify as for AddLesson
+// and have been posted after the lesson was last confirmed, so an old episode
+// cannot keep a lesson alive.
 func (s *Store) ConfirmLesson(ctx context.Context, agentID string, lessonID int64, ids []int64, now time.Time) error {
 	lessons, err := queryLessons(ctx, s.db, `agent_id=? AND id=? AND retired_at IS NULL`, agentID, lessonID)
 	if err != nil {
@@ -218,7 +241,7 @@ func (s *Store) ConfirmLesson(ctx context.Context, agentID string, lessonID int6
 		return refuse("lesson_citations")
 	}
 	l := lessons[0]
-	if err = s.citations(ctx, agentID, l.Kind, l.Polarity, ids); err != nil {
+	if err = s.citations(ctx, agentID, l.Kind, l.Polarity, ids, l.ConfirmedAt); err != nil {
 		return err
 	}
 	return s.write(ctx, func(conn *sql.Conn) error {
@@ -272,7 +295,7 @@ func (s *Store) ForgetLesson(ctx context.Context, agentID string, lessonID int64
 func (s *Store) ExpireLessons(ctx context.Context, agentID string, now time.Time) (int, error) {
 	day := 24 * time.Hour
 	res, err := s.db.ExecContext(ctx, `UPDATE lessons SET retired_at=?,retired_by=?,retire_reason=? WHERE agent_id=? AND retired_at IS NULL AND julianday(confirmed_at)<=julianday(?)
-		AND NOT EXISTS(SELECT 1 FROM action_lessons al JOIN actions a ON a.id=al.action_id WHERE al.lesson_id=lessons.id AND julianday(a.posted_at)>julianday(?))`,
+		AND NOT EXISTS(SELECT 1 FROM action_lessons al JOIN actions a ON a.id=al.action_id WHERE al.lesson_id=lessons.id AND `+appliedAction+` AND julianday(a.posted_at)>julianday(?))`,
 		formatStoreTimestamp(now), RetiredByExpiry, "not confirmed for "+strconv.Itoa(LessonConfirmDays)+" days and not applied for "+strconv.Itoa(LessonUseDays), agentID,
 		formatStoreTimestamp(now.Add(-LessonConfirmDays*day)), formatStoreTimestamp(now.Add(-LessonUseDays*day)))
 	if err != nil {
@@ -293,7 +316,7 @@ type LessonUse struct {
 
 // LessonUses computes the use stats of the given lessons, keyed by lesson id.
 func (s *Store) LessonUses(ctx context.Context, agentID string, lessons []Lesson) (map[int64]LessonUse, error) {
-	rows, err := s.db.QueryContext(ctx, `SELECT al.lesson_id,al.action_id FROM action_lessons al JOIN lessons l ON l.id=al.lesson_id JOIN actions a ON a.id=al.action_id WHERE l.agent_id=? AND a.failed=0`, agentID)
+	rows, err := s.db.QueryContext(ctx, `SELECT al.lesson_id,al.action_id FROM action_lessons al JOIN lessons l ON l.id=al.lesson_id JOIN actions a ON a.id=al.action_id WHERE l.agent_id=? AND `+appliedAction, agentID)
 	if err != nil {
 		return nil, fmt.Errorf("reading lesson use: %w", err)
 	}

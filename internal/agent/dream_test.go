@@ -206,3 +206,26 @@ func TestDreamGateCountsDistinctRankedActionsOnce(t *testing.T) {
 		t.Fatalf("a 24h re-measure counted twice: %+v %v", wake, err)
 	}
 }
+
+func TestDreamSeesForgottenLessons(t *testing.T) {
+	ctx := context.Background()
+	g := newDreamRig(t)
+	g.episodes(t, 9)
+	gone := seedLesson(t, g.st, g.tmpl, "post", "do", "open with a rhetorical question", g.now.Add(-3*24*time.Hour), g.now.Add(-24*time.Hour))
+	dream := seedLesson(t, g.st, g.tmpl, "post", "do", "retired by the dream itself", g.now.Add(-3*24*time.Hour), g.now.Add(-24*time.Hour))
+	if err := g.st.ForgetLesson(ctx, g.tmpl, gone, g.now); err != nil {
+		t.Fatal(err)
+	}
+	if err := g.st.RetireLesson(ctx, g.tmpl, dream, store.RetiredByDream, "x", g.now); err != nil {
+		t.Fatal(err)
+	}
+	if wake, err := g.r.RunPhase(ctx, store.WakeDream, "2026-01-03"); err != nil || wake.EndReason != "completed" {
+		t.Fatalf("wake=%+v err=%v", wake, err)
+	}
+	var data struct {
+		Forgotten []string `json:"forgotten"`
+	}
+	if err := json.Unmarshal([]byte(g.sent[0][1].Content), &data); err != nil || len(data.Forgotten) != 1 || data.Forgotten[0] != "open with a rhetorical question" {
+		t.Fatalf("forgotten=%v err=%v", data.Forgotten, err)
+	}
+}

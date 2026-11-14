@@ -134,6 +134,9 @@ func TestLessonAddGates(t *testing.T) {
 		{"short ref", "Bài r12 mở bằng số.", "post", "do", []int{3, 5}, "stale_ref"},
 		{"number not measured", "Bài có 77 lượt thích.", "post", "do", []int{3, 5}, "lesson_number_mismatch"},
 		{"foreign link", "Xem https://example.com/x", "post", "do", []int{3, 5}, "lesson_foreign_url"},
+		{"iso date", "Bài ngày 2026-11-10 mở bằng số.", "post", "do", []int{3, 5}, "lesson_has_ref"},
+		{"action id", "Làm như action 3 mở bằng số.", "post", "do", []int{3, 5}, "lesson_has_ref"},
+		{"action id with underscore", "Giống action_id: 5.", "post", "do", []int{3, 5}, "lesson_has_ref"},
 		{"secret", "sk-abcdefghijklmnopqrstuvwx", "post", "do", []int{3, 5}, "lesson_secret"},
 		{"too long", strings.Repeat("ab ", 81), "post", "do", []int{3, 5}, "lesson_too_long"},
 	} {
@@ -142,14 +145,20 @@ func TestLessonAddGates(t *testing.T) {
 		}
 	}
 	// Numbers may be the counters of any cited action: 8 is on action 3, 9 on action 5.
-	out, reason := f.call("lesson_add", map[string]any{"text": "Bài có 8 và 9 lượt thích mở bằng số, ngày 2026-11-10.", "kind": "post", "polarity": "do", "action_ids": []int{3, 5}})
+	out, reason := f.call("lesson_add", map[string]any{"text": "Bài có 8 và 9 lượt thích mở bằng số.", "kind": "post", "polarity": "do", "action_ids": []int{3, 5}})
 	if reason != "" || !strings.Contains(out, `"lesson_id":1`) {
 		t.Fatalf("add: %q %q", out, reason)
 	}
-	if _, reason = f.call("lesson_add", map[string]any{"text": "BÀI có 8 và 9 lượt thích, mở bằng số - ngày 2026-11-10", "kind": "post", "polarity": "do", "action_ids": []int{3, 5}}); reason != "lesson_duplicate" {
+	if _, reason = f.call("lesson_add", map[string]any{"text": "BÀI có 8 và 9 lượt thích, mở bằng số", "kind": "post", "polarity": "do", "action_ids": []int{3, 5}}); reason != "lesson_duplicate" {
 		t.Errorf("duplicate: %q", reason)
 	}
 
+	if _, reason = f.call("lesson_confirm", map[string]any{"id": 1, "action_ids": []int{7}}); reason != "lesson_old_episode" {
+		t.Errorf("confirm with an episode older than the lesson: %q", reason)
+	}
+	if _, err := f.st.DB().Exec(`UPDATE lessons SET confirmed_at='2026-11-01T00:00:00Z' WHERE id=1`); err != nil {
+		t.Fatal(err)
+	}
 	if _, reason = f.call("lesson_confirm", map[string]any{"id": 1, "action_ids": []int{3}}); reason != "lesson_no_new_evidence" {
 		t.Errorf("confirm without new evidence: %q", reason)
 	}

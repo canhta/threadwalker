@@ -99,7 +99,7 @@ var blockedReasons = []string{
 	"persistence_error", "unknown_outcome", "browser_error", "timeout",
 	"malformed_page", "unknown_page", "error",
 	"lesson_foreign_citation", "lesson_number_mismatch",
-	"lesson_foreign_url", "lesson_secret", "stale_ref",
+	"lesson_foreign_url", "lesson_secret", "lesson_has_ref", "lesson_old_episode", "stale_ref",
 	"lesson_citations", "lesson_unranked", "lesson_kind_mismatch", "lesson_band", "lesson_too_long", "lessons_full", "lesson_duplicate", "lesson_forgotten", "lesson_unknown", "lesson_no_new_evidence", "lesson_enum", "invalid_lesson_ids",
 }
 
@@ -175,6 +175,8 @@ var blockedLabels = map[string]string{
 	"lesson_number_mismatch":      "Lesson number not measured",
 	"lesson_foreign_url":          "Lesson link not its own",
 	"lesson_secret":               "Lesson looks like a secret",
+	"lesson_has_ref":              "Lesson names a date or post id",
+	"lesson_old_episode":          "Lesson confirmed with an old post",
 	"stale_ref":                   "Text names a per-wake ref",
 }
 
@@ -184,7 +186,7 @@ var failureReasons = []string{
 	"malformed_page", "metrics_unavailable", "media_not_found", "write_refused", "quota_exhausted",
 	"api_error", "close_failed", "cancelled", "timeout",
 	"lesson_foreign_citation", "lesson_number_mismatch",
-	"lesson_foreign_url", "lesson_secret",
+	"lesson_foreign_url", "lesson_secret", "lesson_has_ref", "lesson_old_episode",
 	"lesson_citations", "lesson_unranked", "lesson_kind_mismatch", "lesson_band", "lesson_too_long", "lessons_full", "lesson_duplicate", "lesson_forgotten", "lesson_unknown", "lesson_no_new_evidence", "lesson_enum",
 }
 
