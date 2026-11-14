@@ -1,5 +1,5 @@
 {
-  "source": "https://www.threads.com/ measured in the owner-authorized authenticated Orca Browser tab",
+  "source": "https://www.threads.com/ measured with agent-browser snapshots of a throwaway account",
   "measured_at": "2026-11-12",
   "auth_state": "authenticated for feed; logged-out for logged-out fixture",
   "replacements": "usernames, post text, post IDs, media alt text, tracking URLs and profile data replaced with synthetic content; roles, nesting, control labels and URL patterns preserved",

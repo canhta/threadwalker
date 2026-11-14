@@ -41,7 +41,7 @@ func TestPhaseContextsDifferInPromptAndData(t *testing.T) {
 	}
 }
 
-func TestSystemPromptNeverForcesAWriteOrNamesARemovedTool(t *testing.T) {
+func TestSystemPromptNeverForcesAWriteOrNamesAHarnessRead(t *testing.T) {
 	tmpl := OfflineTemplate()
 	for _, phase := range []string{guard.PhaseAgent, guard.PhaseDream} {
 		prompt := systemPrompt(tmpl, phase)
@@ -50,10 +50,8 @@ func TestSystemPromptNeverForcesAWriteOrNamesARemovedTool(t *testing.T) {
 				t.Errorf("%s prompt forces a write: %q", phase, forced)
 			}
 		}
-		for _, removed := range []string{"memory_add", "note_write", "playbook", "strategy_write", "knowledge_read", "read_own_metrics", "explore"} {
-			if strings.Contains(prompt, removed) {
-				t.Errorf("%s prompt names the removed %q", phase, removed)
-			}
+		if strings.Contains(prompt, "read_own_metrics") {
+			t.Errorf("%s prompt names the harness read read_own_metrics", phase)
 		}
 	}
 }

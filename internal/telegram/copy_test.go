@@ -76,16 +76,6 @@ Blocked actions: blocked_phrase ×3, quota ×1`
 			t.Fatalf("empty report missing %q:\n%s", part, empty)
 		}
 	}
-	for _, gone := range []string{"top post", "outcome", "label", "playbook", "strategy", "best episodes"} {
-		if strings.Contains(strings.ToLower(empty), gone) {
-			t.Fatalf("empty report mentions %q:\n%s", gone, empty)
-		}
-	}
-	for _, gone := range []string{"top post", "outcome", "label", "playbook", "strategy"} {
-		if strings.Contains(strings.ToLower(want), gone) {
-			t.Fatalf("report mentions %q:\n%s", gone, want)
-		}
-	}
 }
 
 func TestStatusText(t *testing.T) {

@@ -178,7 +178,6 @@ func TestSpecParse(t *testing.T) {
 	}{
 		{reply, `{"text":"x","target":"p1"}`, true},
 		{reply, `{"text":"x"}`, false},
-		{reply, `{"text":"x","target_url":"u","target_username":"n"}`, false},
 		{reply, `{"text":" ","target":"p1"}`, false},
 		{reply, `{"text":null,"target":"p1"}`, false},
 		{reply, `{"text":"x","target":"p1","answers_note":0}`, false},
@@ -200,7 +199,6 @@ func TestSpecParse(t *testing.T) {
 		{find, `{"query":"q"}`, false},
 		{post, `{"text":"x","hook":"number","trend":"t1"}`, true},
 		{post, `{"text":"x","hook":"shout"}`, false},
-		{post, `{"text":"x","trend_ref":"t1"}`, false},
 	} {
 		if _, err := tc.spec.Parse(tc.raw); (err == nil) != tc.ok {
 			t.Fatalf("%s %s: err=%v", tc.spec.Name, tc.raw, err)

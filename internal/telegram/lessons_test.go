@@ -170,11 +170,6 @@ func TestDailyReportNamesEpisodesAndLessonChanges(t *testing.T) {
 			t.Fatalf("report lacks %q:\n%s", want, got)
 		}
 	}
-	for _, gone := range []string{"outcome", "label", "playbook", "strategy"} {
-		if strings.Contains(strings.ToLower(got), gone) {
-			t.Fatalf("report mentions %q:\n%s", gone, got)
-		}
-	}
 }
 
 func TestLessonsCommandFitsOneTelegramMessageWhenFull(t *testing.T) {

@@ -31,24 +31,7 @@ flowchart LR
   Ctl[ctl CLI] --> Admin
 ```
 
-| Package | Owns |
-|---|---|
-| `cmd/threadz` | CLI: `run`, `check`, `ctl`, `dashboard`, `eval`, `update`, `version` |
-| `internal/config` | Template loading, validation, redacting `Secret` values |
-| `internal/store` | SQLite, `schema.sql`, queries, retention |
-| `internal/llm` | Protocol adapters, shared tool loop, ledger |
-| `internal/agent` | One wake: context assembly, scoreboard, cadence, dream |
-| `internal/tools` | Tool executors and the dispatcher |
-| `internal/guard` | Tool table (`Specs`), limits, safety rules, do-not-contact, intent reservation |
-| `internal/quality` | Writer, critic and ideas calls; `rubric.json`; draft-quality scoring and the eval judge |
-| `internal/threads` | API client, token lifecycle, `Backend` contract, `Memory` backend |
-| `internal/agentbrowser` | Pinned `agent-browser` client |
-| `internal/api` | Loopback HTTP for OAuth and webhooks |
-| `internal/metrics` | Metric jobs and samples |
-| `internal/trends` | Trend fetch, ranking, sources, target and topic facts, web search |
-| `internal/telegram`, `internal/admin`, `internal/dashboard` | Owner channel, ctl socket, read-only page |
-| `internal/update`, `internal/ratelimit`, `internal/logging`, `internal/stdx` | Self-update, shared limiter, event names, helpers |
-| `internal/eval` | Fixtures and runner for offline evals |
+Each package and the file to read first are listed in the repo map of [AGENTS.md](../AGENTS.md#repo-map).
 
 Every tool implements one interface in `internal/tools`; `internal/guard` wraps the dispatcher, so no code path runs a tool without the guards. Templates are `templates/*.agent.yaml`.
 

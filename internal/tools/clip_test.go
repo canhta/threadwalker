@@ -11,9 +11,9 @@ import (
 func TestClipResult(t *testing.T) {
 	posts := make([]string, 60)
 	for i := range posts {
-		posts[i] = fmt.Sprintf(`{"ref":"r%d","text":%q}`, i, strings.Repeat("é", 150))
+		posts[i] = fmt.Sprintf(`{"ref":"p%d","text":%q}`, i, strings.Repeat("é", 150))
 	}
-	wrapped := `{"untrusted":true,"source":"read_feed","data":{"kind":"feed","posts":[` + strings.Join(posts, ",") + `],"trends":[{"ref":"t1"}]}}`
+	wrapped := `{"untrusted":true,"source":"find_posts","data":{"kind":"feed","posts":[` + strings.Join(posts, ",") + `],"trends":[{"ref":"t1"}]}}`
 
 	if got := clipResult(`{"a":1}`, MaxResultBytes); got != `{"a":1}` {
 		t.Fatalf("small result changed: %s", got)
@@ -32,7 +32,7 @@ func TestClipResult(t *testing.T) {
 		t.Fatalf("header %+v", v)
 	}
 	for i, p := range v.Data.Posts { // whole items, in order, none cut
-		if p.Ref != fmt.Sprintf("r%d", i) || p.Text != strings.Repeat("é", 150) {
+		if p.Ref != fmt.Sprintf("p%d", i) || p.Text != strings.Repeat("é", 150) {
 			t.Fatalf("item %d cut: %+v", i, p)
 		}
 	}

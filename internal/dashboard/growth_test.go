@@ -5,6 +5,7 @@ import (
 	"github.com/canhta/threadz/internal/config"
 	"github.com/canhta/threadz/internal/guard"
 	"net"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -108,7 +109,7 @@ func TestEveryEnumHasAPlainLabel(t *testing.T) {
 	for _, spec := range guard.Specs() {
 		name := spec.Name
 		label := toolLabel(name)
-		if label == "" || label == "Other step" {
+		if label == "" || label == "Other" {
 			t.Errorf("tool %q has no plain label", name)
 		}
 	}
@@ -132,9 +133,14 @@ func TestEveryEnumHasAPlainLabel(t *testing.T) {
 			t.Errorf("blocked label for unmapped code %q", code)
 		}
 	}
-	for source := range sourceTags {
-		if tag := sourceTag(source); tag == "" || tag == "WEB" {
+	for _, source := range config.SourceNames {
+		if _, ok := sourceTags[source]; !ok {
 			t.Errorf("source %q has no tag", source)
+		}
+	}
+	for source := range sourceTags {
+		if !slices.Contains(config.SourceNames, source) {
+			t.Errorf("tag for unknown source %q", source)
 		}
 	}
 	if toolLabel("new_tool") != "Other" || endReasonLabel("new_reason") != "Stopped" || blockedLabel("new_code") != "Blocked" || sourceTag("new_source") != "WEB" {

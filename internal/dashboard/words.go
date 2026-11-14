@@ -16,9 +16,13 @@ var toolLabels = map[string]string{
 	"post":                "Post",
 	"reply":               "Reply",
 	"web_search":          "Web search",
+	"ideas":               "Pick ideas",
 	"notify_owner":        "Message owner",
 	"ask_owner":           "Ask owner",
 	"mark_do_not_contact": "Do not contact",
+	"lesson_add":          "Add lesson",
+	"lesson_confirm":      "Confirm lesson",
+	"lesson_retire":       "Retire lesson",
 }
 
 func toolLabel(raw string) string {
@@ -242,12 +246,7 @@ var sourceTags = map[string]string{
 	"the_verge":          "VG",
 	"techcrunch":         "TC",
 	"arstechnica":        "AT",
-	"reddit_localllama":  "RD",
-	"reddit_openai":      "RD",
-	"reddit_singularity": "RD",
 	"github_trending":    "GH",
-	"youtube":            "YT",
-	"threads":            "TH",
 }
 
 // sourceTag picks the first recognised source in a comma-separated list.

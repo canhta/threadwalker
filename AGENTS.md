@@ -72,9 +72,9 @@ The issue is done when every "Done when" box is ticked with evidence and
 - Every network call takes a `context.Context` with a timeout.
 - Errors are returned and wrapped with what was being attempted; only `main` exits the process.
 - Time and randomness come from an injected clock and source, so tests are deterministic.
-- SQL uses parameters and lives in `internal/store`. The schema is one file, `internal/store/schema.sql`; a change edits it, with no migration files and no upgrade path.
-- Logging is `log/slog`; log ids, counts and reasons. Event names and reason codes are constants,
-  never string literals at the call site.
+- SQL uses parameters and lives in `internal/store`. The schema is one file, `internal/store/schema.sql`; a change edits it, with no in-place upgrade at startup; a schema change ships a one-off `deploy/migrate-N.sql`.
+- Logging is `log/slog`; log ids, counts and reasons. Event names and reason codes are constants
+  declared once in their package, not retyped at call sites.
 - One version of everything. This is a greenfield project: a change that replaces code deletes the
   old code in the same commit. No compatibility shims, deprecated wrappers, fallbacks to an old
   path, feature flags for the old behaviour, or "legacy" anything.
@@ -145,7 +145,8 @@ Each commit keeps all five true:
 | `internal/store` | SQLite schema (`schema.sql`) and every query, including wake transcripts and the retention table | `store.go` |
 | `internal/admin` | The local admin socket the `ctl` commands use to reach the running service | `admin.go` |
 | `internal/metrics` | Own-action metric collection jobs and samples | `processor.go` |
-| `internal/trends` | Fetching, ranking and recording outside trends, web search, and the Threads trend brief | `trends.go` |
+| `internal/trends` | Fetching, ranking and recording outside trends, and web search | `fetch.go` |
+| `internal/api` | The loopback HTTP server for OAuth and webhooks | `api.go` |
 | `internal/telegram` | Owner messages, digests and commands | `service.go` |
 | `internal/dashboard` | Read-only localhost dashboard | `dashboard.go` |
 | `internal/eval` | Offline and live eval suites | `runner.go` |

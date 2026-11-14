@@ -18,7 +18,7 @@ const MaxArgField = 2 << 10
 type CallDetail struct {
 	// Detail is the refusal's detail, such as the measured length.
 	Detail string `json:"detail,omitempty"`
-	// Ref is how a trend_ref or reply target resolved.
+	// Ref is how a trend or reply target resolved.
 	Ref *RefTrace `json:"ref,omitempty"`
 	// Tries is every draft the writer and critic produced, oldest first.
 	Tries []TryTrace `json:"tries,omitempty"`

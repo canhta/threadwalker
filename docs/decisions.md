@@ -34,7 +34,7 @@ Each row is one decision with a one-line reason. A change to a decision edits it
 | Non-goal | Reason |
 |---|---|
 | A multi-agent pipeline of tool-using agents; the only extra model calls are the tool-free `ideas`, writer and critic | Keeps one loop to audit |
-| A vector database, an ORM, a web framework | Brute-force cosine over SQLite blobs and the standard library are enough at this scale |
+| An ORM, a web framework | The standard library is enough at this scale |
 | Delays that imitate a human | Spacing is a rate limit, not disguise |
 | Feeding real revenue back into the budget | Out of scope for the experiment |
 | Open X, Facebook or TikTok feeds | No stable no-login source was measured |

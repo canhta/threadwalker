@@ -20,6 +20,10 @@ Use these terms and spellings in code, issues and docs.
 | `admin socket` | The local Unix socket through which `threadz ctl` reaches the running service. |
 | `episode` | One live, confirmed own action with its newest metric window, score (`likes + 2 * replies`), rank among the last 50 of its kind and band (`top`, `mid`, `bottom`, `unranked`). Computed, not stored. |
 | `lesson` | One sentence of at most 240 characters on how the account should write, grounded in 2 to 5 cited episodes. Only the dream writes it; the owner can forget it. |
-| `hook type` | The kind of first line an action opens with (`number`, `contrarian`, `curiosity_gap`, `personal_stake`, `trend_detail`), stored on the action. |
+| `hook type` | The kind of first line an action opens with stored on the action; the list is in [docs/content.md](docs/content.md). |
 | `series` | A post of 2 to 5 parts: part 1 is the hook and each later part is published as a reply to the part before it. It is one action and counts as one post. |
 | `trend anchor` | The item (a trend, or a post stored by a read) a post names in `trend` by its `t` or `p` ref; the guard refuses a post anchored to nothing it read. |
+| `dream` | The once-a-day wake that reads episodes and writes, confirms or retires lessons. It has its own budget and no write tool ([docs/learning.md](docs/learning.md#dream)). |
+| `ref` | A short handle the model passes instead of a URL: `p<N>` for a post a read returned (durable for 7 days), `t<N>` for a trend, web source or Trending-now topic (restarts every wake). |
+| `seen_posts` | The table of every post a read returned, keyed by its `p` id; reply targets and open reply candidates are resolved from it. |
+| `find_posts` | The one read tool for posts, with a `source` of `feed`, `topic`, `search` or `profile`. |

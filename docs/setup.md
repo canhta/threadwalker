@@ -146,7 +146,7 @@ ssh <host> sudo install -o root -g root -m 0600 /tmp/threadz.env \
   /etc/threadz/threadz.env
 ```
 
-The env file holds only the LLM key (`OPENAI_API_KEY` for the viral template), `TELEGRAM_BOT_TOKEN` and `TELEGRAM_OWNER_CHAT_ID`. The
+The env file holds the variables from the table above that your template and flags use. The
 service runs as `threadz` with `/opt/threadz/{data,profiles,bin}`; install the pinned
 Chrome and agent-browser there. [deploy/threadz.service](../deploy/threadz.service) caps
 memory at `MemoryMax=2400M` (3.6 GiB host).
@@ -257,8 +257,8 @@ threads:
 
 With `dry_run: false` every write passes the guard's audit row, reserved intent and limits, and the
 API's publishing quota. A publish with an unknown outcome is recorded as unknown and never retried.
-Feed posts carry no post id, so the agent replies only to posts returned by search, mentions or
-replies. Captcha and rate-limit banners are not handled, and the feed profile's account survival is
+`reply` takes the `p` ref of a stored post: a post the API returned is answered through the API, and a
+feed or topic post, which has no API id, through the browser, capped by `limits.browser_replies_per_day`. Captcha and rate-limit banners are not handled, and the feed profile's account survival is
 not measured.
 
 Opt-in live API check (`/me`, insights, `followers_count`, publishing limit; never publishes):
@@ -283,7 +283,7 @@ arrives at `report_hour` (default 21) in `telegram.timezone` (IANA, default `Asi
 which is also the zone of every displayed time. Every `getUpdates` sends `allowed_updates: ["message"]`, because
 Telegram persists the filter per bot.
 
-The bot registers its menu with `setMyCommands` at start: `/status`, `/report`, `/pause`, `/resume`,
+The bot registers its menu with `setMyCommands` at start: `/status`, `/report`, `/lessons`, `/forget`, `/pause`, `/resume`,
 `/kill`, `/dnc`, `/cookie`, `/update`, `/help` and `/start`. With several agents the
 per-agent commands take the agent ID first: `/status <agent_id>`, `/dnc <agent_id> <username>`.
 `/help` lists them and `/start` adds one line on what the chat receives. Kill is terminal. Reply to a
@@ -300,9 +300,9 @@ The service binds `/run/threadz/admin.sock` (mode 0600, service user; the direct
 are in [operations.md](operations.md):
 
 ```sh
-ssh vps threadz ctl status
-ssh vps threadz ctl wake --agent viral --phase dream --dry-run
-ssh vps threadz ctl wake-show 42 --agent viral
+ssh <host> threadz ctl status
+ssh <host> threadz ctl wake --agent viral --phase dream --dry-run
+ssh <host> threadz ctl wake-show 42 --agent viral
 ```
 
 `ctl` resolves templates, database and env file like every command, so on the documented layout
@@ -322,7 +322,7 @@ go run ./cmd/threadz dashboard --agents /path/to/templates --db data/threadz.db
 ```
 
 Open `http://127.0.0.1:8080/` (`--listen` selects another loopback port). The DB must exist. It
-needs no credentials, opens SQLite read-only and accepts only `?agent=<id>` and `?range=7|14|30`.
+needs no credentials, opens SQLite read-only and accepts only `?agent=<id>` and `?range=7|14|30|90`.
 
 Behind the Cloudflare tunnel the limiter keys visitors by `CF-Connecting-IP`; from any other peer
 that header is ignored. `-rate`, `-burst` and `-max-concurrent` tune the limits.

@@ -51,7 +51,7 @@ func TestRuntimeFixtureRejectsAmbiguousOrUnboundedInputs(t *testing.T) {
 			c.Responses = map[string][]eval.Response{"openai": {{Status: 200, Body: json.RawMessage(`{}`)}}}
 		}},
 		{"mixed_tools", func(c *eval.Case) { c.Tools = []llm.Tool{{Type: "function"}} }},
-		{"mixed_outputs", func(c *eval.Case) { c.ToolOutputs = map[string]string{"read_feed": "synthetic"} }},
+		{"mixed_outputs", func(c *eval.Case) { c.ToolOutputs = map[string]string{"find_posts": "synthetic"} }},
 		{"zero_schedule", func(c *eval.Case) { c.Runtime.ExpectedNextMinutes = 0 }},
 		{"impossible_schedule", func(c *eval.Case) { c.Runtime.ExpectedNextMinutes = 1441 }},
 		{"negative_actions", func(c *eval.Case) { c.Runtime.ExpectedActions = -1 }},

@@ -15,7 +15,7 @@ func TestCallDetailsJoinTheAuditAndAreKeptAsLongAsTranscripts(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	fresh, err := s.RecordToolAttempt(ctx, "a", 1, "read_feed", "{}", "", retentionNow.Add(-time.Hour))
+	fresh, err := s.RecordToolAttempt(ctx, "a", 1, "find_posts", "{}", "", retentionNow.Add(-time.Hour))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -25,7 +25,7 @@ func TestCallDetailsJoinTheAuditAndAreKeptAsLongAsTranscripts(t *testing.T) {
 	if err = s.RecordCallArgs(ctx, "a", 1, fresh, `{}`, retentionNow.Add(-time.Hour)); err != nil {
 		t.Fatal(err)
 	}
-	if err = s.RecordCallDetail(ctx, fresh, store.CallDetail{Counts: map[string]int{"posts": 12}, Ref: &store.RefTrace{Field: "trend_ref", Given: "x"}}); err != nil {
+	if err = s.RecordCallDetail(ctx, fresh, store.CallDetail{Counts: map[string]int{"posts": 12}, Ref: &store.RefTrace{Field: "trend", Given: "x"}}); err != nil {
 		t.Fatal(err)
 	}
 	if err = s.RecordToolResult(ctx, fresh, `{"outcome":"success"}`); err != nil {

@@ -11,7 +11,7 @@ Install, credentials, deploy, self-update steps, Cloudflare routing and the Meta
 | Dashboard | A read-only page over the database | None |
 | Journald, `wake-show`, `wake-diagnose` | Logs, stored transcripts and the audit of one wake | Host access |
 
-Nothing is exposed over the network from the harness except the loopback API behind the Cloudflare tunnel ([threads.md](threads.md)) and the dashboard listener. Remote use is `ssh vps threadz ctl ...`.
+Nothing is exposed over the network from the harness except the loopback API behind the Cloudflare tunnel ([threads.md](threads.md)) and the dashboard listener. Remote use is `ssh <host> threadz ctl ...`.
 
 ## Admin socket and ctl
 
@@ -99,7 +99,7 @@ A call older than the details' retention shows its outcome and guard reason with
 | Persistence | Poll offsets, command receipts, question delivery IDs and reply correlation survive restarts |
 | Bot avatar | Set by hand, the Bot API cannot set it: `@BotFather` `/setuserpic` with [`docs/images/brand/threadz-avatar-1024.png`](images/brand/threadz-avatar-1024.png) |
 | Owner tools | `ask_owner` and `notify_owner` enqueue locally and return immediately. The agent's next wake sees only the latest ten answers, secrets redacted; raw updates and chat identifiers never enter its context |
-| Menu | On start the bot replaces its default-scope menu with `status`, `report`, `pause`, `resume`, `kill`, `dnc`, `cookie`, `update`, `help`, `start`, from the same table `/help` prints; a failure is logged as `menu_failed` and does not stop polling. Each long poll sends `allowed_updates: ["message"]` |
+| Menu | On start the bot replaces its default-scope menu with `status`, `report`, `lessons`, `forget`, `pause`, `resume`, `kill`, `dnc`, `cookie`, `update`, `help`, `start`, from the same table `/help` prints; a failure is logged as `menu_failed` and does not stop polling. Each long poll sends `allowed_updates: ["message"]` |
 | Copy | English plain text (no `parse_mode`, so nothing is escaped) built from code-owned facts; the model never writes counts, limits or times. A message starts with a title line: `Status`, `Daily report, <date>`, `Notice`, `Question from the agent` or `Message from the agent`, then short `Label: value` lines. With a shared bot the title is prefixed with `persona.name`. Times are `HH:MM` in `telegram.timezone`, money is USD with two decimals. `ask_owner` and `notify_owner` text is the model's, asked for in English |
 | Notices | Daily notices use the local day in `schedule.timezone` for action limits and the 80% and 100% budget thresholds, and give the reset time in the owner's zone; killed notices use the terminal state identity. The browser's `BrowserStopped` seam pauses the agent and dedupes its notice |
 | Report | Once per owner-local date from `telegram.report_hour` (default 21) in `telegram.timezone`; `/report` sends the same text on demand. It covers the 24 hours up to now, so consecutive reports leave no gap: state and next run, posts and replies, the latest metric sample of each action measured in that window, the top post by views with its engagements and permalink (never its text), followers with the change since the last count before the window, spend of the local day (resets at 00:00 in `schedule.timezone`) against the cap with the wake and dream split, failed runs with their top 3 end reasons, and the top 5 blocked reasons (`tool_calls.blocked_by`). A missing metric or follower count says "not measured", never 0 |
@@ -126,10 +126,10 @@ A request runs no LLM call, agent action, schema change or agent initialization.
 
 The page reads top to bottom in priority order. First a hero: views, followers and engagement,
 each with its change on the previous period, over trend charts that go weekly beyond 30 days. Then
-the latest 10 posts and replies, with the 3 best performers beside them. Learning, held-back
+the latest 6 posts and replies, with the 5 best performers beside them. Learning, held-back
 drafts, cost, runs, tools and trends follow as collapsed rows.
 
-No list is unbounded. At most the 40 latest posts are kept; the rest sit in an "Earlier" fold.
+No list is unbounded. At most the 42 latest posts are kept; the rest sit in an "Earlier" fold.
 
 Sections run in this order; missing values show `—`.
 

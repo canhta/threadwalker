@@ -36,7 +36,7 @@ go run ./cmd/threadz run --once --offline
 
 ## Install
 
-A release bundle carries the linux/amd64 binary, the systemd units and a ready template:
+A release has two bundles, `linux_amd64` (the server) and `darwin_arm64` (Apple silicon, for local runs). The server bundle carries the binary, the systemd units and a ready template; the Apple silicon one carries the binary and the template. For the server:
 
 ```sh
 v=$(curl -fsSL https://api.github.com/repos/canhta/threadz/releases/latest \
@@ -55,6 +55,8 @@ Start from [`templates/viral.agent.yaml`](templates/viral.agent.yaml), every key
 [docs/template.md](docs/template.md). Credentials come from the environment
 ([`.env.example`](.env.example)). Templates ship with `dry_run: true`, and the default
 `backend: stub` runs the whole loop without a Threads app.
+
+Inside the extracted bundle:
 
 ```sh
 ./threadz check --agents .
