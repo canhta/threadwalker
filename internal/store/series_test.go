@@ -52,8 +52,9 @@ func TestSeriesPartsAreReservedWithTheActionAndConfirmedOnce(t *testing.T) {
 	if err = st.DB().QueryRow(`SELECT COUNT(*) FROM action_parts WHERE thread_url<>''`).Scan(&published); err != nil || published != 1 {
 		t.Fatalf("published=%d err=%v", published, err)
 	}
-	own, err := st.RecentOwnActions(ctx, store.ActionScope{AgentID: "a"}, time.Now().Add(-time.Hour), 10)
-	if err != nil || len(own) != 1 || own[0].Hook != "number" || own[0].Parts != 2 || strings.Contains(own[0].Text, "hai") {
-		t.Fatalf("own=%+v err=%v", own, err)
+	var hook, text string
+	var parts int
+	if err = st.DB().QueryRow(`SELECT hook,text,(SELECT COUNT(*) FROM action_parts WHERE action_id=actions.id) FROM actions WHERE agent_id='a'`).Scan(&hook, &text, &parts); err != nil || hook != "number" || parts != 2 || strings.Contains(text, "hai") {
+		t.Fatalf("hook=%q text=%q parts=%d err=%v", hook, text, parts, err)
 	}
 }

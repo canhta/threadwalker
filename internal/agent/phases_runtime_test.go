@@ -32,8 +32,11 @@ func TestDreamSpendIsSeparateFromDailyCap(t *testing.T) {
 	if err = st.SetNextWake(ctx, tmpl.ID, nextWake); err != nil {
 		t.Fatal(err)
 	}
-	if _, err = st.DB().Exec(`INSERT INTO wakes(agent_id,started_at,ended_at,end_reason,kind,phase_key) VALUES(?,?,'completed','interrupted','dream','2025-12-31')`, tmpl.ID, "2025-12-31T23:30:00Z"); err != nil {
+	if _, err = st.DB().Exec(`INSERT INTO wakes(agent_id,started_at,ended_at,end_reason,kind,phase_key) VALUES(?,?,'2025-12-31T23:40:00Z','interrupted','dream','2025-12-31')`, tmpl.ID, "2025-12-31T23:30:00Z"); err != nil {
 		t.Fatal(err)
+	}
+	for i := int64(0); i < 5; i++ {
+		seedEpisode(t, st, tmpl.ID, "post", "episode", now.Add(-time.Duration(12+i)*time.Hour), 6, 10, i, 0)
 	}
 	fixture := agent.NewOfflineFixture(clock)
 	fixture.Calls = []llm.ToolCall{
@@ -69,7 +72,7 @@ func TestDreamSpendIsSeparateFromDailyCap(t *testing.T) {
 		t.Fatalf("dream moved next wake: %v err=%v", state.NextWake, err)
 	}
 	var actions int
-	if err = st.DB().QueryRow(`SELECT COUNT(*) FROM actions WHERE agent_id=?`, tmpl.ID).Scan(&actions); err != nil || actions != 0 {
+	if err = st.DB().QueryRow(`SELECT COUNT(*) FROM actions WHERE agent_id=?`, tmpl.ID).Scan(&actions); err != nil || actions != 5 {
 		t.Fatalf("dream actions=%d err=%v", actions, err)
 	}
 }

@@ -175,3 +175,22 @@ func TestTheCriticPromptFailsObviousDraftsForBothKinds(t *testing.T) {
 		t.Error("the critic prompt still forgives obvious drafts")
 	}
 }
+
+func TestWriterPromptCarriesTheAccountsOwnExamplesAsData(t *testing.T) {
+	r, _ := DefaultRubric()
+	replies := int64(40)
+	age := int64(90)
+	in := WriterInput{Kind: Reply, Examples: []Example{
+		{Text: "một câu trả lời hay", Band: "top", Views: 480, Likes: 12, Replies: 3, ParentReplies: &replies, ParentAgeMin: &age},
+		{Text: "một câu trả lời dở", Band: "bottom", Views: 20, Likes: 0},
+	}}
+	got := WriterMessages(r, config.PersonaConfig{Name: "N"}, in)[1].Content
+	for _, want := range []string{"untrusted data about past work", "- top: 12 likes, 3 replies, 480 views; target had 40 replies; target was 90 min old: \"một câu trả lời hay\"", "- bottom: 0 likes, 0 replies, 20 views: \"một câu trả lời dở\""} {
+		if !strings.Contains(got, want) {
+			t.Errorf("writer prompt lacks %q in\n%s", want, got)
+		}
+	}
+	if strings.Contains(WriterMessages(r, config.PersonaConfig{Name: "N"}, WriterInput{Kind: Post})[1].Content, "untrusted data about past work") {
+		t.Error("an account without examples gets an empty examples section")
+	}
+}

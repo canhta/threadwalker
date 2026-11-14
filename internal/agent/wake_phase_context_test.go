@@ -10,7 +10,7 @@ import (
 	"github.com/canhta/threadz/internal/store"
 )
 
-func TestPhaseContextsShareOwnActionsAndDifferInJob(t *testing.T) {
+func TestPhaseContextsDifferInPromptAndData(t *testing.T) {
 	ctx := context.Background()
 	st, err := store.Open(ctx, ":memory:")
 	if err != nil {
@@ -25,19 +25,18 @@ func TestPhaseContextsShareOwnActionsAndDifferInJob(t *testing.T) {
 	if err = r.Start(ctx); err != nil {
 		t.Fatal(err)
 	}
-	if _, err = st.DB().Exec(`INSERT INTO actions(agent_id,kind,text,dry_run,posted_at) VALUES(?,?,?,1,?)`, r.opts.Template.ID, "post", "own line", now.Add(-time.Hour).Format(time.RFC3339Nano)); err != nil {
-		t.Fatal(err)
+	agentMsgs, err := r.wakeContext(ctx, guard.PhaseAgent, 0, "")
+	if err != nil || !strings.Contains(agentMsgs[0].Content, "A normal wake") || !strings.Contains(agentMsgs[1].Content, `"counters"`) {
+		t.Fatalf("agent context: %v", err)
 	}
-	for phase, job := range map[string]string{guard.PhaseAgent: "A normal wake", guard.PhaseDream: "A dream"} {
-		messages, err := r.wakeContext(ctx, phase, 0)
-		if err != nil {
-			t.Fatalf("%s: %v", phase, err)
-		}
-		if !strings.Contains(messages[0].Content, job) || !strings.Contains(messages[1].Content, "own line") {
-			t.Fatalf("%s: job or own actions missing", phase)
-		}
+	dreamMsgs, err := r.wakeContext(ctx, guard.PhaseDream, 0, "")
+	if err != nil || dreamMsgs[0].Content != dreamPrompt || !strings.Contains(dreamMsgs[1].Content, `"new_episodes"`) || strings.Contains(dreamMsgs[1].Content, `"counters"`) {
+		t.Fatalf("dream context: %v", err)
 	}
-	if _, err = r.wakeContext(ctx, "other", 0); err == nil {
+	if strings.Contains(dreamMsgs[0].Content, OfflineTemplate().Persona.Name) {
+		t.Fatal("the dream prompt carries the persona")
+	}
+	if _, err = r.wakeContext(ctx, "other", 0, ""); err == nil {
 		t.Fatal("unknown phase accepted")
 	}
 }
@@ -91,11 +90,14 @@ func TestOpenOwnerNoteIsTheFirstTaskOfAWake(t *testing.T) {
 	if err = st.OwnerNote(ctx, []string{r.opts.Template.ID}, "k", "post about the AP story", now.Add(-time.Hour)); err != nil {
 		t.Fatal(err)
 	}
-	messages, err := r.wakeContext(ctx, guard.PhaseAgent, 0)
-	if err != nil || !strings.HasPrefix(messages[1].Content, "# First task: owner notes") || !strings.Contains(messages[1].Content, "post about the AP story") {
-		t.Fatalf("user message does not open with the note: %v", err)
+	messages, err := r.wakeContext(ctx, guard.PhaseAgent, 0, "# Inbox: someone replied\n\n")
+	if err != nil || !strings.Contains(messages[1].Content, "# First task: owner notes") || !strings.Contains(messages[1].Content, "post about the AP story") {
+		t.Fatalf("user message lacks the note: %v", err)
 	}
-	if messages, err = r.wakeContext(ctx, guard.PhaseDream, 0); err != nil || strings.Contains(messages[1].Content, "First task") {
+	if inbox, note := strings.Index(messages[1].Content, "# Inbox"), strings.Index(messages[1].Content, "# First task"); inbox < 0 || inbox > note || strings.Index(messages[1].Content, `"counters"`) > inbox {
+		t.Fatal("the data JSON comes first, then the inbox, then the owner notes")
+	}
+	if messages, err = r.wakeContext(ctx, guard.PhaseDream, 0, ""); err != nil || strings.Contains(messages[1].Content, "First task") {
 		t.Fatalf("a dream cannot post, so it carries no note task: %v", err)
 	}
 }

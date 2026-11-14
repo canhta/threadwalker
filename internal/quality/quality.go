@@ -106,32 +106,20 @@ func JudgeMessages(r Rubric, p config.PersonaConfig, kind, text string) []llm.Me
 	return []llm.Message{{Role: "system", Content: r.JudgeInstructions}, {Role: "user", Content: b.String()}}
 }
 
-// Score runs every check. wake is the wake context's user message (JSON): its
-// numbers are the facts a self-stat may quote and its own_actions are what was
-// already said today. The result lists code checks, then one check per style
-// rule, then bad_example.
-func Score(r Rubric, p config.PersonaConfig, kind, text, wake string, v Verdict) []Check {
+// Score runs every check. wake is the wake context's user message: its JSON
+// holds the numbers a self-stat may quote. said is what the account already
+// said. The result lists code checks, then one check per style rule, then
+// bad_example.
+func Score(r Rubric, p config.PersonaConfig, kind, text, wake string, said []string, v Verdict) []Check {
 	var out []Check
 	add := func(id string, pass bool) { out = append(out, Check{id, pass}) }
 	add(MaxRunes, utf8.RuneCountInString(text) <= r.MaxRunes[kind])
 	add(MaxLines, kind != Post || len(strings.Split(strings.TrimSpace(text), "\n")) <= r.MaxPostLines)
 	add(StyleAvoid, !containsAny(text, p.StyleAvoid))
-	// The state is JSON; the scoreboard and owner notes come before it as text.
-	if i := strings.Index(wake, "\n{"); i >= 0 {
-		wake = wake[i+1:]
-	}
-	var said []string
 	var facts []float64
-	var data struct {
-		OwnActions []struct{ Text string } `json:"own_actions"`
-	}
-	if json.Unmarshal([]byte(wake), &data) == nil {
-		for _, a := range data.OwnActions {
-			said = append(said, a.Text)
-		}
-	}
 	var tree any
-	if json.Unmarshal([]byte(wake), &tree) == nil {
+	// The data JSON opens the message; the scoreboard and notes follow as text.
+	if json.NewDecoder(strings.NewReader(wake)).Decode(&tree) == nil {
 		facts = numbers(tree, nil)
 	}
 	add(RepeatImage, !repeatsImage(text, said, r.ImageWords))

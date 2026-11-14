@@ -91,7 +91,7 @@ func runQualityCase(ctx context.Context, c Case, p Profile, repeat int, opts Opt
 		r.Reason = "judge_verdict_invalid"
 		return r
 	}
-	r.Quality = quality.Score(rubric, tmpl.Persona, q.Kind, draft, wake[1].Content, verdict)
+	r.Quality = quality.Score(rubric, tmpl.Persona, q.Kind, draft, wake[1].Content, q.Said, verdict)
 	r.Passed, r.Reason = qualityOutcome(opts.Mode, r.Quality, q.Fails)
 	return r
 }
@@ -154,12 +154,6 @@ func qualityWake(ctx context.Context, q *QualityCase, now time.Time) (*config.Te
 		return nil, nil, err
 	}
 	defer st.Close()
-	for _, a := range q.OwnActions {
-		at := now.Add(-time.Duration(a.HoursAgo) * time.Hour)
-		if _, err = st.SeedAction(ctx, store.SeededAction{AgentID: tmpl.ID, Kind: a.Kind, Text: a.Text, DryRun: true, PostedAt: at}); err != nil {
-			return nil, nil, fmt.Errorf("seeding own actions: %w", err)
-		}
-	}
 	fixture := agent.NewOfflineFixture(func() time.Time { return now })
 	rt, err := agent.New(agent.Options{Store: st, Template: *tmpl, Now: func() time.Time { return now }, HTTPClient: fixture.Client(), FetchTrends: fixture.Trends})
 	if err != nil {

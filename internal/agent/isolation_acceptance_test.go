@@ -87,8 +87,10 @@ func newIsolationAgentFixture(t *testing.T, logger *slog.Logger) *isolationAgent
 }
 
 type isolationContextState struct {
-	OwnActions   []store.OwnAction `json:"own_actions"`
-	RemainingUSD float64           `json:"remaining_usd"`
+	Examples struct {
+		Post kindExamples `json:"post"`
+	} `json:"examples"`
+	RemainingUSD float64 `json:"remaining_usd"`
 }
 
 func isolationContextStateOf(t *testing.T, rt *agent.Runtime) (isolationContextState, string) {
@@ -101,24 +103,21 @@ func isolationContextStateOf(t *testing.T, rt *agent.Runtime) (isolationContextS
 		t.Fatalf("unexpected context shape: %+v", messages)
 	}
 	var state isolationContextState
-	if err := json.Unmarshal([]byte(messages[1].Content), &state); err != nil {
-		t.Fatalf("decoding isolated context: %v", err)
-	}
+	firstJSON(t, messages[1].Content, &state)
 	return state, messages[0].Content + "\n" + messages[1].Content
 }
 
 func TestIsolationAcceptanceOwnActionsAreInvisibleAcrossAgents(t *testing.T) {
 	env := newIsolationAgentFixture(t, nil)
-	ctx := context.Background()
 	for id, text := range map[string]string{isolationAgentOne: "syntheticnote oneonlysentinel", isolationAgentTwo: "syntheticnote twoonlysentinel"} {
-		if _, err := env.store.SeedAction(ctx, store.SeededAction{AgentID: id, Kind: "post", Text: text, DryRun: true, PostedAt: env.now.Add(-time.Hour)}); err != nil {
-			t.Fatal(err)
+		for i := int64(0); i < 9; i++ {
+			seedEpisode(t, env.store, id, "post", text, env.now.Add(-time.Duration(10+i)*time.Hour), 6, 10, i, 0)
 		}
 	}
 	stateOne, allOne := isolationContextStateOf(t, env.one)
 	stateTwo, allTwo := isolationContextStateOf(t, env.two)
-	if len(stateOne.OwnActions) != 1 || stateOne.OwnActions[0].Text != "syntheticnote oneonlysentinel" || len(stateTwo.OwnActions) != 1 || stateTwo.OwnActions[0].Text != "syntheticnote twoonlysentinel" {
-		t.Fatalf("own actions crossed scopes: %v %v", stateOne.OwnActions, stateTwo.OwnActions)
+	if len(stateOne.Examples.Post.Top) != 3 || stateOne.Examples.Post.Top[0].Text != "syntheticnote oneonlysentinel" || len(stateTwo.Examples.Post.Top) != 3 || stateTwo.Examples.Post.Top[0].Text != "syntheticnote twoonlysentinel" {
+		t.Fatalf("episodes crossed scopes: %v %v", stateOne.Examples.Post, stateTwo.Examples.Post)
 	}
 	if strings.Contains(allOne, "twoonlysentinel") {
 		t.Fatal("agent-one context exposed agent-two state")

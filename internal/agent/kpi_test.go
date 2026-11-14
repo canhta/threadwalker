@@ -3,6 +3,7 @@ package agent_test
 import (
 	"context"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"testing"
@@ -121,8 +122,8 @@ func TestScoreboardTopsTheWakeAndStatesTheGap(t *testing.T) {
 			t.Errorf("scoreboard lacks %q in:\n%.900s", want, user)
 		}
 	}
-	if !strings.HasPrefix(user, "# Scoreboard") || !strings.Contains(user, "\n\n{") {
-		t.Fatal("scoreboard must come first and the state JSON after it")
+	if !strings.HasPrefix(user, "{") || !strings.Contains(user, "}\n\n# Scoreboard") {
+		t.Fatal("the state JSON must come first and the scoreboard after it")
 	}
 }
 
@@ -290,22 +291,21 @@ func seedToday(t *testing.T, st *store.Store, kind string, n int) {
 	}
 }
 
-// The host zone never reaches the model: every timestamp in the wake context is
-// RFC3339 in the template zone.
-func TestWakeContextTimesAreInTheTemplateZone(t *testing.T) {
+// The host zone never reaches the model: the wake context carries no timestamp,
+// only ages and local clock times.
+func TestWakeContextHasNoTimestamps(t *testing.T) {
 	old := time.Local
 	time.Local = time.FixedZone("host", 8*3600)
 	t.Cleanup(func() { time.Local = old })
-	r, _, _ := kpiRuntimeFull(t, "Asia/Ho_Chi_Minh", 90*time.Minute, 3, 0)
+	r, _, _ := kpiRuntimeFull(t, "Asia/Ho_Chi_Minh", 30*time.Minute, 3, 120)
 	messages, err := r.Context(context.Background(), "agent")
 	if err != nil {
 		t.Fatal(err)
 	}
-	user := messages[1].Content
-	if strings.Contains(user, "+08:00") {
-		t.Errorf("context carries the host zone:\n%.1500s", user)
+	if stamp := regexp.MustCompile(`\d{4}-\d\d-\d\dT|\+08:00`); stamp.MatchString(messages[1].Content) {
+		t.Errorf("context carries a timestamp:\n%.1500s", messages[1].Content)
 	}
-	if !strings.Contains(user, "+07:00") || strings.Contains(user, "Z\"") {
-		t.Errorf("context times are not in +07:00:\n%.1500s", user)
+	if !strings.Contains(messages[1].Content, "Next post allowed at 20:30 local") {
+		t.Errorf("context lacks the template-zone clock time:\n%.1500s", messages[1].Content)
 	}
 }

@@ -77,7 +77,7 @@ Per-agent template fields:
 limits:
   max_usd_per_day: 2.00
   max_usd_per_dream: 0.30   # dream spend is outside max_usd_per_day
-  max_steps_per_dream: 20
+  max_steps_per_dream: 8
 schedule:
   timezone: Asia/Ho_Chi_Minh
   dream_at: "23:30"          # once per local day; a missed one runs once on next start

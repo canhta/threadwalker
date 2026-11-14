@@ -11,6 +11,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/canhta/threadz/internal/quality"
@@ -159,13 +160,8 @@ func validateSuite(s *Suite) error {
 		switch c.Kind {
 		case "quality":
 			q := c.Quality
-			if (q.Kind != quality.Post && q.Kind != quality.Reply) || q.TemplateDir == "" || !safeID(q.TemplateID) || q.Draft == "" || q.Judge == "" || len(q.OwnActions) > 30 {
+			if (q.Kind != quality.Post && q.Kind != quality.Reply) || q.TemplateDir == "" || !safeID(q.TemplateID) || q.Draft == "" || q.Judge == "" || len(q.Said) > 30 || slices.Contains(q.Said, "") {
 				return invalid()
-			}
-			for _, a := range q.OwnActions {
-				if (a.Kind != quality.Post && a.Kind != quality.Reply) || a.Text == "" || a.HoursAgo < 0 || a.HoursAgo >= 24 {
-					return invalid()
-				}
 			}
 			for _, id := range q.Fails {
 				if !reportCode(id) {

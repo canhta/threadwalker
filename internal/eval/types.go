@@ -31,19 +31,15 @@ type RuntimeCase struct {
 // Judge are the recorded model outputs an offline run replays; a live run
 // ignores them. Fails lists the check ids the scorer must flag.
 type QualityCase struct {
-	TemplateDir string          `json:"template_dir"`
-	TemplateID  string          `json:"template_id"`
-	Kind        string          `json:"kind"`
-	OwnActions  []QualityAction `json:"own_actions,omitempty"`
-	Draft       string          `json:"draft"`
-	Judge       string          `json:"judge"`
-	Fails       []string        `json:"fails,omitempty"`
+	TemplateDir string `json:"template_dir"`
+	TemplateID  string `json:"template_id"`
+	Kind        string `json:"kind"`
+	// Said is what the account already said; the repeat_image check reads it.
+	Said        []string `json:"said,omitempty"`
+	Draft       string   `json:"draft"`
+	Judge       string   `json:"judge"`
+	Fails       []string `json:"fails,omitempty"`
 	resolvedDir string
-}
-type QualityAction struct {
-	Kind     string `json:"kind"`
-	Text     string `json:"text"`
-	HoursAgo int    `json:"hours_ago"`
 }
 
 // Case is one eval case. Kind selects the runner; Scenario picks a variant

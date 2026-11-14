@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -61,14 +62,14 @@ func TestGuardBlocksThreadsAndOwnerWritesInTheDream(t *testing.T) {
 			if err := st.DB().QueryRow(`SELECT blocked_by FROM tool_calls WHERE wake_id=? ORDER BY id DESC LIMIT 1`, wakeID).Scan(&blocked); err != nil || blocked != "phase_read_only" {
 				t.Fatalf("blocked_by=%q err=%v", blocked, err)
 			}
-			for _, tool := range []string{"fetch_trends", "read_feed", "search", "read_post"} {
+			for _, tool := range []string{"fetch_trends", "read_feed", "read_topic", "search", "read_post", "read_replies"} {
 				var ran bool
 				_, err := g.Execute(context.Background(), guard.Attempt{Tool: tool, Arguments: allowedArgs(tool)}, func() (string, error) {
 					ran = true
 					return "ok", nil
 				})
-				if !ran {
-					t.Fatalf("%s should run in %s: err=%v", tool, phase, err)
+				if !errors.Is(err, guard.ErrBlocked) || ran {
+					t.Fatalf("%s must not run in %s: err=%v ran=%v", tool, phase, err, ran)
 				}
 			}
 		})
@@ -111,6 +112,15 @@ func TestSpecPhases(t *testing.T) {
 		if spec.AllowedIn(guard.PhaseDream) || !spec.AllowedIn("") {
 			t.Fatalf("%s phases %v", tool, spec.Phases)
 		}
+	}
+	var dream []string
+	for _, spec := range guard.Specs() {
+		if spec.AllowedIn(guard.PhaseDream) {
+			dream = append(dream, spec.Name)
+		}
+	}
+	if strings.Join(dream, ",") != "lesson_add,lesson_confirm,lesson_retire" {
+		t.Fatalf("the dream's tools are %v", dream)
 	}
 	if _, ok := guard.Spec("untrusted-name-canary"); ok {
 		t.Fatal("unlisted tool has a spec")

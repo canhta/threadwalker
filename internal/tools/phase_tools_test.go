@@ -65,6 +65,9 @@ func TestPhasesAreOfferedOnlyToolsTheyMayCall(t *testing.T) {
 					t.Fatalf("%s offered=%v in %s", name, offered[name], phase)
 				}
 			}
+			if phase == guard.PhaseDream && len(offered) != 3 {
+				t.Fatalf("the dream is offered %v, want the three lesson tools", offered)
+			}
 			if offered["web_search"] != (phase == guard.PhaseAgent) {
 				t.Fatalf("web_search offered=%v in %s", offered["web_search"], phase)
 			}

@@ -39,6 +39,18 @@ func (s *Store) LastPhaseWake(ctx context.Context, agentID, kind string) (time.T
 	return at, true, nil
 }
 
+// LastCompletedDreamEnd is when the newest dream that finished normally ended:
+// the watermark the next dream reads episodes from. ok is false before any.
+func (s *Store) LastCompletedDreamEnd(ctx context.Context, agentID string) (time.Time, bool, error) {
+	var raw sql.NullString
+	err := s.db.QueryRowContext(ctx, `SELECT MAX(ended_at) FROM wakes WHERE agent_id=? AND kind=? AND end_reason='completed'`, agentID, WakeDream).Scan(&raw)
+	if err != nil || !raw.Valid {
+		return time.Time{}, false, err
+	}
+	at, err := parseTime(raw.String)
+	return at, err == nil, err
+}
+
 // BeginPhaseWake inserts one dream session without touching the agent's normal
 // next wake. phaseKey is the local-day identity; the partial unique index makes
 // a second run impossible even across concurrent schedulers and restarts.
@@ -233,56 +245,6 @@ func (s *Store) IsDoNotContact(ctx context.Context, agentID, username string) (b
 		return false, fmt.Errorf("reading do-not-contact flag: %w", err)
 	}
 	return dnc, nil
-}
-
-// OwnAction is one of the agent's own reserved actions, without third-party data.
-type OwnAction struct {
-	ID        int64     `json:"id"`
-	Kind      string    `json:"kind"`
-	Text      string    `json:"text"`
-	PostedAt  time.Time `json:"posted_at"`
-	ThreadURL string    `json:"thread_url,omitempty"`
-	DryRun    bool      `json:"dry_run"`
-	Hook      string    `json:"hook,omitempty"`
-	// Parts counts the later parts of a series post.
-	Parts int `json:"parts,omitempty"`
-}
-
-// RecentOwnActions returns the scope's own actions that did not fail since the
-// given time, newest first.
-func (s *Store) RecentOwnActions(ctx context.Context, scope ActionScope, since time.Time, limit int) ([]OwnAction, error) {
-	if scope.AgentID == "" || limit < 1 || limit > 100 {
-		return nil, errors.New("reading own actions: agent and limit 1..100 required")
-	}
-	rows, err := s.db.QueryContext(ctx, `SELECT id,kind,text,posted_at,CASE WHEN length(thread_url)<=512 THEN thread_url ELSE '' END,dry_run,hook,(SELECT COUNT(*) FROM action_parts WHERE action_id=actions.id) FROM actions WHERE agent_id=? AND dry_run=? AND failed=0 AND julianday(posted_at)>=julianday(?) ORDER BY substr(posted_at,1,19) DESC,id DESC LIMIT ?`, scope.AgentID, scope.DryRun, since.UTC().Format(time.RFC3339Nano), limit)
-	if err != nil {
-		return nil, fmt.Errorf("reading own actions: %w", err)
-	}
-	defer rows.Close()
-	out := []OwnAction{}
-	for rows.Next() {
-		var action OwnAction
-		var at string
-		if err = rows.Scan(&action.ID, &action.Kind, &action.Text, &at, &action.ThreadURL, &action.DryRun, &action.Hook, &action.Parts); err != nil {
-			return nil, fmt.Errorf("reading own actions: %w", err)
-		}
-		action.Kind = oneOfKind(action.Kind)
-		if action.PostedAt, err = time.Parse(time.RFC3339Nano, at); err != nil {
-			return nil, errors.New("reading own actions: invalid timestamp")
-		}
-		out = append(out, action)
-	}
-	if err = rows.Err(); err != nil {
-		return nil, fmt.Errorf("reading own actions: %w", err)
-	}
-	return out, nil
-}
-
-func oneOfKind(kind string) string {
-	if kind == "post" || kind == "reply" {
-		return kind
-	}
-	return "unknown"
 }
 
 // ReplyTargets returns the target URLs of the agent's own replies.

@@ -37,7 +37,7 @@ func TestTemplatePhaseDefaults(t *testing.T) {
 	if tmpl.Schedule.Timezone != "Asia/Ho_Chi_Minh" || tmpl.Schedule.DreamAt != "" {
 		t.Fatalf("schedule defaults: %+v", tmpl.Schedule)
 	}
-	if tmpl.Limits.MaxUSDPerDream != 0.30 || tmpl.Limits.MaxStepsPerDream != 20 {
+	if tmpl.Limits.MaxUSDPerDream != 0.30 || tmpl.Limits.MaxStepsPerDream != 8 {
 		t.Fatalf("dream limits: %+v", tmpl.Limits)
 	}
 	include, avoid := tmpl.TrendKeywords()

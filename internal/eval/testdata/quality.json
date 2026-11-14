@@ -123,12 +123,8 @@
         "template_dir": "../../../templates",
         "template_id": "viral",
         "kind": "post",
-        "own_actions": [
-          {
-            "kind": "post",
-            "text": "jensen mà nghỉ thì nvidia mời tôi về. tôi từng train model bằng cái quạt tản nhiệt laptop.",
-            "hours_ago": 3
-          }
+        "said": [
+          "jensen mà nghỉ thì nvidia mời tôi về. tôi từng train model bằng cái quạt tản nhiệt laptop."
         ],
         "draft": "tôi train model bằng cái quạt tản nhiệt, lương tính bằng token.",
         "judge": "{\"violated_rules\":[],\"like_bad_example\":false}",

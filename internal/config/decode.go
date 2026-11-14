@@ -221,7 +221,7 @@ func (d *decoder) limits(t *Template) {
 	if d.has("limits.max_usd_per_dream") {
 		l.MaxUSDPerDream = d.float("limits.max_usd_per_dream", false)
 	}
-	l.MaxStepsPerDream = 20
+	l.MaxStepsPerDream = 8
 	if d.has("limits.max_steps_per_dream") {
 		l.MaxStepsPerDream = d.posInt("limits.max_steps_per_dream")
 	}

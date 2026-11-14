@@ -2,65 +2,12 @@ package agent_test
 
 import (
 	"context"
-	"encoding/json"
 	"testing"
 	"time"
 
 	"github.com/canhta/threadz/internal/agent"
 	"github.com/canhta/threadz/internal/store"
 )
-
-func TestContextContainsOnlyBoundedOwnConfirmedMetrics(t *testing.T) {
-	ctx := context.Background()
-	st, err := store.Open(ctx, ":memory:")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer st.Close()
-	now := time.Date(2026, 1, 2, 0, 0, 0, 0, time.UTC)
-	tmpl := agent.OfflineTemplate()
-	tmpl.Limits.MaxUSDPerDream = 1
-	fixture := agent.NewOfflineFixture(func() time.Time { return now })
-	r, err := agent.New(agent.Options{Store: st, Template: tmpl, Now: func() time.Time { return now }, FetchTrends: fixture.Trends})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err = r.Start(ctx); err != nil {
-		t.Fatal(err)
-	}
-	for _, a := range []struct {
-		id    int
-		agent string
-		dry   int
-		url   string
-	}{{1, tmpl.ID, 0, "https://fixture.test/own"}, {2, "other", 0, "https://fixture.test/foreign"}, {3, tmpl.ID, 1, "https://fixture.test/dry"}, {4, tmpl.ID, 0, ""}} {
-		if _, err = st.DB().Exec(`INSERT INTO actions(id,agent_id,kind,text,dry_run,posted_at,thread_url,media_id) VALUES(?,?,'post','PRIVATE BODY',?,?,?,'m')`, a.id, a.agent, a.dry, now.Add(-24*time.Hour).Format(time.RFC3339Nano), a.url); err != nil {
-			t.Fatal(err)
-		}
-		if _, err = st.DB().Exec(`INSERT INTO metrics(agent_id,action_id,measured_at,views,likes,replies,reposts) VALUES(?,?,?,42,3,2,1)`, a.agent, a.id, now.Format(time.RFC3339Nano)); err != nil {
-			t.Fatal(err)
-		}
-	}
-	for _, phase := range []string{"agent", "dream"} {
-		messages, err := r.Context(ctx, phase)
-		if err != nil {
-			t.Fatal(err)
-		}
-		var data struct {
-			Metrics []struct {
-				ActionID   int64     `json:"action_id"`
-				Views      int64     `json:"views"`
-				MeasuredAt time.Time `json:"measured_at"`
-			} `json:"metrics"`
-		}
-		if err = json.Unmarshal([]byte(messages[1].Content), &data); err != nil {
-			t.Fatal(err)
-		}
-		if len(data.Metrics) != 1 || data.Metrics[0].ActionID != 1 || data.Metrics[0].Views != 42 || !data.Metrics[0].MeasuredAt.Equal(now) {
-			t.Fatalf("%s metrics=%+v", phase, data.Metrics)
-		}
-	}
-}
 
 func TestSchedulerPollsMetricsBeforeAgentChosen24HourWake(t *testing.T) {
 	ctx := context.Background()

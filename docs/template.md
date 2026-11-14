@@ -91,7 +91,7 @@ All required unless noted. A phrase in both `guard.blocked_phrases` and `persona
 | `limits.max_usd_per_day` | number > 0 | required | code | Daily spend cap shared by the agent and critic phases; the day runs 00:00 to 24:00 in `schedule.timezone` |
 | `limits.min_minutes_between_wakes` | int 1..1440 | required | code | Wake spacing when behind, and the minimum cadence ([wake.md](wake.md)) |
 | `limits.max_usd_per_dream` | number > 0 | 0.30 | code | Dream spend cap, outside the daily cap |
-| `limits.max_steps_per_dream` | int > 0 | 20 | code | Dream step cap |
+| `limits.max_steps_per_dream` | int > 0 | 8 | code | Dream step cap |
 
 ## kpi
 

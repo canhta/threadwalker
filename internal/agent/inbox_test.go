@@ -154,7 +154,7 @@ func TestPollInboxFailureBacksOffAndKeepsTheProcessRunning(t *testing.T) {
 	}
 }
 
-func TestWakeDataMessageStartsWithTheInbox(t *testing.T) {
+func TestWakeDataMessageCarriesTheInboxAfterTheState(t *testing.T) {
 	g := newInboxRig(t, 10)
 	g.reply("a1", "alice")
 	var seen string
@@ -169,7 +169,7 @@ func TestWakeDataMessageStartsWithTheInbox(t *testing.T) {
 	if _, err := g.r.Wake(context.Background()); err != nil {
 		t.Fatal(err)
 	}
-	if !strings.HasPrefix(seen, "# Inbox: people who replied to you") || !strings.Contains(seen, `"author":"alice"`) || !strings.Contains(seen, `"replying_to":"ours"`) {
-		t.Fatalf("data message does not start with the inbox: %.300s", seen)
+	if inbox := strings.Index(seen, "# Inbox: people who replied to you"); inbox < strings.Index(seen, `"counters"`) || !strings.Contains(seen, `"author":"alice"`) || !strings.Contains(seen, `"replying_to":"ours"`) {
+		t.Fatalf("data message does not carry the inbox after the state: %.300s", seen)
 	}
 }

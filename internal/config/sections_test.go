@@ -93,7 +93,7 @@ func TestSectionLimits(t *testing.T) {
 		{name: "zero spend cap", old: "max_usd_per_day: 0.50", new: "max_usd_per_day: 0", wantErr: "limits.max_usd_per_day"},
 		{name: "wake gap too long", old: "min_minutes_between_wakes: 20", new: "min_minutes_between_wakes: 1441", wantErr: "at most 1440"},
 		{name: "dream defaults", check: func(t *testing.T, tmpl config.Template) {
-			if tmpl.Limits.MaxUSDPerDream != 0.30 || tmpl.Limits.MaxStepsPerDream != 20 {
+			if tmpl.Limits.MaxUSDPerDream != 0.30 || tmpl.Limits.MaxStepsPerDream != 8 {
 				t.Fatalf("limits = %+v", tmpl.Limits)
 			}
 		}},

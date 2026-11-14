@@ -46,7 +46,7 @@ Measured on the VPS dry-run database: 9 wakes of 9 to 15 steps carry 9,883 to 75
 | Phase | Trigger | Tools | Writes | Spend |
 |---|---|---|---|---|
 | `agent` | `next_wake_at`; a fresh webhook reply or mention | All, see [tools.md](tools.md) | Threads, owner | `limits.max_usd_per_day` |
-| `dream` | `schedule.dream_at`, once per local day | Reads | None to Threads or owner | `limits.max_usd_per_dream` (default 0.30), `limits.max_steps_per_dream` (default 20), excluded from the daily cap |
+| `dream` | `schedule.dream_at`, once per local day | Reads | None to Threads or owner | `limits.max_usd_per_dream` (default 0.30), `limits.max_steps_per_dream` (default 8), excluded from the daily cap |
 | `metrics` | Due metric targets | None (no model call) | Metric samples only | None |
 
 A dream wake uses `wakes.kind` and a durable `phase_key`; a partial unique index makes one dream per local day unrepeatable, restarts included. A dream missed while the process was down runs once on the next start. A dream does not move `next_wake_at`. Spend rows carry the phase, so the dashboard and the daily report show wake and dream spend separately. `critic` is a third ledger phase for the pre-publish review ([content.md](content.md)).

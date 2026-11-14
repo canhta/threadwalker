@@ -262,6 +262,22 @@ func TestCtlContextIsWhatTheNextWakeSends(t *testing.T) {
 				}
 			}
 			s.fixture.Calls = []llm.ToolCall{}
+			if phase == "dream" { // a dream with fewer than five new episodes does not run
+				for i := 0; i < 5; i++ {
+					posted := ctlNow.Add(-time.Duration(12+i) * time.Hour)
+					measured := posted.Add(6 * time.Hour).Format(time.RFC3339Nano)
+					res, err := s.st.DB().Exec(`INSERT INTO actions(agent_id,kind,text,dry_run,posted_at,thread_url,media_id) VALUES(?,'post','episode',0,?,'https://threads.test/p','m')`, s.id, posted.Format(time.RFC3339Nano))
+					if err != nil {
+						t.Fatal(err)
+					}
+					id, _ := res.LastInsertId()
+					for _, q := range []string{`INSERT INTO metrics(agent_id,action_id,measured_at) VALUES(?,?,?)`, `INSERT INTO metric_jobs(agent_id,action_id,window_hours,due_at,not_before,completed_at) VALUES(?,?,6,?3,?3,?3)`} {
+						if _, err = s.st.DB().Exec(q, s.id, id, measured); err != nil {
+							t.Fatal(err)
+						}
+					}
+				}
+			}
 			code, out, stderr := s.ctl("context", "--agent", s.id, "--phase", phase, "--json")
 			if code != 0 {
 				t.Fatalf("code=%d %s", code, stderr)

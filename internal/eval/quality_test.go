@@ -142,14 +142,13 @@ func TestQualitySuiteValidation(t *testing.T) {
 		t.Fatal(err)
 	}
 	for name, mutate := range map[string]func(*Case){
-		"kind":        func(c *Case) { c.Quality.Kind = "dm" },
-		"no draft":    func(c *Case) { c.Quality.Draft = "" },
-		"no judge":    func(c *Case) { c.Quality.Judge = "" },
-		"no dir":      func(c *Case) { c.Quality.TemplateDir = "" },
-		"payload":     func(c *Case) { c.Kind = "guard"; c.Guard = &GuardCase{} },
-		"stale":       func(c *Case) { c.Quality.OwnActions = []QualityAction{{Kind: "post", Text: "x", HoursAgo: 24}} },
-		"action kind": func(c *Case) { c.Quality.OwnActions = []QualityAction{{Kind: "dm", Text: "x"}} },
-		"check id":    func(c *Case) { c.Quality.Fails = []string{"Bad-ID"} },
+		"kind":       func(c *Case) { c.Quality.Kind = "dm" },
+		"no draft":   func(c *Case) { c.Quality.Draft = "" },
+		"no judge":   func(c *Case) { c.Quality.Judge = "" },
+		"no dir":     func(c *Case) { c.Quality.TemplateDir = "" },
+		"payload":    func(c *Case) { c.Kind = "guard"; c.Guard = &GuardCase{} },
+		"empty said": func(c *Case) { c.Quality.Said = []string{""} },
+		"check id":   func(c *Case) { c.Quality.Fails = []string{"Bad-ID"} },
 	} {
 		c := good()
 		mutate(&c)

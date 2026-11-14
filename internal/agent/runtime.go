@@ -264,8 +264,8 @@ func (r *Runtime) startWake(ctx context.Context, now time.Time) (WakeResult, err
 	wake := WakeResult{ID: id, EndReason: "runtime_error"}
 	r.event(ctx, guard.PhaseAgent, logging.WakeStarted, "started", "due", id, 0)
 	r.event(ctx, guard.PhaseAgent, logging.SchedulerScheduled, "success", "fallback", id, 0)
-	return r.execute(ctx, wake, guard.PhaseAgent, 0, 0, func(context.Context) ([]llm.Message, error) {
-		return r.wakeContext(ctx, guard.PhaseAgent, id)
+	return r.execute(ctx, wake, guard.PhaseAgent, 0, 0, func(inbox string) ([]llm.Message, error) {
+		return r.wakeContext(ctx, guard.PhaseAgent, id, inbox)
 	})
 }
 
@@ -326,8 +326,20 @@ func (r *Runtime) RunPhase(ctx context.Context, kind, phaseKey string) (WakeResu
 	phase := kind
 	r.event(ctx, kind, logging.WakeStarted, "started", kind, id, 0)
 	capUSD, maxSteps := r.phaseCap(kind)
-	return r.execute(ctx, wake, phase, capUSD, maxSteps, func(context.Context) ([]llm.Message, error) {
-		return r.wakeContext(ctx, kind, id)
+	if kind == store.WakeDream {
+		run, err := r.prepareDream(ctx, id)
+		if err != nil {
+			wake.EndReason = "runtime_error"
+			_ = r.opts.Store.FinishWake(context.WithoutCancel(ctx), id, r.opts.Now(), 0, wake.EndReason)
+			return wake, err
+		}
+		if !run {
+			wake.EndReason = dreamSkipReason
+			return wake, nil
+		}
+	}
+	return r.execute(ctx, wake, phase, capUSD, maxSteps, func(inbox string) ([]llm.Message, error) {
+		return r.wakeContext(ctx, kind, id, inbox)
 	})
 }
 
@@ -340,7 +352,7 @@ func (r *Runtime) phaseCap(phase string) (capUSD float64, maxSteps int) {
 	return 0, 0
 }
 
-func (r *Runtime) execute(ctx context.Context, wake WakeResult, phase string, capUSD float64, maxSteps int, build func(context.Context) ([]llm.Message, error)) (result WakeResult, wakeErr error) {
+func (r *Runtime) execute(ctx context.Context, wake WakeResult, phase string, capUSD float64, maxSteps int, build func(inbox string) ([]llm.Message, error)) (result WakeResult, wakeErr error) {
 	result = wake
 	defer func() {
 		finalCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)
@@ -417,14 +429,13 @@ func (r *Runtime) execute(ctx context.Context, wake WakeResult, phase string, ca
 		replies, inbox = dispatcher.Inbox(ctx)
 		r.inbox.markSeen(replies)
 	}
-	messages, err := build(ctx)
+	section, err := inboxSection(inbox)
 	if err != nil {
 		return result, err
 	}
-	if section, secErr := inboxSection(inbox); secErr != nil {
-		return result, secErr
-	} else if section != "" {
-		messages[1].Content = section + messages[1].Content
+	messages, err := build(section)
+	if err != nil {
+		return result, err
 	}
 	var stopCheck func(called map[string]bool, succeeded map[string]int) string
 	if phase == guard.PhaseAgent {
@@ -874,6 +885,9 @@ func NewReviewer(o ReviewerOptions, wakeID int64) Reviewer {
 			}
 			in.Angle, in.Fact, in.Parent = redact(in.Angle), redact(in.Fact), redact(in.Parent)
 			in.Draft, in.Problems, in.Recent = redactAll(in.Draft), redactAll(in.Problems), redactAll(in.Recent)
+			if in.Examples, err = writerExamples(ctx, o.Store, t.ID, o.Now(), in.Kind, o.Redactor); err != nil {
+				return nil, err
+			}
 			draft := write
 			if in.Kind == quality.Post {
 				draft = writePost

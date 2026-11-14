@@ -7,7 +7,11 @@ import (
 	"github.com/canhta/threadz/internal/config"
 )
 
-const wake = `{"remaining_usd":1.5,"counters":{"posts_today":2,"window_hours":24},"own_actions":[{"id":9,"text":"tôi nhìn màn hình là code sợ"}]}`
+const wake = `{"remaining_usd":1.5,"counters":{"posts_today":2,"window_hours":24},"recent":[{"id":9}]}
+
+The scoreboard follows the JSON as text.`
+
+var said = []string{"tôi nhìn màn hình là code sợ"}
 
 func persona() config.PersonaConfig {
 	return config.PersonaConfig{
@@ -59,7 +63,7 @@ func TestScore(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := failed(Score(r, persona(), tt.kind, tt.text, wake, tt.verdict)); got != tt.want {
+			if got := failed(Score(r, persona(), tt.kind, tt.text, wake, said, tt.verdict)); got != tt.want {
 				t.Fatalf("failed checks = %q, want %q", got, tt.want)
 			}
 		})
@@ -68,7 +72,7 @@ func TestScore(t *testing.T) {
 
 func TestScoreToleratesMalformedWake(t *testing.T) {
 	r, _ := DefaultRubric()
-	if got := failed(Score(r, persona(), Post, "9 view", "not json", Verdict{})); got != UngroundedNumber {
+	if got := failed(Score(r, persona(), Post, "9 view", "not json", nil, Verdict{})); got != UngroundedNumber {
 		t.Fatalf("failed = %q", got)
 	}
 }
