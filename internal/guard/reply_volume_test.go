@@ -23,7 +23,10 @@ func TestSeventhReplyInAnHourIsRefused(t *testing.T) {
 	}
 	h.blocked("reply", volumeReply(7), "replies_per_hour")
 	h.allow("post", postArgs(1))
+	// The hour opens after the wake ends: the reply tool is closed now and open in the next wake.
+	h.blocked("reply", volumeReply(8), "tool_closed")
 	h.clock.Advance(61 * time.Minute)
+	h.nextWake()
 	h.allow("reply", volumeReply(8))
 }
 
@@ -55,24 +58,22 @@ func TestBreakerPausesRepliesNotPostsAndQueuesOneNotice(t *testing.T) {
 		tmpl.Limits.BreakerMinLikes, tmpl.Limits.BreakerActions, tmpl.Limits.BreakerHours = 2, 15, 6
 	})
 	seedMeasured(t, h, 15, 0)
-	h.blocked("reply", volumeReply(1), "reply_breaker")
-	// The second refusal of the wake; a third would close the reply tool.
-	if hint := h.lastHint(t); !strings.Contains(hint, "2026-11-11T16:00:00Z") {
-		t.Fatalf("hint %q", hint)
+	// The pause lifts after the wake ends: the first refusal names when and closes the reply tool.
+	_, err := h.call("reply", volumeReply(1))
+	if b, hint := modelResult(t, err); b != "reply_breaker" || strings.Count(hint, "2026-11-11T16:00:00Z") != 2 || !strings.Contains(hint, "closed for the rest of the wake") {
+		t.Fatalf("breaker refusal: %q %q", b, hint)
+	}
+	_, err = h.call("reply", volumeReply(2))
+	if b, _ := modelResult(t, err); b != "tool_closed" {
+		t.Fatalf("second refusal: %q", b)
 	}
 	if n := breakerNotices(t, h); n != 1 {
 		t.Fatalf("notices %d, want 1", n)
 	}
 	h.allow("post", postArgs(1))
 	h.clock.Advance(6*time.Hour + time.Minute)
+	h.nextWake()
 	h.allow("reply", volumeReply(3)) // only actions after the pause began count toward a new trip
-}
-
-func (h *policyHarness) lastHint(t *testing.T) string {
-	t.Helper()
-	_, err := h.call("reply", volumeReply(99))
-	_, hint := modelResult(t, err)
-	return hint
 }
 
 func TestBreakerNeedsAFullWindowAndEnoughLikesToStayOpen(t *testing.T) {

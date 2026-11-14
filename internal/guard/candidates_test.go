@@ -66,7 +66,7 @@ func TestOpenCandidatesAreRankedAgedAndFiltered(t *testing.T) {
 	if _, err := st.DB().Exec(`INSERT INTO actions(agent_id,kind,text,dry_run,posted_at,target_url) VALUES(?,'reply','x',?,?,?)`, tmpl.ID, tmpl.DryRun, now.Add(-time.Hour).Format(time.RFC3339Nano), "https://www.threads.com/@gina/post/answered?x=1"); err != nil {
 		t.Fatal(err)
 	}
-	got, err := guard.OpenCandidates(ctx, st, tmpl, nil, now)
+	got, err := guard.OpenCandidates(ctx, st, tmpl, nil, now, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -76,11 +76,18 @@ func TestOpenCandidatesAreRankedAgedAndFiltered(t *testing.T) {
 	if got[0].AgeMinutes != 30 || got[0].Author != "alice" || got[0].Text != "text best" {
 		t.Fatalf("first candidate %+v: its age is the age at read plus the time since", got[0])
 	}
+	// With the browser cap used up only the post that has an API id is left.
+	if _, err = st.NoteSeenPost(ctx, tmpl.ID, store.SeenPost{URL: "https://threads.com/@alice/post/best", Author: "alice", MediaID: "api-best", Text: "text best"}); err != nil {
+		t.Fatal(err)
+	}
+	if got, err = guard.OpenCandidates(ctx, st, tmpl, nil, now, true); err != nil || len(got) != 1 || got[0].Ref != best {
+		t.Fatalf("api-only candidates %+v, %v; want only %s", got, err, best)
+	}
 	// The list is capped.
 	for i := 0; i < 2*guard.MaxCandidates; i++ {
 		note("bulk"+string(rune('a'+i)), "user"+string(rune('a'+i)), 300, 2, 20, time.Minute)
 	}
-	if got, err = guard.OpenCandidates(ctx, st, tmpl, nil, now); err != nil || len(got) != guard.MaxCandidates {
+	if got, err = guard.OpenCandidates(ctx, st, tmpl, nil, now, false); err != nil || len(got) != guard.MaxCandidates {
 		t.Fatalf("%d candidates, %v; want %d", len(got), err, guard.MaxCandidates)
 	}
 }

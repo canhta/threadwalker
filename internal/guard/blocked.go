@@ -43,7 +43,7 @@ const reasonTargetOutsideWindow = "target_outside_window"
 // hints holds the fixed model-facing text per reason code; %s is Detail.
 var hints = map[string]string{
 	reasonTargetOutsideWindow:     "this post is outside the reply window (%s); pick a young, rising post with room in its replies",
-	"tool_closed":                 "this tool was refused 3 times for the same reason and is closed for the rest of the wake; use another tool or end the wake",
+	"tool_closed":                 "this tool is closed for the rest of the wake; use another tool or end the wake",
 	"tool_hidden":                 "this tool or source is not offered in this wake; use another one or end the wake",
 	"tool_call_cap":               "this wake used all its tool calls; end the wake now",
 	"repeat_refused":              "this exact call already failed 3 times and was not run; change the inputs, use another tool, or end the wake",
@@ -107,7 +107,7 @@ var hints = map[string]string{
 	"post_brief":                  "a post needs hook, trend and a one-line rationale; add them and send it again",
 	"repeat_topic":                "you already posted on this story in the last 24 hours; anchor a different story or reply to someone instead",
 	"owner_note_open":             "an owner note is still open; send this post with answers_note set to its id, or reply to the note first",
-	"browser_replies_per_day":     "the daily limit of replies to feed posts is used; reply to an inbox item or post instead",
+	"browser_replies_per_day":     "the daily limit of replies through the browser is used and stays used for the rest of the wake; reply only to an inbox item or an open reply candidate (those have an api id), or post instead",
 	"api_quota_exhausted":         "Threads allows no more publishing right now; end the wake",
 	"api_quota_unreadable":        "the Threads publishing quota could not be read; end the wake and try next wake",
 	"find_args":                   "source feed takes no other argument, topic takes topic (a t ref from feed) or query, search takes query, profile takes username; send exactly those",

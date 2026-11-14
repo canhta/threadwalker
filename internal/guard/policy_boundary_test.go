@@ -49,6 +49,7 @@ type policyHarness struct {
 	clock *policyClock
 	guard *guard.Guard
 	tools *tools.Dispatcher
+	opts  tools.Options
 	calls int
 }
 
@@ -87,13 +88,21 @@ func newPolicyHarness(t *testing.T, mutate func(*config.Template)) *policyHarnes
 		t.Fatal(err)
 	}
 	clock := &policyClock{at: time.Date(2026, 11, 11, 10, 0, 0, 0, time.UTC)}
-	d, err := tools.NewDispatcher(tools.Options{Scope: guard.Scope{Store: st, Template: tmpl, WakeID: 1, Now: clock.Now}, FetchTrends: func(context.Context) ([]trends.Trend, error) {
+	h := &policyHarness{t: t, st: st, clock: clock, opts: tools.Options{Scope: guard.Scope{Store: st, Template: tmpl, WakeID: 1, Now: clock.Now}, FetchTrends: func(context.Context) ([]trends.Trend, error) {
 		return []trends.Trend{{Source: "synthetic", Title: "synthetic-trend", URL: "https://example.test/trend"}}, nil
-	}})
+	}}}
+	h.nextWake()
+	return h
+}
+
+// nextWake starts a new wake at the clock's time: a new dispatcher, so what the last one closed is open again.
+func (h *policyHarness) nextWake() {
+	h.t.Helper()
+	d, err := tools.NewDispatcher(h.opts)
 	if err != nil {
-		t.Fatal(err)
+		h.t.Fatal(err)
 	}
-	return &policyHarness{t: t, st: st, clock: clock, guard: d.Guard(), tools: d}
+	h.guard, h.tools = d.Guard(), d
 }
 
 func (h *policyHarness) call(tool string, args any) (string, error) {

@@ -6,10 +6,13 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/canhta/threadz/internal/guard"
+	"github.com/canhta/threadz/internal/quality"
 	"github.com/canhta/threadz/internal/store"
+	"github.com/canhta/threadz/internal/threads"
 	"github.com/canhta/threadz/internal/tools"
 )
 
@@ -36,10 +39,10 @@ func TestRefusalsOfDifferentTargetsNeverCloseATool(t *testing.T) {
 	}
 }
 
-// A time gate can open later in the wake, so refusing at it never closes the tool.
+// A time gate that opens within the wake can open later in it, so refusing at it never closes the tool.
 func TestTimeGatedRefusalsNeverCloseATool(t *testing.T) {
 	st, opts, _ := setup(t)
-	opts.Template.Limits.MinMinutesBetweenPosts = 60
+	opts.Template.Limits.MinMinutesBetweenPosts = 20
 	opts.Scope.Template = opts.Template
 	if _, err := st.SeedAction(context.Background(), store.SeededAction{AgentID: "agent", Kind: "post", Text: "earlier", DryRun: true, PostedAt: opts.Now()}); err != nil {
 		t.Fatal(err)
@@ -152,5 +155,78 @@ func TestPermanentToolsAreCappedPerWake(t *testing.T) {
 				t.Fatalf("reason %s", reason)
 			}
 		}
+	}
+}
+
+// #95: a post published, the next one is allowed after the wake ends. The first
+// refusal says so and closes post; the model is not left to try again.
+func TestPostSpacedPastTheWakeClosesAfterTheFirstRefusal(t *testing.T) {
+	h := newBrowserHarness(t, true, func(o *tools.Options) { o.Template.Limits.MinMinutesBetweenPosts = 120 })
+	if _, err := h.call("post", `{"text":"Synthetic first post"}`); err != nil {
+		t.Fatal(err)
+	}
+	_, err := h.call("post", `{"text":"unrelated words number2"}`)
+	if reason, hint := blockedResult(t, err); reason != "min_minutes_between_posts" || !strings.Contains(hint, "closed for the rest of the wake") {
+		t.Fatalf("first refusal: %s %q", reason, hint)
+	}
+	_, err = h.call("post", `{"text":"unrelated words number3"}`)
+	if reason, _ := blockedResult(t, err); reason != "tool_closed" || errors.Is(err, tools.ErrStallStop) {
+		t.Fatalf("second attempt: %s %v", reason, err)
+	}
+}
+
+// #95: the daily browser reply cap shuts only the browser path; replies to a
+// post with an API id still go out, and the reply tool is never closed.
+func TestBrowserReplyCapLeavesAPIRepliesOpen(t *testing.T) {
+	h := newBrowserHarness(t, true, func(o *tools.Options) { o.Template.Limits.BrowserRepliesPerDay = 1 })
+	reply := func(slug, id string) error {
+		h.next()
+		target := readRef(t, h.guard, "https://www.threads.com/@user"+slug+"/post/"+slug, id)
+		_, err := h.call("reply", `{"text":"Synthetic reply `+slug+`","target":"`+target+`"}`)
+		return err
+	}
+	if err := reply("a", ""); err != nil {
+		t.Fatal(err)
+	}
+	for _, slug := range []string{"b", "c", "d", "e"} {
+		if reason, hint := blockedResult(t, reply(slug, "")); reason != "browser_replies_per_day" || !strings.Contains(hint, "inbox item or an open reply candidate") {
+			t.Fatalf("browser reply %s: %s %q", slug, reason, hint)
+		}
+	}
+	if err := reply("f", "api-f"); err != nil {
+		t.Fatalf("api reply after the browser cap: %v", err)
+	}
+}
+
+func TestIdeasIsCappedPerWake(t *testing.T) {
+	_, opts, _ := setup(t)
+	opts.Ideas = func(context.Context, []quality.Item) ([]quality.Idea, error) { return []quality.Idea{}, nil }
+	d, err := tools.NewDispatcher(opts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i := 1; i <= 3; i++ {
+		dispatch(t, d, "ideas", "{}")
+	}
+	_, err = d.Dispatch(context.Background(), call("ideas", "{}"))
+	if reason, _ := blockedResult(t, err); reason != "limit_per_wake" {
+		t.Fatalf("4th ideas call: %s", reason)
+	}
+}
+
+// With post and reply both closed the wake ends on the call that closed the
+// last one: no model request is left to spend on reads.
+func TestWakeEndsWhenEveryWritePathIsClosed(t *testing.T) {
+	h := newBrowserHarness(t, false)
+	h.backend.Quota = threads.Quota{PostsUsed: 250, PostsTotal: 250, RepliesUsed: 1000, RepliesTotal: 1000}
+	h.next()
+	_, err := h.call("post", `{"text":"Synthetic quota post"}`)
+	if reason, _ := blockedResult(t, err); reason != "api_quota_exhausted" || errors.Is(err, tools.ErrNothingToDo) || !h.dispatch.Closed("post") {
+		t.Fatalf("post: %s %v", reason, err)
+	}
+	target := readRef(t, h.guard, "https://www.threads.com/@alice/post/a1", "api-a1")
+	_, err = h.call("reply", `{"text":"Synthetic reply","target":"`+target+`"}`)
+	if !errors.Is(err, tools.ErrNothingToDo) || errors.Is(err, tools.ErrStallStop) {
+		t.Fatalf("last write path closed: %v", err)
 	}
 }

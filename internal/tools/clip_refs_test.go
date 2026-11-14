@@ -42,7 +42,7 @@ func TestClippedFeedStillStoresEveryPostAndListsCandidates(t *testing.T) {
 	if err != nil || len(stored) != 60 {
 		t.Fatalf("stored %d posts, %v; want all 60", len(stored), err)
 	}
-	open, err := guard.OpenCandidates(context.Background(), st, opts.Template, nil, opts.Now())
+	open, err := guard.OpenCandidates(context.Background(), st, opts.Template, nil, opts.Now(), false)
 	if err != nil || len(open) != guard.MaxCandidates {
 		t.Fatalf("%d open candidates, %v; want %d", len(open), err, guard.MaxCandidates)
 	}

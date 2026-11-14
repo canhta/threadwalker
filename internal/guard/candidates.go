@@ -40,8 +40,9 @@ type Candidate struct {
 // OpenCandidates lists up to MaxCandidates open reply targets, best target
 // score first and newer first among equals. Each post's age is its age at
 // read time plus the time since, so a post that grew too old is out of the
-// window. own holds the account's own usernames.
-func OpenCandidates(ctx context.Context, st *store.Store, t config.Template, own []string, now time.Time) ([]Candidate, error) {
+// window. own holds the account's own usernames. apiOnly leaves out posts only
+// a browser read showed, which a reply could reach only through the browser.
+func OpenCandidates(ctx context.Context, st *store.Store, t config.Template, own []string, now time.Time, apiOnly bool) ([]Candidate, error) {
 	rows, err := st.SeenPostsSince(ctx, t.ID, now.Add(-CandidateWindow))
 	if err != nil {
 		return nil, err
@@ -64,7 +65,7 @@ func OpenCandidates(ctx context.Context, st *store.Store, t config.Template, own
 	}
 	var out []Candidate
 	for _, row := range rows {
-		if row.AgeMinutes == nil || answered[row.URL] || mine[row.Author] || !strings.Contains(row.URL, "/post/") {
+		if row.AgeMinutes == nil || answered[row.URL] || mine[row.Author] || (apiOnly && row.MediaID == "") || !strings.Contains(row.URL, "/post/") {
 			continue
 		}
 		age := *row.AgeMinutes + int64(max(now.Sub(row.ReadAt), 0)/time.Minute)

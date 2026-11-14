@@ -520,7 +520,7 @@ func TestOpenCandidatesLeaveOutOutsideWindowPosts(t *testing.T) {
 	dead := threads.Post{ID: "dead", Username: "synthetic_author", Text: "nobody cares", URL: "https://www.threads.com/@synthetic_author/post/dead", Likes: count(1), Replies: count(0), AgeMinutes: count(60)}
 	h.backend.Pages[threads.OpReadFeed] = threads.Page{Kind: "feed", Posts: []threads.Post{live, dead}}
 	h.mustCall("find_posts", `{"source":"feed"}`)
-	open, err := guard.OpenCandidates(context.Background(), h.store, h.opts.Template, nil, h.now)
+	open, err := guard.OpenCandidates(context.Background(), h.store, h.opts.Template, nil, h.now, false)
 	if err != nil || len(open) != 1 || len(h.guard.Seen()) != 2 {
 		t.Fatalf("open candidates %v, %v; seen %+v", open, err, h.guard.Seen())
 	}
@@ -533,7 +533,7 @@ func TestOpenCandidatesLeaveOutOutsideWindowPosts(t *testing.T) {
 		}
 	}
 	// Five hours on, the live post has aged out of the target window.
-	later, err := guard.OpenCandidates(context.Background(), h.store, h.opts.Template, nil, h.now.Add(5*time.Hour))
+	later, err := guard.OpenCandidates(context.Background(), h.store, h.opts.Template, nil, h.now.Add(5*time.Hour), false)
 	if err != nil || len(later) != 0 {
 		t.Fatalf("a post past the target window is still a candidate: %v, %v", later, err)
 	}

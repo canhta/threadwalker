@@ -463,7 +463,7 @@ func (r *Runtime) execute(ctx context.Context, wake WakeResult, phase string, ca
 			if boardErr != nil {
 				return result, boardErr
 			}
-			stopCheck = board.stopCheck(hidden, func() []string { return r.openCandidates(ctx, dispatcher.Guard()) }, r.opts.Template.Limits.MaxUSDPerDay-board.SpendToday)
+			stopCheck = board.stopCheck(dispatcher.Closed, func() []string { return r.openCandidates(ctx, dispatcher.Guard()) }, r.opts.Template.Limits.MaxUSDPerDay-board.SpendToday)
 		}
 		client, err := llm.New(r.opts.Template.LLM, r.opts.Template.Limits, r.opts.Store, dispatcher.ConfigureClient(llm.Options{StopCheck: stopCheck, Logger: r.opts.Logger, Now: r.opts.Now, Sleep: r.opts.Wait, HTTPClient: r.opts.HTTPClient, ReasoningEffort: r.opts.Template.LLM.ReasoningEffort, Phase: phase, CapUSD: capUSD, MaxSteps: maxSteps, Transcript: func(ctx context.Context, kind, body string) { r.appendTranscript(ctx, phase, result.ID, kind, body) }}))
 		if err != nil {
@@ -510,6 +510,8 @@ func wakeEndReason(err error) string {
 		return "audit_failure"
 	case errors.Is(err, tools.ErrStallStop):
 		return "stall_stop"
+	case errors.Is(err, tools.ErrNothingToDo):
+		return "nothing_to_do"
 	case errors.Is(err, tools.ErrToolCallCap):
 		return "tool_call_cap"
 	case errors.Is(err, llm.ErrStepLimit):
@@ -526,7 +528,7 @@ func wakeEndReason(err error) string {
 
 func nonFatalWakeEnd(reason string) bool {
 	switch reason {
-	case "stall_stop", "tool_call_cap", "step_limit", "budget", "action_limit", "logged_out", "captcha":
+	case "nothing_to_do", "stall_stop", "tool_call_cap", "step_limit", "budget", "action_limit", "logged_out", "captcha":
 		return true
 	}
 	return false
@@ -959,7 +961,12 @@ func NewReviewer(o ReviewerOptions, wakeID int64) Reviewer {
 // candidate meanwhile has no ref the wake could reply to. A failed read names
 // none.
 func (r *Runtime) openCandidates(ctx context.Context, g *guard.Guard) []string {
-	candidates, err := guard.OpenCandidates(ctx, r.opts.Store, r.opts.Template, r.opts.OwnUsernames, r.opts.Now())
+	now := r.opts.Now()
+	state, err := r.wakeState(ctx, now)
+	if err != nil {
+		return nil
+	}
+	candidates, err := guard.OpenCandidates(ctx, r.opts.Store, r.opts.Template, r.opts.OwnUsernames, now, state.BrowserLeft == 0)
 	if err != nil {
 		return nil
 	}

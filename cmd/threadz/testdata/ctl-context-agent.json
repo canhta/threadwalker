@@ -8,7 +8,7 @@
     },
     {
       "role": "user",
-      "content": "{\"lessons\":[],\"examples\":{\"post\":{\"top\":[],\"bottom\":[]},\"reply\":{\"top\":[],\"bottom\":[]}},\"recent\":[],\"owner_answers\":[],\"facts\":[{\"id\":\"usd_spent_today\",\"value\":0},{\"id\":\"usd_left_today\",\"value\":1},{\"id\":\"tokens_today\",\"value\":0},{\"id\":\"posts_today\",\"value\":0},{\"id\":\"replies_today\",\"value\":0}],\"remaining_usd\":1,\"counters\":{\"posts_today\":0,\"posts_limit\":3,\"replies_today\":0,\"replies_limit\":15},\"said\":[]}\n\n# Limits now (computed by code)\n- Posts: 3 of 3 left today.\n- Replies: 15 of 15 left today."
+      "content": "{\"lessons\":[],\"examples\":{\"post\":{\"top\":[],\"bottom\":[]},\"reply\":{\"top\":[],\"bottom\":[]}},\"recent\":[],\"owner_answers\":[],\"facts\":[{\"id\":\"usd_spent_today\",\"value\":0},{\"id\":\"usd_left_today\",\"value\":1},{\"id\":\"tokens_today\",\"value\":0},{\"id\":\"posts_today\",\"value\":0},{\"id\":\"replies_today\",\"value\":0}],\"remaining_usd\":1,\"counters\":{\"posts_today\":0,\"posts_limit\":3,\"replies_today\":0,\"replies_limit\":15},\"said\":[]}\n\n# Limits now (computed by code)\n- Posts: 3 of 3 left today.\n- Replies: 15 of 15 left today.\n- Browser replies (to feed posts): 0 of 0 left today; at 0, reply only to the inbox and the open reply candidates."
     }
   ]
 }

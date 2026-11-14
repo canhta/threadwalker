@@ -10,12 +10,8 @@ import (
 
 	"github.com/canhta/threadz/internal/guard"
 	"github.com/canhta/threadz/internal/store"
+	"github.com/canhta/threadz/internal/tools"
 )
-
-// maxWakeSpan is the longest a wake is expected to run. A gate that opens
-// inside it is worth keeping the tool for; one that stays shut past it is not.
-// Limit: a wake has no deadline of its own; derive this from one if it gets one.
-const maxWakeSpan = 30 * time.Minute
 
 // wakeState is what the write gates allow at the start of a wake, from the
 // guard's own helpers and the store's counts.
@@ -24,6 +20,8 @@ type wakeState struct {
 	Loc *time.Location
 	// Today's posts and replies still allowed, and the caps.
 	PostsLeft, PostsLimit, RepliesLeft, RepliesLimit int
+	// BrowserLeft is the replies still allowed today to posts only a browser read showed.
+	BrowserLeft, BrowserLimit int
 	// HourLeft is replies left in the rolling hour, HourLeftAtEnd the same when
 	// the wake ends; both are meaningless when HourLimit is 0 (off).
 	HourLeft, HourLeftAtEnd, HourLimit int
@@ -37,18 +35,19 @@ func (r *Runtime) wakeState(ctx context.Context, now time.Time) (wakeState, erro
 	t := r.opts.Template
 	l := t.Limits
 	scope := store.ActionScope{AgentID: t.ID, DryRun: t.DryRun}
-	s := wakeState{Now: now, Loc: l.Location(), PostsLimit: l.PostsPerDay, RepliesLimit: l.RepliesPerDay, HourLimit: l.RepliesPerHour}
+	s := wakeState{Now: now, Loc: l.Location(), PostsLimit: l.PostsPerDay, RepliesLimit: l.RepliesPerDay, HourLimit: l.RepliesPerHour, BrowserLimit: l.BrowserRepliesPerDay}
 	dayStart, dayEnd, _ := l.DayBounds(now)
 	today, err := r.opts.Store.CountActions(ctx, scope, dayStart, dayEnd)
 	if err != nil {
 		return s, err
 	}
 	s.PostsLeft, s.RepliesLeft = max(l.PostsPerDay-today.Posts, 0), max(l.RepliesPerDay-today.Replies, 0)
+	s.BrowserLeft = max(l.BrowserRepliesPerDay-today.BrowserReplies, 0)
 	if l.RepliesPerHour > 0 {
 		for _, w := range []struct {
 			from time.Time
 			left *int
-		}{{now.Add(-time.Hour), &s.HourLeft}, {now.Add(maxWakeSpan - time.Hour), &s.HourLeftAtEnd}} {
+		}{{now.Add(-time.Hour), &s.HourLeft}, {now.Add(tools.MaxWakeSpan - time.Hour), &s.HourLeftAtEnd}} {
 			hour, err := r.opts.Store.CountActions(ctx, scope, w.from, now.Add(time.Second))
 			if err != nil {
 				return s, err
@@ -69,12 +68,12 @@ func (r *Runtime) wakeState(ctx context.Context, now time.Time) (wakeState, erro
 
 // postClosed: no post can go out before the wake must end.
 func (s wakeState) postClosed() bool {
-	return s.PostsLeft == 0 || s.NextPost.After(s.Now.Add(maxWakeSpan))
+	return s.PostsLeft == 0 || s.NextPost.After(s.Now.Add(tools.MaxWakeSpan))
 }
 
 // replyClosed: no reply can go out before the wake must end.
 func (s wakeState) replyClosed() bool {
-	return s.RepliesLeft == 0 || (s.HourLimit > 0 && s.HourLeftAtEnd == 0) || s.RepliesPausedUntil.After(s.Now.Add(maxWakeSpan))
+	return s.RepliesLeft == 0 || (s.HourLimit > 0 && s.HourLeftAtEnd == 0) || s.RepliesPausedUntil.After(s.Now.Add(tools.MaxWakeSpan))
 }
 
 // nothingToDo: no write tool is usable, so the wake could not answer anyone either.
@@ -106,7 +105,7 @@ func (s wakeState) text() string {
 	if s.HourLimit > 0 {
 		fmt.Fprintf(&b, ", %d of %d left this hour", s.HourLeft, s.HourLimit)
 	}
-	b.WriteString(".\n")
+	fmt.Fprintf(&b, ".\n- Browser replies (to feed posts): %d of %d left today; at 0, reply only to the inbox and the open reply candidates.\n", s.BrowserLeft, s.BrowserLimit)
 	if !s.RepliesPausedUntil.IsZero() {
 		fmt.Fprintf(&b, "- Replies are paused by the breaker until %s local; posts continue.\n", s.RepliesPausedUntil.In(s.Loc).Format("15:04"))
 	}

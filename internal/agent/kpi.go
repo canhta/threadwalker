@@ -3,7 +3,6 @@ package agent
 import (
 	"context"
 	"fmt"
-	"slices"
 	"strings"
 	"time"
 
@@ -96,18 +95,18 @@ func (s scoreboard) text() string {
 // it lists the posts it read that still score well and it has not answered,
 // and what a wake owes (ideas). An agent on target is never
 // asked. The turn is sent once per wake (llm.MaxStopNudges) and imposes no
-// reply count. Empty when the stop is allowed. hidden lists tools this wake
-// does not offer.
-func (s scoreboard) stopCheck(hidden []string, open func() []string, usdLeft float64) func(called map[string]bool, succeeded map[string]int) string {
+// reply count. Empty when the stop is allowed. closed reports the tools this wake
+// does not offer or has closed; it never nudges toward one.
+func (s scoreboard) stopCheck(closed func(string) bool, open func() []string, usdLeft float64) func(called map[string]bool, succeeded map[string]int) string {
 	return func(called map[string]bool, succeeded map[string]int) string {
 		if !s.Behind() {
 			return ""
 		}
 		var todo []string
-		if !called["ideas"] && !slices.Contains(hidden, "ideas") {
+		if !called["ideas"] && !closed("ideas") {
 			todo = append(todo, "call ideas")
 		}
-		if refs := open(); len(refs) > 0 && !slices.Contains(hidden, "reply") && usdLeft >= minUSDToContinue {
+		if refs := open(); len(refs) > 0 && !closed("reply") && usdLeft >= minUSDToContinue {
 			shown := refs[:min(len(refs), guard.MaxCandidates)]
 			todo = append(todo, fmt.Sprintf("%d posts you read still score well and you have not answered them (%s); reply only to one you have a real angle for", len(refs), strings.Join(shown, ", ")))
 		}

@@ -52,6 +52,15 @@ func (*stallStop) Error() string {
 }
 func (*stallStop) TerminalToolError() bool { return true }
 
+// ErrNothingToDo marks a wake ended because post and reply are both closed:
+// a model call could only read. It is not a failure.
+var ErrNothingToDo = &nothingToDoStop{}
+
+type nothingToDoStop struct{}
+
+func (*nothingToDoStop) Error() string           { return "wake stopped: no write tool is left open" }
+func (*nothingToDoStop) TerminalToolError() bool { return true }
+
 type callCapStop struct{}
 
 func (*callCapStop) Error() string           { return "wake stopped: tool call cap reached" }
@@ -91,9 +100,15 @@ type Dispatcher struct {
 	reads        map[string]int
 	refused      map[string]int // refusals per call scope and reason
 	closed       map[string]bool
+	started      time.Time
 	calls        int // model tool calls this wake, refused ones included
 	capRefusals  int
 }
+
+// MaxWakeSpan is the longest a wake is expected to run. A gate that opens
+// inside it is worth keeping the tool for; one that stays shut past it is not.
+// Limit: a wake has no deadline of its own; derive this from one if it gets one.
+const MaxWakeSpan = 30 * time.Minute
 
 // MaxTopicReadsPerWake bounds find_posts source topic in a normal wake: each
 // opens a page in the wake's one browser.
@@ -128,6 +143,7 @@ var wakeCaps = map[string]int{
 	"notify_owner":        2,
 	"ask_owner":           1,
 	"mark_do_not_contact": 3,
+	"ideas":               3,
 }
 
 // callScope is what a refusal counter, a close and a hide apply to: the tool,
@@ -164,10 +180,12 @@ func (d *Dispatcher) countCall(name string) error {
 const closeAtRefusals = 3
 
 // uncounted are refusals the dispatcher itself raises about the wake or the
-// repeat, not about what the model asked for.
-var uncounted = []string{"tool_closed", "tool_hidden", "tool_call_cap", "repeat_refused", "stall_stop", "browser_stopped", "audit_failure"}
+// repeat, not about what the model asked for, and browser_replies_per_day: it
+// shuts only the browser reply path, never the reply tool, whose API replies stay allowed.
+var uncounted = []string{"tool_closed", "tool_hidden", "tool_call_cap", "repeat_refused", "stall_stop", "browser_stopped", "audit_failure", "browser_replies_per_day"}
 
-// timeGated refusals lift as the wake goes on; they never close a tool.
+// timeGated refusals lift at a time the refusal names: they close a tool only
+// when that is past the wake's horizon, never by counting.
 var timeGated = []string{"min_minutes_between_posts", "replies_per_hour", "min_seconds_between_actions", "reply_breaker"}
 
 // perTarget refusals are about one post or person: another target starts a new count.
@@ -178,10 +196,22 @@ var perTarget = []string{"unknown_target", "target_outside_window", "thread_per_
 // the 3rd.
 func (d *Dispatcher) countRefusal(tool, arguments string, err error) {
 	var blocked *guard.BlockedError
-	if !errors.As(err, &blocked) || slices.Contains(uncounted, blocked.Reason) || slices.Contains(timeGated, blocked.Reason) {
+	if !errors.As(err, &blocked) || slices.Contains(uncounted, blocked.Reason) {
 		return
 	}
 	scope := callScope(tool, arguments)
+	if slices.Contains(timeGated, blocked.Reason) {
+		if until, perr := time.Parse(time.RFC3339, blocked.Detail); perr == nil && until.After(d.started.Add(MaxWakeSpan)) {
+			d.closed[scope] = true
+			blocked.Next = "this tool is closed for the rest of the wake; it reopens at " + blocked.Detail
+		}
+		return
+	}
+	if blocked.Reason == "api_quota_exhausted" { // a daily window: it does not reopen today
+		d.closed[scope] = true
+		blocked.Next = "this tool is closed for the rest of the wake"
+		return
+	}
 	key := scope + "\x00" + blocked.Reason
 	if slices.Contains(perTarget, blocked.Reason) {
 		var a struct {
@@ -222,7 +252,7 @@ func NewDispatcher(opts Options) (*Dispatcher, error) {
 	if opts.FetchTrends == nil || (opts.Template.WebSearch.Enabled && opts.SearchWeb == nil) {
 		return nil, errors.New("configuring tools: injected trend and web-search fetchers required")
 	}
-	d := &Dispatcher{guard: g, opts: opts, registry: map[string]executor{}, seen: map[[32]byte]seenCall{}, reads: map[string]int{}, refused: map[string]int{}, closed: map[string]bool{}}
+	d := &Dispatcher{started: opts.Now(), guard: g, opts: opts, registry: map[string]executor{}, seen: map[[32]byte]seenCall{}, reads: map[string]int{}, refused: map[string]int{}, closed: map[string]bool{}}
 	include, avoid := opts.Template.TrendKeywords()
 	d.trendProfile = trends.TrendProfile{Include: include, Avoid: avoid}
 	d.redactor = config.NewRedactor(opts.Redactor, opts.Template)
@@ -338,6 +368,8 @@ func (d *Dispatcher) Dispatch(ctx context.Context, call llm.ToolCall) (string, e
 			block = "stall_stop"
 		} else if errors.Is(d.stopped, ErrToolCallCap) {
 			block = "tool_call_cap"
+		} else if errors.Is(d.stopped, ErrNothingToDo) {
+			block = "tool_closed"
 		} else if errors.As(d.stopped, new(*browserStop)) {
 			block = "browser_stopped"
 		} else {
@@ -426,6 +458,9 @@ func (d *Dispatcher) Dispatch(ctx context.Context, call llm.ToolCall) (string, e
 			d.stopped = ErrStallStop
 		}
 	}
+	if d.stopped == nil && !harness && d.opts.Phase == guard.PhaseAgent && d.isClosed("post") && d.isClosed("reply") {
+		d.stopped = ErrNothingToDo
+	}
 	if d.stopped != nil {
 		err = d.stopped
 	}
@@ -445,6 +480,19 @@ func (d *Dispatcher) Dispatch(ctx context.Context, call llm.ToolCall) (string, e
 	}
 	return output, err
 }
+
+// isClosed: the tool is hidden or closed for the rest of the wake. Dispatch holds d.mu.
+func (d *Dispatcher) isClosed(tool string) bool {
+	return d.closed[tool] || slices.Contains(d.opts.Hidden, tool)
+}
+
+// Closed is isClosed for the stop check, which must not nudge toward a closed tool.
+func (d *Dispatcher) Closed(tool string) bool {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	return d.isClosed(tool)
+}
+
 func (d *Dispatcher) containsSecret(raw string, a guard.Args) bool {
 	for _, value := range append(a.Texts(), raw) {
 		if d.redactor.Contains(value) {

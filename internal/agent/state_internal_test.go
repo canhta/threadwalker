@@ -9,15 +9,16 @@ import (
 
 	"github.com/canhta/threadz/internal/guard"
 	"github.com/canhta/threadz/internal/store"
+	"github.com/canhta/threadz/internal/tools"
 )
 
 func TestStopCheckNeverNudgesTowardAHiddenTool(t *testing.T) {
 	open := func() []string { return []string{"p1", "p2"} }
 	called := map[string]bool{"ideas": true}
-	if ask := behindSB.stopCheck([]string{"reply"}, open, 5)(called, nil); ask != "" {
+	if ask := behindSB.stopCheck(func(tool string) bool { return tool == "reply" }, open, 5)(called, nil); ask != "" {
 		t.Fatalf("hidden reply still asked for: %q", ask)
 	}
-	if ask := behindSB.stopCheck([]string{"ideas"}, open, 5)(nil, nil); strings.Contains(ask, "call ideas") || !strings.Contains(ask, "p1, p2") {
+	if ask := behindSB.stopCheck(func(tool string) bool { return tool == "ideas" }, open, 5)(nil, nil); strings.Contains(ask, "call ideas") || !strings.Contains(ask, "p1, p2") {
 		t.Fatalf("ask %q", ask)
 	}
 }
@@ -43,7 +44,7 @@ func TestStopCheckNamesOnlyRefsThisWakeIssued(t *testing.T) {
 	}
 	n := func(v int64) *int64 { return &v }
 	note := func(slug string) string {
-		id, err := st.NoteSeenPost(ctx, tmpl.ID, store.SeenPost{URL: "https://threads.com/@alice/post/" + slug, Author: "alice", Text: slug, Likes: n(300), Replies: n(2), AgeMinutes: n(20), ReadAt: now})
+		id, err := st.NoteSeenPost(ctx, tmpl.ID, store.SeenPost{URL: "https://threads.com/@alice/post/" + slug, Author: "alice", MediaID: "api-" + slug, Text: slug, Likes: n(300), Replies: n(2), AgeMinutes: n(20), ReadAt: now})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -69,5 +70,11 @@ func TestNothingToDoWhenNoWriteToolIsUsable(t *testing.T) {
 	}
 	if (wakeState{PostsLeft: 1}).nothingToDo() || (wakeState{RepliesLeft: 1}).nothingToDo() {
 		t.Fatal("an open write tool leaves something to do")
+	}
+}
+
+func TestNothingToDoIsNotAFailedWake(t *testing.T) {
+	if r := wakeEndReason(tools.ErrNothingToDo); r != "nothing_to_do" || !nonFatalWakeEnd(r) {
+		t.Fatalf("end reason %q", r)
 	}
 }

@@ -90,6 +90,9 @@ func (d *Dispatcher) executors() map[string]executor {
 	}
 	if d.opts.Ideas != nil {
 		tools["ideas"] = func(ctx context.Context, a arguments) (any, error) {
+			if err := d.countCall("ideas"); err != nil {
+				return nil, err
+			}
 			ideas, err := d.opts.Ideas(ctx, d.guard.Seen())
 			if err != nil {
 				return nil, errors.New("choosing ideas: failed")

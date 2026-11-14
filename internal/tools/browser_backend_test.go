@@ -748,6 +748,11 @@ func TestPublishingQuotaFromTheAPIRefusesLiveWritesBeforeAnyIntent(t *testing.T)
 	h.backend.Quota = threads.Quota{PostsUsed: 249, PostsTotal: 250}
 	h.backend.Results[threads.OpPost] = "https://threads.example/post/quota"
 	h.next()
+	d, err := tools.NewDispatcher(h.opts) // the exhausted quota closed post for the rest of that wake
+	if err != nil {
+		t.Fatal(err)
+	}
+	h.dispatch = d
 	if _, err = h.call("post", `{"text":"Synthetic quota post"}`); err != nil || h.backend.Count("post") != 1 {
 		t.Fatalf("post with quota left: err=%v", err)
 	}

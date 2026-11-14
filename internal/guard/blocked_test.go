@@ -64,14 +64,14 @@ func TestEveryReasonCodeHasAFixedHint(t *testing.T) {
 func TestPostsAreSpacedApart(t *testing.T) {
 	h := newPolicyHarness(t, func(tmpl *config.Template) {
 		tmpl.Limits.MinSecondsBetweenActions = 1
-		tmpl.Limits.MinMinutesBetweenPosts = 120
+		tmpl.Limits.MinMinutesBetweenPosts = 20
 	})
 	h.allow("post", postArgs(1))
 	h.clock.Advance(10 * time.Minute)
 	_, err := h.call("post", postArgs(2))
-	if b, hint := modelResult(t, err); b != "min_minutes_between_posts" || !strings.Contains(hint, "2026-11-11T12:00:00Z") {
+	if b, hint := modelResult(t, err); b != "min_minutes_between_posts" || !strings.Contains(hint, "2026-11-11T10:20:00Z") {
 		t.Fatalf("post spacing: %q %q", b, hint)
 	}
-	h.clock.Advance(111 * time.Minute)
+	h.clock.Advance(11 * time.Minute)
 	h.allow("post", postArgs(3))
 }

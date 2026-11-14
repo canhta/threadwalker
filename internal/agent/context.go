@@ -167,7 +167,7 @@ func (r *Runtime) wakeContext(ctx context.Context, phase string, wakeID int64, i
 	b.WriteString(state.text())
 	b.WriteString(inbox)
 	if !slices.Contains(hidden, "reply") {
-		candidates, err := guard.OpenCandidates(ctx, r.opts.Store, t, r.opts.OwnUsernames, now)
+		candidates, err := guard.OpenCandidates(ctx, r.opts.Store, t, r.opts.OwnUsernames, now, state.BrowserLeft == 0)
 		if err != nil {
 			return nil, err
 		}

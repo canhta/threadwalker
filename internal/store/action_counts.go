@@ -19,6 +19,8 @@ type ActionScope struct {
 type ActionCounts struct {
 	Posts   int
 	Replies int
+	// BrowserReplies is the replies sent through the browser, a subset of Replies.
+	BrowserReplies int
 }
 
 func (s *Store) CountActions(ctx context.Context, scope ActionScope, from, to time.Time) (ActionCounts, error) {
@@ -26,14 +28,15 @@ func (s *Store) CountActions(ctx context.Context, scope ActionScope, from, to ti
 	if scope.AgentID == "" || to.Before(from) {
 		return counts, errors.New("counting actions: invalid scope or interval")
 	}
-	rows, err := s.db.QueryContext(ctx, `SELECT kind,posted_at FROM actions WHERE agent_id=? AND dry_run=? AND failed=0`, scope.AgentID, scope.DryRun)
+	rows, err := s.db.QueryContext(ctx, `SELECT kind,posted_at,browser FROM actions WHERE agent_id=? AND dry_run=? AND failed=0`, scope.AgentID, scope.DryRun)
 	if err != nil {
 		return counts, fmt.Errorf("counting actions: %w", err)
 	}
 	defer rows.Close()
 	for rows.Next() {
 		var kind, stamp string
-		if err := rows.Scan(&kind, &stamp); err != nil {
+		var browser bool
+		if err := rows.Scan(&kind, &stamp, &browser); err != nil {
 			return counts, fmt.Errorf("reading action count: %w", err)
 		}
 		at, err := time.Parse(time.RFC3339Nano, stamp)
@@ -45,6 +48,9 @@ func (s *Store) CountActions(ctx context.Context, scope ActionScope, from, to ti
 				counts.Posts++
 			} else if kind == "reply" {
 				counts.Replies++
+				if browser {
+					counts.BrowserReplies++
+				}
 			}
 		}
 	}
