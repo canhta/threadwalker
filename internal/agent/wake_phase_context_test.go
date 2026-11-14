@@ -42,10 +42,18 @@ func TestPhaseContextsShareOwnActionsAndDifferInJob(t *testing.T) {
 	}
 }
 
-func TestSystemPromptEndsAgentWakeWithNote(t *testing.T) {
+func TestSystemPromptNeverForcesANoteAndOffersMemoryAddOnlyToTheDream(t *testing.T) {
 	tmpl := OfflineTemplate()
-	if !strings.Contains(systemPrompt(tmpl, guard.PhaseAgent), "memory_add for the one-line lessons") || strings.Contains(systemPrompt(tmpl, guard.PhaseDream), "End the wake") {
-		t.Fatal("end-of-wake rule must apply to the normal wake only")
+	for _, phase := range []string{guard.PhaseAgent, guard.PhaseDream, guard.PhaseStudy} {
+		prompt := systemPrompt(tmpl, phase)
+		for _, forced := range []string{"End the wake", "one-line lessons", "saying why", "Save what you learned"} {
+			if strings.Contains(prompt, forced) {
+				t.Errorf("%s prompt forces a write: %q", phase, forced)
+			}
+		}
+		if got := strings.Contains(prompt, "memory_add"); got != (phase == guard.PhaseDream) {
+			t.Errorf("%s prompt names memory_add = %v", phase, got)
+		}
 	}
 }
 

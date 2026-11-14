@@ -70,7 +70,7 @@ func TestDreamLessonChecks(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			st, d, logs := dreamSetup(t)
 			_, err := d.Dispatch(context.Background(), call("memory_add", tc.args))
-			index, _ := st.MemoryIndex(context.Background(), "agent")
+			index, _ := st.MemoryIndex(context.Background(), "agent", false)
 			if tc.reason == "" {
 				if err != nil || len(index) != 1 {
 					t.Fatalf("err %v index %v", err, index)
@@ -99,7 +99,7 @@ func TestDreamLessonCap(t *testing.T) {
 			t.Fatalf("lesson %d: %v", i, err)
 		}
 	}
-	if index, _ := st.MemoryIndex(context.Background(), "agent"); len(index) != guard.MaxDreamLessons {
+	if index, _ := st.MemoryIndex(context.Background(), "agent", false); len(index) != guard.MaxDreamLessons {
 		t.Fatal(index)
 	}
 }
@@ -133,11 +133,11 @@ func TestMemorySupersedeToolArchivesAndJournals(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	live, _ := st.MemoryIndex(ctx, "agent")
+	live, _ := st.MemoryIndex(ctx, "agent", false)
 	if _, err := d.Dispatch(ctx, call("memory_supersede", fmt.Sprintf(`{"old_id":%d,"new_id":%d}`, live[0].ID, live[1].ID))); err != nil {
 		t.Fatal(err)
 	}
-	if left, _ := st.MemoryIndex(ctx, "agent"); len(left) != 1 || left[0].Text != "post at 7h" {
+	if left, _ := st.MemoryIndex(ctx, "agent", false); len(left) != 1 || left[0].Text != "post at 7h" {
 		t.Fatalf("index = %v", left)
 	}
 	var wake int64

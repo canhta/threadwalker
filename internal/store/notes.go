@@ -77,7 +77,7 @@ type Memory struct {
 // reciprocal rank fusion. A nil queryVec contributes no cosine ranking, so the
 // result is the BM25 order. Zero since/until leave that side open. An empty or
 // punctuation-only query returns no hits. Limits above the cap are capped.
-func (s *Store) SearchMemory(ctx context.Context, agentID, query string, queryVec []float32, since, until time.Time, limit int) ([]MemoryHit, error) {
+func (s *Store) SearchMemory(ctx context.Context, agentID string, dryRun bool, query string, queryVec []float32, since, until time.Time, limit int) ([]MemoryHit, error) {
 	const operation = "searching agent memory"
 
 	if limit <= 0 {
@@ -98,13 +98,13 @@ func (s *Store) SearchMemory(ctx context.Context, agentID, query string, queryVe
 		to = formatStoreTimestamp(until)
 	}
 
-	lexical, err := s.bm25Hits(ctx, agentID, match, from, to)
+	lexical, err := s.bm25Hits(ctx, agentID, dryRun, match, from, to)
 	if err != nil {
 		return nil, fmt.Errorf("%s for agent %q: %w", operation, agentID, err)
 	}
 	rankings := [][]rankedHit{lexical}
 	if queryVec != nil {
-		semantic, err := s.vectorHits(ctx, agentID, queryVec, from, to)
+		semantic, err := s.vectorHits(ctx, agentID, dryRun, queryVec, from, to)
 		if err != nil {
 			return nil, fmt.Errorf("%s for agent %q: scanning embeddings: %w", operation, agentID, err)
 		}
@@ -113,14 +113,14 @@ func (s *Store) SearchMemory(ctx context.Context, agentID, query string, queryVe
 	return fuse(limit, rankings...), nil
 }
 
-func (s *Store) bm25Hits(ctx context.Context, agentID, match, from, to string) ([]rankedHit, error) {
+func (s *Store) bm25Hits(ctx context.Context, agentID string, dryRun bool, match, from, to string) ([]rankedHit, error) {
 	rows, err := s.db.QueryContext(ctx, `
 		SELECT ref, kind, snippet, at FROM (
 			SELECT 'note:' || n.id AS ref, 'note' AS kind,
 				snippet(notes_fts, 1, '[', ']', '…', 24) AS snippet,
 				n.created_at AS at, bm25(notes_fts) AS score, n.id AS id
 			FROM notes_fts JOIN notes n ON n.id = notes_fts.rowid
-			WHERE notes_fts MATCH ?1 AND n.agent_id = ?2
+			WHERE notes_fts MATCH ?1 AND n.agent_id = ?2 AND `+inMode("n", "created_at", "?6")+`
 				AND (?3 = '' OR julianday(n.created_at) >= julianday(?3))
 				AND (?4 = '' OR julianday(n.created_at) <= julianday(?4))
 			UNION ALL
@@ -134,7 +134,7 @@ func (s *Store) bm25Hits(ctx context.Context, agentID, match, from, to string) (
 		)
 		ORDER BY score, julianday(at) DESC, id DESC
 		LIMIT ?5
-	`, match, agentID, from, to, maxAgentNotesSearchLimit)
+	`, match, agentID, from, to, maxAgentNotesSearchLimit, dryRun)
 	if err != nil {
 		return nil, fmt.Errorf("querying FTS index: %w", err)
 	}

@@ -144,7 +144,7 @@ func (f *OfflineFixture) RoundTrip(req *http.Request) (*http.Response, error) {
 		calls := f.Calls
 		if calls == nil {
 			now := f.Now()
-			calls = []llm.ToolCall{SyntheticCall("read_feed", `{}`), SyntheticCall("fetch_trends", `{}`), SyntheticCall("memory_add", `{"text":"Synthetic note for the next wake."}`), SyntheticCall("post", fmt.Sprintf(`{"text":"local%d"}`, now.UnixNano()))}
+			calls = []llm.ToolCall{SyntheticCall("read_feed", `{}`), SyntheticCall("fetch_trends", `{}`), SyntheticCall("note_write", `{"topic":"synthetic","description":"Synthetic note for the next wake.","text":"Synthetic note body."}`), SyntheticCall("post", fmt.Sprintf(`{"text":"local%d"}`, now.UnixNano()))}
 			for _, tool := range raw.Tools {
 				if tool.Function.Name == "web_search" {
 					calls = append([]llm.ToolCall{SyntheticCall("web_search", `{"query":"Synthetic offline study story."}`)}, calls...)

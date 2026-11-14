@@ -79,7 +79,7 @@ The text says that pressure means more and better ideas, never lower quality: th
 | Never published | True |
 | Publish age | `max_hours_without_publish` old or older |
 
-An agent on target is never sent a stop check. A behind agent gets one extra turn per wake (`llm.MaxStopNudges` = 1) when the model stops calling tools. It names `ideas` when offered and not called, the posts the agent read that still score well and are unanswered (while budget is left; no reply count is imposed), and a `note_write` when nothing was published or noted. After that turn the wake ends whatever the model does. Replies are never required.
+An agent on target is never sent a stop check. A behind agent gets one extra turn per wake (`llm.MaxStopNudges` = 1) when the model stops calling tools. It names `ideas` when offered and not called, the posts the agent read that still score well and are unanswered (while budget is left; no reply count is imposed). After that turn the wake ends whatever the model does. Replies are never required.
 
 ## Cadence
 
@@ -104,7 +104,8 @@ The agent has no tool to schedule a wake.
 | No replay | An interrupted wake is never re-run. A `post` or `reply` with an unknown outcome is recorded as sent and never retried |
 | Stall stop | Calls are keyed by tool name and canonical arguments; the dispatcher hashes each result. A call that failed the same way 3 times is refused without running (`repeat_refused`). The wake ends (`stall_stop`) at the second refusal, or when one call returns the same successful result 10 times. A different result resets the count |
 | Result trailer | Every tool result ends with `{"steps_left": N, "usd_left": X}` (steps left and USD left under the phase's daily cap) |
-| Nudge | When the model answers with final text without having called `memory_add` or `note_write`, the loop sends one nudge ("Save what you learned with memory_add, then stop.") and never a second. It counts as a step. The stop check above rides in the same extra turn |
+| Notes | No instruction or nudge asks a wake to write memory or a note: a wake ends in text without one. It writes a topic note with `note_write` only when it learned something about a subject. `memory_add` is a dream tool only |
+| Durable text | `memory_add`, `note_write` (topic, description, text) and `strategy_write` refuse text naming a per-wake ref (`\br\d+\b`, such as `r58`): refs restart at r1 each wake and would point at another post next time (`stale_ref`). `note_write` refuses a topic that starts with an ISO date (`dated_topic`); a note is about a subject, not a day. Both reach the model as a blocked hint |
 | Browser | At most one browser per wake, started on the first `read_feed`, closed on every exit. A close failure is logged as `wake.cleanup.failed` and does not change `end_reason` ([threads.md](threads.md)) |
 | Dream lesson gate | A dream's `memory_add` lesson must cite exactly one own `action_id`. Code rejects it, logs `lesson.rejected` with a reason and writes nothing when: the id is missing or foreign (`lesson_missing_citation`, `lesson_foreign_citation`), a number is not a counter measured on that action (`lesson_number_mismatch`), a URL is not one of the agent's own action URLs (`lesson_foreign_url`), the text looks like a secret (`lesson_secret`), or the pass already accepted 6 lessons (`lesson_cap`) |
 

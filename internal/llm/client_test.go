@@ -600,33 +600,17 @@ func nudgeRun(t *testing.T, maxSteps int, replies ...string) (llm.Result, []llm.
 
 const (
 	textReply = `{"choices":[{"message":{"role":"assistant","content":"done"},"finish_reason":"stop"}],"usage":{"prompt_tokens":1,"completion_tokens":1}}`
-	noteReply = `{"choices":[{"message":{"role":"assistant","tool_calls":[{"id":"n","type":"function","function":{"name":"note_write","arguments":"{}"}}]},"finish_reason":"tool_calls"}],"usage":{"prompt_tokens":1,"completion_tokens":1}}`
 )
 
-func TestNudgeSentOnceWhenNoNoteWritten(t *testing.T) {
+func TestWakeEndingInTextWithoutANoteIsNeverNudged(t *testing.T) {
 	result, last, err := nudgeRun(t, 5, textReply, textReply)
-	nudges := 0
 	for _, m := range last {
-		if m.Role == "user" && strings.Contains(m.Content, "Save what you learned") {
-			nudges++
+		if m.Role == "user" && m.Content != "go" {
+			t.Fatalf("unexpected user message %q", m.Content)
 		}
 	}
-	if err != nil || nudges != 1 || result.Steps != 2 || result.Content != "done" {
-		t.Fatalf("nudges %d result %+v err %v", nudges, result, err)
-	}
-}
-
-func TestNoNudgeAfterNoteWritten(t *testing.T) {
-	result, last, err := nudgeRun(t, 5, noteReply, textReply)
-	if err != nil || result.Steps != 2 || last[len(last)-1].Role != "tool" {
-		t.Fatalf("result %+v last %+v err %v", result, last, err)
-	}
-}
-
-func TestNudgeCountsAgainstStepLimit(t *testing.T) {
-	_, _, err := nudgeRun(t, 1, textReply, textReply)
-	if !errors.Is(err, llm.ErrStepLimit) {
-		t.Fatalf("err %v", err)
+	if err != nil || result.Steps != 1 || result.Content != "done" {
+		t.Fatalf("result %+v err %v", result, err)
 	}
 }
 

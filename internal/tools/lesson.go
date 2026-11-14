@@ -57,6 +57,10 @@ func failureReason(err error) string {
 		return "playbook_input"
 	case errors.Is(err, errUnknownKnowledge):
 		return "unknown_knowledge"
+	case errors.Is(err, errStaleRef):
+		return "stale_ref"
+	case errors.Is(err, errDatedTopic):
+		return "dated_topic"
 	case errors.Is(err, errBudgetSpent):
 		return "budget"
 	}
@@ -68,6 +72,8 @@ func failureReason(err error) string {
 
 var (
 	errUnknownKnowledge = errors.New("unknown knowledge_id")
+	errStaleRef         = errors.New("text names a per-wake ref")
+	errDatedTopic       = errors.New("note topic starts with a date")
 	errBudgetSpent      = errors.New("daily budget spent")
 )
 
@@ -76,6 +82,7 @@ var modelFixable = map[string]bool{
 	"lesson_missing_citation": true, "lesson_foreign_citation": true, "lesson_number_mismatch": true,
 	"lesson_foreign_url": true, "lesson_secret": true, "lesson_cap": true,
 	"strategy_input": true, "playbook_input": true, "unknown_knowledge": true, "budget": true,
+	"stale_ref": true, "dated_topic": true,
 }
 
 // modelFacing gives a model-fixable failure the blocked hint the model reads.
@@ -100,9 +107,13 @@ var (
 	urlPattern    = regexp.MustCompile(`https?://[^\s)\]>"']+`)
 	numberPattern = regexp.MustCompile(`\d+(?:[.,]\d+)*`)
 	// refPattern is what a lesson may name without it being a claimed counter:
-	// an ISO date, an action or note id, and a short ref such as r69.
-	refPattern    = regexp.MustCompile(`(?i)\b\d{4}-\d{2}-\d{2}\b|\b(?:action|note)(?:_id)?[\s:#]*\d+|\br\d+\b`)
-	secretPattern = regexp.MustCompile(`sk-[A-Za-z0-9_-]{16,}|(?i:bearer\s+[A-Za-z0-9._~+/=-]{16,})|[A-Za-z0-9_-]{40,}|-----BEGIN`)
+	// an ISO date, and an action or note id.
+	refPattern = regexp.MustCompile(`(?i)\b\d{4}-\d{2}-\d{2}\b|\b(?:action|note)(?:_id)?[\s:#]*\d+`)
+	// wakeRefPattern is a short ref such as r58. Refs restart at r1 every wake, so
+	// stored text that names one points at a different post in the next wake.
+	wakeRefPattern = regexp.MustCompile(`\br\d+\b`)
+	datedTopic     = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}`)
+	secretPattern  = regexp.MustCompile(`sk-[A-Za-z0-9_-]{16,}|(?i:bearer\s+[A-Za-z0-9._~+/=-]{16,})|[A-Za-z0-9_-]{40,}|-----BEGIN`)
 )
 
 // checkLesson accepts text only when every URL is one of the agent's own
@@ -121,6 +132,16 @@ func checkLesson(text string, ev store.ActionEvidence) error {
 		v, err := strconv.ParseInt(strings.ReplaceAll(n, ",", ""), 10, 64)
 		if err != nil || strings.Contains(n, ".") || !ev.Counters[v] {
 			return errLessonNumber
+		}
+	}
+	return nil
+}
+
+// checkNoWakeRef refuses durable text that names a per-wake ref.
+func checkNoWakeRef(texts ...string) error {
+	for _, t := range texts {
+		if wakeRefPattern.MatchString(t) {
+			return errStaleRef
 		}
 	}
 	return nil

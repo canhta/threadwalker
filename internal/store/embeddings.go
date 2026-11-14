@@ -141,11 +141,11 @@ type rankedHit struct {
 
 // vectorHits ranks the agent's embedded rows by cosine similarity to query.
 // Rows whose vector has another length are skipped.
-func (s *Store) vectorHits(ctx context.Context, agentID string, query []float32, from, to string) ([]rankedHit, error) {
+func (s *Store) vectorHits(ctx context.Context, agentID string, dryRun bool, query []float32, from, to string) ([]rankedHit, error) {
 	rows, err := s.db.QueryContext(ctx, `
 		SELECT 'note:' || n.id, 'note', n.text, n.created_at, e.vector
 		FROM embeddings e JOIN notes n ON e.source = 'note' AND n.id = e.source_id
-		WHERE n.agent_id = ?1
+		WHERE n.agent_id = ?1 AND `+inMode("n", "created_at", "?4")+`
 			AND (?2 = '' OR julianday(n.created_at) >= julianday(?2))
 			AND (?3 = '' OR julianday(n.created_at) <= julianday(?3))
 		UNION ALL
@@ -153,7 +153,7 @@ func (s *Store) vectorHits(ctx context.Context, agentID string, query []float32,
 		FROM embeddings e JOIN actions a ON e.source = 'action' AND a.id = e.source_id
 		WHERE a.agent_id = ?1
 			AND (?2 = '' OR julianday(a.posted_at) >= julianday(?2))
-			AND (?3 = '' OR julianday(a.posted_at) <= julianday(?3))`, agentID, from, to)
+			AND (?3 = '' OR julianday(a.posted_at) <= julianday(?3))`, agentID, from, to, dryRun)
 	if err != nil {
 		return nil, err
 	}

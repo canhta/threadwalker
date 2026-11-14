@@ -46,7 +46,7 @@ func TestTranscriptRecordsNudgeAndStoresSystemPromptOnce(t *testing.T) {
 	if i < 1 || !slices.Contains(kinds[:i], "assistant") || !slices.Contains(kinds[i+1:], "assistant") {
 		t.Fatalf("want a user row between two assistant rows, kinds=%v", kinds)
 	}
-	if !strings.Contains(rows[i].body, "Save what you learned") || system != 1 {
+	if !strings.Contains(rows[i].body, "also [REDACTED]") || system != 1 {
 		t.Fatalf("user row %s, system prompt stored %d times", rows[i].body, system)
 	}
 }

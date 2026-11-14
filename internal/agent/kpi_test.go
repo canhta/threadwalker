@@ -138,20 +138,20 @@ func TestScoreboardOnTargetHasNoStopRule(t *testing.T) {
 	}
 }
 
-func TestBehindAgentGetsBoundedExtraTurnsWhenItStopsIdle(t *testing.T) {
+func TestBehindAgentIsNeverPressedToWriteANote(t *testing.T) {
 	r, _, fixture := kpiRuntime(t, 9*time.Hour, 3)
 	fixture.Calls = []llm.ToolCall{} // the model stops at once
 	nudges := 0
 	fixture.Observe = func(messages []llm.Message) {
 		nudges = 0
 		for _, m := range messages[2:] {
-			if m.Role == "user" && strings.Contains(m.Content, "Before you stop:") && strings.Contains(m.Content, "one-line note_write") {
+			if m.Role == "user" && strings.Contains(m.Content, "note_write") {
 				nudges++
 			}
 		}
 	}
 	wake, err := r.Wake(context.Background())
-	if err != nil || wake.EndReason != "completed" || nudges != 1 || llm.MaxStopNudges != 1 {
+	if err != nil || wake.EndReason != "completed" || nudges != 0 {
 		t.Fatalf("wake %+v err %v nudges %d", wake, err, nudges)
 	}
 }

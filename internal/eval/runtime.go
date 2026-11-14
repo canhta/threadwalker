@@ -148,9 +148,9 @@ func runRuntimeCase(ctx context.Context, c Case, p Profile, repeat int, opts Opt
 	}
 	if c.Runtime.ExpectedNote != "" {
 		messages, err := runtime.Context(ctx, "agent")
-		index, indexErr := st.MemoryIndex(ctx, tmpl.ID)
-		if err != nil || indexErr != nil || len(index) != 1 || index[0].Text != c.Runtime.ExpectedNote || !strings.Contains(messages[1].Content, c.Runtime.ExpectedNote) {
-			return fail("memory_index_missing")
+		topics, topicsErr := st.TopicList(ctx, tmpl.ID, tmpl.DryRun)
+		if err != nil || topicsErr != nil || len(topics) != 1 || topics[0].Description != c.Runtime.ExpectedNote || !strings.Contains(messages[1].Content, c.Runtime.ExpectedNote) {
+			return fail("topic_note_missing")
 		}
 	}
 	if c.Runtime.ExpectedBlocked != "" && !sawBlocked {

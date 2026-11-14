@@ -77,6 +77,8 @@ var hints = map[string]string{
 	"strategy_input":              "the strategy must be 1 to the allowed length and cite 1 or more of your own ids as action:<id> or note:<id>",
 	"playbook_input":              "the playbook entry is blank, too long, or names an unknown or decided hypothesis; fix it or skip",
 	"unknown_knowledge":           "no such knowledge_id; read knowledge_read for valid ids or omit it",
+	"stale_ref":                   "refs such as r58 only live for one wake and point at a different post next time; name the post or story in words instead",
+	"dated_topic":                 "a note topic is a subject, not a diary day; name the subject without a date, and the note replaces the older one on that subject",
 	"budget":                      "today's budget is spent; stop calling paid tools this wake",
 	"limit_per_wake":              "%s is used up for this wake; do not call it again, work with what you already read",
 	"topic_args":                  "pass exactly one of url or query; url is only the short ref (such as \"r3\") of a Threads trend that read_feed returned this wake; for a news story or anything else, pass a few words as query",

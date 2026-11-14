@@ -83,7 +83,7 @@ func TestWriteTopic_InsertsNoteAndFTS(t *testing.T) {
 		t.Fatalf("created_at = %q, want %q", createdAt, want)
 	}
 
-	hits, err := st.SearchMemory(ctx, "agent-a", "Vietnam", nil, time.Time{}, time.Time{}, 10)
+	hits, err := st.SearchMemory(ctx, "agent-a", true, "Vietnam", nil, time.Time{}, time.Time{}, 10)
 	if err != nil {
 		t.Fatalf("SearchMemory: %v", err)
 	}
@@ -101,7 +101,7 @@ func TestWriteTopic_InsertsNoteAndFTS(t *testing.T) {
 
 func searchRefs(t *testing.T, st *store.Store, agent, query string, since, until time.Time, limit int) []string {
 	t.Helper()
-	hits, err := st.SearchMemory(context.Background(), agent, query, nil, since, until, limit)
+	hits, err := st.SearchMemory(context.Background(), agent, true, query, nil, since, until, limit)
 	if err != nil {
 		t.Fatalf("SearchMemory(%q): %v", query, err)
 	}
@@ -130,7 +130,7 @@ func TestSearchMemory_PunctuationAndOperatorsNeverError(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, query := range []string{`"`, `"unterminated`, `co-op`, `a:b`, `AND`, `NOT`, `OR NEAR`, `x AND`, `(`, `*`, `^pricing`, `pricing"; DROP TABLE notes; --`, `NOT pricing`} {
-		if _, err := st.SearchMemory(context.Background(), "agent-a", query, nil, time.Time{}, time.Time{}, 10); err != nil {
+		if _, err := st.SearchMemory(context.Background(), "agent-a", true, query, nil, time.Time{}, time.Time{}, 10); err != nil {
 			t.Fatalf("SearchMemory(%q) error: %v", query, err)
 		}
 	}
@@ -142,7 +142,7 @@ func TestSearchMemory_PunctuationAndOperatorsNeverError(t *testing.T) {
 			t.Fatalf("SearchMemory(%q) = %v, want none", query, got)
 		}
 	}
-	if _, err := st.SearchMemory(context.Background(), "agent-a", "x", nil, time.Time{}, time.Time{}, 0); err == nil {
+	if _, err := st.SearchMemory(context.Background(), "agent-a", true, "x", nil, time.Time{}, time.Time{}, 0); err == nil {
 		t.Fatal("limit 0 accepted")
 	}
 }
@@ -165,7 +165,7 @@ func TestSearchMemory_RanksBetterMatchAboveNewer(t *testing.T) {
 	if want := []string{fmt.Sprintf("note:%d", tieNewer), fmt.Sprintf("note:%d", tieOlder)}; fmt.Sprint(got) != fmt.Sprint(want) {
 		t.Fatalf("tie order = %v, want newest first %v", got, want)
 	}
-	hits, _ := st.SearchMemory(ctx, "agent-a", "budget", nil, time.Time{}, time.Time{}, 10)
+	hits, _ := st.SearchMemory(ctx, "agent-a", true, "budget", nil, time.Time{}, time.Time{}, 10)
 	if len(hits) != 1 || !strings.Contains(hits[0].Snippet, "[budget]") {
 		t.Fatalf("snippet = %+v, want matched term marked", hits)
 	}
@@ -203,7 +203,7 @@ func TestSearchMemory_ActionsFiltersAndIsolation(t *testing.T) {
 		t.Fatalf("limit 2 = %v", got)
 	}
 
-	hits, _ := st.SearchMemory(ctx, "agent-a", "theatre", nil, time.Time{}, time.Time{}, 10)
+	hits, _ := st.SearchMemory(ctx, "agent-a", true, "theatre", nil, time.Time{}, time.Time{}, 10)
 	if len(hits) != 1 || hits[0].Kind != "reply" {
 		t.Fatalf("action hit = %+v, want a reply", hits)
 	}
@@ -267,7 +267,7 @@ func TestAgentNotes_RejectsCancelledContextAndClosedDB(t *testing.T) {
 	if _, err := writeNote(st, cancelled, "agent-a", "no write", at); !errors.Is(err, context.Canceled) {
 		t.Fatalf("WriteTopic with cancelled context error = %v, want context.Canceled", err)
 	}
-	if _, err := st.SearchMemory(cancelled, "agent-a", "write", nil, time.Time{}, time.Time{}, 10); !errors.Is(err, context.Canceled) {
+	if _, err := st.SearchMemory(cancelled, "agent-a", true, "write", nil, time.Time{}, time.Time{}, 10); !errors.Is(err, context.Canceled) {
 		t.Fatalf("SearchMemory with cancelled context error = %v, want context.Canceled", err)
 	}
 	if got := countRows(t, st, `SELECT COUNT(*) FROM notes`); got != 0 {
@@ -280,7 +280,7 @@ func TestAgentNotes_RejectsCancelledContextAndClosedDB(t *testing.T) {
 	if _, err := writeNote(st, ctx, "agent-a", "closed", at); err == nil {
 		t.Fatal("WriteTopic on closed store succeeded, want an error")
 	}
-	if _, err := st.SearchMemory(ctx, "agent-a", "closed", nil, time.Time{}, time.Time{}, 10); err == nil {
+	if _, err := st.SearchMemory(ctx, "agent-a", true, "closed", nil, time.Time{}, time.Time{}, 10); err == nil {
 		t.Fatal("SearchMemory on closed store succeeded, want an error")
 	}
 }

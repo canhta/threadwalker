@@ -51,6 +51,11 @@ func (d *Dispatcher) executors() map[string]executor {
 			return map[string]int64{"candidate_id": id}, nil
 		},
 		"strategy_write": func(ctx context.Context, a arguments) (any, error) {
+			err := checkNoWakeRef(a.Text("text"))
+			if err != nil {
+				d.event(ctx, logging.StrategyWritten, outcome(err), failureReason(err), "strategy_write", time.Time{})
+				return nil, fmt.Errorf("writing strategy: %w", err)
+			}
 			version, err := d.opts.Store.WriteStrategy(ctx, d.opts.Template.ID, a.Text("text"), a.TextList("citations"), d.opts.Now())
 			d.event(ctx, logging.StrategyWritten, outcome(err), failureReason(err), "strategy_write", time.Time{})
 			if err != nil {
@@ -65,10 +70,17 @@ func (d *Dispatcher) executors() map[string]executor {
 			return map[string]bool{"do_not_contact": true}, nil
 		},
 		"memory_add": func(ctx context.Context, a arguments) (any, error) {
-			if err := d.checkDreamLesson(ctx, a); err != nil {
+			err := checkNoWakeRef(a.Text("text"))
+			if err == nil {
+				err = d.checkDreamLesson(ctx, a)
+			}
+			if err != nil {
+				if errors.Is(err, errStaleRef) {
+					d.event(ctx, logging.MemoryAdded, outcome(err), failureReason(err), "memory_add", time.Time{})
+				}
 				return nil, fmt.Errorf("adding memory entry: %w", err)
 			}
-			err := d.opts.Store.AddMemoryEntry(ctx, d.opts.Template.ID, a.Text("text"), d.opts.Now(), d.memoryActor())
+			err = d.opts.Store.AddMemoryEntry(ctx, d.opts.Template.ID, a.Text("text"), d.opts.Now(), d.memoryActor())
 			d.event(ctx, logging.MemoryAdded, outcome(err), failureReason(err), "memory_add", time.Time{})
 			if err != nil {
 				return nil, fmt.Errorf("adding memory entry: %w", err)
@@ -87,7 +99,14 @@ func (d *Dispatcher) executors() map[string]executor {
 			return map[string]bool{"superseded": true}, nil
 		},
 		"note_write": func(ctx context.Context, a arguments) (any, error) {
-			id, err := d.opts.Store.WriteTopic(ctx, d.opts.Template.ID, a.Text("topic"), a.Text("description"), a.Text("text"), d.opts.Now())
+			err := checkNoWakeRef(a.Text("topic"), a.Text("description"), a.Text("text"))
+			if err == nil && datedTopic.MatchString(a.Text("topic")) {
+				err = errDatedTopic
+			}
+			var id int64
+			if err == nil {
+				id, err = d.opts.Store.WriteTopic(ctx, d.opts.Template.ID, a.Text("topic"), a.Text("description"), a.Text("text"), d.opts.Now())
+			}
 			if err == nil {
 				d.syncEmbeddings(ctx)
 			}
@@ -98,7 +117,7 @@ func (d *Dispatcher) executors() map[string]executor {
 			return map[string]any{"id": id}, nil
 		},
 		"note_search": func(ctx context.Context, a arguments) (any, error) {
-			hits, err := d.opts.Store.SearchMemory(ctx, d.opts.Template.ID, a.Text("query"), d.embedQuery(ctx, a.Text("query")), a.Time("since"), a.Time("until"), int(a.Int("limit")))
+			hits, err := d.opts.Store.SearchMemory(ctx, d.opts.Template.ID, d.opts.Template.DryRun, a.Text("query"), d.embedQuery(ctx, a.Text("query")), a.Time("since"), a.Time("until"), int(a.Int("limit")))
 			d.event(ctx, logging.NoteSearched, outcome(err), failureReason(err), "note_search", time.Time{})
 			if err != nil {
 				return nil, fmt.Errorf("searching agent notes: %w", err)

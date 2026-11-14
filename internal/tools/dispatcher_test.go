@@ -71,7 +71,7 @@ func dispatch(t *testing.T, d *tools.Dispatcher, name, args string) string {
 func TestDefinitionsAndConstructor(t *testing.T) {
 	_, opts, d := setup(t)
 	defs := d.Definitions()
-	if len(defs) != 20 {
+	if len(defs) != 19 {
 		t.Fatalf("definitions %d", len(defs))
 	}
 	names := map[string]bool{}
@@ -135,9 +135,8 @@ func TestNotes(t *testing.T) {
 	if out := dispatch(t, d, "note_read", `{"ref":"topic:robots"}`); !strings.Contains(out, "remember deterministic robots") {
 		t.Fatal(out)
 	}
-	dispatch(t, d, "memory_add", `{"text":"robots topic holds the plan"}`)
-	if index, _ := st.MemoryIndex(context.Background(), "agent"); len(index) != 1 || index[0].Text != "robots topic holds the plan" {
-		t.Fatal(index)
+	if _, err := d.Dispatch(context.Background(), call("memory_add", `{"text":"robots topic holds the plan"}`)); err == nil || !strings.Contains(err.Error(), "phase_read_only") {
+		t.Fatalf("an agent wake wrote memory: %v", err)
 	}
 	out := dispatch(t, d, "note_search", `{"query":"robots"}`)
 	if !strings.Contains(out, "remember deterministic [robots]") || !strings.Contains(out, `"ref":"note:1"`) {

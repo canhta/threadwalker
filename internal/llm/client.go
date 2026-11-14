@@ -198,14 +198,8 @@ func New(cfg config.LLMConfig, limits config.LimitsConfig, ledger Ledger, opts O
 	return &Client{logger: opts.Logger, providerID: opts.ProviderID, profileID: opts.ProfileID, config: cfg, redactor: config.NewRedactor(cfg, opts.Redactor), limits: limits, http: opts.HTTPClient, now: opts.Now, timeout: opts.RequestTimeout, ledger: ledger, sleep: opts.Sleep, jitter: opts.Jitter, outputLimit: opts.MaxCompletionTokens, reasoning: opts.ReasoningEffort, adapter: adapter, phase: phase, capUSD: capUSD, maxSteps: maxSteps, stopCheck: opts.StopCheck, transcript: opts.Transcript}, nil
 }
 
-// noteTools are the memory writes that count as leaving a note for the next wake.
-var noteTools = map[string]bool{"memory_add": true, "note_write": true}
-
 // MaxStopNudges bounds the extra turns a run gets when it stops early.
 const MaxStopNudges = 1
-
-// nudgeText is the single reminder sent when a wake ends in text without a note.
-const nudgeText = "Save what you learned with memory_add, then stop."
 
 // completion is a provider response decoded by its adapter. raw holds the
 // provider's bytes for the audit of a refused response; they are never re-encoded.
@@ -252,7 +246,7 @@ func (c *Client) Run(ctx context.Context, agentID string, wakeID int64, messages
 		result.Messages[i] = c.redactMessage(message)
 	}
 	c.recordContext(ctx, result.Messages)
-	nudges, noted := 0, false
+	nudges := 0
 	called, succeeded := map[string]bool{}, map[string]int{}
 	for result.Steps < c.maxSteps {
 		requestIndex++
@@ -307,19 +301,10 @@ func (c *Client) Run(ctx context.Context, agentID string, wakeID int64, messages
 			if response.FinishReason != "stop" {
 				return result, failure("reading chat response", "incomplete_response", nil)
 			}
-			if nudges < MaxStopNudges {
-				var asks []string
-				if (known["memory_add"] || known["note_write"]) && !noted && nudges == 0 {
-					asks = append(asks, nudgeText)
-				}
-				if c.stopCheck != nil {
-					if ask := c.stopCheck(called, succeeded); ask != "" {
-						asks = append(asks, ask)
-					}
-				}
-				if len(asks) > 0 {
+			if nudges < MaxStopNudges && c.stopCheck != nil {
+				if ask := c.stopCheck(called, succeeded); ask != "" {
 					nudges++
-					nudge := Message{Role: "user", Content: strings.Join(asks, " ")}
+					nudge := Message{Role: "user", Content: ask}
 					result.Messages = append(result.Messages, nudge)
 					c.recordUser(ctx, nudge)
 					continue
@@ -363,7 +348,6 @@ func (c *Client) Run(ctx context.Context, agentID string, wakeID int64, messages
 				level = slog.LevelError
 			}
 			logging.Emit(ctx, c.logger, level, logging.Record{Event: logging.LLMToolFinished, AgentID: agentID, Phase: c.phase, WakeID: wakeID, Request: requestIndex, ToolCallID: fmt.Sprintf("%d/%d", wakeID, result.Steps), Tool: safeTool, ProviderID: c.providerID, ProfileID: c.profileID, Model: c.config.Model, Protocol: c.config.Protocol, Operation: "dispatch", Outcome: outcome, Reason: reason, DurationMS: c.now().Sub(toolStarted).Milliseconds(), Steps: result.Steps})
-			noted = noted || noteTools[safeTool] && toolErr == nil
 			called[safeTool] = true
 			if toolErr == nil {
 				succeeded[safeTool]++

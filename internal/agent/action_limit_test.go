@@ -34,7 +34,7 @@ func TestDailyActionLimitStopsWakeBeforeFurtherTools(t *testing.T) {
 	if err != nil || wake.EndReason != "action_limit" {
 		t.Fatalf("wake %+v err %v", wake, err)
 	}
-	index, err := st.MemoryIndex(ctx, tmpl.ID)
+	index, err := st.MemoryIndex(ctx, tmpl.ID, false)
 	if err != nil || len(index) != 0 {
 		t.Fatalf("continued after cap %v %v", index, err)
 	}

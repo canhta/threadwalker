@@ -228,7 +228,7 @@ func TestRuntimeCLIOnceOfflineWakePersistsCompletedAudit(t *testing.T) {
 	if auditRows < 4 {
 		t.Errorf("tool call audit rows = %d, want at least 4", auditRows)
 	}
-	for _, want := range []string{"read_feed", "fetch_trends", "memory_add", "post"} {
+	for _, want := range []string{"read_feed", "fetch_trends", "note_write", "post"} {
 		if !seenTools[want] {
 			t.Errorf("tool call audit rows do not include %q; got %v", want, seenTools)
 		}
@@ -259,8 +259,8 @@ func TestRuntimeCLIOnceOfflineWakePersistsCompletedAudit(t *testing.T) {
 	if err := st.DB().QueryRow(`SELECT next_wake_at FROM agents WHERE id=?`, agentID).Scan(&nextWakeRaw); err != nil {
 		t.Fatalf("reading agent next_wake_at: %v", err)
 	}
-	if index, err := st.MemoryIndex(context.Background(), agentID); err != nil || len(index) != 1 || index[0].Text != runtimeCLINoteText {
-		t.Errorf("memory index = %v, %v; want the entry written during the wake %q", index, err, runtimeCLINoteText)
+	if topics, err := st.TopicList(context.Background(), agentID, true); err != nil || len(topics) != 1 || topics[0].Description != runtimeCLINoteText {
+		t.Errorf("topics = %v, %v; want the note written during the wake %q", topics, err, runtimeCLINoteText)
 	}
 	nextWake, err := time.Parse(time.RFC3339Nano, nextWakeRaw)
 	if err != nil {
@@ -365,8 +365,8 @@ func TestRuntimeCLIOfflineLogsOmitTemplateAndNoteValues(t *testing.T) {
 	}
 
 	st := runtimeCLIOpen(t, dbPath)
-	if got := runtimeCLICount(t, st, `SELECT COUNT(*) FROM memory_index WHERE text=? AND archived_at IS NULL`, runtimeCLINoteText); got != 1 {
-		t.Fatalf("live memory entries matching the scripted note = %d, want 1", got)
+	if got := runtimeCLICount(t, st, `SELECT COUNT(*) FROM notes WHERE description=?`, runtimeCLINoteText); got != 1 {
+		t.Fatalf("topic notes matching the scripted note = %d, want 1", got)
 	}
 
 	records := runtimeCLIDecodeLogs(t, stdout)

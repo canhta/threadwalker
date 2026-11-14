@@ -72,7 +72,7 @@ flowchart TD
 | `invalid_hypothesis` | More than 5, duplicate, foreign or decided `hypothesis_ids` | code | reserve |
 | `explore_budget` | Explore share would exceed `limits.explore_percent` of the newest 20 own actions, counting the new one | template | reserve |
 
-Dashboard-only codes: failed `memory_add` reasons `lesson_*` ([wake.md](wake.md)) show as "blocked", not as guard codes.
+Dashboard-only codes: failed `memory_add` reasons `lesson_*`, and `stale_ref` and `dated_topic` of `memory_add`, `note_write` and `strategy_write` ([wake.md](wake.md)) show as "blocked", not as guard codes.
 
 ## Rules behind several codes
 

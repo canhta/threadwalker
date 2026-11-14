@@ -145,11 +145,11 @@ func TestSearchMemory_FusesSemanticAndLexicalRankings(t *testing.T) {
 	saveVector(t, st, store.EmbeddingNote, odd, "harbor wrong dimension", []float32{1, 0, 0})
 	var none time.Time
 
-	bm25, err := st.SearchMemory(ctx, "a", "harbor", nil, none, none, 10)
+	bm25, err := st.SearchMemory(ctx, "a", true, "harbor", nil, none, none, 10)
 	if err != nil || refList(bm25) != "note:"+itoa(odd)+",note:"+itoa(lexical) && refList(bm25) != "note:"+itoa(lexical)+",note:"+itoa(odd) {
 		t.Fatalf("nil vector = %v, %v; want the BM25 hits only", refList(bm25), err)
 	}
-	hits, err := st.SearchMemory(ctx, "a", "harbor", []float32{1, 0}, none, none, 10)
+	hits, err := st.SearchMemory(ctx, "a", true, "harbor", []float32{1, 0}, none, none, 10)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -171,15 +171,15 @@ func TestSearchMemory_FusesSemanticAndLexicalRankings(t *testing.T) {
 		}
 	}
 
-	late, _ := st.SearchMemory(ctx, "a", "harbor", []float32{1, 0}, embedAt.Add(30*time.Minute), none, 10)
+	late, _ := st.SearchMemory(ctx, "a", true, "harbor", []float32{1, 0}, embedAt.Add(30*time.Minute), none, 10)
 	if strings.Contains(refList(late), "note:"+itoa(lexical)) {
 		t.Fatalf("since bound ignored for notes: %s", refList(late))
 	}
-	early, _ := st.SearchMemory(ctx, "a", "harbor", []float32{1, 0}, none, embedAt.Add(90*time.Minute), 10)
+	early, _ := st.SearchMemory(ctx, "a", true, "harbor", []float32{1, 0}, none, embedAt.Add(90*time.Minute), 10)
 	if strings.Contains(refList(early), "action:") {
 		t.Fatalf("until bound ignored for actions: %s", refList(early))
 	}
-	one, _ := st.SearchMemory(ctx, "a", "harbor", []float32{1, 0}, none, none, 1)
+	one, _ := st.SearchMemory(ctx, "a", true, "harbor", []float32{1, 0}, none, none, 1)
 	if len(one) != 1 {
 		t.Fatalf("limit ignored: %v", one)
 	}
@@ -194,7 +194,7 @@ func TestSearchMemory_FusionTiesGoToTheNewest(t *testing.T) {
 	saveVector(t, st, store.EmbeddingNote, old, "alpha", []float32{1, 0})
 	saveVector(t, st, store.EmbeddingNote, recent, "beta", []float32{0, 1})
 	// "alpha" ranks first lexically and "beta" first semantically: equal scores.
-	hits, err := st.SearchMemory(ctx, "a", "alpha beta", []float32{0, 1}, time.Time{}, time.Time{}, 10)
+	hits, err := st.SearchMemory(ctx, "a", true, "alpha beta", []float32{0, 1}, time.Time{}, time.Time{}, 10)
 	if err != nil || refList(hits) != "note:"+itoa(recent)+",note:"+itoa(old) {
 		t.Fatalf("hits = %v, %v; want the newest first on a tie", refList(hits), err)
 	}

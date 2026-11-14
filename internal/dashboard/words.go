@@ -109,7 +109,7 @@ var blockedReasons = []string{
 	"persistence_error", "unknown_outcome", "browser_error", "timeout",
 	"malformed_page", "unknown_page", "error",
 	"lesson_missing_citation", "lesson_foreign_citation", "lesson_number_mismatch",
-	"lesson_foreign_url", "lesson_secret", "lesson_cap",
+	"lesson_foreign_url", "lesson_secret", "lesson_cap", "stale_ref", "dated_topic",
 }
 
 var blockedLabels = map[string]string{
@@ -176,6 +176,8 @@ var blockedLabels = map[string]string{
 	"lesson_foreign_url":          "Lesson link not its own",
 	"lesson_secret":               "Lesson looks like a secret",
 	"lesson_cap":                  "Lesson limit",
+	"stale_ref":                   "Text names a per-wake ref",
+	"dated_topic":                 "Note topic starts with a date",
 }
 
 // failureReasons is the fixed vocabulary of a failed step's reason code.

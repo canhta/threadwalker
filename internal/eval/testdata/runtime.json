@@ -16,8 +16,8 @@
           {
             "type": "function",
             "function": {
-              "name": "memory_add",
-              "arguments": "{\"text\": \"Synthetic persistent self note.\"}"
+              "name": "note_write",
+              "arguments": "{\"topic\": \"synthetic\", \"description\": \"Synthetic persistent self note.\", \"text\": \"Synthetic note body.\"}"
             }
           },
           {
@@ -37,7 +37,7 @@
         "tools": [
           "read_own_metrics",
           "read_feed",
-          "memory_add",
+          "note_write",
           "post"
         ]
       }

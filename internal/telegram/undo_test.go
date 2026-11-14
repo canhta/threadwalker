@@ -136,7 +136,7 @@ func TestRestoreListsAndRestoresMemoryAndStrategy(t *testing.T) {
 	if got := send(77, 3, "/restore m1"); got != "Restored" {
 		t.Fatalf("memory: %s", got)
 	}
-	if mem, err := st.MemoryIndex(ctx, "one"); err != nil || len(mem) != 1 || mem[0].Text != "old fact" {
+	if mem, err := st.MemoryIndex(ctx, "one", false); err != nil || len(mem) != 1 || mem[0].Text != "old fact" {
 		t.Fatalf("memory=%+v err=%v", mem, err)
 	}
 	if got := send(77, 4, "/restore s1"); got != "Restored" {

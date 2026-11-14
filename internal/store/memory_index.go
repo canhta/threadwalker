@@ -289,9 +289,20 @@ func (s *Store) MemoryJournal(ctx context.Context, agentID string, limit int) ([
 	return out, rows.Err()
 }
 
-// MemoryIndex returns the agent's live index entries, oldest first.
-func (s *Store) MemoryIndex(ctx context.Context, agentID string) ([]MemoryEntry, error) {
-	rows, err := s.db.QueryContext(ctx, `SELECT id, text FROM memory_index WHERE agent_id = ? AND archived_at IS NULL ORDER BY id`, agentID)
+// inMode is the SQL condition that a row stamped by alias.at was written in the
+// mode bound as the given placeholder. Rows carry no mode of their own, so it is
+// the mode of the agent's latest action at or before the row, else of its first
+// action, else the asked mode (an agent that never acted keeps all rows). A row
+// written after a mode change and before the next action takes the old mode.
+func inMode(alias, at, param string) string {
+	row := "(SELECT m.dry_run FROM actions m WHERE m.agent_id = " + alias + ".agent_id AND julianday(m.posted_at) %s julianday(" + alias + "." + at + ") ORDER BY julianday(m.posted_at) %s, m.id %s LIMIT 1)"
+	return "COALESCE(" + fmt.Sprintf(row, "<=", "DESC", "DESC") + ", " + fmt.Sprintf(row, ">", "ASC", "ASC") + ", " + param + ") = " + param
+}
+
+// MemoryIndex returns the agent's live index entries written in the given mode
+// (dry-run or live), oldest first.
+func (s *Store) MemoryIndex(ctx context.Context, agentID string, dryRun bool) ([]MemoryEntry, error) {
+	rows, err := s.db.QueryContext(ctx, `SELECT x.id, x.text FROM memory_index x WHERE x.agent_id = ?1 AND x.archived_at IS NULL AND `+inMode("x", "created_at", "?2")+` ORDER BY x.id`, agentID, dryRun)
 	if err != nil {
 		return nil, fmt.Errorf("reading memory index for agent %q: %w", agentID, err)
 	}
@@ -318,11 +329,11 @@ type TopicSummary struct {
 	Description string `json:"description,omitempty"`
 }
 
-// TopicList returns the agent's topic notes, most recently written first, cut
+// TopicList returns the agent's topic notes written in the given mode, most recently written first, cut
 // at MaxTopicList topics and MaxTopicListRunes characters of names and
 // descriptions. Bodies are never included.
-func (s *Store) TopicList(ctx context.Context, agentID string) ([]TopicSummary, error) {
-	rows, err := s.db.QueryContext(ctx, `SELECT topic, description FROM notes WHERE agent_id = ? AND topic <> '' ORDER BY julianday(created_at) DESC, id DESC LIMIT ?`, agentID, MaxTopicList)
+func (s *Store) TopicList(ctx context.Context, agentID string, dryRun bool) ([]TopicSummary, error) {
+	rows, err := s.db.QueryContext(ctx, `SELECT x.topic, x.description FROM notes x WHERE x.agent_id = ?1 AND x.topic <> '' AND `+inMode("x", "created_at", "?2")+` ORDER BY julianday(x.created_at) DESC, x.id DESC LIMIT ?3`, agentID, dryRun, MaxTopicList)
 	if err != nil {
 		return nil, fmt.Errorf("listing topics for agent %q: %w", agentID, err)
 	}

@@ -35,7 +35,7 @@ func (r *Runtime) withRecall(ctx context.Context, phase string, wakeID int64, em
 	} else {
 		vec = vectors[0]
 	}
-	hits, err := r.opts.Store.SearchMemory(ctx, r.opts.Template.ID, query, vec, time.Time{}, time.Time{}, recallMaxHits*2)
+	hits, err := r.opts.Store.SearchMemory(ctx, r.opts.Template.ID, r.opts.Template.DryRun, query, vec, time.Time{}, time.Time{}, recallMaxHits*2)
 	if err != nil {
 		return messages
 	}

@@ -72,7 +72,7 @@ func runIsolationCaptured(ctx context.Context, c Case, p Profile, repeat int, op
 			tmpl.SeedPlaybook = []string{private[i]}
 			tmpl.LLM.Protocol = p.Config.Protocol
 			fixture := agent.NewOfflineFixture(clock)
-			fixture.Calls = []llm.ToolCall{agent.SyntheticCall("memory_add", string(isolationJSON(map[string]string{"text": private[i]})))}
+			fixture.Calls = []llm.ToolCall{agent.SyntheticCall("note_write", string(isolationJSON(map[string]string{"topic": "isolation", "description": private[i], "text": private[i]})))}
 			runtime, err := agent.New(agent.Options{Store: st, Template: *tmpl, Now: clock, Logger: logger, HTTPClient: fixture.Client(), FetchTrends: fixture.Trends, FetchStudy: fixture.Study})
 			if err != nil {
 				return r
@@ -188,11 +188,11 @@ func runIsolationCaptured(ctx context.Context, c Case, p Profile, repeat int, op
 		if err = scheduler.Run(ctx, true); err != nil {
 			return r
 		}
-		indexA, err := st.MemoryIndex(ctx, templates[0].ID)
+		indexA, err := st.TopicList(ctx, templates[0].ID, templates[0].DryRun)
 		if err != nil {
 			return r
 		}
-		indexB, err := st.MemoryIndex(ctx, templates[1].ID)
+		indexB, err := st.TopicList(ctx, templates[1].ID, templates[1].DryRun)
 		if err != nil {
 			return r
 		}
@@ -204,7 +204,7 @@ func runIsolationCaptured(ctx context.Context, c Case, p Profile, repeat int, op
 		if err != nil {
 			return r
 		}
-		if len(indexA) != 0 || len(indexB) != 1 || indexB[0].Text != private[1] || ua.CostUSD != 1 || ub.CostUSD <= 0 {
+		if len(indexA) != 0 || len(indexB) != 1 || indexB[0].Description != private[1] || ua.CostUSD != 1 || ub.CostUSD <= 0 {
 			return fail("state_budget_cross_agent")
 		}
 	case "own_accounts":

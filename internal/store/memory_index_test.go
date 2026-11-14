@@ -31,7 +31,7 @@ func TestMemoryIndex_LineBudgetArchivesOldest(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	got, err := st.MemoryIndex(ctx, "a")
+	got, err := st.MemoryIndex(ctx, "a", false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -41,7 +41,7 @@ func TestMemoryIndex_LineBudgetArchivesOldest(t *testing.T) {
 	if n := countRows(t, st, `SELECT COUNT(*) FROM memory_index WHERE agent_id='a' AND archived_at IS NOT NULL`); n != 3 {
 		t.Fatalf("archived rows = %d, want the 3 oldest kept, not deleted", n)
 	}
-	if other, _ := st.MemoryIndex(ctx, "b"); len(other) != 1 {
+	if other, _ := st.MemoryIndex(ctx, "b", false); len(other) != 1 {
 		t.Fatalf("other agent's index = %v, want untouched", other)
 	}
 }
@@ -58,7 +58,7 @@ func TestMemoryIndex_ByteBudgetArchivesOldest(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	got, _ := st.MemoryIndex(ctx, "a")
+	got, _ := st.MemoryIndex(ctx, "a", false)
 	size := 0
 	for _, e := range got {
 		size += len(e.Text)
@@ -79,7 +79,7 @@ func TestMemoryIndex_MultiLineEntriesCountLines(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	if got, _ := st.MemoryIndex(ctx, "a"); len(got) != store.MaxIndexLines/store.MaxEntryLines {
+	if got, _ := st.MemoryIndex(ctx, "a", false); len(got) != store.MaxIndexLines/store.MaxEntryLines {
 		t.Fatalf("index = %d entries, want %d", len(got), store.MaxIndexLines/store.MaxEntryLines)
 	}
 }
@@ -119,7 +119,7 @@ func TestMemoryIndex_ClosedStoreErrors(t *testing.T) {
 	if err := st.AddMemoryEntry(ctx, "a", "x", indexAt, store.MemoryActor{}); err == nil {
 		t.Error("AddMemoryEntry on closed store succeeded")
 	}
-	if _, err := st.MemoryIndex(ctx, "a"); err == nil {
+	if _, err := st.MemoryIndex(ctx, "a", false); err == nil {
 		t.Error("MemoryIndex on closed store succeeded")
 	}
 }
@@ -149,10 +149,10 @@ func TestTopics_WriteReplaceRead(t *testing.T) {
 	if byID, err := st.ReadMemory(ctx, "a", fmt.Sprintf("note:%d", first)); err != nil || byID.Text != mem.Text {
 		t.Fatalf("ReadMemory(note:id) = %+v, %v", byID, err)
 	}
-	if hits, _ := st.SearchMemory(ctx, "a", "roast", nil, time.Time{}, time.Time{}, 5); len(hits) != 1 {
+	if hits, _ := st.SearchMemory(ctx, "a", false, "roast", nil, time.Time{}, time.Time{}, 5); len(hits) != 1 {
 		t.Fatalf("search after rewrite = %v, want the new text indexed", hits)
 	}
-	if hits, _ := st.SearchMemory(ctx, "a", "plain", nil, time.Time{}, time.Time{}, 5); len(hits) != 0 {
+	if hits, _ := st.SearchMemory(ctx, "a", false, "plain", nil, time.Time{}, time.Time{}, 5); len(hits) != 0 {
 		t.Fatalf("search after rewrite = %v, want the old text gone", hits)
 	}
 	if _, err := st.ReadMemory(ctx, "a", "topic:nope"); !errors.Is(err, sql.ErrNoRows) {
@@ -212,7 +212,7 @@ func TestMemoryIndexBudgetMeasurement(t *testing.T) {
 				t.Fatal(err)
 			}
 		}
-		got, _ := st.MemoryIndex(ctx, "a")
+		got, _ := st.MemoryIndex(ctx, "a", false)
 		for _, e := range got {
 			bytes += len(e.Text)
 		}
@@ -254,7 +254,7 @@ func TestTopicList_NewestFirstAndBounded(t *testing.T) {
 	}
 	st.DB().ExecContext(ctx, `INSERT INTO notes(agent_id,text,created_at) VALUES('a','untitled note',?)`, indexAt.Format(time.RFC3339Nano))
 
-	got, err := st.TopicList(ctx, "a")
+	got, err := st.TopicList(ctx, "a", false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -268,7 +268,7 @@ func TestTopicList_NewestFirstAndBounded(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	got, _ = st.TopicList(ctx, "a")
+	got, _ = st.TopicList(ctx, "a", false)
 	if len(got) != store.MaxTopicList || got[0].Topic != fmt.Sprintf("t%02d", store.MaxTopicList+4) {
 		t.Fatalf("TopicList = %d entries starting at %q, want the newest %d", len(got), got[0].Topic, store.MaxTopicList)
 	}
@@ -276,7 +276,7 @@ func TestTopicList_NewestFirstAndBounded(t *testing.T) {
 	for i := range got {
 		st.DB().ExecContext(ctx, `UPDATE notes SET description=? WHERE agent_id='a' AND topic=?`, strings.Repeat("d", 200), got[i].Topic)
 	}
-	got, _ = st.TopicList(ctx, "a")
+	got, _ = st.TopicList(ctx, "a", false)
 	chars := 0
 	for _, g := range got {
 		chars += utf8.RuneCountInString(g.Topic) + utf8.RuneCountInString(g.Description)
@@ -298,7 +298,7 @@ func TestMemoryUpkeep(t *testing.T) {
 		}
 	}
 	texts := func() (out []string) {
-		got, _ := st.MemoryIndex(ctx, "a")
+		got, _ := st.MemoryIndex(ctx, "a", false)
 		for _, e := range got {
 			out = append(out, e.Text)
 		}
@@ -322,9 +322,9 @@ func TestMemoryUpkeep(t *testing.T) {
 		t.Fatalf("expired entry still live: %q %v", texts(), err)
 	}
 
-	live, _ := st.MemoryIndex(ctx, "a")
+	live, _ := st.MemoryIndex(ctx, "a", false)
 	add("post at 7h")
-	live, _ = st.MemoryIndex(ctx, "a")
+	live, _ = st.MemoryIndex(ctx, "a", false)
 	if err := st.SupersedeMemory(ctx, "a", live[1].ID, live[0].ID, indexAt, by); err == nil {
 		t.Fatal("superseding the newer entry with the older one was accepted")
 	}
@@ -367,7 +367,7 @@ func TestSupersedeCapIsAFifthPerWake(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	live, _ := st.MemoryIndex(ctx, "a")
+	live, _ := st.MemoryIndex(ctx, "a", false)
 	newest := live[9].ID
 	for i, wantErr := range []bool{false, false, true} {
 		err := st.SupersedeMemory(ctx, "a", live[i].ID, newest, indexAt, by)
@@ -377,5 +377,47 @@ func TestSupersedeCapIsAFifthPerWake(t *testing.T) {
 	}
 	if err := st.SupersedeMemory(ctx, "a", live[3].ID, newest, indexAt, store.MemoryActor{WakeID: 4, Phase: "dream"}); err != nil {
 		t.Fatalf("a later wake has its own cap: %v", err)
+	}
+}
+
+// Memory and notes carry no mode of their own: a row takes the mode of the
+// agent's latest action before it, so dry-run text never loads into a live wake.
+func TestMemoryAndNotesLoadOnlyInTheModeTheyWereWrittenIn(t *testing.T) {
+	ctx := context.Background()
+	st := openNotesTestStore(t)
+	insertNotesTestAgent(t, st, "a")
+	at := func(h int) time.Time { return indexAt.Add(time.Duration(h) * time.Hour) }
+	for _, a := range []struct {
+		dry bool
+		h   int
+	}{{true, 1}, {false, 10}} {
+		if _, err := st.SeedAction(ctx, store.SeededAction{AgentID: "a", Kind: "post", Text: "p", DryRun: a.dry, PostedAt: at(a.h)}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, e := range []struct {
+		text string
+		h    int
+	}{{"dry fact", 2}, {"live fact", 11}} {
+		if err := st.AddMemoryEntry(ctx, "a", e.text, at(e.h), store.MemoryActor{}); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := st.WriteTopic(ctx, "a", e.text, "", e.text+" harbor", at(e.h)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for dry, want := range map[bool]string{true: "dry fact", false: "live fact"} {
+		index, err := st.MemoryIndex(ctx, "a", dry)
+		if err != nil || len(index) != 1 || index[0].Text != want {
+			t.Errorf("dry=%v index %v err %v, want only %q", dry, index, err, want)
+		}
+		topics, err := st.TopicList(ctx, "a", dry)
+		if err != nil || len(topics) != 1 || topics[0].Topic != want {
+			t.Errorf("dry=%v topics %v err %v, want only %q", dry, topics, err, want)
+		}
+		hits, err := st.SearchMemory(ctx, "a", dry, "harbor", nil, time.Time{}, time.Time{}, 10)
+		if err != nil || len(hits) != 1 || !strings.Contains(hits[0].Snippet, strings.Fields(want)[0]) {
+			t.Errorf("dry=%v search %v err %v, want only %q", dry, hits, err, want)
+		}
 	}
 }

@@ -45,7 +45,7 @@ func TestWakeReadsWritesDryRunAndSchedules(t *testing.T) {
 		t.Fatal(err)
 	}
 	const memory = "Synthetic note for the next wake."
-	if index, _ := st.MemoryIndex(ctx, "synthetic-offline"); len(index) != 1 || index[0].Text != memory || !state.NextWake.Equal(now.Add(time.Hour)) {
+	if topics, _ := st.TopicList(ctx, "synthetic-offline", true); len(topics) != 1 || topics[0].Description != memory || !state.NextWake.Equal(now.Add(time.Hour)) {
 		t.Fatalf("%+v", state)
 	}
 	var count int

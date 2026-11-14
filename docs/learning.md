@@ -23,8 +23,8 @@ flowchart LR
 
 | Store | Tools | Bounds |
 |---|---|---|
-| Memory index | `memory_add`, `memory_supersede` | Entry at most 500 characters and 5 lines. Index at most 60 lines and 6 KiB of live entries (`TestMemoryIndexBudgetMeasurement`: the byte cap binds first, leaving 45 entries of about 130 bytes, or 4 of the longest allowed). The only memory loaded into a wake, each live entry shown with its `id` |
-| Notes | `note_write`, `note_search`, `note_read` | Topic at most 64 characters on one line, description at most 200. A wake loads only the topic list (name and description, newest written first, at most 40 topics and 2,000 characters), never a body |
+| Memory index | `memory_add`, `memory_supersede` | Entry at most 500 characters and 5 lines. Index at most 60 lines and 6 KiB of live entries (`TestMemoryIndexBudgetMeasurement`: the byte cap binds first, leaving 45 entries of about 130 bytes, or 4 of the longest allowed). The only memory loaded into a wake, each live entry shown with its `id`. Written by the dream only |
+| Notes | `note_write`, `note_search`, `note_read` | Topic at most 64 characters on one line, description at most 200. A wake loads only the topic list (name and description, newest written first, at most 40 topics and 2,000 characters), never a body. Memory entries, topics and recalled notes load only in the mode (dry-run or live) they were written in: a row takes the mode of the agent's latest action at or before its `created_at`, else of its first action, else the current mode. A row written after a mode change and before the next action takes the old mode |
 | Playbook | `playbook_read`, `playbook_propose` | Hypotheses `testing`, `established`, `rejected`; below |
 | Strategy | `strategy_write` | At most 2000 characters; below |
 | Contacts | `mark_do_not_contact` | Add-only ([guards.md](guards.md)) |
