@@ -312,6 +312,27 @@ func TestBehindAgentPacesItsBudgetOverTheRestOfTheDay(t *testing.T) {
 	}
 }
 
+// The dream's spend counts against the day's budget but not in the average cost
+// of a wake: $0.30 of dream beside $0.12 over 5 wakes paces at 12h * 0.024 / 0.58,
+// about 30 minutes, not the 104 minutes the dream would add to the first wake.
+func TestDreamSpendDoesNotInflateTheCostOfAWake(t *testing.T) {
+	r, st, fixture := kpiRuntime(t, 9*time.Hour, 3)
+	fixture.Calls = []llm.ToolCall{agent.SyntheticCall("find_posts", `{"source":"feed"}`)}
+	if _, err := st.DB().Exec(`INSERT INTO ledger_phases(agent_id,day,phase,cost_usd) VALUES('synthetic-offline','2026-01-01','dream',0.3)`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := r.Wake(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	state, err := st.AgentState(context.Background(), "synthetic-offline")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := state.NextWake.Sub(kpiNow); got < 29*time.Minute || got > 31*time.Minute {
+		t.Fatalf("next wake in %v, want about 30 minutes", got)
+	}
+}
+
 func seedToday(t *testing.T, st *store.Store, kind string, n int) {
 	t.Helper()
 	if _, err := st.SeedAction(context.Background(), store.SeededAction{AgentID: "synthetic-offline", Kind: kind, Text: kind + strconv.Itoa(n), DryRun: true, PostedAt: kpiNow.Add(-time.Duration(n+1) * time.Minute)}); err != nil {

@@ -23,8 +23,12 @@ type KPIStats struct {
 	// Spend and tokens over all phases: the local day of now, and that day with the 6 before it.
 	SpendToday, Spend7d   float64
 	TokensToday, Tokens7d int64
+	// DreamToday is the part of SpendToday the dream phase spent.
+	DreamToday float64
 	// WakesToday counts agent wakes started on the local day of now.
 	WakesToday int
+	// LastWake is when the newest agent wake started; zero when there is none.
+	LastWake time.Time
 }
 
 // LastPublish is the newest published action of a kind ("" for any) in the
@@ -69,12 +73,21 @@ func (s *Store) KPIStats(ctx context.Context, agentID string, dryRun bool, now, 
 	week := dayStart.AddDate(0, 0, -6).Format(time.DateOnly)
 	if err := s.db.QueryRowContext(ctx, `SELECT
  COALESCE(SUM(CASE WHEN day=?2 THEN cost_usd END),0), COALESCE(SUM(CASE WHEN day=?2 THEN tokens_in+tokens_out END),0),
- COALESCE(SUM(cost_usd),0), COALESCE(SUM(tokens_in+tokens_out),0)
- FROM ledger_phases WHERE agent_id=?1 AND day>=?3 AND day<=?2`, agentID, day, week).Scan(&k.SpendToday, &k.TokensToday, &k.Spend7d, &k.Tokens7d); err != nil {
+ COALESCE(SUM(cost_usd),0), COALESCE(SUM(tokens_in+tokens_out),0), COALESCE(SUM(CASE WHEN day=?2 AND phase='dream' THEN cost_usd END),0)
+ FROM ledger_phases WHERE agent_id=?1 AND day>=?3 AND day<=?2`, agentID, day, week).Scan(&k.SpendToday, &k.TokensToday, &k.Spend7d, &k.Tokens7d, &k.DreamToday); err != nil {
 		return k, fmt.Errorf("reading spend: %w", err)
 	}
 	if err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM wakes WHERE agent_id=? AND kind='agent' AND julianday(started_at)>=julianday(?)`, agentID, formatStoreTimestamp(dayStart)).Scan(&k.WakesToday); err != nil {
 		return k, fmt.Errorf("reading wakes: %w", err)
+	}
+	var last sql.NullString
+	if err := s.db.QueryRowContext(ctx, `SELECT MAX(started_at) FROM wakes WHERE agent_id=? AND kind='agent'`, agentID).Scan(&last); err != nil {
+		return k, fmt.Errorf("reading last wake: %w", err)
+	}
+	if last.Valid {
+		if k.LastWake, err = time.Parse(time.RFC3339Nano, last.String); err != nil {
+			return k, fmt.Errorf("reading last wake: invalid timestamp")
+		}
 	}
 	return k, nil
 }

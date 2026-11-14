@@ -9,6 +9,7 @@ import (
 
 	"github.com/canhta/threadz/internal/config"
 	"github.com/canhta/threadz/internal/guard"
+	"github.com/canhta/threadz/internal/logging"
 	"github.com/canhta/threadz/internal/store"
 )
 
@@ -122,9 +123,7 @@ func (s scoreboard) stopCheck(hidden []string, open func() []string, usdLeft flo
 const minUSDToContinue = 0.05
 
 // nextWake is when code wakes the agent again: the template minimum when
-// behind, the on-target interval when not, stretched by budget pacing (see
-// pacedInterval), and the end of the capped day when the day is capped (see
-// capReset).
+// behind, the on-target interval when not, settled by settleWake.
 func (r *Runtime) nextWake(ctx context.Context, now time.Time) (time.Time, error) {
 	t := r.opts.Template
 	s, err := r.scoreboard(ctx, now)
@@ -139,53 +138,91 @@ func (r *Runtime) nextWake(ctx context.Context, now time.Time) (time.Time, error
 		}
 		interval = time.Duration(minutes) * time.Minute
 	}
-	_, dayEnd, _ := t.Limits.DayBounds(now)
-	horizon := dayEnd
-	if quiet, ok := r.schedule.NextQuietFrom(now); ok && quiet.Before(horizon) {
-		horizon = quiet
-	}
-	interval = max(interval, pacedInterval(horizon.Sub(now), s.SpendToday, int64(s.WakesToday), t.Limits.MaxUSDPerDay-s.SpendToday))
 	return r.settleWake(ctx, now)(now.Add(interval))
 }
+
+// lastWakeMargin keeps a paced wake that would land on the start of the quiet
+// window just before it, so the day's last affordable wake is not pushed to the morning.
+const lastWakeMargin = time.Minute
 
 // pacedInterval spreads what is left of the daily budget over what is left of
 // the working day, so a behind agent does not spend it all by the afternoon and
 // sleep through the evening peak.
 //
-//	interval = timeLeft * (spentToday / wakesToday) / usdLeft
+//	interval = timeLeft * (agentSpend / wakesToday) / usdLeft
 //
 // timeLeft is the time until the working day ends: the next start of the quiet
-// window, or the day reset, whichever comes first. spentToday / wakesToday is
-// the average cost of one agent wake today, all phases included, and usdLeft is
-// limits.max_usd_per_day minus spentToday. The interval is the time that, at
-// that average cost, makes the budget last until timeLeft is over. The caller
-// takes the larger of it and the template's own interval. With no wake or no
-// spend today there is no cost history and the result is zero; with no budget
-// left the day is capped and capReset decides.
-func pacedInterval(timeLeft time.Duration, spentToday float64, wakesToday int64, usdLeft float64) time.Duration {
-	if timeLeft <= 0 || wakesToday <= 0 || spentToday <= 0 || usdLeft <= 0 {
+// window, or the day reset, whichever comes first. agentSpend / wakesToday is
+// the average cost of one agent wake today: the day's spend without the dream,
+// which is not a wake of this cadence. usdLeft is limits.max_usd_per_day minus
+// the whole day's spend, dream included. The interval is the time that, at that
+// average cost, makes the budget last until timeLeft is over, and at most
+// lastWakeMargin short of it. With no wake or no spend today there is no cost
+// history and the result is zero; with no budget left the day is capped and
+// capReset decides.
+func pacedInterval(timeLeft time.Duration, agentSpend float64, wakesToday int64, usdLeft float64) time.Duration {
+	if timeLeft <= 0 || wakesToday <= 0 || agentSpend <= 0 || usdLeft <= 0 {
 		return 0
 	}
-	paced := float64(timeLeft) * (spentToday / float64(wakesToday)) / usdLeft
-	return time.Duration(min(paced, float64(timeLeft)))
+	paced := float64(timeLeft) * (agentSpend / float64(wakesToday)) / usdLeft
+	return max(time.Duration(min(paced, float64(timeLeft-lastWakeMargin))), 0)
 }
 
-// settleWake returns the rule every wake time follows, early ones included:
-// not before a capped day resets (see capReset), and not inside the quiet
+// pacedWake is the earliest the budget lets the next agent wake start: the
+// paced interval after the last wake started. Zero when pacing has no say.
+func (r *Runtime) pacedWake(s scoreboard, now time.Time) time.Time {
+	if s.LastWake.IsZero() {
+		return time.Time{}
+	}
+	t := r.opts.Template
+	_, dayEnd, _ := t.Limits.DayBounds(now)
+	horizon := dayEnd
+	if quiet, ok := r.schedule.NextQuietFrom(now); ok && quiet.Before(horizon) {
+		horizon = quiet
+	}
+	return s.LastWake.Add(pacedInterval(horizon.Sub(now), s.SpendToday-s.DreamToday, int64(s.WakesToday), t.Limits.MaxUSDPerDay-s.SpendToday))
+}
+
+// settleWake returns the rule every scheduled wake time follows, early ones
+// included: not before a capped day resets (see capReset), not before the
+// budget lets the next wake start (see pacedInterval), and not inside the quiet
 // window, where a wake spends tokens for posts nobody reads. A capped day
 // cannot be worked: a wake would burn tokens on reads and ideas and publish
-// nothing. The cap is read only when a time is settled.
+// nothing. Spend is read only when a time is settled. The scheduler's own check
+// (deferQuiet) catches a wake time that was stored before it was due.
 func (r *Runtime) settleWake(ctx context.Context, now time.Time) func(time.Time) (time.Time, error) {
 	return func(at time.Time) (time.Time, error) {
 		reset, err := r.capReset(ctx, now)
 		if err != nil {
 			return time.Time{}, err
 		}
-		if at.Before(reset) {
-			at = reset
+		s, err := r.scoreboard(ctx, now)
+		if err != nil {
+			return time.Time{}, err
+		}
+		for _, floor := range []time.Time{reset, r.pacedWake(s, now)} {
+			if at.Before(floor) {
+				at = floor
+			}
 		}
 		return r.schedule.AfterQuiet(at), nil
 	}
+}
+
+// deferQuiet is the scheduler's last check before an agent wake: a wake that
+// is due inside the quiet window (a failed wake's fallback, a recovered wake, a
+// missing or stale next_wake_at) moves to the end of the window instead. It
+// reports whether it moved the wake.
+func (r *Runtime) deferQuiet(ctx context.Context, now time.Time) (bool, error) {
+	until := r.schedule.AfterQuiet(now)
+	if until.Equal(now) {
+		return false, nil
+	}
+	if err := r.opts.Store.SetNextWake(ctx, r.opts.Template.ID, until); err != nil {
+		return false, err
+	}
+	r.event(ctx, guard.PhaseAgent, logging.SchedulerScheduled, "success", "quiet_hours", 0, 0)
+	return true, nil
 }
 
 // capReset is when a capped day ends, or the zero time when it is not capped:

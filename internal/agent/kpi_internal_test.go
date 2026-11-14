@@ -30,7 +30,7 @@ func TestPacedInterval(t *testing.T) {
 		// $0.10 a wake, $0.70 for 10 hours: 7 more wakes, one every 10h * 0.10 / 0.70.
 		{"even spread", 10 * time.Hour, 0.3, 3, 0.7, 10 * time.Hour / 7},
 		// Little left: never later than the end of the day.
-		{"tiny budget", 2 * time.Hour, 0.99, 3, 0.01, 2 * time.Hour},
+		{"tiny budget", 2 * time.Hour, 0.99, 3, 0.01, 2*time.Hour - lastWakeMargin},
 	} {
 		if got := pacedInterval(c.timeLeft, c.spent, c.wakes, c.usdLeft); got < c.want-time.Millisecond || got > c.want+time.Millisecond {
 			t.Errorf("%s: got %v, want %v", c.name, got, c.want)

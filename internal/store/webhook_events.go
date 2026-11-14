@@ -48,7 +48,7 @@ func (s *Store) WakeEarly(ctx context.Context, agentID string, at time.Time, min
 	return nil
 }
 
-// WakeOnWebhook is the one early-wake path: a webhook reply or mention that
+// WakeOnWebhook is the webhook's early-wake path (the inbox poll has its own): a webhook reply or mention that
 // arrived since the latest wake started moves the next wake up with WakeEarly.
 func (s *Store) WakeOnWebhook(ctx context.Context, agentID string, at time.Time, minGap time.Duration, settle func(time.Time) (time.Time, error)) error {
 	var met bool

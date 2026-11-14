@@ -205,3 +205,45 @@ func TestWakeDataMessageCarriesTheInboxAfterTheState(t *testing.T) {
 		t.Fatalf("data message does not carry the inbox after the state: %.300s", seen)
 	}
 }
+
+// A wake time stored inside the quiet window (a failed wake's fallback, a
+// recovered wake, a stale next_wake_at) never starts a wake: the scheduler moves it.
+func TestSchedulerDefersAnAgentWakeDueInQuietHours(t *testing.T) {
+	g := newInboxRigWith(t, 0, func(tmpl *config.Template) {
+		tmpl.Schedule = config.ScheduleConfig{Timezone: "UTC", QuietFrom: "11:00", QuietUntil: "13:30"}
+	})
+	if err := g.st.SetNextWake(context.Background(), "synthetic-offline", g.now.Add(-time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+	if err := (agent.Scheduler{Agents: []*agent.Runtime{g.r}, Now: func() time.Time { return g.now }}).Run(context.Background(), true); err != nil {
+		t.Fatal(err)
+	}
+	state, err := g.st.AgentState(context.Background(), "synthetic-offline")
+	if want := time.Date(2026, 1, 1, 13, 30, 0, 0, time.UTC); err != nil || !state.NextWake.Equal(want) {
+		t.Fatalf("next wake %v, want the end of the quiet window %v (err %v)", state.NextWake, want, err)
+	}
+	var wakes int
+	if err = g.st.DB().QueryRow(`SELECT COUNT(*) FROM wakes`).Scan(&wakes); err != nil || wakes != 0 {
+		t.Fatalf("wakes started in quiet hours: %d (err %v)", wakes, err)
+	}
+}
+
+// An early wake follows the budget pacing too: $0.20 over one wake, $0.80 left
+// for the 12 hours to midnight, is 3 hours after the last wake started.
+func TestPollInboxWakeEarlyWaitsForThePacedWake(t *testing.T) {
+	g := newInboxRig(t, 10)
+	g.farm = g.now.Add(10 * time.Hour)
+	g.park(t)
+	for _, q := range []string{
+		`INSERT INTO ledger_phases(agent_id,day,phase,cost_usd) VALUES('synthetic-offline','2026-01-01','agent',0.2)`,
+		`INSERT INTO wakes(agent_id,started_at) VALUES('synthetic-offline','2026-01-01T11:00:00Z')`,
+	} {
+		if _, err := g.st.DB().Exec(q); err != nil {
+			t.Fatal(err)
+		}
+	}
+	g.reply("a1", "alice")
+	if next, want := g.poll(t), time.Date(2026, 1, 1, 14, 0, 0, 0, time.UTC); next.Sub(want) < -time.Minute || next.Sub(want) > time.Minute {
+		t.Fatalf("wake at %v, want about %v", next, want)
+	}
+}

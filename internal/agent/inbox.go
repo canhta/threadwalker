@@ -43,8 +43,9 @@ func (c *inboxClock) markSeen(replies []tools.InboxReply) (fresh int) {
 // PollInbox is the scheduler's cheap look, between wakes, at replies to the
 // account: API reads only, no model call. A reply it has not seen before moves
 // the next wake up with WakeEarly, never closer than
-// inbox.min_minutes_after_wake after the last wake started; spend caps and
-// pacing are unchanged. A failed poll backs off like failed work and never
+// inbox.min_minutes_after_wake after the last wake started, and never past the
+// spend cap, the quiet hours or the budget pacing (settleWake): a reply may wait
+// for the next paced wake. A failed poll backs off like failed work and never
 // stops the process.
 func (r *Runtime) PollInbox(ctx context.Context, now time.Time) error {
 	t := r.opts.Template

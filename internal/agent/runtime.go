@@ -807,6 +807,15 @@ func (s Scheduler) Run(ctx context.Context, once bool) error {
 			}
 			continue
 		}
+		if moved, err := selected.Runtime.deferQuiet(ctx, now); err != nil || moved {
+			if err != nil {
+				return err
+			}
+			if once {
+				return nil
+			}
+			continue
+		}
 		if _, err := selected.Runtime.Wake(ctx); err != nil {
 			if errors.Is(err, ErrNotRunning) || errors.Is(err, ErrProfileHeld) {
 				continue
