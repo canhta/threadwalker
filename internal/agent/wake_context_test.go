@@ -27,6 +27,7 @@ type kindExamples struct {
 }
 
 type wakeData struct {
+	Said    []string `json:"said"`
 	Lessons []struct {
 		ID   int64  `json:"id"`
 		Text string `json:"text"`
@@ -114,7 +115,7 @@ func TestWakeContextOrdersStableBeforeVolatile(t *testing.T) {
 	seedLesson(t, st, tmpl.ID, "post", "do", "open with the number", now.Add(-48*time.Hour), now.Add(-time.Hour))
 	_, user, _ := wakeMessages(t, r)
 	last := -1
-	for _, key := range []string{`"lessons"`, `"examples"`, `"recent"`, `"owner_answers"`, `"facts"`, `"remaining_usd"`, `"counters"`} {
+	for _, key := range []string{`"lessons"`, `"examples"`, `"recent"`, `"owner_answers"`, `"facts"`, `"remaining_usd"`, `"counters"`, `"said"`} {
 		i := strings.Index(user, key)
 		if i <= last {
 			t.Fatalf("%s is out of order in\n%.600s", key, user)
@@ -145,10 +146,20 @@ func TestWakeContextHoldsOnlyOwnEpisodesAndLessons(t *testing.T) {
 		t.Fatal(err)
 	}
 	system, user, data := wakeMessages(t, r)
-	for _, secret := range []string{"OTHER AGENT TEXT", "OTHER LESSON", "RETIRED LESSON", "DRY RUN TEXT", "offline-dummy-key"} {
+	for _, secret := range []string{"OTHER AGENT TEXT", "OTHER LESSON", "RETIRED LESSON", "offline-dummy-key"} {
 		if strings.Contains(system+user, secret) {
 			t.Fatalf("%q reached the context", secret)
 		}
+	}
+	// A dry run is never an episode, but said shows it in its own mode.
+	if !tmpl.DryRun {
+		t.Fatal("offline template is expected to be a dry run")
+	}
+	if len(data.Said) == 0 || data.Said[0] != "DRY RUN TEXT" {
+		t.Fatalf("said=%q, want the newest dry-run text first", data.Said)
+	}
+	if n := strings.Count(user, "DRY RUN TEXT"); n != 1 {
+		t.Fatalf("the dry run appears %d times; only said may show it", n)
 	}
 	if len(data.Lessons) != 1 || data.Lessons[0].Text != "own lesson" {
 		t.Fatalf("lessons=%+v", data.Lessons)
@@ -180,7 +191,7 @@ func TestExamplesAreTheLast48Hours(t *testing.T) {
 
 // With 30 episodes and 10 lessons the data message, scoreboard included and
 // inbox excluded, stays inside its budget.
-func TestWakeContextStaysUnderSixKilobytes(t *testing.T) {
+func TestWakeContextStaysUnderSevenKilobytes(t *testing.T) {
 	now := time.Date(2026, 1, 2, 12, 0, 0, 0, time.UTC)
 	tmpl := agent.OfflineTemplate()
 	tmpl.KPI = config.KPIConfig{EngagementsPerDay: 10, FollowersPerWeek: 5, MaxHoursWithoutPublish: 8, OnTargetMinutes: 180}
@@ -198,12 +209,18 @@ func TestWakeContextStaysUnderSixKilobytes(t *testing.T) {
 	for i := 0; i < 10; i++ {
 		seedLesson(t, st, tmpl.ID, "any", "do", fmt.Sprintf("%s %d", lesson, i), now.Add(-48*time.Hour), now.Add(-time.Hour))
 	}
+	// The template is a dry run, so said shows these, the size a live wake sees.
+	for i := 0; i < 10; i++ {
+		if _, err := st.SeedAction(context.Background(), store.SeededAction{AgentID: tmpl.ID, Kind: "reply", Text: reply, DryRun: true, PostedAt: now.Add(-time.Duration(i) * time.Minute)}); err != nil {
+			t.Fatal(err)
+		}
+	}
 	_, user, data := wakeMessages(t, r)
 	t.Logf("data message: %d bytes", len(user))
-	if len(user) > 6<<10 {
-		t.Fatalf("data message is %d bytes, want at most %d", len(user), 6<<10)
+	if len(user) > 7<<10 {
+		t.Fatalf("data message is %d bytes, want at most %d", len(user), 7<<10)
 	}
-	if len(data.Lessons) != 10 || len(data.Recent) != 10 || len(data.Examples.Post.Top) != 3 || len(data.Examples.Reply.Bottom) != 3 {
+	if len(data.Said) != 10 || len(data.Lessons) != 10 || len(data.Recent) != 10 || len(data.Examples.Post.Top) != 3 || len(data.Examples.Reply.Bottom) != 3 {
 		t.Fatalf("a realistic state must fill every section: %d lessons, %d recent, %+v", len(data.Lessons), len(data.Recent), data.Examples)
 	}
 }
