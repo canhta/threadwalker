@@ -225,8 +225,10 @@ func agentJob(hidden []string) string {
 	if !slices.Contains(hidden, "search") {
 		job += "Never wait for a Threads search hit (search may return only your own posts). "
 	}
-	job += "When the data message has an inbox section, answer those people first: they replied to you. Answer each item at most once with reply, target_url = its ref, target_id = its target_id and target_username = its author; this is the API path, not the browser. Skip an item that needs no answer (an emoji only, a thanks that closes the talk). "
-	job += "To reply to a feed post, read_feed, pick a post written in Vietnamese (read_feed also lists the Trending-now topics: open one with read_topic url = its ref, or search words with read_topic query, when your feed has none) and reply with its ref (such as r3) as target_url, without target_id. "
+	if !slices.Contains(hidden, "reply") {
+		job += "When the data message has an inbox section, answer those people first: they replied to you. Answer each item at most once with reply, target_url = its ref, target_id = its target_id and target_username = its author; this is the API path, not the browser. Skip an item that needs no answer (an emoji only, a thanks that closes the talk). "
+		job += "To reply to a feed post, read_feed, pick a post written in Vietnamese (read_feed also lists the Trending-now topics: open one with read_topic url = its ref, or search words with read_topic query, when your feed has none) and reply with its ref (such as r3) as target_url, without target_id. "
+	}
 	if !slices.Contains(hidden, "ideas") {
 		job += "After reading, call ideas, then post or reply with angle = the moment and trend_ref or target_url = the ref ideas returned. If ideas returns none, read more and call it again; when you are not behind on your KPIs you may skip posting this wake. "
 	}

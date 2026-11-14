@@ -46,7 +46,7 @@ func kindLabel(raw string) string {
 var endReasons = []string{
 	"completed", "interrupted", "step_limit", "budget", "provider_error",
 	"invalid_response", "cancelled", "accounting_error", "persistence_error",
-	"stall_stop", "action_limit", "unknown_outcome", "logged_out", "captcha",
+	"stall_stop", "tool_call_cap", "action_limit", "unknown_outcome", "logged_out", "captcha",
 	"browser_error", "stopped", "too_few_episodes", "nothing_to_do", "in_progress", "",
 }
 
@@ -62,6 +62,7 @@ var endReasonLabels = map[string]string{
 	"accounting_error":  "Cost not recorded",
 	"persistence_error": "Not saved",
 	"stall_stop":        "Stalled",
+	"tool_call_cap":     "Tool call limit",
 	"action_limit":      "Action limit",
 	"unknown_outcome":   "Unknown outcome",
 	"logged_out":        "Signed out",
@@ -94,7 +95,7 @@ var blockedReasons = []string{
 	"reply_target_host", "reply_target_mismatch", "reply_target_unread", "target_outside_window",
 	"critic_rejected", "critic_limit", "critic_unavailable", "ungrounded_number",
 	"reply_url", "shared_promotion_link", "text_length", "thread_per_day",
-	"do_not_contact", "stall_stop", "wake_not_open", "stop_request",
+	"do_not_contact", "stall_stop", "tool_closed", "tool_hidden", "tool_call_cap", "last_request", "wake_not_open", "stop_request",
 	"reservation_failed", "state_read_failed", "unknown_tool", "write_refused",
 	"accounting_error", "budget", "captcha", "logged_out", "cancelled",
 	"persistence_error", "unknown_outcome", "browser_error", "timeout",
@@ -142,6 +143,10 @@ var blockedLabels = map[string]string{
 	"critic_unavailable":          "Editor unavailable",
 	"ungrounded_number":           "Number with no source",
 	"stall_stop":                  "It stopped making progress",
+	"tool_closed":                 "Tool closed after repeated refusals",
+	"tool_hidden":                 "Tool not offered",
+	"tool_call_cap":               "Tool call limit",
+	"last_request":                "Write on the last request",
 	"wake_not_open":               "Run ended",
 	"stop_request":                "Owner stop",
 	"reservation_failed":          "Not reserved",

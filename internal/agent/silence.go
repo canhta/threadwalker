@@ -11,14 +11,14 @@ import (
 // to recover on its own.
 const silenceSlack = 3 * time.Hour
 
-// WarnIfSilent queues one owner notice per local day when a running agent, in
+// WarnIfSilent queues one owner notice per local day when a running live agent, in
 // waking hours, has gone longer than kpi.max_hours_without_publish plus
 // silenceSlack without a publish. An agent that never published has no clock
 // to measure and is skipped.
 func (r *Runtime) WarnIfSilent(ctx context.Context, now time.Time) error {
 	t := r.opts.Template
 	limit := time.Duration(t.KPI.MaxHoursWithoutPublish) * time.Hour
-	if limit <= 0 || r.schedule.AfterQuiet(now) != now {
+	if limit <= 0 || t.DryRun || r.schedule.AfterQuiet(now) != now {
 		return nil
 	}
 	state, err := r.opts.Store.AgentState(ctx, t.ID)

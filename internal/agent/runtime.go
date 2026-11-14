@@ -440,14 +440,17 @@ func (r *Runtime) execute(ctx context.Context, wake WakeResult, phase string, ca
 		var replies []tools.InboxReply
 		replies, inbox = dispatcher.Inbox(ctx)
 		r.inbox.markSeen(replies)
+		if slices.Contains(hidden, "reply") {
+			inbox = nil // the wake could not answer it, and must not be told to
+		}
 	}
 	section, err := inboxSection(inbox)
 	if err != nil {
 		return result, err
 	}
-	if phase == guard.PhaseAgent && state.nothingToDo(len(inbox)) {
-		// Every write gate is shut for the whole wake and nobody wrote: a model
-		// call could only read.
+	if phase == guard.PhaseAgent && state.nothingToDo() {
+		// Every write gate is shut for the whole wake, so even an inbox could not
+		// be answered: a model call could only read.
 		result.EndReason = "nothing_to_do"
 	} else {
 		messages, err := build(section)
@@ -507,6 +510,8 @@ func wakeEndReason(err error) string {
 		return "audit_failure"
 	case errors.Is(err, tools.ErrStallStop):
 		return "stall_stop"
+	case errors.Is(err, tools.ErrToolCallCap):
+		return "tool_call_cap"
 	case errors.Is(err, llm.ErrStepLimit):
 		return "step_limit"
 	case errors.Is(err, llm.ErrBudget):
@@ -521,7 +526,7 @@ func wakeEndReason(err error) string {
 
 func nonFatalWakeEnd(reason string) bool {
 	switch reason {
-	case "stall_stop", "step_limit", "budget", "action_limit", "logged_out", "captcha":
+	case "stall_stop", "tool_call_cap", "step_limit", "budget", "action_limit", "logged_out", "captcha":
 		return true
 	}
 	return false
@@ -716,7 +721,10 @@ func (s Scheduler) Run(ctx context.Context, once bool) error {
 				return err
 			}
 			if err := r.WarnIfSilent(ctx, now); err != nil {
-				return err
+				// A missed notice must not stop the scheduler.
+				if r.opts.Logger != nil {
+					r.opts.Logger.Warn("silent-agent check failed", "agent", r.opts.Template.ID, "err", err)
+				}
 			}
 			candidate, ok, err := r.NextWork(ctx, now)
 			if err != nil {

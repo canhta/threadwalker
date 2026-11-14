@@ -30,6 +30,11 @@ flowchart TD
 | `sensitive_arguments` | Arguments contain a configured secret | code | dispatcher |
 | `repeat_refused` | Same call failed the same way 3 times | code | dispatcher |
 | `stall_stop` | Second `repeat_refused`, or 10 identical successful results; ends the wake | code | dispatcher |
+| `tool_closed` | The tool was refused 3 times for the same reason (for a reason about one post or person, the same target; time gates such as `min_minutes_between_posts`, `replies_per_hour`, `min_seconds_between_actions` and `reply_breaker` never count); closed for the rest of the wake. Does not feed `stall_stop` | code | dispatcher |
+| `tool_hidden` | The tool is not offered this wake (a closed write gate, a tool the Meta app may not use); a call to it is refused. Does not feed `stall_stop` | code | dispatcher |
+| `tool_call_cap` | The wake made 40 tool calls; the first call past it is refused, the second ends the wake (`end_reason` `tool_call_cap`) | code | dispatcher |
+| `last_request` | A `post` or `reply` returned by the last model request the wake may make: its result could not be read, so nothing is published | code | dispatcher |
+| `limit_per_wake` | A capped tool was called past its per-wake cap: `read_topic` 3, `web_search` 3, `read_feed` 2, `fetch_trends` 1, `notify_owner` 2, `ask_owner` 1, `mark_do_not_contact` 3 | code | executor |
 | `browser_stopped` | Browser logged out or captcha already stopped the agent | code | dispatcher |
 | `audit_failure` | Audit write failed; fail closed | code | dispatcher |
 | `agent_not_running` | Agent paused or killed | code | guard, reserve |

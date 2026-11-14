@@ -150,9 +150,10 @@ func (t ReservationTx) MarkBlocked(ctx context.Context, auditID int64, reason st
 	return nil
 }
 
-// ClearBlocked empties the refusal on an audited attempt that went on to succeed.
-func (s *Store) ClearBlocked(ctx context.Context, auditID int64) error {
-	if _, err := s.db.ExecContext(ctx, `UPDATE tool_calls SET blocked_by='' WHERE id=?`, auditID); err != nil {
+// ClearBlocked empties the refusal on an audited attempt that went on to
+// succeed; it runs in the transaction of the reservation that succeeded.
+func (t ReservationTx) ClearBlocked(ctx context.Context, auditID int64) error {
+	if _, err := t.conn.ExecContext(ctx, `UPDATE tool_calls SET blocked_by='' WHERE id=?`, auditID); err != nil {
 		return fmt.Errorf("clearing refusal: %w", err)
 	}
 	return nil

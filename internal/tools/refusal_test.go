@@ -41,7 +41,8 @@ func TestRefusalCounterClosesATool(t *testing.T) {
 	}
 	var hints []string
 	for i := 1; i <= 3; i++ {
-		_, err := d.Dispatch(context.Background(), call("reply", unreadReply(i)))
+		// The same target each time: a refusal counts per (reason, target).
+		_, err := d.Dispatch(context.Background(), call("reply", strings.Replace(unreadReply(1), "draft 1", fmt.Sprintf("draft %d", i), 1)))
 		reason, hint := blockedResult(t, err)
 		if reason != "reply_target_unread" {
 			t.Fatalf("refusal %d: %s", i, reason)
@@ -67,10 +68,12 @@ func TestRefusalCounterClosesATool(t *testing.T) {
 	if n != 1 {
 		t.Fatalf("tool_closed audits %d", n)
 	}
-	// Calling the closed tool again ends the wake, like a repeated refusal.
-	_, err = d.Dispatch(context.Background(), call("reply", unreadReply(9)))
-	if !errors.Is(err, tools.ErrStallStop) {
-		t.Fatalf("second call to a closed tool: %v", err)
+	// Calling the closed tool again is refused again, and never ends the wake.
+	for range 3 {
+		_, err = d.Dispatch(context.Background(), call("reply", unreadReply(9)))
+		if reason, _ := blockedResult(t, err); reason != "tool_closed" || errors.Is(err, tools.ErrStallStop) {
+			t.Fatalf("later call to a closed tool: %v", err)
+		}
 	}
 }
 

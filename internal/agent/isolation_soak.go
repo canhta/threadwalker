@@ -138,7 +138,7 @@ func RunIsolationSoak(ctx context.Context, dbPath string, hours int, logger *slo
 				e.MaxActiveBackends = max(e.MaxActiveBackends, active)
 				return isolationBackend(&active, "https://fixture.invalid/@"+chosen.Threads.Username+"/post/seed"), nil
 			}
-			r, err := New(Options{Store: st, Template: t, Now: clock, HTTPClient: fixture.Client(), FetchTrends: fixture.Trends, Logger: logger, ThreadsFactory: factory})
+			r, err := New(Options{Store: st, Template: t, Now: clock, Wait: func(context.Context, time.Duration) error { return nil }, HTTPClient: fixture.Client(), FetchTrends: fixture.Trends, Logger: logger, ThreadsFactory: factory})
 			if err != nil {
 				return err
 			}
@@ -150,6 +150,7 @@ func RunIsolationSoak(ctx context.Context, dbPath string, hours int, logger *slo
 				SyntheticCall("read_feed", `{}`),
 				SyntheticCall("fetch_trends", `{}`),
 				SyntheticCall("reply", string(mustJSON(map[string]string{"text": "Synthetic refused own-account reply.", "target_username": templates[1-i].Threads.Username, "target_id": "fixture-id", "target_url": "https://threads.net/@" + templates[1-i].Threads.Username + "/post/1"}))),
+				SyntheticCall("post", ""),
 				SyntheticCall("post", ""),
 			}
 		}
@@ -201,8 +202,12 @@ func RunIsolationSoak(ctx context.Context, dbPath string, hours int, logger *slo
 			e.Restarts++
 		}
 		// A post differs each wake, so the repeated-closing check never fires on the fixture.
+		// The second post reaches the daily cap inside the wake that has one post
+		// left; a tool hidden at the wake's start is refused before the guard.
 		for i, f := range fixtures {
-			f.Calls[len(f.Calls)-1] = SyntheticCall("post", string(mustJSON(map[string]string{"text": fmt.Sprintf("agent%d https://links.invalid/%d wake%d", i, i, hour)})))
+			for j, word := range []string{"agent", "second"} {
+				f.Calls[len(f.Calls)-2+j] = SyntheticCall("post", string(mustJSON(map[string]string{"text": fmt.Sprintf("%s%d https://links.invalid/%d wake%d", word, i, i, hour)})))
+			}
 		}
 		// Once executes one due session. Repeating it at the same injected instant
 		// drains the two agents without introducing concurrent wake execution.

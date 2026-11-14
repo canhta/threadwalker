@@ -92,7 +92,7 @@ A call older than the details' retention shows its outcome and guard reason with
 
 | Item | Fact |
 |---|---|
-| Agent to owner | When it meets something outside its permissions, is logged out or hits a captcha (the notice says how to send cookies with `/cookie`), has no Threads token (carries the OAuth link, once a day), or is near its budget limit; once per local day when a running agent has published nothing for longer than `kpi.max_hours_without_publish` (hours, how the last run ended, top blocked reasons today); plus the daily report |
+| Agent to owner | When it meets something outside its permissions, is logged out or hits a captcha (the notice says how to send cookies with `/cookie`), has no Threads token (carries the OAuth link, once a day), or is near its budget limit; once per local day, in waking hours, when a running live agent has published nothing for longer than `kpi.max_hours_without_publish` plus 3 hours (the notice gives the hours without a publish and says to send `/status`); a dry-run agent never sends it, and a failed check is logged and does not stop the scheduler; plus the daily report |
 | Owner commands | `/help`, `/start`, `/status`, `/report`, `/lessons`, `/forget <id>`, `/pause`, `/resume`, `/kill`, `/dnc <username>`, `/cookie <cookies>`, `/update`. With a shared bot, per-agent commands take the ID: `/pause <agent_id>`, `/dnc <agent_id> <username>`, `/status <agent_id>`, `/report <agent_id>`, `/lessons <agent_id>`, `/forget <agent_id> <id>`. Ambiguous or unknown agents fail safely. `/kill` is terminal; `/resume` cannot revive it |
 | Replies | Replying to a delivered `ask_owner` question answers it. Free text that is neither a command nor a reply becomes an owner note for the next wake with one acknowledgement and no model call |
 | Access | One long poller per bot; conflicting owner chats for a bot are rejected. Only the configured owner chat can command or answer |
@@ -172,3 +172,7 @@ v0.2.0 changes the schema (v11 to v12) and drops template keys, so its release n
 7. Start the services: `systemctl start threadz`, then `systemctl start threadz-dashboard`, then `threadz ctl doctor`.
 
 To roll back, stop both services and restore the two backups and the previous binary. `OPENAI_API_KEY` is no longer required for embeddings; keep it only when the LLM or `web_search` uses it.
+
+## Manual step for v0.2.1
+
+A step is now one model request, so the live `limits.max_steps_per_wake: 45` allows 45 requests, far more than a wake needs. Set `max_steps_per_wake: 20` in `/opt/threadz/agents/viral.agent.yaml` by hand and restart `threadz`. The repo template stays at 15. The wake also stops at 40 tool calls (`tool_call_cap`), whatever the step limit.

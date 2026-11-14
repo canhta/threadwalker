@@ -47,12 +47,19 @@ type Options struct {
 }
 type stallStop struct{}
 
-func (*stallStop) Error() string           { return "wake stopped: repeated identical tool call" }
+func (*stallStop) Error() string {
+	return "wake stopped: the same tool call kept failing or returning the same result"
+}
 func (*stallStop) TerminalToolError() bool { return true }
 
+type callCapStop struct{}
+
+func (*callCapStop) Error() string           { return "wake stopped: tool call cap reached" }
+func (*callCapStop) TerminalToolError() bool { return true }
+
 // Repeat policy: a call that failed the same way repeatFailures times is
-// refused; the wake ends at the stallRefusals-th refusal or when one call
-// returns the same successful result stallSameResults times.
+// refused without running; the wake ends at the stallRefusals-th such refusal
+// or when one call returns the same successful result stallSameResults times.
 const (
 	repeatFailures   = 3
 	stallRefusals    = 2
@@ -64,6 +71,9 @@ type seenCall struct {
 	answer [32]byte
 	streak int
 }
+
+// ErrToolCallCap marks a wake ended because the model kept calling tools past MaxToolCallsPerWake.
+var ErrToolCallCap = &callCapStop{}
 
 // ErrStallStop marks a wake ended for repeating itself. errors.Is works through the client's safe terminal-error wrapper.
 var ErrStallStop = &stallStop{}
@@ -81,6 +91,8 @@ type Dispatcher struct {
 	reads        map[string]int
 	refused      map[string]int // refusals per tool and reason
 	closed       map[string]bool
+	calls        int // model tool calls this wake, refused ones included
+	capRefusals  int
 }
 
 // MaxTopicReadsPerWake bounds read_topic in a normal wake: each opens a page in
@@ -98,24 +110,33 @@ const (
 	MaxTrendFetchesPerWake = 1
 )
 
+// MaxToolCallsPerWake bounds the tool calls of a normal wake: steps are model
+// requests, and one request may return several calls. The first call past it is
+// refused; the next ends the wake.
+const MaxToolCallsPerWake = 40
+
 // MaxResultBytes clips every tool result the model reads.
 const MaxResultBytes = 6 << 10
 
-// readCaps are the per-wake call caps of the read tools that have one.
-var readCaps = map[string]int{
-	"read_topic":   MaxTopicReadsPerWake,
-	"web_search":   MaxWebSearchesPerWake,
-	"read_feed":    MaxFeedReadsPerWake,
-	"fetch_trends": MaxTrendFetchesPerWake,
+// wakeCaps are the per-wake call caps of the tools that have one: paid or
+// slow reads, and the tools that reach the owner or add a permanent record.
+var wakeCaps = map[string]int{
+	"read_topic":          MaxTopicReadsPerWake,
+	"web_search":          MaxWebSearchesPerWake,
+	"read_feed":           MaxFeedReadsPerWake,
+	"fetch_trends":        MaxTrendFetchesPerWake,
+	"notify_owner":        2,
+	"ask_owner":           1,
+	"mark_do_not_contact": 3,
 }
 
-// countRead counts one call of a capped read tool in a normal wake and refuses
+// countCall counts one call of a capped tool in a normal wake and refuses
 // the one past its cap. Dispatch already holds d.mu.
-func (d *Dispatcher) countRead(name string) error {
+func (d *Dispatcher) countCall(name string) error {
 	if d.opts.Phase != guard.PhaseAgent {
 		return nil
 	}
-	if d.reads[name]++; d.reads[name] > readCaps[name] {
+	if d.reads[name]++; d.reads[name] > wakeCaps[name] {
 		return &guard.BlockedError{Reason: "limit_per_wake", Detail: name}
 	}
 	return nil
@@ -127,16 +148,30 @@ const closeAtRefusals = 3
 
 // uncounted are refusals the dispatcher itself raises about the wake or the
 // repeat, not about what the model asked for.
-var uncounted = []string{"tool_closed", "repeat_refused", "stall_stop", "browser_stopped", "audit_failure"}
+var uncounted = []string{"tool_closed", "tool_hidden", "tool_call_cap", "last_request", "repeat_refused", "stall_stop", "browser_stopped", "audit_failure"}
 
-// countRefusal tallies a refusal by (tool, reason), annotating it on the 2nd
-// and closing the tool on the 3rd.
-func (d *Dispatcher) countRefusal(tool string, err error) {
+// timeGated refusals lift as the wake goes on; they never close a tool.
+var timeGated = []string{"min_minutes_between_posts", "replies_per_hour", "min_seconds_between_actions", "reply_breaker"}
+
+// perTarget refusals are about one post or person: another target starts a new count.
+var perTarget = []string{"reply_target_unread", "target_outside_window", "thread_per_day", "replies_per_user_7d", "replies_per_conversation", "stale_ref", "do_not_contact", "own_account", "reply_target_host", "reply_target_mismatch"}
+
+// countRefusal tallies a refusal by (tool, reason), or (tool, reason, target)
+// for a per-target reason, annotating it on the 2nd and closing the tool on
+// the 3rd.
+func (d *Dispatcher) countRefusal(tool, arguments string, err error) {
 	var blocked *guard.BlockedError
-	if !errors.As(err, &blocked) || slices.Contains(uncounted, blocked.Reason) {
+	if !errors.As(err, &blocked) || slices.Contains(uncounted, blocked.Reason) || slices.Contains(timeGated, blocked.Reason) {
 		return
 	}
 	key := tool + "\x00" + blocked.Reason
+	if slices.Contains(perTarget, blocked.Reason) {
+		var a struct {
+			TargetURL string `json:"target_url"`
+		}
+		_ = json.Unmarshal([]byte(arguments), &a)
+		key += "\x00" + a.TargetURL
+	}
 	switch d.refused[key]++; {
 	case d.refused[key] == 2:
 		blocked.Next = guard.NextAction(blocked.Reason)
@@ -247,8 +282,12 @@ func (d *Dispatcher) Dispatch(ctx context.Context, call llm.ToolCall) (string, e
 	started := d.opts.Now()
 	run, known := d.registry[call.Function.Name]
 	spec, _ := guard.Spec(call.Function.Name)
-	if harness, _ := ctx.Value(harnessKey{}).(bool); known && spec.Harness && !harness {
+	harness, _ := ctx.Value(harnessKey{}).(bool)
+	if known && spec.Harness && !harness {
 		known = false
+	}
+	if !harness && d.opts.Phase == guard.PhaseAgent {
+		d.calls++
 	}
 	safeTool := "unknown"
 	if known {
@@ -280,21 +319,35 @@ func (d *Dispatcher) Dispatch(ctx context.Context, call llm.ToolCall) (string, e
 	if d.stopped != nil {
 		if errors.Is(d.stopped, ErrStallStop) {
 			block = "stall_stop"
+		} else if errors.Is(d.stopped, ErrToolCallCap) {
+			block = "tool_call_cap"
 		} else if errors.As(d.stopped, new(*browserStop)) {
 			block = "browser_stopped"
 		} else {
 			block = "audit_failure"
 		}
-	} else if d.closed[safeTool] {
-		block = "tool_closed"
+	} else if d.calls > MaxToolCallsPerWake {
+		block = "tool_call_cap"
+	} else if !harness && slices.Contains(d.opts.Hidden, safeTool) {
+		block = "tool_hidden"
 	} else if prior := d.seen[key]; !prior.ok && prior.streak >= repeatFailures {
 		block = "repeat_refused"
+	} else if d.closed[safeTool] {
+		block = "tool_closed"
+	} else if known && spec.Effect == guard.EffectThreadsWrite && llm.FinalRequest(ctx) {
+		// Its result could never be read, so nothing is published.
+		block = "last_request"
 	}
-	// A call to a closed tool or a thrice-failed call is refused without
-	// running; the second such refusal ends the wake.
-	if block == "tool_closed" || block == "repeat_refused" {
+	// A thrice-failed call is refused without running; the second such
+	// refusal ends the wake. The second call past the cap does too.
+	if block == "repeat_refused" {
 		if d.refusals++; d.refusals >= stallRefusals {
 			d.stopped = ErrStallStop
+		}
+	}
+	if block == "tool_call_cap" {
+		if d.capRefusals++; d.capRefusals >= 2 {
+			d.stopped = ErrToolCallCap
 		}
 	}
 	var reservedID int64
@@ -344,7 +397,7 @@ func (d *Dispatcher) Dispatch(ctx context.Context, call llm.ToolCall) (string, e
 	if errors.Is(err, guard.ErrAudit) {
 		d.stopped = err
 	}
-	d.countRefusal(safeTool, err)
+	d.countRefusal(safeTool, call.Function.Arguments, err)
 	if block != "repeat_refused" {
 		answer := sha256.Sum256([]byte(output))
 		if err != nil {
@@ -374,7 +427,7 @@ func (d *Dispatcher) Dispatch(ctx context.Context, call llm.ToolCall) (string, e
 		}
 	}
 	d.event(ctx, logging.ToolFinished, outcome(err), why, safeTool, started)
-	if harness, _ := ctx.Value(harnessKey{}).(bool); !harness && err == nil {
+	if !harness && err == nil {
 		output = clipResult(output, MaxResultBytes)
 	}
 	return output, err

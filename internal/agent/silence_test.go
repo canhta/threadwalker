@@ -9,6 +9,7 @@ import (
 	"github.com/canhta/threadz/internal/agent"
 	"github.com/canhta/threadz/internal/config"
 	"github.com/canhta/threadz/internal/store"
+	"github.com/canhta/threadz/internal/threads"
 )
 
 func TestSilentAgentIsReportedOncePerLocalDayInWakingHours(t *testing.T) {
@@ -18,12 +19,14 @@ func TestSilentAgentIsReportedOncePerLocalDayInWakingHours(t *testing.T) {
 		silent time.Duration // how long before the check the last publish was
 		quiet  bool
 		paused bool
+		dryRun bool
 		want   int
 	}{
-		{"past the limit and the slack", 12 * time.Hour, false, false, 1},
-		{"inside the slack", 10 * time.Hour, false, false, 0},
-		{"quiet hours", 12 * time.Hour, true, false, 0},
-		{"paused", 12 * time.Hour, false, true, 0},
+		{"past the limit and the slack", 12 * time.Hour, false, false, false, 1},
+		{"inside the slack", 10 * time.Hour, false, false, false, 0},
+		{"quiet hours", 12 * time.Hour, true, false, false, 0},
+		{"paused", 12 * time.Hour, false, true, false, 0},
+		{"dry run", 12 * time.Hour, false, false, true, 0},
 	} {
 		st, err := store.Open(ctx, filepath.Join(t.TempDir(), "silent.db"))
 		if err != nil {
@@ -31,6 +34,7 @@ func TestSilentAgentIsReportedOncePerLocalDayInWakingHours(t *testing.T) {
 		}
 		t.Cleanup(func() { st.Close() })
 		tmpl := agent.OfflineTemplate()
+		tmpl.DryRun = tc.dryRun
 		tmpl.KPI = config.KPIConfig{EngagementsPerDay: 10, MaxHoursWithoutPublish: 8, OnTargetMinutes: 180}
 		if tc.quiet {
 			tmpl.Schedule.QuietFrom, tmpl.Schedule.QuietUntil = "18:00", "22:00"
@@ -46,7 +50,7 @@ func TestSilentAgentIsReportedOncePerLocalDayInWakingHours(t *testing.T) {
 				t.Fatal(err)
 			}
 		}
-		r, err := agent.New(agent.Options{Store: st, Template: tmpl, Now: func() time.Time { return kpiNow }})
+		r, err := agent.New(agent.Options{Store: st, Template: tmpl, Now: func() time.Time { return kpiNow }, ThreadsFactory: func(context.Context, config.Template) (threads.Backend, error) { return threads.NewMemory(), nil }})
 		if err != nil {
 			t.Fatal(err)
 		}

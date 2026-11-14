@@ -2,14 +2,20 @@ package tools
 
 import (
 	"encoding/json"
+	"slices"
 	"strings"
 )
 
 // clipResult keeps a tool result within max bytes by dropping whole items from
-// the end of its lists, the longest list first, and says how many of how many
-// it kept with top-level "shown" and "total". Nothing is cut inside a string,
-// so the result stays valid JSON and valid UTF-8. A result that stays too large
-// without its lists is replaced by a note.
+// the end of its lists, the longest list first (ties by path), and says how
+// many of how many each list kept in "clipped_lists", keyed by the list's path
+// such as "data.posts". Nothing is cut inside a string, so the result stays
+// valid JSON and valid UTF-8. A result that stays too large without its lists
+// is replaced by a note.
+//
+// ponytail: refs of dropped items stay in the guard's registry, where the
+// executor noted them before the clip; clipping first would put the clip
+// inside every list-returning tool. The model never sees those refs.
 func clipResult(result string, max int) string {
 	if len(result) <= max {
 		return result
@@ -27,29 +33,31 @@ func clipResult(result string, max int) string {
 	type list struct {
 		holder map[string]any
 		key    string
+		path   string
 		items  []any
+		total  int
 	}
 	var lists []*list
-	total := 0
-	var walk func(map[string]any)
-	walk = func(m map[string]any) {
+	var walk func(map[string]any, string)
+	walk = func(m map[string]any, prefix string) {
 		for k, v := range m {
 			switch v := v.(type) {
 			case map[string]any:
-				walk(v)
+				walk(v, prefix+k+".")
 			case []any:
-				lists = append(lists, &list{m, k, v})
-				total += len(v)
+				lists = append(lists, &list{m, k, prefix + k, v, len(v)})
 			}
 		}
 	}
-	walk(root)
-	shown := total
+	walk(root, "")
+	slices.SortFunc(lists, func(a, b *list) int { return strings.Compare(a.path, b.path) })
 	render := func() string {
+		shown, total := map[string]int{}, map[string]int{}
 		for _, l := range lists {
 			l.holder[l.key] = l.items
+			shown[l.path], total[l.path] = len(l.items), l.total
 		}
-		root["shown"], root["total"] = shown, total
+		root["clipped_lists"] = map[string]any{"shown": shown, "total": total}
 		out, _ := json.Marshal(root)
 		return string(out)
 	}
@@ -68,6 +76,5 @@ func clipResult(result string, max int) string {
 			return note()
 		}
 		longest.items = longest.items[:len(longest.items)-1]
-		shown--
 	}
 }

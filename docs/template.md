@@ -99,7 +99,7 @@ All required unless noted. A phrase in both `guard.blocked_phrases` and `persona
 |---|---|---|---|---|
 | `kpi.engagements_per_day` | int > 0 | no block | code | Daily engagement target; behind when under it |
 | `kpi.followers_per_week` | int > 0 | no block | code | Weekly follower target shown on the scoreboard |
-| `kpi.max_hours_without_publish` | int > 0 | no block | code | Behind when the last publish is this old; also the silence after which the owner gets one notice a day ([operations.md](operations.md)) |
+| `kpi.max_hours_without_publish` | int > 0 | no block | code | Behind when the last publish is this old; also the silence, plus 3 hours, after which a live agent's owner gets one notice a day ([operations.md](operations.md)) |
 | `kpi.on_target_minutes_between_wakes` | int, `limits.min_minutes_between_wakes`..1440 | no block | code | Wait before the next wake when on target |
 
 The `kpi:` block is optional; once any of its four keys exists all four are required. The viral template starts at 10, 5, 8, 180.

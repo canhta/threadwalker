@@ -81,7 +81,7 @@ func TestWakeStoresRedactedBoundedTranscript(t *testing.T) {
 				t.Fatalf("tool result not capped: %d err=%v", len(body.Output), err)
 			}
 			// The dispatcher clips a result far below the transcript cap, dropping whole items.
-			clipped = clipped || strings.Contains(body.Output, `"shown":0`)
+			clipped = clipped || strings.Contains(body.Output, `"clipped_lists"`)
 			if !body.Untrusted {
 				t.Fatalf("%s untrusted=%v", body.Tool, body.Untrusted)
 			}

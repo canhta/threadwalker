@@ -23,6 +23,14 @@ func terminalToolFailure(err error) error {
 }
 
 type rejectionKey struct{}
+type finalKey struct{}
+
+// FinalRequest reports whether a call comes from the last model request the
+// wake may make: the model never sees its result.
+func FinalRequest(ctx context.Context) bool {
+	final, _ := ctx.Value(finalKey{}).(bool)
+	return final
+}
 
 // RejectedReason is the reason the client attaches to a call taken from a
 // malformed response; the dispatcher must refuse and audit it, never run it.

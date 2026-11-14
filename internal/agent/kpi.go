@@ -100,7 +100,7 @@ func (s scoreboard) stopCheck(hidden []string, open func() []string, usdLeft flo
 		if !called["ideas"] && !slices.Contains(hidden, "ideas") {
 			todo = append(todo, "call ideas")
 		}
-		if refs := open(); len(refs) > 0 && usdLeft >= minUSDToContinue {
+		if refs := open(); len(refs) > 0 && !slices.Contains(hidden, "reply") && usdLeft >= minUSDToContinue {
 			shown := refs[:min(len(refs), 8)]
 			todo = append(todo, fmt.Sprintf("%d posts you read still score well and you have not answered them (%s); reply only to one you have a real angle for", len(refs), strings.Join(shown, ", ")))
 		}

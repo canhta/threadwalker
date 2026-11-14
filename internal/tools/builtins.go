@@ -16,13 +16,16 @@ import (
 func (d *Dispatcher) executors() map[string]executor {
 	tools := map[string]executor{
 		"mark_do_not_contact": func(ctx context.Context, a arguments) (any, error) {
+			if err := d.countCall("mark_do_not_contact"); err != nil {
+				return nil, err
+			}
 			if err := d.opts.Store.MarkDoNotContact(ctx, d.opts.Template.ID, a.Text("username"), "agent_request"); err != nil {
 				return nil, errors.New("marking do not contact: failed")
 			}
 			return map[string]bool{"do_not_contact": true}, nil
 		},
 		"fetch_trends": func(ctx context.Context, a arguments) (any, error) {
-			if err := d.countRead("fetch_trends"); err != nil {
+			if err := d.countCall("fetch_trends"); err != nil {
 				return nil, err
 			}
 			fetched, err := d.opts.FetchTrends(ctx)
@@ -61,7 +64,7 @@ func (d *Dispatcher) executors() map[string]executor {
 				}
 			}
 			if name == "read_feed" {
-				if err := d.countRead(name); err != nil {
+				if err := d.countCall(name); err != nil {
 					return nil, err
 				}
 			}
@@ -95,7 +98,7 @@ func (d *Dispatcher) executors() map[string]executor {
 	}
 	if d.opts.Template.WebSearch.Enabled {
 		tools["web_search"] = func(ctx context.Context, a arguments) (any, error) {
-			if err := d.countRead("web_search"); err != nil {
+			if err := d.countCall("web_search"); err != nil {
 				return nil, err
 			}
 			result, err := d.webSearch(ctx, a.Text("query"))
@@ -126,6 +129,9 @@ func (d *Dispatcher) executors() map[string]executor {
 		for _, name := range []string{"notify_owner", "ask_owner"} {
 			question := name == "ask_owner"
 			tools[name] = func(ctx context.Context, a arguments) (any, error) {
+				if err := d.countCall(name); err != nil {
+					return nil, err
+				}
 				id, err := d.opts.Owner.QueueOwner(ctx, d.opts.Template.ID, a.Text("text"), question)
 				if err != nil {
 					return nil, errors.New("queueing owner message: failed")

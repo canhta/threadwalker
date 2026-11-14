@@ -319,6 +319,10 @@ func (c *Client) Run(ctx context.Context, agentID string, wakeID int64, messages
 		if dispatcher == nil {
 			return result, failure("running chat loop", "missing_dispatcher", nil)
 		}
+		dispatchCtx := ctx
+		if result.Steps >= c.maxSteps {
+			dispatchCtx = context.WithValue(ctx, finalKey{}, true)
+		}
 		for _, call := range message.ToolCalls {
 			if err := ctx.Err(); err != nil {
 				return result, fmt.Errorf("dispatching tool call: %w", err)
@@ -333,7 +337,7 @@ func (c *Client) Run(ctx context.Context, agentID string, wakeID int64, messages
 			if known[call.Function.Name] {
 				safeTool = call.Function.Name
 			}
-			output, toolErr = dispatcher.Dispatch(ctx, call)
+			output, toolErr = dispatcher.Dispatch(dispatchCtx, call)
 			toolError = toolErr != nil
 			if toolErr != nil {
 				outcome, reason = "error", "dispatch_failed"

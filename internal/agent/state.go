@@ -77,9 +77,9 @@ func (s wakeState) replyClosed() bool {
 	return s.RepliesLeft == 0 || (s.HourLimit > 0 && s.HourLeftAtEnd == 0) || s.RepliesPausedUntil.After(s.Now.Add(maxWakeSpan))
 }
 
-// nothingToDo: no write tool is usable and nobody wrote to the agent.
-func (s wakeState) nothingToDo(inbox int) bool {
-	return s.postClosed() && s.replyClosed() && inbox == 0
+// nothingToDo: no write tool is usable, so the wake could not answer anyone either.
+func (s wakeState) nothingToDo() bool {
+	return s.postClosed() && s.replyClosed()
 }
 
 // withClosed adds the write tools whose gates are closed for the whole wake to

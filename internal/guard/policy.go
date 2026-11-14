@@ -537,6 +537,10 @@ func (g *Guard) reserve(ctx context.Context, a Attempt, intent *actionIntent, au
 					return err
 				}
 			}
+			// After a pacing wait the first pass left the row marked refused.
+			if err = tx.ClearBlocked(ctx, auditID); err != nil {
+				return err
+			}
 		}
 		if reason != "" {
 			return tx.MarkBlocked(ctx, auditID, reason)

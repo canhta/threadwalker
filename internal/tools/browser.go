@@ -88,7 +88,7 @@ func (d *Dispatcher) checkTopic(a *arguments) error {
 		}
 		a.Args = a.Args.WithText("url", seen)
 	}
-	return d.countRead("read_topic")
+	return d.countCall("read_topic")
 }
 
 func (d *Dispatcher) observeStops(ctx context.Context, operation string, page threads.Page) error {

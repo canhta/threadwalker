@@ -302,7 +302,7 @@ func TestGuardClientAuditsRejectedAndRefusesRepeatedFailures(t *testing.T) {
 			}
 			var count, blocked int
 			st.DB().QueryRow(`SELECT COUNT(*) FROM tool_calls`).Scan(&count)
-			st.DB().QueryRow(`SELECT COUNT(*) FROM tool_calls WHERE blocked_by='tool_closed'`).Scan(&blocked)
+			st.DB().QueryRow(`SELECT COUNT(*) FROM tool_calls WHERE blocked_by='repeat_refused'`).Scan(&blocked)
 			if count != 5 || blocked != 2 {
 				t.Fatalf("audits %d stall %d", count, blocked)
 			}
