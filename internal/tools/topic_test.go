@@ -48,13 +48,19 @@ func TestReadTopicAfterTrendingPanel(t *testing.T) {
 	h.next()
 	h.mustCall("reply", `{"text":"Synthetic reply","target":"p1"}`)
 
-	for i := 0; i < tools.MaxTopicReadsPerWake; i++ {
+	// The first reads above count toward the cap; the call past it is refused
+	// and the source closes for the rest of the wake.
+	var err error
+	for i := 0; i < tools.MaxTopicReadsPerWake+1 && (err == nil || !strings.Contains(err.Error(), "limit_per_wake")); i++ {
 		h.next()
-		_, _ = h.call("find_posts", `{"source":"topic","query":"more"}`)
+		_, err = h.call("find_posts", `{"source":"topic","query":"more"}`)
+	}
+	if err == nil || !strings.Contains(err.Error(), "limit_per_wake") {
+		t.Fatalf("cap not enforced: %v", err)
 	}
 	h.next()
-	if _, err := h.call("find_posts", `{"source":"topic","query":"over"}`); err == nil || !strings.Contains(err.Error(), "limit_per_wake") {
-		t.Fatalf("cap not enforced: %v", err)
+	if _, err = h.call("find_posts", `{"source":"topic","query":"over"}`); err == nil || !strings.Contains(err.Error(), "tool_closed") {
+		t.Fatalf("source not closed after its cap: %v", err)
 	}
 }
 

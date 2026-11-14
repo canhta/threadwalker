@@ -178,9 +178,10 @@ func TestPostSpacedPastTheWakeClosesAfterTheFirstRefusal(t *testing.T) {
 	}
 }
 
-// #95: the daily browser reply cap shuts only the browser path; replies to a
-// post with an API id still go out, and the reply tool is never closed.
-func TestBrowserReplyCapLeavesAPIRepliesOpen(t *testing.T) {
+// #95, #102: the daily browser reply cap first shuts only the browser path, so a
+// reply to a post with an API id still goes out; a second browser refusal shows
+// the model is still reaching for feed posts, and reply closes for the wake.
+func TestBrowserReplyCapLeavesAPIRepliesOpenThenCloses(t *testing.T) {
 	h := newBrowserHarness(t, true, func(o *tools.Options) { o.Template.Limits.BrowserRepliesPerDay = 1 })
 	reply := func(slug, id string) error {
 		h.next()
@@ -191,13 +192,38 @@ func TestBrowserReplyCapLeavesAPIRepliesOpen(t *testing.T) {
 	if err := reply("a", ""); err != nil {
 		t.Fatal(err)
 	}
-	for _, slug := range []string{"b", "c", "d", "e"} {
-		if reason, hint := blockedResult(t, reply(slug, "")); reason != "browser_replies_per_day" || !strings.Contains(hint, "inbox item or an open reply candidate") {
-			t.Fatalf("browser reply %s: %s %q", slug, reason, hint)
-		}
+	if reason, hint := blockedResult(t, reply("b", "")); reason != "browser_replies_per_day" || !strings.Contains(hint, "inbox item or an open reply candidate") {
+		t.Fatalf("browser reply b: %s %q", reason, hint)
 	}
 	if err := reply("f", "api-f"); err != nil {
-		t.Fatalf("api reply after the browser cap: %v", err)
+		t.Fatalf("api reply after the first browser refusal: %v", err)
+	}
+	if reason, hint := blockedResult(t, reply("c", "")); reason != "browser_replies_per_day" || !strings.Contains(hint, "closed for the rest of the wake") {
+		t.Fatalf("second browser refusal: %s %q", reason, hint)
+	}
+	if reason, _ := blockedResult(t, reply("g", "api-g")); reason != "tool_closed" {
+		t.Fatalf("reply after closing: %s", reason)
+	}
+}
+
+// A per-wake cap never reopens: past it the tool is closed, not refused again.
+func TestACappedToolIsClosed(t *testing.T) {
+	_, opts, _ := setup(t)
+	opts.Ideas = func(context.Context, []quality.Item) ([]quality.Idea, error) { return []quality.Idea{}, nil }
+	d, err := tools.NewDispatcher(opts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i := 1; i <= 3; i++ {
+		dispatch(t, d, "ideas", "{}")
+	}
+	_, err = d.Dispatch(context.Background(), call("ideas", "{}"))
+	if reason, _ := blockedResult(t, err); reason != "limit_per_wake" {
+		t.Fatalf("4th: %s", reason)
+	}
+	_, err = d.Dispatch(context.Background(), call("ideas", "{}"))
+	if reason, _ := blockedResult(t, err); reason != "tool_closed" {
+		t.Fatalf("5th: %s", reason)
 	}
 }
 

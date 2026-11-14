@@ -184,9 +184,13 @@ func (d *Dispatcher) countCall(name string) error {
 const closeAtRefusals = 3
 
 // uncounted are refusals the dispatcher itself raises about the wake or the
-// repeat, not about what the model asked for, and browser_replies_per_day: it
-// shuts only the browser reply path, never the reply tool, whose API replies stay allowed.
-var uncounted = []string{"tool_closed", "tool_hidden", "tool_call_cap", "repeat_refused", "stall_stop", "browser_stopped", "audit_failure", "browser_replies_per_day"}
+// repeat, not about what the model asked for.
+var uncounted = []string{"tool_closed", "tool_hidden", "tool_call_cap", "repeat_refused", "stall_stop", "browser_stopped", "audit_failure"}
+
+// browserCapCloses is how many browser_replies_per_day refusals close reply
+// for the wake: the first leaves API replies (inbox, candidates) open, a
+// second shows the model is still reaching for feed posts it cannot answer.
+const browserCapCloses = 2
 
 // timeGated refusals lift at a time the refusal names: they close a tool only
 // when that is past the wake's horizon, never by counting.
@@ -211,9 +215,20 @@ func (d *Dispatcher) countRefusal(tool, arguments string, err error) {
 		}
 		return
 	}
-	if blocked.Reason == "api_quota_exhausted" { // a daily window: it does not reopen today
+	switch blocked.Reason {
+	case "api_quota_exhausted": // a daily window: it does not reopen today
 		d.closed[scope] = true
 		blocked.Next = "this tool is closed for the rest of the wake"
+		return
+	case "limit_per_wake": // a per-wake cap never reopens within the wake
+		d.closed[blocked.Detail] = true
+		blocked.Next = "this tool is closed for the rest of the wake"
+		return
+	case "browser_replies_per_day":
+		if d.refused[scope+"\x00browser"]++; d.refused[scope+"\x00browser"] >= browserCapCloses {
+			d.closed[scope] = true
+			blocked.Next = "reply is closed for the rest of the wake"
+		}
 		return
 	}
 	key := scope + "\x00" + blocked.Reason
