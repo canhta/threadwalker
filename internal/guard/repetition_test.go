@@ -18,7 +18,9 @@ func TestRepeatedClosingTokenIsFlaggedBeforeTheCritic(t *testing.T) {
 	}{
 		{"emoticon run repeated in 5 replies", "hay quá :)))", "giá vé tăng gấp đôi thật luôn :)))", 1, true},
 		{"emoji repeated", "thương quá 😭", "vé hết trong 5 phút 😭", 1, true},
-		{"last two words repeated", "ai mua được vậy", "mà ai mua được vậy?", 1, true},
+		{"emoticon run of another length", "hay quá :))))", "giá vé tăng gấp đôi thật luôn :)))))", 1, true},
+		{"laugh token", "hay quá kkkk", "giá vé tăng gấp đôi kkk", 1, true},
+		{"a different ending passes", "hay quá :)))", "giá vé tăng gấp đôi thật luôn", 1, false},
 		{"live rows are another mode", "hay quá :)))", "giá vé tăng gấp đôi thật luôn :)))", 0, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -42,8 +44,8 @@ func TestRepeatedClosingTokenIsFlaggedBeforeTheCritic(t *testing.T) {
 				}
 				return
 			}
-			if !errors.As(err, &blocked) || blocked.Reason != "critic_rejected" || !strings.Contains(blocked.Detail, "closes 5 of your last 5 texts") || calls != 0 {
-				t.Fatalf("err %v critic calls %d, want critic_rejected before the critic", err, calls)
+			if !errors.As(err, &blocked) || blocked.Reason != "repeat_ending" || blocked.Detail == "" || !strings.Contains(guard.Hint(blocked.Reason, blocked.Detail), blocked.Detail) || calls != 0 {
+				t.Fatalf("err %v critic calls %d, want repeat_ending before the critic", err, calls)
 			}
 		})
 	}

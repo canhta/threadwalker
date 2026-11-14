@@ -398,6 +398,7 @@ func (g *Guard) review(ctx context.Context, a Attempt, intent *actionIntent) (re
 	if err != nil {
 		return "critic_unavailable", "", ""
 	}
+	ending := "" // the overused closing token of the last draft checked
 	check := func(texts []string) []string {
 		if why, d := g.recheck(a, texts); why != "" {
 			return []string{Hint(why, d)}
@@ -405,9 +406,11 @@ func (g *Guard) review(ctx context.Context, a Attempt, intent *actionIntent) (re
 		if p := factProblem(intent.Fact, texts); p != "" {
 			return []string{p}
 		}
-		if p := repetitionProblem(texts[len(texts)-1], recent); p != "" {
-			return []string{p}
+		if t := overusedEnding(texts[len(texts)-1], recent); t != "" {
+			ending = t
+			return []string{Hint("repeat_ending", t)}
 		}
+		ending = ""
 		return nil
 	}
 	redact := config.NewRedactor(g.opts.Template).String
@@ -425,7 +428,7 @@ func (g *Guard) review(ctx context.Context, a Attempt, intent *actionIntent) (re
 		source = "writer"
 		intent.tries = append(intent.tries, draftTrace("agent", intent.texts(), nil))
 	}
-	tries, ok, err := quality.Revise(ctx, g.opts.Writer, g.opts.Critic, check, quality.WriterInput{Kind: a.Tool, Angle: intent.Angle, Fact: intent.Fact, Parent: parent, Draft: intent.texts(), Recent: recent, Lessons: lessons}, MaxRevisions)
+	tries, ok, err := quality.Revise(ctx, g.opts.Writer, g.opts.Critic, check, quality.WriterInput{Kind: a.Tool, Angle: intent.Angle, Fact: intent.Fact, Parent: parent, Draft: intent.texts(), Recent: recent, Endings: recentEndings(recent), Lessons: lessons}, MaxRevisions)
 	for _, t := range tries {
 		v := t.Verdict
 		intent.tries = append(intent.tries, draftTrace(source, t.Texts, &v))
@@ -436,6 +439,9 @@ func (g *Guard) review(ctx context.Context, a Attempt, intent *actionIntent) (re
 	}
 	last := tries[len(tries)-1]
 	encoded, _ := json.Marshal(last.Verdict)
+	if !ok && ending != "" {
+		return "repeat_ending", ending, ""
+	}
 	if ok {
 		intent.Text, intent.Parts = last.Texts[0], last.Texts[1:]
 		return "", "", string(encoded)

@@ -72,6 +72,7 @@ flowchart TD
 | `min_seconds_between_actions` | Spacing since the newest action under `limits.min_seconds_between_actions`; the hint names the next allowed time | template | reserve |
 | `min_minutes_between_posts` | A post within `limits.min_minutes_between_posts` of the newest own post; replies are not affected; the hint names the next allowed time | template | reserve |
 | `owner_note_open` | An owner note is open and the post names none via `answers_note` | code | reserve |
+| `repeat_ending` | The final text's closing token (trailing emoticon or emoji run, or a laugh such as `kkk`) already ends 3 of the agent's last 10 live actions (dry-run actions count only in dry-run mode); the writer gets two rewrites first, the hint names the token and says to end differently | code | reserve |
 | `repeat_topic` | Post's `trend_ref` equals that of an own post of the last 24 h, or its first line shares at least two words (4+ letters, links left out) and half of the smaller word set with one | code | reserve |
 
 Dashboard-only codes: the `lesson_*` reasons of a lesson the text gate refused, and `stale_ref`, show as "blocked", not as guard codes.

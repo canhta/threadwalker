@@ -1,7 +1,7 @@
 package guard
 
 import (
-	"fmt"
+	"regexp"
 	"strings"
 	"unicode"
 )
@@ -13,39 +13,50 @@ const (
 	repeatLimit  = 3
 )
 
-// closingToken is the trailing run of symbols and punctuation of a text (an
-// emoticon like ":)))" or an emoji), or its last two words when it ends in
-// letters or in plain sentence punctuation. Case is folded.
+var laugh = regexp.MustCompile(`^(k{3,}|(ha){2,}|(hi){2,}|(he){2,})$`)
+
+// closingToken is the trailing run of symbols (an emoticon like ":)))" or an
+// emoji, sentence punctuation left out) of a text, or its last word when that
+// is a laugh (kkk, haha). Runs of one symbol collapse, so ":)))" and ":))))"
+// are the same token. A text that ends in anything else has none.
 func closingToken(text string) string {
 	runes := []rune(strings.TrimSpace(text))
-	end := len(runes)
-	i := end
+	i := len(runes)
 	for i > 0 && !unicode.IsLetter(runes[i-1]) && !unicode.IsDigit(runes[i-1]) && !unicode.IsSpace(runes[i-1]) {
 		i--
 	}
-	if run := string(runes[i:end]); strings.Trim(run, ".,!?;") != "" {
-		return run
+	if run := strings.TrimRight(string(runes[i:]), ".,!?;"); run != "" {
+		var out []rune
+		for _, r := range run {
+			if len(out) == 0 || out[len(out)-1] != r {
+				out = append(out, r)
+			}
+		}
+		return string(out)
 	}
-	words := strings.Fields(strings.ToLower(strings.TrimRight(string(runes[:i]), " \t\n")))
-	if len(words) > 2 {
-		words = words[len(words)-2:]
+	fields := strings.Fields(strings.ToLower(string(runes[:i])))
+	if len(fields) == 0 {
+		return ""
 	}
-	return strings.Join(words, " ")
+	switch w := fields[len(fields)-1]; {
+	case !laugh.MatchString(w):
+		return ""
+	case w[0] == 'k':
+		return "kkk"
+	default:
+		return strings.Repeat(w[:2], 2)
+	}
 }
 
-// repetitionProblem returns a revision problem when the draft's closing token
-// ends repeatLimit or more of the newest repeatWindow texts in recent (newest
-// first), else "". It is deterministic and runs before the critic.
-func repetitionProblem(draft string, recent []string) string {
+// overusedEnding returns the draft's closing token when it ends repeatLimit or
+// more of the newest repeatWindow texts in recent (newest first), else "".
+func overusedEnding(draft string, recent []string) string {
 	token := closingToken(draft)
 	if token == "" {
 		return ""
 	}
-	if len(recent) > repeatWindow {
-		recent = recent[:repeatWindow]
-	}
 	n := 0
-	for _, r := range recent {
+	for _, r := range recent[:min(len(recent), repeatWindow)] {
 		if closingToken(r) == token {
 			n++
 		}
@@ -53,5 +64,18 @@ func repetitionProblem(draft string, recent []string) string {
 	if n < repeatLimit {
 		return ""
 	}
-	return fmt.Sprintf("the ending %q closes %d of your last %d texts; end this one a different way", token, n, len(recent))
+	return token
+}
+
+// recentEndings is the distinct closing tokens of the newest repeatWindow texts in recent.
+func recentEndings(recent []string) []string {
+	out := []string{}
+	seen := map[string]bool{}
+	for _, r := range recent[:min(len(recent), repeatWindow)] {
+		if t := closingToken(r); t != "" && !seen[t] {
+			seen[t] = true
+			out = append(out, t)
+		}
+	}
+	return out
 }

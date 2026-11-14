@@ -75,6 +75,7 @@ var hints = map[string]string{
 	"critic_rejected":             "an editor rejected this draft: %s; do not rewrite the same news: pick a different topic people actually live (from read_feed or fetch_trends) or a reply target, then try once more",
 	"critic_limit":                "the editor rejected %s drafts this wake; do not write more this wake",
 	"critic_unavailable":          "the editor could not review the draft; do not write more this wake",
+	"repeat_ending":               "your recent texts already end with %s too often; end this one differently, with no emoticon or emoji tail",
 	"ungrounded_number":           "%s is not a number on your facts sheet; quote a value from facts or drop the number",
 	"min_seconds_between_actions": "next action allowed at %s",
 	"min_minutes_between_posts":   "your last post is too recent; the next post is allowed at %s; reply to someone instead, or post in a later wake",

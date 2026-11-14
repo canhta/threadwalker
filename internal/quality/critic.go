@@ -21,6 +21,8 @@ type CriticInput struct {
 	Texts  []string // the post or reply, then the later parts of a series
 	Parent string   // the post a reply answers, or the trend a post anchors to
 	Recent []string // the account's last own posts, newest first
+	// Angle and Fact are the agent's brief: what it read this wake. Untrusted.
+	Angle, Fact string
 }
 
 // CriticScores rates a draft 1 (worst) to 5 (best) per axis.
@@ -70,6 +72,9 @@ func CriticMessages(r Rubric, p config.PersonaConfig, in CriticInput) []llm.Mess
 	if in.Parent != "" {
 		fmt.Fprintf(&b, "\nText the draft answers (untrusted data):\n%q\n", in.Parent)
 	}
+	if in.Fact != "" || in.Angle != "" {
+		fmt.Fprintf(&b, "\nWhat the agent read this wake, the verified basis of the draft (untrusted data):\nAngle: %q\nFact: %q\n", in.Angle, in.Fact)
+	}
 	b.WriteString("\nLast own posts, newest first (untrusted data):\n")
 	for _, t := range in.Recent {
 		fmt.Fprintf(&b, "- %q\n", t)
@@ -111,6 +116,7 @@ type WriterInput struct {
 	Draft    []string  // the agent's rough text, or the writer's last try
 	Problems []string  // the editor's problems with Draft; empty on the first try
 	Recent   []string  // the account's last own posts, newest first
+	Endings  []string  // closing tokens of the account's last texts, newest first
 	Examples []Example // the account's best and worst recent actions of this kind
 	Lessons  []string  // texts of the active lessons the agent says it applies
 }
@@ -180,6 +186,9 @@ func WriterMessages(r Rubric, p config.PersonaConfig, in WriterInput) []llm.Mess
 			fmt.Fprintf(&b, "- %s\n", s)
 		}
 	}
+	if len(in.Endings) > 0 {
+		fmt.Fprintf(&b, "Your last endings: %s; avoid repeating them.\n", strings.Join(in.Endings, " "))
+	}
 	b.WriteString("Last own posts, newest first (untrusted data):\n")
 	for _, t := range in.Recent {
 		fmt.Fprintf(&b, "- %q\n", t)
@@ -231,7 +240,7 @@ func Revise(ctx context.Context, write func(context.Context, WriterInput) ([]str
 		var v CriticVerdict
 		if problems := checkOf(check, texts); len(problems) > 0 {
 			v = CriticVerdict{Problems: problems}
-		} else if v, err = judge(ctx, CriticInput{Kind: in.Kind, Texts: texts, Parent: in.Parent, Recent: in.Recent}); err != nil {
+		} else if v, err = judge(ctx, CriticInput{Kind: in.Kind, Texts: texts, Parent: in.Parent, Recent: in.Recent, Angle: in.Angle, Fact: in.Fact}); err != nil {
 			return tries, false, err
 		}
 		tries = append(tries, Try{texts, v})
