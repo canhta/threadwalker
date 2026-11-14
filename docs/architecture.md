@@ -60,7 +60,7 @@ Each fact about an agent lives in exactly one owner. The agent changes only the 
 |---|---|---|
 | Code (Go, same for every agent) | Wake loop: read, `ideas`, write, critic, guard, publish, measure; tools and argument schemas; role prompts of writer, critic and ideas (what the call does and its JSON shape, nothing about audience, language or style); hard limits (safety and privacy, untrusted-data boundaries, secret and link checks, ungrounded self-stat numbers, caps, budget and step limits, dry-run); measurement (metric jobs, KPI scoreboard arithmetic, cadence from the KPI gap); storage, retention, dashboard, Telegram, self-update | A release |
 | Template (per agent, fixed while it runs) | Who it writes for (audience, language, identity, voice, topics, avoided topics); what good looks like (writer and critic rules, starting examples); numbers (KPI targets, caps, budget, intervals, the timezone and the quiet hours in which no wake runs, trend sources, models and reasoning effort); hard-limit lists (blocked phrases, off-limits subjects, own accounts) | The owner, by editing the template; every key in [template.md](template.md) |
-| Agent-learned (database) | Contacts and do-not-contact marks; the measured numbers of its own actions (inside the template's waking hours) | The agent through tools; code bounds every write |
+| Agent-learned (database) | Contacts and do-not-contact marks; the measured numbers of its own actions (inside the template's waking hours); lessons | Contacts: the agent through tools. Lessons: the dream only, through tools; code bounds every write and the owner can forget one |
 
 
 ## Data flow

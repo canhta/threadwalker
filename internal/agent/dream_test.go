@@ -3,15 +3,39 @@ package agent_test
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/canhta/threadz/internal/agent"
+	"github.com/canhta/threadz/internal/config"
 	"github.com/canhta/threadz/internal/llm"
 	"github.com/canhta/threadz/internal/store"
+	"github.com/canhta/threadz/internal/threads"
 )
+
+func TestDreamLaunchesNoThreadsBackend(t *testing.T) {
+	ctx := context.Background()
+	g := newDreamRig(t)
+	g.episodes(t, 6)
+	tmpl := agent.OfflineTemplate()
+	tmpl.Limits.MaxUSDPerDream, tmpl.Limits.MaxStepsPerDream = 1, 8
+	launched := 0
+	r, err := agent.New(agent.Options{Store: g.st, Template: tmpl, Now: func() time.Time { return g.now }, HTTPClient: g.fixture.Client(), FetchTrends: g.fixture.Trends,
+		ThreadsFactory: func(context.Context, config.Template) (threads.Backend, error) {
+			launched++
+			return nil, errors.New("the dream must not open Threads")
+		}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	wake, err := r.RunPhase(ctx, store.WakeDream, "2026-01-03")
+	if err != nil || wake.EndReason != "completed" || launched != 0 {
+		t.Fatalf("wake=%+v err=%v launched=%d", wake, err, launched)
+	}
+}
 
 type dreamRig struct {
 	r       *agent.Runtime

@@ -95,7 +95,7 @@ func TestLoggingFailurePathRedactionAtEveryLevel(t *testing.T) {
 				case "missing_usage":
 					body = `{"private":"` + loggingFakeProviderBody + `"}`
 				case "invalid_tool_call_id":
-					body = `{"choices":[{"message":{"role":"assistant","tool_calls":[{"id":"","type":"function","function":{"name":"note_write","arguments":"{}"}}]}}],"usage":{"prompt_tokens":10,"completion_tokens":2}}`
+					body = `{"choices":[{"message":{"role":"assistant","tool_calls":[{"id":"","type":"function","function":{"name":"web_search","arguments":"{}"}}]}}],"usage":{"prompt_tokens":10,"completion_tokens":2}}`
 				case "incomplete_response":
 					body = strings.Replace(valid(), `"finish_reason":"stop"`, `"finish_reason":"length"`, 1)
 				case "http_error":
@@ -103,7 +103,7 @@ func TestLoggingFailurePathRedactionAtEveryLevel(t *testing.T) {
 				case "retry_exhausted":
 					status = 503
 				case "step_limit", "dispatch_failed":
-					b, _ := json.Marshal(loggingToolResponse(t, llm.ToolCall{ID: poison, Type: "function", Function: llm.CallFunction{Name: "note_write", Arguments: `{"text":"` + loggingFakeNote + `"}`}}))
+					b, _ := json.Marshal(loggingToolResponse(t, llm.ToolCall{ID: poison, Type: "function", Function: llm.CallFunction{Name: "web_search", Arguments: `{"text":"` + loggingFakeNote + `"}`}}))
 					body = string(b)
 				}
 				transport := roundTripFunc(func(r *http.Request) (*http.Response, error) {
@@ -130,7 +130,7 @@ func TestLoggingFailurePathRedactionAtEveryLevel(t *testing.T) {
 					ctx = cancelled
 					ledger.readErr = context.Canceled
 				}
-				tools := []llm.Tool{loggingTool("note_write", "")}
+				tools := []llm.Tool{loggingTool("web_search", "")}
 				tools[0].Function.Description = poison
 				if scenario == "invalid_request" {
 					tools[0].Function.Parameters = json.RawMessage(poison)

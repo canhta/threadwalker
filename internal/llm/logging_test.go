@@ -258,7 +258,7 @@ func TestLoggingSuccessfulToolLoopCorrelatesEvents(t *testing.T) {
 					Role: "assistant",
 					ToolCalls: []llm.ToolCall{{
 						ID: "call-correlated-1", Type: "function",
-						Function: llm.CallFunction{Name: "note_write", Arguments: string(args)},
+						Function: llm.CallFunction{Name: "web_search", Arguments: string(args)},
 					}},
 				}}},
 				"usage": map[string]int64{"prompt_tokens": 120, "completion_tokens": 30},
@@ -275,7 +275,7 @@ func TestLoggingSuccessfulToolLoopCorrelatesEvents(t *testing.T) {
 	ledger := &memoryLedger{}
 	client := loggingClient(t, server, ledger, llm.Options{Logger: logger})
 	result, err := client.Run(context.Background(), "agent-logging", 42, loggingMessages(),
-		[]llm.Tool{loggingTool("note_write", `{"type":"object"}`)},
+		[]llm.Tool{loggingTool("web_search", `{"type":"object"}`)},
 		llm.DispatchFunc(func(_ context.Context, call llm.ToolCall) (string, error) {
 			if call.ID != "call-correlated-1" {
 				t.Errorf("dispatched tool call id = %q", call.ID)
@@ -336,7 +336,7 @@ func TestLoggingSuccessfulToolLoopCorrelatesEvents(t *testing.T) {
 	}
 
 	tool := loggingOneEvent(t, records, "llm.tool.finished")
-	if got := loggingStringField(t, tool, "tool"); got != "note_write" {
+	if got := loggingStringField(t, tool, "tool"); got != "web_search" {
 		t.Errorf("tool.finished tool = %q", got)
 	}
 	// Tool calls are correlated by the local wake/step identifier, never by an
@@ -468,7 +468,7 @@ func TestLoggingMalformedResponsesStopSafely(t *testing.T) {
 		{name: "no choices", body: `{"choices":[],"usage":{"prompt_tokens":10,"completion_tokens":2}}`},
 		{name: "missing usage", body: `{"choices":[{"message":{"role":"assistant","content":"ok"},"finish_reason":"stop"}]}`},
 		{name: "negative usage", body: `{"choices":[{"message":{"role":"assistant","content":"ok"},"finish_reason":"stop"}],"usage":{"prompt_tokens":-1,"completion_tokens":2}}`},
-		{name: "duplicate tool call id", body: `{"choices":[{"message":{"role":"assistant","tool_calls":[{"id":"same","type":"function","function":{"name":"note_write","arguments":"{}"}},{"id":"same","type":"function","function":{"name":"note_write","arguments":"{}"}}]}}],"usage":{"prompt_tokens":10,"completion_tokens":2}}`},
+		{name: "duplicate tool call id", body: `{"choices":[{"message":{"role":"assistant","tool_calls":[{"id":"same","type":"function","function":{"name":"web_search","arguments":"{}"}},{"id":"same","type":"function","function":{"name":"web_search","arguments":"{}"}}]}}],"usage":{"prompt_tokens":10,"completion_tokens":2}}`},
 		{name: "unfinished response", body: `{"choices":[{"message":{"role":"assistant","content":"partial"},"finish_reason":"length"}],"usage":{"prompt_tokens":10,"completion_tokens":2}}`},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -505,9 +505,9 @@ func TestLoggingMalformedToolCallsDoNotEchoPayloads(t *testing.T) {
 		if requests == 1 {
 			loggingWriteJSON(t, w, loggingToolResponse(t,
 				llm.ToolCall{ID: "call-unknown", Type: "function", Function: llm.CallFunction{Name: loggingFakeUnknownTool, Arguments: `{}`}},
-				llm.ToolCall{ID: "call-bad-args", Type: "function", Function: llm.CallFunction{Name: "note_write", Arguments: badArguments}},
-				llm.ToolCall{ID: "call-bad-type", Type: "not_function", Function: llm.CallFunction{Name: "note_write", Arguments: `{}`}},
-				llm.ToolCall{ID: "call-dispatch", Type: "function", Function: llm.CallFunction{Name: "note_write", Arguments: `{}`}},
+				llm.ToolCall{ID: "call-bad-args", Type: "function", Function: llm.CallFunction{Name: "web_search", Arguments: badArguments}},
+				llm.ToolCall{ID: "call-bad-type", Type: "not_function", Function: llm.CallFunction{Name: "web_search", Arguments: `{}`}},
+				llm.ToolCall{ID: "call-dispatch", Type: "function", Function: llm.CallFunction{Name: "web_search", Arguments: `{}`}},
 			))
 			return
 		}
@@ -521,11 +521,11 @@ func TestLoggingMalformedToolCallsDoNotEchoPayloads(t *testing.T) {
 	client := loggingClient(t, server, &memoryLedger{}, llm.Options{Logger: logger, MaxSteps: 10})
 	dispatches := 0
 	result, err := client.Run(context.Background(), "agent-logging", 10, loggingMessages(),
-		[]llm.Tool{loggingTool("note_write", `{"type":"object"}`)},
+		[]llm.Tool{loggingTool("web_search", `{"type":"object"}`)},
 		wellFormed(llm.DispatchFunc(func(context.Context, llm.ToolCall) (string, error) {
 			dispatches++
 			return "", errors.New("fake guard rejected: " + loggingFakeToolResult)
-		}), "note_write"))
+		}), "web_search"))
 	if err != nil || result.Content != "recovered" || result.Steps != 5 || dispatches != 1 {
 		t.Fatalf("result = %+v dispatches = %d err = %v", result, dispatches, err)
 	}
@@ -587,7 +587,7 @@ func TestLoggingBudgetAndStepStops(t *testing.T) {
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			requests++
 			loggingWriteJSON(t, w, loggingToolResponse(t,
-				llm.ToolCall{ID: "call-step", Type: "function", Function: llm.CallFunction{Name: "note_write", Arguments: `{}`}},
+				llm.ToolCall{ID: "call-step", Type: "function", Function: llm.CallFunction{Name: "web_search", Arguments: `{}`}},
 			))
 		}))
 		defer server.Close()
@@ -602,7 +602,7 @@ func TestLoggingBudgetAndStepStops(t *testing.T) {
 			t.Fatal(err)
 		}
 		_, err = client.Run(context.Background(), "agent-logging", 12, loggingMessages(),
-			[]llm.Tool{loggingTool("note_write", `{"type":"object"}`)},
+			[]llm.Tool{loggingTool("web_search", `{"type":"object"}`)},
 			llm.DispatchFunc(func(context.Context, llm.ToolCall) (string, error) { return "ok", nil }))
 		if !errors.Is(err, llm.ErrStepLimit) {
 			t.Fatalf("step error = %v", err)
@@ -716,7 +716,7 @@ func TestLoggingRedactionHoldsAtDebugAndInfo(t *testing.T) {
 							Role: "assistant",
 							ToolCalls: []llm.ToolCall{
 								{ID: "call-unknown", Type: "function", Function: llm.CallFunction{Name: loggingFakeUnknownTool, Arguments: `{"` + loggingFakeToolArgs + `":true}`}},
-								{ID: "call-known", Type: "function", Function: llm.CallFunction{Name: "note_write", Arguments: `{"text":"` + loggingFakeToolArgs + `"}`}},
+								{ID: "call-known", Type: "function", Function: llm.CallFunction{Name: "web_search", Arguments: `{"text":"` + loggingFakeToolArgs + `"}`}},
 							},
 						}}},
 						"usage": map[string]int64{"prompt_tokens": 11, "completion_tokens": 3},
@@ -735,7 +735,7 @@ func TestLoggingRedactionHoldsAtDebugAndInfo(t *testing.T) {
 				Sleep:  func(context.Context, time.Duration) error { return nil },
 			})
 			result, err := client.Run(context.Background(), "agent-logging", 15, loggingMessages(),
-				[]llm.Tool{loggingTool("note_write", `{"type":"object"}`)},
+				[]llm.Tool{loggingTool("web_search", `{"type":"object"}`)},
 				llm.DispatchFunc(func(context.Context, llm.ToolCall) (string, error) {
 					return "", errors.New("fake guard rejected: " + loggingFakeToolResult)
 				}))

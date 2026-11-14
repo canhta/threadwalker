@@ -368,40 +368,45 @@ func (r *Runtime) execute(ctx context.Context, wake WakeResult, phase string, ca
 		end, _ := json.Marshal(map[string]any{"reason": result.EndReason, "steps": result.Steps})
 		r.appendTranscript(finalCtx, phase, result.ID, store.TranscriptEnd, string(end))
 	}()
-	launched := r.opts.Now()
-	backend, err := r.opts.ThreadsFactory(ctx, r.opts.Template)
-	launchOutcome, launchReason := "success", "launched"
-	if err != nil {
-		launchOutcome, launchReason = "error", "launch_failed"
-	}
-	r.browserEvent(ctx, phase, logging.BrowserLaunch, result.ID, launchOutcome, launchReason, launched)
-	if errors.Is(err, threads.ErrNoToken) {
-		// A missing token ends this wake only; the process keeps running and the
-		// next wake retries after the fallback interval.
-		result.EndReason = "no_token"
-		if r.opts.TokenMissing != nil {
-			r.opts.TokenMissing(ctx, r.opts.Template.ID)
+	// The dream has only lesson tools: it needs no Threads backend or browser.
+	var backend threads.Backend
+	if phase == guard.PhaseAgent {
+		launched := r.opts.Now()
+		var err error
+		backend, err = r.opts.ThreadsFactory(ctx, r.opts.Template)
+		launchOutcome, launchReason := "success", "launched"
+		if err != nil {
+			launchOutcome, launchReason = "error", "launch_failed"
 		}
-		return result, nil
-	}
-	if err != nil {
-		result.EndReason = "browser_error"
-		return result, errors.New("opening wake browser: failed")
-	}
-	defer func() {
-		closeCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)
-		defer cancel()
-		closing := r.opts.Now()
-		closeOutcome, closeReason := "success", "closed"
-		if closeErr := backend.Close(closeCtx); closeErr != nil {
-			// The wake has already decided its own outcome. A cleanup
-			// failure is logged and must not rewrite end_reason, fail
-			// the scheduler or cancel the independent owner poller.
-			closeOutcome, closeReason = "error", "close_failed"
-			r.event(closeCtx, phase, logging.WakeCleanupFailed, "error", "close_failed", result.ID, result.Steps)
+		r.browserEvent(ctx, phase, logging.BrowserLaunch, result.ID, launchOutcome, launchReason, launched)
+		if errors.Is(err, threads.ErrNoToken) {
+			// A missing token ends this wake only; the process keeps running and the
+			// next wake retries after the fallback interval.
+			result.EndReason = "no_token"
+			if r.opts.TokenMissing != nil {
+				r.opts.TokenMissing(ctx, r.opts.Template.ID)
+			}
+			return result, nil
 		}
-		r.browserEvent(closeCtx, phase, logging.BrowserClose, result.ID, closeOutcome, closeReason, closing)
-	}()
+		if err != nil {
+			result.EndReason = "browser_error"
+			return result, errors.New("opening wake browser: failed")
+		}
+		defer func() {
+			closeCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)
+			defer cancel()
+			closing := r.opts.Now()
+			closeOutcome, closeReason := "success", "closed"
+			if closeErr := backend.Close(closeCtx); closeErr != nil {
+				// The wake has already decided its own outcome. A cleanup
+				// failure is logged and must not rewrite end_reason, fail
+				// the scheduler or cancel the independent owner poller.
+				closeOutcome, closeReason = "error", "close_failed"
+				r.event(closeCtx, phase, logging.WakeCleanupFailed, "error", "close_failed", result.ID, result.Steps)
+			}
+			r.browserEvent(closeCtx, phase, logging.BrowserClose, result.ID, closeOutcome, closeReason, closing)
+		}()
+	}
 	hidden, err := r.opts.Store.RefusedTools(ctx, r.opts.Template.ID, r.opts.Now())
 	if err != nil {
 		return result, err

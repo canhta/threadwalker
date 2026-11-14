@@ -34,7 +34,7 @@ The issue is done when every "Done when" box is ticked with evidence and
 - Hot files that parallel work keeps touching: `internal/tools/builtins.go`,
   `internal/tools/dispatcher.go`, `internal/guard/spec.go`, `internal/agent/runtime.go`,
   `internal/agent/context.go`, the design docs in `docs/`. Keep edits there minimal and local.
-- Paid or live calls (LLM providers, OpenAI embeddings, the Threads API, Telegram) run only when the
+- Paid or live calls (LLM providers, the Threads API, Telegram) run only when the
   issue's Scope names them, behind an opt-in env var, never in `go test ./...`. Keys live in `.env`
   and are never printed. A live run of the agent with an Anthropic key uses `claude-haiku-5-5`;
   production uses the template's OpenAI model.
@@ -136,7 +136,7 @@ Each commit keeps all five true:
 |---|---|---|
 | `cmd/threadz` | CLI commands and wiring, including the `ctl` operator commands and the health table | `main.go`, `ctl.go` |
 | `internal/config` | Template and catalog loading, validation, secrets from env | `config.go` |
-| `internal/agent` | Wakes, scheduler, dream and study phases, wake context | `runtime.go` |
+| `internal/agent` | Wakes, scheduler, dream, episodes and lessons, wake context | `runtime.go` |
 | `internal/llm` | Chat loop, OpenAI and Anthropic protocol adapters, ledger accounting | `client.go` |
 | `internal/tools` | Tool executors and the dispatcher that sends every call through the guard | `dispatcher.go` |
 | `internal/guard` | Every check the agent cannot disable: phases, content, quotas, do-not-contact, audit | `guard.go` |
@@ -144,14 +144,12 @@ Each commit keeps all five true:
 | `internal/agentbrowser` | The harness-owned agent-browser CLI client | `client.go` |
 | `internal/store` | SQLite schema (`schema.sql`) and every query, including wake transcripts and the retention table | `store.go` |
 | `internal/admin` | The local admin socket the `ctl` commands use to reach the running service | `admin.go` |
-| `internal/knowledge` | The embedded, read-only craft knowledge base | `knowledge.go` |
-| `internal/playbook` | Hypothesis gate maths | `gate.go` |
-| `internal/metrics` | Own-action metric collection jobs, the outcome model (expected value, lifts, labels) and the matched viral/flop pairs with their context/content attribution | `processor.go`, `outcome.go`, `pairs.go` |
-| `internal/trends` | Fetching, ranking and recording outside trends, study sources, web search, and the Threads trend brief | `trends.go` |
+| `internal/metrics` | Own-action metric collection jobs and samples | `processor.go` |
+| `internal/trends` | Fetching, ranking and recording outside trends, web search, and the Threads trend brief | `trends.go` |
 | `internal/telegram` | Owner messages, digests and commands | `service.go` |
 | `internal/dashboard` | Read-only localhost dashboard | `dashboard.go` |
 | `internal/eval` | Offline and live eval suites | `runner.go` |
-| `internal/quality` | Draft quality rubric, code checks, content features and judge prompts (draft and post-mortem), shared by evals and the dream post-mortem | `quality.go`, `features.go` |
+| `internal/quality` | Draft quality rubric, code checks, critic and ideas prompts, shared by evals and the wake | `quality.go`, `critic.go` |
 | `internal/ratelimit` | The per-client token bucket and the client-address rule (`CF-Connecting-IP` from a loopback peer) both HTTP servers use | `ratelimit.go` |
 | `internal/stdx` | Small helpers the standard library lacks and several packages share: context-aware sleep, finite non-negative check | `stdx.go` |
 | `internal/update` | Self-update from signed GitHub releases: verify, swap, restart, roll back; update window and request file | `update.go` |

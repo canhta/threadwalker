@@ -108,7 +108,7 @@ The `kpi:` block is optional; once any of its four keys exists all four are requ
 
 | Key | Type | Default | Owner | Effect |
 |---|---|---|---|---|
-| `schedule.timezone` | IANA name | `Asia/Ho_Chi_Minh` | code | Zone of the dream time, of every daily cap and of the timestamps in the wake context (RFC3339 with this zone offset) |
+| `schedule.timezone` | IANA name | `Asia/Ho_Chi_Minh` | code | Zone of the dream time, of the quiet window and of every daily cap |
 | `schedule.dream_at` | `HH:MM` local | empty (off) | code | Nightly dream, once per local day |
 | `schedule.quiet_from`, `schedule.quiet_until` | `HH:MM` local, both or neither | empty (off) | code | Night window with no agent wake; one scheduled inside it moves to `quiet_until`. May cross midnight. The dream keeps its own time |
 

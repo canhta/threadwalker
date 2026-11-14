@@ -597,7 +597,7 @@ func nudgeRun(t *testing.T, maxSteps int, replies ...string) (llm.Result, []llm.
 	if err != nil {
 		t.Fatal(err)
 	}
-	tools := []llm.Tool{{Type: "function", Function: llm.Function{Name: "note_write", Parameters: json.RawMessage(`{"type":"object"}`)}}}
+	tools := []llm.Tool{{Type: "function", Function: llm.Function{Name: "web_search", Parameters: json.RawMessage(`{"type":"object"}`)}}}
 	result, err := client.Run(context.Background(), "agent", 1, []llm.Message{{Role: "user", Content: "go"}}, tools, llm.DispatchFunc(func(context.Context, llm.ToolCall) (string, error) { return "ok", nil }))
 	return result, last, err
 }

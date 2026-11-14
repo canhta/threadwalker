@@ -26,7 +26,7 @@ func TestTranscriptRecordsNudgeAndStoresSystemPromptOnce(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	tools := []llm.Tool{{Type: "function", Function: llm.Function{Name: "note_write", Parameters: json.RawMessage(`{"type":"object"}`)}}}
+	tools := []llm.Tool{{Type: "function", Function: llm.Function{Name: "web_search", Parameters: json.RawMessage(`{"type":"object"}`)}}}
 	messages := []llm.Message{{Role: "system", Content: "SYSTEM-PROMPT-TEXT"}, {Role: "user", Content: "go"}}
 	if _, err = client.Run(context.Background(), "agent", 1, messages, tools, llm.DispatchFunc(func(context.Context, llm.ToolCall) (string, error) { return "ok", nil })); err != nil {
 		t.Fatal(err)

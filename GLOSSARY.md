@@ -18,8 +18,8 @@ Use these terms and spellings in code, issues and docs.
 | `do_not_contact` | Usernames the agent may no longer reply to. |
 | `transcript` | The redacted, bounded record of one wake kept 8 days: context hash and data message, model turns, tool results, usage and end reason. |
 | `admin socket` | The local Unix socket through which `threadz ctl` reaches the running service. |
-| `post-mortem` | The code-built block of the dream context: matched viral and flop pairs of the last 14 days with content features, an independent judge's scores and the split of the gap between context and content. |
-| `judge` | The model set in the template's `review.llm`, never the agent's own, that scores published actions in the post-mortem. It approves and blocks nothing. |
+| `episode` | One live, confirmed own action with its newest metric window, score (`likes + 2 * replies`), rank among the last 50 of its kind and band (`top`, `mid`, `bottom`, `unranked`). Computed, not stored. |
+| `lesson` | One sentence of at most 240 characters on how the account should write, grounded in 2 to 5 cited episodes. Only the dream writes it; the owner can forget it. |
 | `hook type` | The kind of first line an action opens with (`number`, `contrarian`, `curiosity_gap`, `personal_stake`, `trend_detail`), stored on the action. |
 | `series` | A post of 2 to 5 parts: part 1 is the hook and each later part is published as a reply to the part before it. It is one action and counts as one post. |
 | `trend anchor` | The item (a trend, search or feed result read this wake) a post names in `trend_ref`; the guard refuses a post anchored to nothing it read. |

@@ -158,3 +158,17 @@ Sections run in this order; missing values show `—`.
 ## Self-update
 
 `threadz update` (root) installs a GitHub release only after the tarball's sha256 and detached ed25519 signature verify against `update.ReleasePublicKey`. It refuses a downgrade, a major-version jump and release notes with a `Manual step:` line, and restores `.prev` when the restarted unit is not active and `ctl doctor` does not pass within 2 minutes. `THREADZ_UPDATE_AUTO` (default false) and `THREADZ_UPDATE_WINDOW` (local hours `H-H`) gate only the timer; Telegram `/update` and `ctl update` write `/run/threadz/update-request` for a root path unit. Steps, flags and install: [setup.md](setup.md#updates).
+
+## Manual deploy of v0.2.0
+
+v0.2.0 changes the schema (v11 to v12) and drops template keys, so its release notes carry a `Manual step:` line and `threadz update` refuses it. Install by hand, in this order:
+
+1. Stop the service: `systemctl stop threadz`.
+2. Back up the database and the yaml: `cp /opt/threadz/data/threadz.db /opt/threadz/data/threadz.db.v11` and `cp /opt/threadz/agents/viral.agent.yaml /opt/threadz/agents/viral.agent.yaml.v11`.
+3. Migrate the database (needs sqlite3 3.35 or later; one transaction, refuses any schema other than v11): `sqlite3 -bail /opt/threadz/data/threadz.db < deploy/migrate-12.sql`
+4. Patch the live template (writes a `.bak`, prints each change, never touches `dry_run`; a second run changes nothing): `python3 deploy/patch-template-v12.py /opt/threadz/agents/viral.agent.yaml`
+5. Install the v0.2.0 binary over `/opt/threadz/threadz`.
+6. Check with the service env: `set -a; . /etc/threadz/threadz.env; set +a; /opt/threadz/threadz check --agents /opt/threadz/agents --db /opt/threadz/data/threadz.db`
+7. Start the service: `systemctl start threadz`, then `threadz ctl doctor`.
+
+To roll back, stop the service and restore the two backups and the previous binary. `OPENAI_API_KEY` is no longer required for embeddings; keep it only when the LLM or `web_search` uses it.
