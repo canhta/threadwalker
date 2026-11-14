@@ -39,11 +39,14 @@ func (s *Store) LastPhaseWake(ctx context.Context, agentID, kind string) (time.T
 	return at, true, nil
 }
 
-// LastCompletedDreamEnd is when the newest dream that finished normally ended:
-// the watermark the next dream reads episodes from. ok is false before any.
+// LastCompletedDreamEnd is when the newest dream that finished normally, or
+// stopped at its own spend or step cap, ended: the watermark the next dream
+// reads episodes from. A dream that hit a cap had read them all, so running it
+// again on the same pile would only hit the cap again; one that failed on a
+// provider error read nothing and is retried. ok is false before any.
 func (s *Store) LastCompletedDreamEnd(ctx context.Context, agentID string) (time.Time, bool, error) {
 	var raw sql.NullString
-	err := s.db.QueryRowContext(ctx, `SELECT MAX(ended_at) FROM wakes WHERE agent_id=? AND kind=? AND end_reason='completed'`, agentID, WakeDream).Scan(&raw)
+	err := s.db.QueryRowContext(ctx, `SELECT MAX(ended_at) FROM wakes WHERE agent_id=? AND kind=? AND end_reason IN ('completed','budget','step_limit')`, agentID, WakeDream).Scan(&raw)
 	if err != nil || !raw.Valid {
 		return time.Time{}, false, err
 	}

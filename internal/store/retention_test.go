@@ -57,7 +57,6 @@ var ageCases = []ageCase{
 	{"tool_calls", `INSERT INTO tool_calls(agent_id,wake_id,tool,args_json,at) VALUES(?,1,'t','{}',?)`, `SELECT COUNT(*) FROM tool_calls WHERE agent_id=?`, 90 * 24 * time.Hour},
 	{"wakes", `INSERT INTO wakes(agent_id,started_at,ended_at) VALUES(?,'2000-01-01T00:00:00Z',?)`, `SELECT COUNT(*) FROM wakes WHERE agent_id=?`, 90 * 24 * time.Hour},
 	{"owner_msgs", `INSERT INTO owner_msgs(agent_id,direction,text,at) VALUES(?,'in','x',?)`, `SELECT COUNT(*) FROM owner_msgs WHERE agent_id=?`, 90 * 24 * time.Hour},
-	{"metric_jobs", `INSERT INTO metric_jobs(agent_id,action_id,window_hours,due_at,not_before,completed_at) VALUES(?,(SELECT COUNT(*)+1 FROM metric_jobs),1,'2000-01-01T00:00:00Z','2000-01-01T00:00:00Z',?)`, `SELECT COUNT(*) FROM metric_jobs WHERE agent_id=?`, 30 * 24 * time.Hour},
 	{"webhook_events", `INSERT INTO webhook_events(agent_id,field,object_id,at) VALUES(?,'replies',(SELECT COUNT(*)+1 FROM webhook_events),?)`, `SELECT COUNT(*) FROM webhook_events WHERE agent_id=?`, 30 * 24 * time.Hour},
 }
 
@@ -88,13 +87,28 @@ func TestPruneAgeBoundaryPerTable(t *testing.T) {
 	}
 }
 
+// An episode is an action, a completed metric job and its metrics; the job must
+// live as long as the action and its metrics, which are kept.
+func TestPruneKeepsCompletedMetricJobsSoEpisodesSurvive(t *testing.T) {
+	s, _ := retentionStore(t)
+	posted := retentionNow.Add(-40 * 24 * time.Hour)
+	measured := stamp(posted.Add(6 * time.Hour))
+	exec(t, s, `INSERT INTO actions(id,agent_id,kind,text,dry_run,posted_at,thread_url,media_id) VALUES(1,'a','post','old',0,?,'https://threads.test/p','m')`, stamp(posted))
+	exec(t, s, `INSERT INTO metrics(agent_id,action_id,measured_at,views,likes,replies) VALUES('a',1,?,10,3,0)`, measured)
+	exec(t, s, `INSERT INTO metric_jobs(agent_id,action_id,window_hours,due_at,not_before,completed_at) VALUES('a',1,6,?,?,?)`, measured, measured, measured)
+	prune(t, s)
+	eps, err := s.Episodes(context.Background(), "a", store.EpisodeQuery{})
+	if err != nil || len(eps) != 1 || eps[0].Window != 6 {
+		t.Fatalf("episodes after prune: %+v, %v", eps, err)
+	}
+}
+
 func TestPruneKeepsRowsWithoutAgeColumn(t *testing.T) {
 	s, _ := retentionStore(t)
 	exec(t, s, `INSERT INTO wakes(agent_id,started_at) VALUES('a','2000-01-01T00:00:00Z')`)
-	exec(t, s, `INSERT INTO metric_jobs(agent_id,action_id,window_hours,due_at,not_before) VALUES('a',1,1,'2000-01-01T00:00:00Z','2000-01-01T00:00:00Z')`)
 	prune(t, s)
-	if countRows(t, s, `SELECT COUNT(*) FROM wakes`) != 1 || countRows(t, s, `SELECT COUNT(*) FROM metric_jobs`) != 1 {
-		t.Fatal("pruned a running wake or an uncompleted job")
+	if countRows(t, s, `SELECT COUNT(*) FROM wakes`) != 1 {
+		t.Fatal("pruned a running wake")
 	}
 }
 

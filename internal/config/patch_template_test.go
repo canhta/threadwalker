@@ -31,12 +31,15 @@ func TestPatchTemplateV12(t *testing.T) {
 		}
 		return string(out)
 	}
-	if out := run(); !strings.Contains(out, "moved study.web_search") {
+	if out := run(); !strings.Contains(out, "moved study.web_search") || !strings.Contains(out, "max_steps_per_dream from 20 to 8") {
 		t.Fatalf("first run printed %q", out)
 	}
 	tmpl, err := loadOne(live, viralEnv())
 	if err != nil {
 		t.Fatalf("patched template does not load: %v", err)
+	}
+	if tmpl.Limits.MaxStepsPerDream != 8 {
+		t.Errorf("max_steps_per_dream=%d, want 8", tmpl.Limits.MaxStepsPerDream)
 	}
 	if tmpl.DryRun || !tmpl.WebSearch.Enabled || tmpl.WebSearch.Model != "gpt-6-luna" {
 		t.Errorf("dry_run=%v web_search=%+v", tmpl.DryRun, tmpl.WebSearch)

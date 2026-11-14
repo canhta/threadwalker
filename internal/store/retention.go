@@ -29,7 +29,8 @@ const (
 	outsideTextRetention = 8 * day
 )
 
-// retention lists every pruned table. actions, metrics, ledger, ledger_phases,
+// retention lists every pruned table. actions, metrics, completed metric_jobs
+// (an episode is a completed job joined to its metrics), ledger, ledger_phases,
 // and lessons are the experiment's record and are not here;
 // contacts has its own rule in Prune.
 var retention = []retentionPolicy{
@@ -39,7 +40,6 @@ var retention = []retentionPolicy{
 	{table: "tool_calls", ageCol: "at", maxAge: 90 * day},
 	{table: "wakes", ageCol: "ended_at", maxAge: 90 * day},
 	{table: "owner_msgs", ageCol: "at", maxAge: 90 * day},
-	{table: "metric_jobs", ageCol: "completed_at", maxAge: 30 * day},
 	{table: "webhook_events", ageCol: "at", maxAge: 30 * day},
 }
 

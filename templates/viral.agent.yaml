@@ -217,7 +217,7 @@ limits:                           # starting values, no experimental basis
   max_steps_per_wake: 45
   max_usd_per_day: 1.00           # owner cap for the live viral account
   max_usd_per_dream: 0.30         # nightly dream has its own cap, outside the daily cap
-  max_steps_per_dream: 20
+  max_steps_per_dream: 8
   min_minutes_between_wakes: 20
 kpi:                              # pressure: the scoreboard in every wake shows these; code sets the wake cadence from the gap
   engagements_per_day: 10         # likes + replies + reposts + quotes on own actions in 24h

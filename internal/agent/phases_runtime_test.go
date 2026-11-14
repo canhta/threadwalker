@@ -75,4 +75,10 @@ func TestDreamSpendIsSeparateFromDailyCap(t *testing.T) {
 	if err = st.DB().QueryRow(`SELECT COUNT(*) FROM actions WHERE agent_id=?`, tmpl.ID).Scan(&actions); err != nil || actions != 8 {
 		t.Fatalf("dream actions=%d err=%v", actions, err)
 	}
+	// A dream that stopped at its spend cap did read the episodes: the next one
+	// starts after it instead of failing on the same pile every night.
+	now = now.Add(24 * time.Hour)
+	if wake, err = runtime.RunPhase(ctx, kind, "2026-01-02"); err != nil || wake.EndReason != "too_few_episodes" {
+		t.Fatalf("next dream after a budget stop: %+v err=%v", wake, err)
+	}
 }

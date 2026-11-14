@@ -37,11 +37,10 @@ The whole schema is [`internal/store/schema.sql`](../internal/store/schema.sql);
 | `tool_calls` | 90 days |
 | `wakes` | 90 days after they ended; a running wake is never pruned |
 | `owner_msgs` | 90 days |
-| `metric_jobs` | Completed jobs 30 days after completion; seeding covers only actions of the last 29 days, so a pruned job is never recreated |
 | `webhook_events` | 30 days |
 | `contacts` | Rows with `do_not_contact = 0` until no reply to that username falls in the last 7 days; `do_not_contact` rows forever |
 
-`actions`, `metrics` and `ledger_phases` are the experiment's record and are kept. A dashboard panel never shows more days than its table keeps: the trending panel shows at most 7 days whatever range is selected.
+`actions`, `metrics`, completed `metric_jobs` (an episode is a completed job joined to its metrics) and `ledger_phases` are the experiment's record and are kept. A dashboard panel never shows more days than its table keeps: the trending panel shows at most 7 days whatever range is selected.
 
 ## What is stored about a Threads user
 

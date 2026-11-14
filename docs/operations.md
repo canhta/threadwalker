@@ -166,7 +166,7 @@ v0.2.0 changes the schema (v11 to v12) and drops template keys, so its release n
 1. Stop both services: `systemctl stop threadz threadz-dashboard`. The dashboard runs the same binary on the same database.
 2. Back up the database and the yaml: `cp /opt/threadz/data/threadz.db /opt/threadz/data/threadz.db.v11` and `cp /opt/threadz/agents/viral.agent.yaml /opt/threadz/agents/viral.agent.yaml.v11`.
 3. Migrate the database (needs sqlite3 3.35 or later; one transaction, refuses any schema other than v11): `sqlite3 -bail /opt/threadz/data/threadz.db < deploy/migrate-12.sql`
-4. Patch the live template (writes a `.bak`, prints each change, never touches `dry_run`; a second run changes nothing): `python3 deploy/patch-template-v12.py /opt/threadz/agents/viral.agent.yaml`
+4. Patch the live template (writes a `.bak`, prints each change, lowers `limits.max_steps_per_dream` from 20 to 8, never touches `dry_run`; a second run changes nothing): `python3 deploy/patch-template-v12.py /opt/threadz/agents/viral.agent.yaml`
 5. Install the v0.2.0 binary over `/opt/threadz/threadz`.
 6. Check with the service env: `set -a; . /etc/threadz/threadz.env; set +a; /opt/threadz/threadz check --agents /opt/threadz/agents --db /opt/threadz/data/threadz.db`
 7. Start the services: `systemctl start threadz`, then `systemctl start threadz-dashboard`, then `threadz ctl doctor`.

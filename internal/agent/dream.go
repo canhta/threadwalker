@@ -20,6 +20,9 @@ const (
 	// dreamWindow is how far back the dream looks for each kind's best and worst.
 	dreamWindow = 7 * 24 * time.Hour
 	dreamTop    = 5
+	// dreamNewMax bounds the new episodes shown, newest first, so a run of
+	// failed dreams cannot grow the context without limit.
+	dreamNewMax = 30
 	// dreamForgotten is how many owner-forgotten lessons the dream is shown.
 	dreamForgotten = 10
 	// dreamSkipReason is the end reason of a dream that did not run.
@@ -154,7 +157,7 @@ func (r *Runtime) dreamContext(ctx context.Context, wakeID int64) ([]llm.Message
 	if err != nil {
 		return nil, err
 	}
-	for _, e := range fresh {
+	for _, e := range fresh[:min(len(fresh), dreamNewMax)] {
 		data.NewEpisodes = append(data.NewEpisodes, viewOf(e, redactor, true))
 	}
 	week, err := st.Episodes(ctx, t.ID, store.EpisodeQuery{Since: now.Add(-dreamWindow)})

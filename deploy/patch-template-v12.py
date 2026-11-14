@@ -3,7 +3,7 @@
 
 Usage: patch-template-v12.py AGENT.yaml
 Writes AGENT.yaml.bak first, prints every change, touches nothing else
-(dry_run included). A second run changes nothing.
+(dry_run included) except limits.max_steps_per_dream 20, which becomes 8. A second run changes nothing.
 """
 import re
 import shutil
@@ -70,6 +70,14 @@ def patch(lines):
             i = -1 if p < 0 else find(lines, key, p + 1, block_end(lines, p), 2)
         if i >= 0:
             drop(i, key + ":" if parent is None else parent + "." + key)
+
+    # The dream's step cap drops from the v0.1.16 template's 20 to 8; any other
+    # value is the owner's and stays.
+    p = find(lines, "limits", 0, len(lines), 0)
+    i = -1 if p < 0 else find(lines, "max_steps_per_dream", p + 1, block_end(lines, p), 2)
+    if i >= 0 and re.match(r"\s+max_steps_per_dream:\s*20(\s|$)", lines[i]):
+        lines[i] = re.sub(r"(max_steps_per_dream:\s*)20", r"\g<1>8", lines[i], count=1)
+        log.append("changed limits.max_steps_per_dream from 20 to 8")
 
     p = find(lines, "persona", 0, len(lines), 0)
     if p >= 0:

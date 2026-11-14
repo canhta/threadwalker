@@ -90,7 +90,7 @@ func TestMigrate12MatchesFreshSchema(t *testing.T) {
 		INSERT INTO agents(id,status) VALUES('a','running');
 		INSERT INTO actions(agent_id,kind,text,posted_at,hypothesis_ids_json,explore) VALUES('a','post','hello','2026-11-01T00:00:00Z','[1]',1);
 		INSERT INTO notes(agent_id,text,created_at) VALUES('a','a note','2026-11-01T00:00:00Z');
-		INSERT INTO wakes(id,agent_id,started_at,kind) VALUES(1,'a','2026-11-01T00:00:00Z','agent'),(2,'a','2026-11-01T01:00:00Z','study'),(3,'a','2026-11-01T02:00:00Z','dream');
+		INSERT INTO wakes(id,agent_id,started_at,kind) VALUES(1,'a','2026-11-01T00:00:00Z','agent'),(2,'a','2026-11-01T01:00:00Z','study'),(3,'a','2026-11-01T02:00:00Z','dream'),(4,'a','2026-11-01T03:00:00Z','study');
 		INSERT INTO tool_calls(agent_id,wake_id,tool,args_json,at) VALUES('a',1,'post','{}','2026-11-01T00:00:00Z'),('a',2,'note_write','{}','2026-11-01T01:00:00Z');
 		INSERT INTO wake_transcripts(agent_id,wake_id,seq,kind,body,at) VALUES('a',2,1,'start','{}','2026-11-01T01:00:00Z');
 		INSERT INTO ledger_phases(agent_id,day,phase,tokens_in,tokens_out,cost_usd) VALUES('a','2026-11-01','agent',10,1,0.5),('a','2026-11-01','study',20,2,0.25),('a','2026-11-02','study',5,1,0.1);
@@ -132,6 +132,11 @@ func TestMigrate12MatchesFreshSchema(t *testing.T) {
 	}
 	if wakes != 2 || calls != 1 || transcripts != 0 || stories != 1 {
 		t.Errorf("after migration wakes=%d tool_calls=%d transcripts=%d stories=%d, want 2 1 0 1", wakes, calls, transcripts, stories)
+	}
+	// The last study wake held id 4; its deletion must not let a new wake take it.
+	var next int64
+	if err = old.QueryRow(`INSERT INTO wakes(agent_id,started_at) VALUES('a','2026-11-03T00:00:00Z') RETURNING id`).Scan(&next); err != nil || next != 5 {
+		t.Errorf("next wake id = %d, %v; want 5", next, err)
 	}
 	var tokensIn int64
 	var cost float64

@@ -80,6 +80,11 @@ INSERT INTO ledger_phases_new(agent_id, day, phase, tokens_in, tokens_out, cost_
 DROP TABLE ledger_phases;
 ALTER TABLE ledger_phases_new RENAME TO ledger_phases;
 
+-- Dropping wakes forgets its AUTOINCREMENT counter; remember it so a wake id
+-- is never reused (the audit rows of the deleted study wakes are gone, but ids
+-- in logs and exports must stay unique).
+CREATE TEMP TABLE wakes_seq AS SELECT COALESCE((SELECT seq FROM sqlite_sequence WHERE name = 'wakes'), 0) AS seq;
+
 CREATE TABLE wakes_new (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     agent_id TEXT NOT NULL,
@@ -96,6 +101,9 @@ CREATE TABLE wakes_new (
 INSERT INTO wakes_new SELECT id, agent_id, started_at, ended_at, steps, tokens_in, tokens_out, cost_usd, end_reason, kind, phase_key FROM wakes;
 DROP TABLE wakes;
 ALTER TABLE wakes_new RENAME TO wakes;
+DELETE FROM sqlite_sequence WHERE name = 'wakes';
+INSERT INTO sqlite_sequence(name, seq) SELECT 'wakes', seq FROM wakes_seq;
+DROP TABLE wakes_seq;
 CREATE INDEX dashboard_wakes_started ON wakes(agent_id,started_at DESC);
 CREATE UNIQUE INDEX wakes_phase_key ON wakes(agent_id,kind,phase_key) WHERE phase_key <> '';
 
