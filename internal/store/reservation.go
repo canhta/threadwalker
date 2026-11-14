@@ -100,6 +100,10 @@ type NewIntent struct {
 	// TrendRef is the trend a post anchored to; AnswersNote the open owner note it answers, or 0.
 	TrendRef    string
 	AnswersNote int64
+	// Angle and Fact are the agent's brief to the writer; LessonIDs are the
+	// active lessons it says it applied, validated by LessonsFit.
+	Angle, Fact string
+	LessonIDs   []int64
 	// CriticJSON is the pre-publish critic verdict, or empty.
 	CriticJSON string
 	// RootURL is the canonical URL of the root post of the conversation a reply
@@ -117,7 +121,7 @@ type NewIntent struct {
 
 // InsertIntent records the reservation and returns its action id.
 func (t ReservationTx) InsertIntent(ctx context.Context, n NewIntent) (int64, error) {
-	res, err := t.conn.ExecContext(ctx, `INSERT INTO actions(agent_id,kind,text,target_url,target_username,dry_run,posted_at,thread_url,target_score_json,topic_heat,followers_at_post,parent_replies,parent_age_minutes,hook,rationale,browser,trend_ref,answers_note,critic_json,root_url) VALUES(?,?,?,?,?,?,?,?,?,?,(SELECT followers FROM account_followers WHERE agent_id=?),?,?,?,?,?,?,?,?,?)`, n.AgentID, n.Kind, n.Text, n.TargetURL, n.TargetUsername, n.DryRun, n.At.Format(time.RFC3339Nano), "", n.TargetScoreJSON, n.TopicHeat, n.AgentID, n.ParentReplies, n.ParentAgeMinutes, n.Hook, n.Rationale, n.Browser, n.TrendRef, n.AnswersNote, n.CriticJSON, n.RootURL)
+	res, err := t.conn.ExecContext(ctx, `INSERT INTO actions(agent_id,kind,text,target_url,target_username,dry_run,posted_at,thread_url,target_score_json,topic_heat,followers_at_post,parent_replies,parent_age_minutes,hook,rationale,browser,trend_ref,answers_note,critic_json,root_url,angle,fact) VALUES(?,?,?,?,?,?,?,?,?,?,(SELECT followers FROM account_followers WHERE agent_id=?),?,?,?,?,?,?,?,?,?,?,?)`, n.AgentID, n.Kind, n.Text, n.TargetURL, n.TargetUsername, n.DryRun, n.At.Format(time.RFC3339Nano), "", n.TargetScoreJSON, n.TopicHeat, n.AgentID, n.ParentReplies, n.ParentAgeMinutes, n.Hook, n.Rationale, n.Browser, n.TrendRef, n.AnswersNote, n.CriticJSON, n.RootURL, CapRunes(n.Angle, MaxTraceText), CapRunes(n.Fact, MaxTraceText))
 	if err != nil {
 		return 0, fmt.Errorf("reserving action intent: %w", err)
 	}
@@ -128,6 +132,11 @@ func (t ReservationTx) InsertIntent(ctx context.Context, n NewIntent) (int64, er
 	for i, text := range n.Parts {
 		if _, err = t.conn.ExecContext(ctx, `INSERT INTO action_parts(agent_id,action_id,part,text) VALUES(?,?,?,?)`, n.AgentID, id, i+2, text); err != nil {
 			return 0, fmt.Errorf("reserving series part: %w", err)
+		}
+	}
+	for _, lesson := range n.LessonIDs {
+		if _, err = t.conn.ExecContext(ctx, `INSERT INTO action_lessons(action_id,lesson_id) VALUES(?,?)`, id, lesson); err != nil {
+			return 0, fmt.Errorf("recording applied lesson: %w", err)
 		}
 	}
 	return id, nil

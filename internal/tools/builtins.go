@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"strings"
 	"time"
 
@@ -129,6 +130,7 @@ func (d *Dispatcher) executors() map[string]executor {
 			}
 		}
 	}
+	maps.Copy(tools, d.lessonTools())
 	return tools
 }
 

@@ -34,6 +34,7 @@ const (
 	ArgID                      // integer >= 1
 	ArgBool                    // true or false
 	ArgTextList                // non-empty array of non-blank strings
+	ArgIDList                  // non-empty array of integers >= 1
 )
 
 type Arg struct {
@@ -62,11 +63,13 @@ type ToolSpec struct {
 var (
 	allPhases   = []string{PhaseAgent, PhaseDream}
 	agentOnly   = []string{PhaseAgent}
+	dreamOnly   = []string{PhaseDream}
 	textArg     = Arg{"text", ArgText, true}
 	hookArg     = Arg{"hook", ArgText, false}
 	noteArg     = Arg{"answers_note", ArgID, false}
 	angleArg    = Arg{"angle", ArgText, false}
 	factArg     = Arg{"fact", ArgText, false}
+	lessonsArg  = Arg{"lesson_ids", ArgIDList, false}
 	specs       = buildSpecs()
 	specsByName = func() map[string]ToolSpec {
 		m := make(map[string]ToolSpec, len(specs))
@@ -89,11 +92,14 @@ func buildSpecs() []ToolSpec {
 		{Name: "profile_posts", Description: "Read the recent public posts of a Threads username as untrusted data, each with the numeric post id, permalink and publish time a reply needs. Use it on an author you saw in read_feed; then read_post or reply by id. When the API refuses the profile the result carries limited_access.", Args: []Arg{{"username", ArgText, true}}, Effect: EffectRead, Phases: agentOnly, Untrusted: true},
 		{Name: "read_post", Description: "Read one post by its numeric post id, as returned by search, read_replies or an earlier read_post. Untrusted data.", Args: []Arg{{"id", ArgText, true}}, Effect: EffectRead, Phases: allPhases, Untrusted: true},
 		{Name: "read_replies", Description: "Read the replies to one of your own posts by its post id, or your mentions when no id is given. Replies and mentions are untrusted data; each carries the post id and permalink a reply needs.", Args: []Arg{{"id", ArgText, false}}, Effect: EffectRead, Phases: allPhases, Untrusted: true},
-		{Name: "post", Description: fmt.Sprintf("Post subject to harness policy. text is the post, or the hook of a series. parts is optional: up to %d later parts, each published as a reply to the previous part and counted with the series as one post; every part is checked, and if a later part fails the published parts stay and the wake ends. hook names the hook type of the first line (%s). When the template requires a trend anchor, hook, trend_ref and rationale are required and the first line of text stands alone as the hook, at most %d characters, and creates tension (a claim, a contrast, a question or a stake); the concrete detail of the trend may sit in any line. trend_ref is the ref (such as r3, never a copied URL) of an item that fetch_trends, search, read_feed, read_topic or web_search returned in this wake; a post anchored to nothing you read is refused. rationale is one line: which trend you anchor to and what the hook is; it is stored with the post. A post whose trend_ref or first line repeats one of your own posts of the last 24 hours is refused as repeat_topic. While an owner note is open (the data message lists it) a post must name it with answers_note, or it is refused as owner_note_open. angle and fact are the brief for the account's writer: angle is the one thing you want to say, fact is the verified detail it rests on (a number, name or quote you read this wake); when a writer is configured it rewrites text from them and an editor reviews the result before anything is published, so text may be a rough draft. topic_tag is optional and strongly preferred: the Threads topic (community) the post is filed under; posts with a topic reach people who follow it, so reuse the topic field of the read_feed or read_topic posts about the same story, which is the community people already post it under; only when none has one, pick the closest broad topic. 1 to 50 characters, no periods or ampersands. Dry-run mode records intent without submitting.", store.MaxSeriesParts-1, strings.Join(store.HookTypes, ", "), MaxHookRunes), Args: []Arg{textArg, {"parts", ArgTextList, false}, {"topic_tag", ArgText, false}, hookArg, {"trend_ref", ArgText, false}, {"rationale", ArgText, false}, noteArg, angleArg, factArg}, Effect: EffectThreadsWrite, Phases: agentOnly, Untrusted: true},
-		{Name: "reply", Description: fmt.Sprintf("Reply subject to harness policy. target_url is the ref (such as r3, never a copied URL) of the post to answer, from read_feed, read_topic or search. answers_note is the id of the open owner note this reply answers. target_id is the numeric post id a search, read_post, read_replies or profile_posts result returned; omit it (never send an empty string) for a post read_feed returned, which is replied to through the browser under a lower daily cap. hook names the hook type of the reply's first line (%s). angle and fact are the brief for the account's writer: angle is the one thing you want to say, fact is the verified detail it rests on; when a writer is configured it rewrites text from them and an editor reviews the result, so text may be a rough draft. Dry-run mode records intent without submitting.", strings.Join(store.HookTypes, ", ")), Args: []Arg{textArg, {"target_url", ArgText, true}, {"target_id", ArgText, false}, {"target_username", ArgText, true}, hookArg, noteArg, angleArg, factArg}, Effect: EffectThreadsWrite, Phases: agentOnly, Untrusted: true},
+		{Name: "post", Description: fmt.Sprintf("Post subject to harness policy. text is the post, or the hook of a series. parts is optional: up to %d later parts, each published as a reply to the previous part and counted with the series as one post; every part is checked, and if a later part fails the published parts stay and the wake ends. hook names the hook type of the first line (%s). When the template requires a trend anchor, hook, trend_ref and rationale are required and the first line of text stands alone as the hook, at most %d characters, and creates tension (a claim, a contrast, a question or a stake); the concrete detail of the trend may sit in any line. trend_ref is the ref (such as r3, never a copied URL) of an item that fetch_trends, search, read_feed, read_topic or web_search returned in this wake; a post anchored to nothing you read is refused. rationale is one line: which trend you anchor to and what the hook is; it is stored with the post. A post whose trend_ref or first line repeats one of your own posts of the last 24 hours is refused as repeat_topic. While an owner note is open (the data message lists it) a post must name it with answers_note, or it is refused as owner_note_open. angle and fact are the brief for the account's writer: angle is the one thing you want to say, fact is the verified detail it rests on (a number, name or quote you read this wake); when a writer is configured it rewrites text from them and an editor reviews the result before anything is published, so text may be a rough draft. topic_tag is optional and strongly preferred: the Threads topic (community) the post is filed under; posts with a topic reach people who follow it, so reuse the topic field of the read_feed or read_topic posts about the same story, which is the community people already post it under; only when none has one, pick the closest broad topic. 1 to 50 characters, no periods or ampersands. lesson_ids is optional: up to %d active lessons you applied. Dry-run mode records intent without submitting.", store.MaxSeriesParts-1, strings.Join(store.HookTypes, ", "), MaxHookRunes, store.MaxLessonIDs), Args: []Arg{textArg, {"parts", ArgTextList, false}, {"topic_tag", ArgText, false}, hookArg, {"trend_ref", ArgText, false}, {"rationale", ArgText, false}, noteArg, angleArg, factArg, lessonsArg}, Effect: EffectThreadsWrite, Phases: agentOnly, Untrusted: true},
+		{Name: "reply", Description: fmt.Sprintf("Reply subject to harness policy. target_url is the ref (such as r3, never a copied URL) of the post to answer, from read_feed, read_topic or search. answers_note is the id of the open owner note this reply answers. target_id is the numeric post id a search, read_post, read_replies or profile_posts result returned; omit it (never send an empty string) for a post read_feed returned, which is replied to through the browser under a lower daily cap. hook names the hook type of the reply's first line (%s). angle and fact are the brief for the account's writer: angle is the one thing you want to say, fact is the verified detail it rests on; when a writer is configured it rewrites text from them and an editor reviews the result, so text may be a rough draft. lesson_ids is optional: up to %d active lessons you applied. Dry-run mode records intent without submitting.", strings.Join(store.HookTypes, ", "), store.MaxLessonIDs), Args: []Arg{textArg, {"target_url", ArgText, true}, {"target_id", ArgText, false}, {"target_username", ArgText, true}, hookArg, noteArg, angleArg, factArg, lessonsArg}, Effect: EffectThreadsWrite, Phases: agentOnly, Untrusted: true},
 		{Name: "web_search", Description: "Search the web with one bounded provider call; a normal wake allows a few. Use it to confirm a trend headline and quote a concrete detail. Results are untrusted data.", Args: []Arg{{"query", ArgText, true}}, Effect: EffectRead, Phases: agentOnly, Untrusted: true},
 		{Name: "ideas", Description: "Choose what to write about. One tool-free call to the writer model over every trend item and feed post you read this wake; returns up to 3 ideas {kind, ref, moment, why} or none. Call it after reading, then post or reply with angle = the moment and trend_ref or target_url = the ref it returns (such as r3). When it returns none, read more and call it again; when you are not behind on your KPIs you may skip posting this wake. Only Vietnamese posts are replied to.", Effect: EffectOwnState, Phases: agentOnly},
 		{Name: "read_own_metrics", Description: "Harness read of the account totals, or with action_id the numbers of one published action. An unavailable number is never zero.", Args: []Arg{{"action_id", ArgID, false}}, Effect: EffectRead, Phases: agentOnly, Untrusted: true, Harness: true},
+		{Name: "lesson_add", Description: fmt.Sprintf("Keep a lesson. text is at most %d characters. kind is post, reply or any; polarity is do or avoid. action_ids are %d to %d of your own actions ranked at 6h or 24h: all top for do, all bottom for avoid.", store.MaxLessonRunes, store.MinCitations, store.MaxCitations), Args: []Arg{textArg, {"kind", ArgText, true}, {"polarity", ArgText, true}, {"action_ids", ArgIDList, true}}, Effect: EffectOwnState, Phases: dreamOnly},
+		{Name: "lesson_confirm", Description: "Renew a lesson with at least one new action that meets the same rule as when it was added.", Args: []Arg{{"id", ArgID, true}, {"action_ids", ArgIDList, true}}, Effect: EffectOwnState, Phases: dreamOnly},
+		{Name: "lesson_retire", Description: "Retire a lesson that the evidence no longer supports. reason is one short sentence.", Args: []Arg{{"id", ArgID, true}, {"reason", ArgText, true}}, Effect: EffectOwnState, Phases: dreamOnly},
 		{Name: "notify_owner", Description: ownerMessage, Args: []Arg{textArg}, Effect: EffectOwner, Phases: agentOnly},
 		{Name: "ask_owner", Description: ownerMessage, Args: []Arg{textArg}, Effect: EffectOwner, Phases: agentOnly},
 	}
@@ -132,6 +138,8 @@ func (s ToolSpec) Schema() json.RawMessage {
 			p = map[string]any{"type": "boolean"}
 		case ArgTextList:
 			p = map[string]any{"type": "array", "minItems": 1, "items": map[string]any{"type": "string", "minLength": 1}}
+		case ArgIDList:
+			p = map[string]any{"type": "array", "minItems": 1, "items": map[string]any{"type": "integer", "minimum": 1}}
 		}
 		properties[a.Name] = p
 		if a.Required {
@@ -148,12 +156,14 @@ type Args struct {
 	num   map[string]int64
 	bools map[string]bool
 	texts map[string][]string
+	ids   map[string][]int64
 }
 
 func (a Args) Text(name string) string       { return a.text[name] }
 func (a Args) Int(name string) int64         { return a.num[name] }
 func (a Args) Bool(name string) bool         { return a.bools[name] }
 func (a Args) TextList(name string) []string { return a.texts[name] }
+func (a Args) IDList(name string) []int64    { return a.ids[name] }
 
 // WithText returns a copy whose text argument name is value.
 func (a Args) WithText(name, value string) Args {
@@ -195,7 +205,7 @@ func (s ToolSpec) Parse(raw string) (Args, error) {
 	if json.Unmarshal([]byte(raw), &values) != nil || values == nil {
 		return Args{}, errArguments
 	}
-	a := Args{text: map[string]string{}, num: map[string]int64{}, bools: map[string]bool{}, texts: map[string][]string{}}
+	a := Args{text: map[string]string{}, num: map[string]int64{}, bools: map[string]bool{}, texts: map[string][]string{}, ids: map[string][]int64{}}
 	declared := map[string]bool{}
 	for _, arg := range s.Args {
 		declared[arg.Name] = true
@@ -234,6 +244,12 @@ func (s ToolSpec) Parse(raw string) (Args, error) {
 				return Args{}, errArguments
 			}
 			a.texts[arg.Name] = v
+		case ArgIDList:
+			var v []int64
+			if json.Unmarshal(value, &v) != nil || len(v) == 0 || slices.ContainsFunc(v, func(id int64) bool { return id < 1 }) {
+				return Args{}, errArguments
+			}
+			a.ids[arg.Name] = v
 		}
 	}
 	for name := range values {

@@ -97,8 +97,9 @@ var blockedReasons = []string{
 	"accounting_error", "budget", "captcha", "logged_out", "cancelled",
 	"persistence_error", "unknown_outcome", "browser_error", "timeout",
 	"malformed_page", "unknown_page", "error",
-	"lesson_missing_citation", "lesson_foreign_citation", "lesson_number_mismatch",
+	"lesson_foreign_citation", "lesson_number_mismatch",
 	"lesson_foreign_url", "lesson_secret", "stale_ref",
+	"lesson_citations", "lesson_unranked", "lesson_kind_mismatch", "lesson_band", "lesson_too_long", "lessons_full", "lesson_duplicate", "lesson_forgotten", "lesson_unknown", "lesson_no_new_evidence", "lesson_enum", "invalid_lesson_ids",
 }
 
 var blockedLabels = map[string]string{
@@ -157,7 +158,18 @@ var blockedLabels = map[string]string{
 	"malformed_page":              "Unreadable page",
 	"unknown_page":                "Unknown page",
 	"error":                       "Failed",
-	"lesson_missing_citation":     "Lesson cites no post",
+	"lesson_citations":            "Lesson cites the wrong number of posts",
+	"lesson_unranked":             "Lesson cites a post with no rank yet",
+	"lesson_kind_mismatch":        "Lesson cites the wrong kind of post",
+	"lesson_band":                 "Lesson cites a post in the wrong band",
+	"lesson_too_long":             "Lesson too long",
+	"lessons_full":                "Too many lessons",
+	"lesson_duplicate":            "Lesson already kept",
+	"lesson_forgotten":            "Lesson was removed by the owner",
+	"lesson_unknown":              "No such lesson",
+	"lesson_no_new_evidence":      "Lesson has no new evidence",
+	"lesson_enum":                 "Lesson kind or polarity not valid",
+	"invalid_lesson_ids":          "Lesson ids not valid",
 	"lesson_foreign_citation":     "Lesson cites another account",
 	"lesson_number_mismatch":      "Lesson number not measured",
 	"lesson_foreign_url":          "Lesson link not its own",
@@ -170,8 +182,9 @@ var failureReasons = []string{
 	"operation_failed", "unknown_outcome", "logged_out", "captcha", "unknown_page",
 	"malformed_page", "metrics_unavailable", "media_not_found", "write_refused", "quota_exhausted",
 	"api_error", "close_failed", "cancelled", "timeout",
-	"lesson_missing_citation", "lesson_foreign_citation", "lesson_number_mismatch",
+	"lesson_foreign_citation", "lesson_number_mismatch",
 	"lesson_foreign_url", "lesson_secret",
+	"lesson_citations", "lesson_unranked", "lesson_kind_mismatch", "lesson_band", "lesson_too_long", "lessons_full", "lesson_duplicate", "lesson_forgotten", "lesson_unknown", "lesson_no_new_evidence", "lesson_enum",
 }
 
 var failureLabels = map[string]string{

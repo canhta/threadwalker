@@ -33,6 +33,7 @@ type actionIntent struct {
 	AnswersNote    int64    `json:"answers_note"`
 	Angle          string   `json:"angle"`
 	Fact           string   `json:"fact"`
+	LessonIDs      []int64  `json:"lesson_ids"`
 	thread         string
 	criticJSON     string
 	detail         string
@@ -358,6 +359,9 @@ func (g *Guard) content(a Attempt, draft bool) (*actionIntent, string) {
 	if !utf8.ValidString(a.Arguments) || json.Unmarshal([]byte(a.Arguments), &intent) != nil || strings.TrimSpace(intent.Text) == "" {
 		return nil, "invalid_tool_arguments"
 	}
+	if !store.DistinctLessonIDs(intent.LessonIDs) {
+		return nil, "invalid_lesson_ids"
+	}
 	if len(intent.Parts) >= store.MaxSeriesParts || (intent.Hook != "" && !slices.Contains(store.HookTypes, intent.Hook)) {
 		return nil, "invalid_tool_arguments"
 	}
@@ -512,11 +516,20 @@ func (g *Guard) reserve(ctx context.Context, a Attempt, intent *actionIntent, au
 				return err
 			}
 		}
+		if reason == "" {
+			var fit bool
+			if fit, err = tx.LessonsFit(ctx, agent, a.Tool, intent.LessonIDs); err != nil {
+				return err
+			}
+			if !fit {
+				reason = "invalid_lesson_ids"
+			}
+		}
 		if checkOnly {
 			return nil
 		}
 		if reason == "" {
-			if id, err = tx.InsertIntent(ctx, store.NewIntent{AgentID: agent, Kind: a.Tool, Text: intent.Text, TargetURL: intent.TargetURL, TargetUsername: intent.TargetUsername, Hook: intent.Hook, Rationale: intent.Rationale, TrendRef: strings.TrimSpace(intent.TrendRef), AnswersNote: intent.AnswersNote, CriticJSON: intent.criticJSON, RootURL: intent.root, Parts: intent.Parts, TargetScoreJSON: intent.posting.TargetScoreJSON, TopicHeat: intent.posting.TopicHeat, ParentReplies: intent.posting.ParentReplies, ParentAgeMinutes: intent.posting.ParentAgeMinutes, DryRun: g.opts.Template.DryRun, Browser: intent.browser, At: now}); err != nil {
+			if id, err = tx.InsertIntent(ctx, store.NewIntent{AgentID: agent, Kind: a.Tool, Text: intent.Text, TargetURL: intent.TargetURL, TargetUsername: intent.TargetUsername, Hook: intent.Hook, Rationale: intent.Rationale, TrendRef: strings.TrimSpace(intent.TrendRef), AnswersNote: intent.AnswersNote, Angle: intent.Angle, Fact: intent.Fact, LessonIDs: intent.LessonIDs, CriticJSON: intent.criticJSON, RootURL: intent.root, Parts: intent.Parts, TargetScoreJSON: intent.posting.TargetScoreJSON, TopicHeat: intent.posting.TopicHeat, ParentReplies: intent.posting.ParentReplies, ParentAgeMinutes: intent.posting.ParentAgeMinutes, DryRun: g.opts.Template.DryRun, Browser: intent.browser, At: now}); err != nil {
 				return err
 			}
 			if a.Tool == "reply" {

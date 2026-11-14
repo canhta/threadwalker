@@ -144,6 +144,16 @@ func TestMigrate12MatchesFreshSchema(t *testing.T) {
 	if err = old.QueryRow(`SELECT COUNT(*) FROM actions`).Scan(&wakes); err != nil || wakes != 1 {
 		t.Errorf("actions kept = %d, %v; want 1", wakes, err)
 	}
+
+	// Existing actions get an empty brief, and the lesson tables take rows.
+	var angle, fact string
+	if err = old.QueryRow(`SELECT angle,fact FROM actions`).Scan(&angle, &fact); err != nil || angle != "" || fact != "" {
+		t.Errorf("migrated action brief = %q %q, %v; want empty", angle, fact, err)
+	}
+	if _, err = old.Exec(`INSERT INTO lessons(agent_id,kind,polarity,text,evidence_json,created_at,confirmed_at) VALUES('a','post','do','t','[1,2]','2026-11-01T00:00:00Z','2026-11-01T00:00:00Z');
+		INSERT INTO action_lessons(action_id,lesson_id) VALUES(1,1)`); err != nil {
+		t.Errorf("writing lessons after migration: %v", err)
+	}
 }
 
 func TestMigrate12RefusesOtherVersions(t *testing.T) {

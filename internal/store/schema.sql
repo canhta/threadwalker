@@ -27,7 +27,15 @@ CREATE TABLE actions (
     trend_ref TEXT NOT NULL DEFAULT '',
     answers_note INTEGER NOT NULL DEFAULT 0,
     critic_json TEXT NOT NULL DEFAULT '',
-    root_url TEXT NOT NULL DEFAULT '');
+    root_url TEXT NOT NULL DEFAULT '',
+    angle TEXT NOT NULL DEFAULT '',
+    fact TEXT NOT NULL DEFAULT '');
+
+CREATE TABLE action_lessons (
+    action_id INTEGER NOT NULL REFERENCES actions(id),
+    lesson_id INTEGER NOT NULL REFERENCES lessons(id),
+    PRIMARY KEY (action_id, lesson_id)
+) WITHOUT ROWID;
 
 CREATE TABLE action_parts (
     agent_id TEXT NOT NULL,
@@ -61,6 +69,21 @@ CREATE TABLE ledger_phases (
     tokens_out INTEGER NOT NULL DEFAULT 0,
     cost_usd REAL NOT NULL DEFAULT 0,
     PRIMARY KEY(agent_id,day,phase)
+);
+
+CREATE TABLE lessons (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    agent_id TEXT NOT NULL,
+    kind TEXT NOT NULL CHECK (kind IN ('post', 'reply', 'any')),
+    polarity TEXT NOT NULL CHECK (polarity IN ('do', 'avoid')),
+    text TEXT NOT NULL,
+    evidence_json TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    confirmed_at TEXT NOT NULL,
+    retired_at TEXT,
+    retired_by TEXT CHECK (retired_by IN ('dream', 'owner', 'expiry')),
+    retire_reason TEXT NOT NULL DEFAULT '',
+    CHECK ((retired_at IS NULL) = (retired_by IS NULL))
 );
 
 CREATE TABLE metric_jobs (
@@ -194,6 +217,10 @@ CREATE TABLE webhook_events (
 );
 
 CREATE INDEX dashboard_actions_own ON actions(agent_id,dry_run,id DESC);
+
+CREATE INDEX lessons_agent ON lessons(agent_id,retired_at);
+
+CREATE INDEX action_lessons_lesson ON action_lessons(lesson_id);
 
 CREATE INDEX dashboard_metrics_agent ON metrics(agent_id,measured_at);
 

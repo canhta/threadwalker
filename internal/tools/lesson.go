@@ -2,8 +2,11 @@ package tools
 
 import (
 	"cmp"
+	"context"
 	"errors"
+	"maps"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -14,11 +17,9 @@ import (
 )
 
 var (
-	errLessonNoCitation = errors.New("lesson cites no action_id")
-	errLessonForeign    = errors.New("lesson cites an action that is not yours")
-	errLessonNumber     = errors.New("lesson number is not a counter on the cited action")
-	errLessonURL        = errors.New("lesson url is not one of your action urls")
-	errLessonSecret     = errors.New("lesson looks like a secret")
+	errLessonNumber = errors.New("lesson number is not a counter on the cited action")
+	errLessonURL    = errors.New("lesson url is not one of your action urls")
+	errLessonSecret = errors.New("lesson looks like a secret")
 )
 
 // lessonReasons is the one table from a rejection to its logged reason code.
@@ -26,8 +27,6 @@ var lessonReasons = []struct {
 	err    error
 	reason string
 }{
-	{errLessonNoCitation, "lesson_missing_citation"},
-	{errLessonForeign, "lesson_foreign_citation"},
 	{errLessonNumber, "lesson_number_mismatch"},
 	{errLessonURL, "lesson_foreign_url"},
 	{errLessonSecret, "lesson_secret"},
@@ -64,8 +63,7 @@ var (
 
 // modelFixable are the codes the model can act on; each has a guard hint.
 var modelFixable = map[string]bool{
-	"lesson_missing_citation": true, "lesson_foreign_citation": true, "lesson_number_mismatch": true,
-	"lesson_foreign_url": true, "lesson_secret": true, "budget": true, "stale_ref": true,
+	"lesson_number_mismatch": true, "lesson_foreign_url": true, "lesson_secret": true, "budget": true, "stale_ref": true,
 }
 
 // modelFacing gives a model-fixable failure the blocked hint the model reads.
@@ -121,4 +119,68 @@ func checkLesson(text string, ev store.ActionEvidence) error {
 		}
 	}
 	return nil
+}
+
+// lessonFailure is what a failed lesson tool returns: a refusal becomes the
+// blocked hint the model reads, anything else stays generic.
+func lessonFailure(err error, tool string) error {
+	var refusal *store.LessonRefusal
+	if errors.As(err, &refusal) {
+		return &guard.BlockedError{Reason: refusal.Reason, Detail: refusal.Detail}
+	}
+	return errors.New(tool + ": failed")
+}
+
+// citedEvidence merges what the cited actions can back a claim with.
+func (d *Dispatcher) citedEvidence(ctx context.Context, ids []int64) (store.ActionEvidence, error) {
+	merged := store.ActionEvidence{Owned: true, Counters: map[int64]bool{}, URLs: map[string]bool{}}
+	for _, id := range ids {
+		ev, err := d.opts.Store.ActionEvidence(ctx, d.opts.Template.ID, id)
+		if err != nil {
+			return merged, err
+		}
+		maps.Copy(merged.Counters, ev.Counters)
+		maps.Copy(merged.URLs, ev.URLs)
+	}
+	return merged, nil
+}
+
+// lessonTools are the dream's three tools; the guard offers them to no other phase.
+func (d *Dispatcher) lessonTools() map[string]executor {
+	agent := d.opts.Template.ID
+	return map[string]executor{
+		"lesson_add": func(ctx context.Context, a arguments) (any, error) {
+			kind, polarity, ids := a.Text("kind"), a.Text("polarity"), a.IDList("action_ids")
+			if !slices.Contains([]string{"post", "reply", "any"}, kind) || !slices.Contains([]string{"do", "avoid"}, polarity) {
+				return nil, &guard.BlockedError{Reason: "lesson_enum"}
+			}
+			if err := d.opts.Store.CheckCitations(ctx, agent, kind, polarity, ids); err != nil {
+				return nil, lessonFailure(err, "adding lesson")
+			}
+			ev, err := d.citedEvidence(ctx, ids)
+			if err != nil {
+				return nil, errors.New("adding lesson: failed")
+			}
+			if err = checkLesson(a.Text("text"), ev); err != nil {
+				return nil, modelFacing(err)
+			}
+			id, err := d.opts.Store.AddLesson(ctx, agent, kind, polarity, a.Text("text"), ids, d.opts.Now())
+			if err != nil {
+				return nil, lessonFailure(err, "adding lesson")
+			}
+			return map[string]int64{"lesson_id": id}, nil
+		},
+		"lesson_confirm": func(ctx context.Context, a arguments) (any, error) {
+			if err := d.opts.Store.ConfirmLesson(ctx, agent, a.Int("id"), a.IDList("action_ids"), d.opts.Now()); err != nil {
+				return nil, lessonFailure(err, "confirming lesson")
+			}
+			return map[string]bool{"confirmed": true}, nil
+		},
+		"lesson_retire": func(ctx context.Context, a arguments) (any, error) {
+			if err := d.opts.Store.RetireLesson(ctx, agent, a.Int("id"), store.RetiredByDream, a.Text("reason"), d.opts.Now()); err != nil {
+				return nil, lessonFailure(err, "retiring lesson")
+			}
+			return map[string]bool{"retired": true}, nil
+		},
+	}
 }

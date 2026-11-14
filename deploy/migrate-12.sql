@@ -102,6 +102,34 @@ CREATE UNIQUE INDEX wakes_phase_key ON wakes(agent_id,kind,phase_key) WHERE phas
 DROP INDEX IF EXISTS trend_stories_recent;
 ALTER TABLE trend_stories DROP COLUMN phase;
 
+-- 4. Episodes and lessons: the brief of each action, and the one learned store.
+ALTER TABLE actions ADD COLUMN angle TEXT NOT NULL DEFAULT '';
+ALTER TABLE actions ADD COLUMN fact TEXT NOT NULL DEFAULT '';
+
+CREATE TABLE lessons (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    agent_id TEXT NOT NULL,
+    kind TEXT NOT NULL CHECK (kind IN ('post', 'reply', 'any')),
+    polarity TEXT NOT NULL CHECK (polarity IN ('do', 'avoid')),
+    text TEXT NOT NULL,
+    evidence_json TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    confirmed_at TEXT NOT NULL,
+    retired_at TEXT,
+    retired_by TEXT CHECK (retired_by IN ('dream', 'owner', 'expiry')),
+    retire_reason TEXT NOT NULL DEFAULT '',
+    CHECK ((retired_at IS NULL) = (retired_by IS NULL))
+);
+
+CREATE TABLE action_lessons (
+    action_id INTEGER NOT NULL REFERENCES actions(id),
+    lesson_id INTEGER NOT NULL REFERENCES lessons(id),
+    PRIMARY KEY (action_id, lesson_id)
+) WITHOUT ROWID;
+
+CREATE INDEX lessons_agent ON lessons(agent_id,retired_at);
+CREATE INDEX action_lessons_lesson ON action_lessons(lesson_id);
+
 -- Append further v12 changes above this line.
 
 PRAGMA user_version = 12;

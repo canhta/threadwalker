@@ -132,6 +132,8 @@ func TestCodeOwnedFieldsAreRefusedAsToolInput(t *testing.T) {
 				args[a.Name] = true
 			case guard.ArgTextList:
 				args[a.Name] = []string{"x"}
+			case guard.ArgIDList:
+				args[a.Name] = []int{1}
 			}
 		}
 		return args
@@ -170,6 +172,10 @@ func TestSpecParse(t *testing.T) {
 		{reply, `[]`, false},
 		{reply, `null`, false},
 		{reply, `{`, false},
+		{reply, `{"text":"x","target_id": "tid", "target_url":"u","target_username":"n","lesson_ids":[1,2]}`, true},
+		{reply, `{"text":"x","target_id": "tid", "target_url":"u","target_username":"n","lesson_ids":[]}`, false},
+		{reply, `{"text":"x","target_id": "tid", "target_url":"u","target_username":"n","lesson_ids":[0]}`, false},
+		{reply, `{"text":"x","target_id": "tid", "target_url":"u","target_username":"n","lesson_ids":["1"]}`, false},
 		{search, `{"query":"q"}`, true},
 		{search, `{"query":"q","recent":true}`, true},
 		{search, `{"query":"q","recent":"yes"}`, false},
