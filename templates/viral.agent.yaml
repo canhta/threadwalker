@@ -143,7 +143,7 @@ critic:                           # reviews every draft before the guard; defaul
 limits:                           # starting values, no experimental basis
   posts_per_day: 6
   replies_per_day: 80             # anti-spam ceiling only; the daily budget sets the real volume
-  browser_replies_per_day: 20     # replies under other people's posts go through the browser; small on purpose
+  browser_replies_per_day: 40     # replies under other people's posts go through the browser; small on purpose
   replies_per_hour: 6             # volume ceiling in any 60 minutes; 0 is off
   breaker_min_likes: 2            # newest 15 measured actions with fewer likes+replies than this pause replies
   breaker_actions: 15
