@@ -159,12 +159,15 @@ func (d *Dispatcher) webSearch(ctx context.Context, query string) (trends.WebSea
 		MaxResults: d.opts.Template.WebSearch.MaxResults,
 		Country:    searchCountry(d.opts.Template.Persona.Language),
 	})
-	if err != nil {
-		return trends.WebSearchResult{}, err
-	}
+	// Usage is recorded even when the search failed: an empty turn was still paid for.
 	usage := result.Usage
-	usage.CostUSD = float64(usage.TokensIn)/1e6*d.opts.Template.LLM.PricePerMTokInUSD + float64(usage.TokensOut)/1e6*d.opts.Template.LLM.PricePerMTokOutUSD
-	if err = d.opts.Store.RecordLLMUsage(ctx, d.opts.Template.ID, d.opts.WakeID, day, usage); err != nil {
+	if usage.TokensIn > 0 || usage.TokensOut > 0 {
+		usage.CostUSD = float64(usage.TokensIn)/1e6*d.opts.Template.LLM.PricePerMTokInUSD + float64(usage.TokensOut)/1e6*d.opts.Template.LLM.PricePerMTokOutUSD
+		if rerr := d.opts.Store.RecordLLMUsage(ctx, d.opts.Template.ID, d.opts.WakeID, day, usage); rerr != nil {
+			return trends.WebSearchResult{}, rerr
+		}
+	}
+	if err != nil {
 		return trends.WebSearchResult{}, err
 	}
 	return result, nil

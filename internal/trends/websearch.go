@@ -55,8 +55,9 @@ const webSearchMaxQueryRunes = 200
 type WebSearcher func(context.Context, WebSearchRequest) (WebSearchResult, error)
 
 // NewWebSearcher binds the injected client and refuses redirects. Each call
-// performs exactly one OpenAI Responses web-search request; errors contain
-// operation and HTTP status only, never a body or credential.
+// makes one OpenAI Responses web-search request, and one more when the first
+// turn ends with no message; errors contain operation and HTTP status only,
+// never a body or credential.
 func NewWebSearcher(client *http.Client) WebSearcher {
 	copied := *client
 	copied.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
@@ -64,8 +65,12 @@ func NewWebSearcher(client *http.Client) WebSearcher {
 		result, err := searchWeb(ctx, &copied, req)
 		// The Responses API sometimes ends a web_search turn with no message at all;
 		// one more call usually answers. Other failures are returned as they are.
+		// The result carries the usage of every call made, answered or not.
 		if errors.Is(err, errEmptyResponse) {
+			first := result.Usage
 			result, err = searchWeb(ctx, &copied, req)
+			result.Usage.TokensIn += first.TokensIn
+			result.Usage.TokensOut += first.TokensOut
 		}
 		return result, err
 	}
@@ -176,9 +181,6 @@ func searchWeb(ctx context.Context, client *http.Client, req WebSearchRequest) (
 			}
 		}
 	}
-	if result.Answer == "" && len(result.Sources) == 0 {
-		return WebSearchResult{}, errEmptyResponse
-	}
 	if decoded.Usage.InputTokens == nil || decoded.Usage.OutputTokens == nil {
 		return WebSearchResult{}, errors.New("web search: missing usage")
 	}
@@ -186,6 +188,10 @@ func searchWeb(ctx context.Context, client *http.Client, req WebSearchRequest) (
 		return WebSearchResult{}, errors.New("web search: invalid usage")
 	}
 	result.Usage = store.LLMUsage{TokensIn: *decoded.Usage.InputTokens, TokensOut: *decoded.Usage.OutputTokens}
+	if result.Answer == "" && len(result.Sources) == 0 {
+		// The turn was paid for: its usage comes back with the error.
+		return WebSearchResult{Usage: result.Usage}, errEmptyResponse
+	}
 	return result, nil
 }
 

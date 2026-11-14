@@ -128,10 +128,11 @@ func TestSearchWebRetriesOneEmptyResponse(t *testing.T) {
 		bodies  []string
 		calls   int
 		wantErr bool
+		in, out int64
 	}{
-		{"empty then answer", []string{empty, answer}, 2, false},
-		{"empty twice", []string{empty, empty, answer}, 2, true},
-		{"answer first", []string{answer, answer}, 1, false},
+		{"empty then answer", []string{empty, answer}, 2, false, 10, 3},
+		{"empty twice", []string{empty, empty, answer}, 2, true, 10, 0},
+		{"answer first", []string{answer, answer}, 1, false, 5, 3},
 	} {
 		calls := 0
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -142,6 +143,10 @@ func TestSearchWebRetriesOneEmptyResponse(t *testing.T) {
 		server.Close()
 		if calls != tc.calls || (err != nil) != tc.wantErr || (!tc.wantErr && result.Answer != "an answer") {
 			t.Errorf("%s: calls %d, err %v, answer %q", tc.name, calls, err, result.Answer)
+		}
+		// Every call made is paid for, answered or not.
+		if result.Usage.TokensIn != tc.in || result.Usage.TokensOut != tc.out {
+			t.Errorf("%s: usage %d in, %d out; want %d, %d", tc.name, result.Usage.TokensIn, result.Usage.TokensOut, tc.in, tc.out)
 		}
 	}
 }
