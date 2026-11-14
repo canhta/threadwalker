@@ -111,7 +111,7 @@ func TestPatchTemplateV13(t *testing.T) {
 	}
 	out := run(live)
 	t.Log("\n" + out)
-	if strings.Count(out, "rewrote:") != 3 || strings.Count(out, "replaced persona: block") != 1 || strings.Contains(out, "WARNING") {
+	if strings.Count(out, "rewrote:") != 3 || strings.Count(out, "replaced persona: block") != 1 || !strings.Contains(out, "removed writer.post_llm") || strings.Contains(out, "WARNING") {
 		t.Fatalf("first run printed %q", out)
 	}
 	tmpl, err := loadOne(live, viralEnv())
@@ -138,8 +138,12 @@ func TestPatchTemplateV13(t *testing.T) {
 	if bak, err := os.ReadFile(live + ".bak"); err != nil || string(bak) != string(raw) {
 		t.Errorf("backup is not the original file (read err %v)", err)
 	}
-	// Everything outside persona: is byte-for-byte what the live file had.
-	if tail := func(s string) string { return s[strings.Index(s, "\nllm:"):] }; tail(string(patched)) != tail(string(raw)) {
+	if strings.Contains(string(patched), "post_llm") {
+		t.Error("writer.post_llm is still there; v0.3.0 refuses unknown keys")
+	}
+	// Everything outside persona: and writer.post_llm is byte-for-byte what the live file had.
+	withoutPostLLM := regexp.MustCompile(`(?m)^  post_llm:.*\n(?:    .*\n)*`).ReplaceAllString(string(raw), "")
+	if tail := func(s string) string { return s[strings.Index(s, "\nllm:"):] }; tail(string(patched)) != tail(withoutPostLLM) {
 		t.Error("the patch changed something after the persona block")
 	}
 	if out := run(live); strings.TrimSpace(out) != "no changes" {

@@ -43,6 +43,22 @@ llm:
   reasoning_effort: none
   price_per_mtok_in_usd: 0.10
   price_per_mtok_out_usd: 0.50
+writer:
+  llm:
+    protocol: openai
+    base_url: https://api.openai.com/v1
+    model: gpt-6-luna
+    api_key_env: OPENAI_API_KEY
+    price_per_mtok_in_usd: 0.10
+    price_per_mtok_out_usd: 0.50
+  post_llm:                       # posts only
+    protocol: openai
+    base_url: https://api.openai.com/v1
+    model: gpt-6-luna
+    api_key_env: OPENAI_API_KEY
+    reasoning_effort: high
+    price_per_mtok_in_usd: 0.10
+    price_per_mtok_out_usd: 0.50
 limits:
   posts_per_day: 6
   replies_per_day: 80

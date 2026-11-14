@@ -72,8 +72,22 @@ def replace_persona(text, template_text, log):
     return "".join(lines[:span[0]]) + new + "".join(lines[span[1]:])
 
 
+def remove_post_llm(text, log):
+    """Drop writer.post_llm: v0.3.0 has one writer model and refuses unknown keys."""
+    lines = text.splitlines(keepends=True)
+    start = next((i for i, l in enumerate(lines) if l.startswith("  post_llm:")), None)
+    if start is None:
+        return text
+    end = start + 1
+    while end < len(lines) and (not lines[end].strip() or lines[end].startswith("    ")):
+        end += 1
+    log.append("removed writer.post_llm (%d lines); the writer uses writer.llm" % (end - start))
+    return "".join(lines[:start] + lines[end:])
+
+
 def patch(text, template_text):
     log = []
+    text = remove_post_llm(text, log)
     for old, new in REWRITES:
         if old in text:
             text = text.replace(old, new)
