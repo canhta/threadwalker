@@ -88,7 +88,7 @@ A behind agent may not end a wake idle. When the model stops calling tools, the 
 | Wake ends normally or at a step, budget or action limit; behind | `limits.min_minutes_between_wakes` |
 | Same, on target | `kpi.on_target_minutes_between_wakes` |
 | Same, no `kpi:` block | One hour, or the minimum if longer |
-| Day capped: today's agent and study spend reached `max_usd_per_day` (local day), or both `posts_per_day` and `replies_per_day` used (UTC day, in the template's mode, as the guard counts) | The next local midnight for spend, the next UTC midnight for the post and reply caps (the later when both), whatever the gap |
+| Day capped: today's agent and study spend reached `max_usd_per_day` or both `posts_per_day` and `replies_per_day` used (in the template's mode, as the guard counts), all on the local day in `schedule.timezone` | The next local midnight, whatever the gap |
 | Fresh webhook reply or mention arrived since the latest wake started | Now, but never closer than `min_minutes_between_wakes` after that wake started |
 | The inbox poll found a reply not seen before (every `inbox.poll_minutes` between wakes; 0 disables) | Now, but never closer than `inbox.min_minutes_after_wake` after the latest wake started. The poll is API reads only, no model call; a reply is remembered once polled or listed in a wake, so it asks for at most one early wake (the memory is lost on restart). A failed poll backs off 15 minutes, doubling up to 4 hours, and never stops the process. A paused or killed agent is not polled. Spend caps and pacing are unchanged |
 | Wake fails | The fallback below |

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"math/rand"
+	"regexp"
 	"slices"
 	"strings"
 	"time"
@@ -152,7 +153,7 @@ func (r *Runtime) wakeContext(ctx context.Context, phase string, wakeID int64) (
 		return nil, err
 	}
 
-	day := t.Limits.SpendDay(now)
+	day := t.Limits.Day(now)
 	var spent store.LLMUsage
 	budget := t.Limits.MaxUSDPerDay
 	switch phase {
@@ -207,7 +208,7 @@ func (r *Runtime) wakeContext(ctx context.Context, phase string, wakeID int64) (
 	if err != nil {
 		return nil, fmt.Errorf("assembling context: %w", err)
 	}
-	user := string(body)
+	user := inZone(string(body), t.Limits.Location())
 	if phase == guard.PhaseAgent {
 		open, err := r.opts.Store.OpenOwnerNotes(ctx, t.ID, now)
 		if err != nil {
@@ -238,9 +239,8 @@ func (r *Runtime) wakeContext(ctx context.Context, phase string, wakeID int64) (
 func (r *Runtime) ownActions(ctx context.Context, now time.Time, redactor *config.Redactor) ([]store.OwnAction, counters, error) {
 	t := r.opts.Template
 	c := counters{PostsLimit: t.Limits.PostsPerDay, RepliesLimit: t.Limits.RepliesPerDay, WindowHours: int(ownActionWindow.Hours())}
-	u := now.UTC()
-	dayStart := time.Date(u.Year(), u.Month(), u.Day(), 0, 0, 0, 0, time.UTC)
-	today, err := r.opts.Store.CountActions(ctx, store.ActionScope{AgentID: t.ID, DryRun: t.DryRun}, dayStart, dayStart.Add(24*time.Hour))
+	dayStart, dayEnd, _ := t.Limits.DayBounds(now)
+	today, err := r.opts.Store.CountActions(ctx, store.ActionScope{AgentID: t.ID, DryRun: t.DryRun}, dayStart, dayEnd)
 	if err != nil {
 		return nil, c, err
 	}
@@ -358,4 +358,18 @@ func testingKnowledgeIDs(entries []store.PlaybookEntry) []string {
 		}
 	}
 	return ids
+}
+
+var stamp = regexp.MustCompile(`"\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(\.\d+)?(Z|[+-]\d\d:\d\d)"`)
+
+// inZone rewrites every RFC3339 timestamp in the context JSON to the template
+// zone, so the model sees one clock and never the host's.
+func inZone(body string, loc *time.Location) string {
+	return stamp.ReplaceAllStringFunc(body, func(m string) string {
+		at, err := time.Parse(time.RFC3339Nano, m[1:len(m)-1])
+		if err != nil {
+			return m
+		}
+		return `"` + at.In(loc).Format(time.RFC3339Nano) + `"`
+	})
 }

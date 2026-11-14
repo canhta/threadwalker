@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/canhta/threadz/internal/config"
 	"github.com/canhta/threadz/internal/ratelimit"
 	"github.com/canhta/threadz/internal/store"
 )
@@ -41,15 +42,8 @@ type Agent struct {
 	DailyBudgetUSD float64
 	Timezone       string
 	Location       *time.Location
-	// SpendDay maps an instant to its ledger day key; nil is the UTC date.
-	SpendDay func(time.Time) string
-}
-
-func (a Agent) spendDay(now time.Time) string {
-	if a.SpendDay != nil {
-		return a.SpendDay(now)
-	}
-	return now.UTC().Format("2006-01-02")
+	// Limits.Timezone is schedule.timezone: the zone of "today" and of the day columns.
+	Limits config.LimitsConfig
 }
 
 // Source reads the stored facts one page needs. The store implements it.
@@ -174,7 +168,7 @@ func (h *Handler) Page(ctx context.Context) (Page, error) {
 func (h *Handler) readPage(ctx context.Context, a Agent, days int, view postView, now time.Time, content bool) (Page, error) {
 	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
 	defer cancel()
-	snap, err := h.source.DashboardSnapshot(ctx, store.DashboardQuery{AgentID: a.ID, From: dayStarts(now, days)[0], Now: now, Content: content})
+	snap, err := h.source.DashboardSnapshot(ctx, store.DashboardQuery{AgentID: a.ID, From: dayStarts(a.Limits, now, days)[0], Now: now, Content: content})
 	if err != nil {
 		return Page{}, err
 	}

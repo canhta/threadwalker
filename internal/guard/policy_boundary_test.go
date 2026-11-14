@@ -202,7 +202,7 @@ func TestPolicyPostAndReplyDailyCapsAllowNAndRefuseNPlusOne(t *testing.T) {
 	})
 }
 
-func TestPolicyDailyWindowIsUTCCalendarDay(t *testing.T) {
+func TestPolicyDailyWindowWithoutAZoneIsUTCCalendarDay(t *testing.T) {
 	h := newPolicyHarness(t, func(tmpl *config.Template) { tmpl.Limits.PostsPerDay = 1 })
 	h.clock.at = time.Date(2026, 11, 11, 23, 59, 57, 0, time.UTC)
 	h.allow("post", postArgs(1))
@@ -212,6 +212,24 @@ func TestPolicyDailyWindowIsUTCCalendarDay(t *testing.T) {
 	h.allow("post", postArgs(3))
 	h.clock.Advance(time.Second)
 	h.blocked("post", postArgs(4), rulePostsPerDay)
+}
+
+// Every cap counts on the local day in schedule.timezone: 06:30 at UTC+7 is
+// 23:30 UTC the day before, and the quota and the spend ledger agree on "today".
+func TestPolicyDailyWindowIsTheLocalDay(t *testing.T) {
+	h := newPolicyHarness(t, func(tmpl *config.Template) {
+		tmpl.Limits.PostsPerDay = 1
+		tmpl.Limits.Timezone = "Asia/Ho_Chi_Minh"
+	})
+	h.clock.at = time.Date(2026, 11, 11, 23, 30, 0, 0, time.UTC) // 06:30 on 12 Nov local
+	if day := (config.LimitsConfig{Timezone: "Asia/Ho_Chi_Minh"}).Day(h.clock.at); day != "2026-11-12" {
+		t.Fatalf("spend day %s want 2026-11-12", day)
+	}
+	h.allow("post", postArgs(1))
+	h.clock.Advance(17*time.Hour + 29*time.Minute + 57*time.Second) // 23:59:57 local, same day
+	h.blocked("post", postArgs(2), rulePostsPerDay)
+	h.clock.Advance(3 * time.Second) // 00:00:00 local the next day
+	h.allow("post", postArgs(3))
 }
 
 func TestPolicyPerUserSevenDayWindowExpiresExactly(t *testing.T) {
@@ -326,7 +344,7 @@ func TestPolicyReplyMentionsOnlyTheAnsweredAuthor(t *testing.T) {
 	}, ruleReplyMention)
 }
 
-func TestPolicyOneReplyPerThreadPerUTCDay(t *testing.T) {
+func TestPolicyOneReplyPerThreadPerDayWithoutAZoneIsUTC(t *testing.T) {
 	h := newPolicyHarness(t, func(tmpl *config.Template) {
 		tmpl.Limits.RepliesPerDay = 100
 		tmpl.Limits.RepliesPerUser7d = 100

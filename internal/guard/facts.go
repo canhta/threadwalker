@@ -24,13 +24,12 @@ const factMetricSamples = 20
 // FactSheet is the one list of numbers an agent may quote about itself: the
 // wake context shows it and the guard checks post and reply text against it.
 func FactSheet(ctx context.Context, st *store.Store, t config.Template, now time.Time) ([]Fact, error) {
-	u := now.UTC()
-	dayStart := time.Date(u.Year(), u.Month(), u.Day(), 0, 0, 0, 0, time.UTC)
-	spent, err := st.LLMUsageForDayPhases(ctx, t.ID, t.Limits.SpendDay(now), "agent", "study")
+	dayStart, dayEnd, day := t.Limits.DayBounds(now)
+	spent, err := st.LLMUsageForDayPhases(ctx, t.ID, day, "agent", "study")
 	if err != nil {
 		return nil, fmt.Errorf("building fact sheet: %w", err)
 	}
-	today, err := st.CountActions(ctx, store.ActionScope{AgentID: t.ID, DryRun: t.DryRun}, dayStart, dayStart.Add(24*time.Hour))
+	today, err := st.CountActions(ctx, store.ActionScope{AgentID: t.ID, DryRun: t.DryRun}, dayStart, dayEnd)
 	if err != nil {
 		return nil, fmt.Errorf("building fact sheet: %w", err)
 	}

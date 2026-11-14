@@ -86,7 +86,7 @@ func TestScoreboardShowsNextAllowedPost(t *testing.T) {
 		{30 * time.Minute, 0, ""},
 		{5 * time.Hour, 120, ""},
 	} {
-		r, _, _ := kpiRuntimeSpaced(t, c.ago, 3, c.gap)
+		r, _, _ := kpiRuntimeFull(t, "Asia/Ho_Chi_Minh", c.ago, 3, c.gap)
 		messages, err := r.Context(context.Background(), "agent")
 		if err != nil {
 			t.Fatal(err)
@@ -251,11 +251,9 @@ func TestCappedDayWaitsForTheNextUTCDayWithoutAZone(t *testing.T) {
 	}
 }
 
-// Spend resets at the next local midnight (17:00Z at UTC+7), the post and
-// reply caps at the next UTC midnight; a day capped by both waits for the later.
+// Spend and both action caps reset at the same next local midnight (17:00Z at UTC+7).
 func TestCappedSpendWaitsForLocalMidnight(t *testing.T) {
 	localMidnight := time.Date(2026, 1, 1, 17, 0, 0, 0, time.UTC)
-	utcMidnight := time.Date(2026, 1, 2, 0, 0, 0, 0, time.UTC)
 	spend := func(day string) func(t *testing.T, st *store.Store) {
 		return func(t *testing.T, st *store.Store) {
 			if _, err := st.DB().Exec(`INSERT INTO ledger_phases(agent_id,day,phase,cost_usd) VALUES('synthetic-offline',?,'study',0.9)`, day); err != nil {
@@ -278,7 +276,15 @@ func TestCappedSpendWaitsForLocalMidnight(t *testing.T) {
 			for i := 0; i < 2; i++ {
 				seedToday(t, st, "post", 100+i)
 			}
-		}, utcMidnight},
+		}, localMidnight},
+		{"action caps alone", func(t *testing.T, st *store.Store) {
+			for i := 0; i < 15; i++ {
+				seedToday(t, st, "reply", i)
+			}
+			for i := 0; i < 3; i++ {
+				seedToday(t, st, "post", 100+i)
+			}
+		}, localMidnight},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			r, st, fixture := kpiRuntimeIn(t, "Asia/Ho_Chi_Minh", 9*time.Hour, 3)
@@ -299,5 +305,25 @@ func seedToday(t *testing.T, st *store.Store, kind string, n int) {
 	t.Helper()
 	if _, err := st.SeedAction(context.Background(), store.SeededAction{AgentID: "synthetic-offline", Kind: kind, Text: kind + strconv.Itoa(n), DryRun: true, PostedAt: kpiNow.Add(-time.Duration(n+1) * time.Minute)}); err != nil {
 		t.Fatal(err)
+	}
+}
+
+// The host zone never reaches the model: every timestamp in the wake context is
+// RFC3339 in the template zone.
+func TestWakeContextTimesAreInTheTemplateZone(t *testing.T) {
+	old := time.Local
+	time.Local = time.FixedZone("host", 8*3600)
+	t.Cleanup(func() { time.Local = old })
+	r, _, _ := kpiRuntimeFull(t, "Asia/Ho_Chi_Minh", 90*time.Minute, 3, 0)
+	messages, err := r.Context(context.Background(), "agent")
+	if err != nil {
+		t.Fatal(err)
+	}
+	user := messages[1].Content
+	if strings.Contains(user, "+08:00") {
+		t.Errorf("context carries the host zone:\n%.1500s", user)
+	}
+	if !strings.Contains(user, "+07:00") || strings.Contains(user, "Z\"") {
+		t.Errorf("context times are not in +07:00:\n%.1500s", user)
 	}
 }

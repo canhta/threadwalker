@@ -646,7 +646,7 @@ func NextPostAt(l config.LimitsConfig, latestPost time.Time) time.Time {
 
 func (g *Guard) quotas(ctx context.Context, tx store.ReservationTx, actions []store.ReservedAction, kind string, intent *actionIntent, now time.Time) (string, error) {
 	l := g.opts.Template.Limits
-	day := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
+	dayStart, dayEnd, _ := l.DayBounds(now)
 	from := now.Add(-7 * 24 * time.Hour)
 	posts, replies, browserReplies, contact := 0, 0, 0, 0
 	threadUsed := false
@@ -667,7 +667,7 @@ func (g *Guard) quotas(ctx context.Context, tx store.ReservationTx, actions []st
 			latestPost = at
 		}
 		// Future persisted intents are counted conservatively after clock rollback.
-		if !at.Before(day) && at.Before(day.Add(24*time.Hour)) {
+		if !at.Before(dayStart) && at.Before(dayEnd) {
 			if row.Kind == "post" {
 				posts++
 			} else if row.Kind == "reply" {
@@ -701,7 +701,7 @@ func (g *Guard) quotas(ctx context.Context, tx store.ReservationTx, actions []st
 		if err != nil {
 			return "", err
 		}
-		if !at.Before(day) && at.Before(day.Add(24*time.Hour)) && canonical == intent.thread {
+		if !at.Before(dayStart) && at.Before(dayEnd) && canonical == intent.thread {
 			threadUsed = true
 		}
 	}

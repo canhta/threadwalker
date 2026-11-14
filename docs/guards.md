@@ -57,11 +57,11 @@ flowchart TD
 | `api_quota_unreadable` | The quota cannot be read; fail closed | code | API quota |
 | `ungrounded_number` | A number next to a `guard.self_stat_units` unit does not equal, at the precision written, a value on the facts sheet | template (units) | after review |
 | `do_not_contact` | Target username is on the permanent list | code | reserve |
-| `posts_per_day` | `limits.posts_per_day` used (UTC day, template's mode); stops the wake with `action_limit` | template | reserve |
+| `posts_per_day` | `limits.posts_per_day` used (local day in `schedule.timezone`, template's mode); stops the wake with `action_limit` | template | reserve |
 | `replies_per_day` | `limits.replies_per_day` used; stops the wake with `action_limit` | template | reserve |
 | `browser_replies_per_day` | `limits.browser_replies_per_day` used (default 5) | template | reserve |
 | `replies_per_user_7d` | `limits.replies_per_user_7d` replies to one username in the rolling 7 days; an answer to a reply listed in the wake's inbox ([wake.md](wake.md)) is exempt, so a conversation continues, while it still counts toward `replies_per_day` and the person's count | template | reserve |
-| `thread_per_day` | One reply per thread per UTC day; each reply to us is its own thread, so a back-and-forth answers every new reply once | code | reserve |
+| `thread_per_day` | One reply per thread per local day; each reply to us is its own thread, so a back-and-forth answers every new reply once | code | reserve |
 | `replies_per_conversation` | The agent already made `limits.replies_per_conversation` replies under the same root post (the hint names the count), unless its first reply there reached `limits.conversation_hot_likes` likes or `limits.conversation_hot_replies` replies in its newest stored metric. A reply to a feed or search post is rooted at that post; an answer to an inbox reply inherits the root of our reply it answers, and a reply to a comment on our own post is rooted at that comment, so one commenter is one conversation. Rows stored without a root, and mentions, are their own conversations. The inbox lists no reply from a capped conversation | template | reserve |
 | `min_seconds_between_actions` | Spacing since the newest action under `limits.min_seconds_between_actions`; the hint names the next allowed time | template | reserve |
 | `min_minutes_between_posts` | A post within `limits.min_minutes_between_posts` of the newest own post; replies are not affected; the hint names the next allowed time | template | reserve |
@@ -78,7 +78,7 @@ Dashboard-only codes: failed `memory_add` reasons `lesson_*` ([wake.md](wake.md)
 |---|---|
 | Series | One `post` call, one decision. Every part passes every text rule; one refused part refuses the whole series. It reserves one `actions` row: counts once toward `posts_per_day` and spacing; later parts count toward neither `replies_per_day` nor per-user caps. The reserved text other agents' isolation checks read includes every part |
 | Counting | Quotas, spacing, dedupe, isolation and the wake-context counters count only intents of the template's mode (dry-run rows while `dry_run` is true, live rows once false), failed and unknown outcomes included. The reserve step inserts the intent and contact counters atomically; persistence errors fail closed |
-| Days | Post, reply and thread quotas use UTC calendar days. Contacts use the exact rolling interval `(now - 7 days, now]` |
+| Days | Every daily cap (posts, replies, threads, spend) counts on the local day in `schedule.timezone`. Contacts use the exact rolling interval `(now - 7 days, now]` |
 | Unit of length | The 500 ceiling counts Unicode code points |
 | Matching | Blocked and stop phrases: case-insensitive substring. Safety category patterns match case-folded text and are not configurable. `persona.style_avoid` never blocks; a phrase in both lists is a configuration error |
 | Facts sheet | USD spent and left today, tokens today, own post and reply counts, latest views and replies per own action, latest own follower count after a `read_own_metrics` read. Cent figures match USD times 100. Numbers without a listed unit are not checked; a follower figure is refused until a follower count has been read. A reply may quote the post it answers |

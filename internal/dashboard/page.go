@@ -181,7 +181,7 @@ func buildPage(snap store.DashboardSnapshot, agents []Agent, a Agent, days int, 
 		p.Agent.Status = "not_started"
 	}
 
-	daysList := dayStarts(now, days)
+	daysList := dayStarts(a.Limits, now, days)
 	currentStart := daysList[0]
 	priorStart := currentStart.AddDate(0, 0, -days)
 
@@ -215,7 +215,7 @@ func buildPage(snap store.DashboardSnapshot, agents []Agent, a Agent, days int, 
 		return Page{}, err
 	}
 	p.Burn = buildBurn(ledger, phases, a, daysList, now, a.Location)
-	todayKey := a.spendDay(now)
+	todayKey := a.Limits.Day(now)
 	spentToday := ledger[todayKey]
 	if spentToday == 0 {
 		v := phases[todayKey]
@@ -727,7 +727,7 @@ func buildBurn(ledger map[string]float64, phases map[string][3]float64, a Agent,
 		return p
 	}
 	p.HasRows = true
-	today := a.spendDay(now)
+	today := a.Limits.Day(now)
 	todayTotal := ledger[today]
 	todayPhase := phases[today]
 	if todayPhase[0]+todayPhase[1]+todayPhase[2] == 0 && todayTotal > 0 {

@@ -28,19 +28,16 @@ type scoreboard struct {
 
 func (r *Runtime) scoreboard(ctx context.Context, now time.Time) (scoreboard, error) {
 	t := r.opts.Template
-	dayStart, _, _ := t.Limits.SpendDayBounds(now)
+	dayStart, dayEnd, _ := t.Limits.DayBounds(now)
 	stats, err := r.opts.Store.KPIStats(ctx, t.ID, t.DryRun, now, dayStart)
-	b := scoreboard{KPIStats: stats, KPI: t.KPI, Now: now, Loc: time.UTC}
+	b := scoreboard{KPIStats: stats, KPI: t.KPI, Now: now, Loc: t.Limits.Location()}
 	if err != nil {
 		return b, err
 	}
-	b.Loc = r.schedule.loc
 	if next := guard.NextPostAt(t.Limits, stats.LastPost); now.Before(next) {
 		b.NextPost = next
 	}
-	u := now.UTC()
-	day := time.Date(u.Year(), u.Month(), u.Day(), 0, 0, 0, 0, time.UTC)
-	done, err := r.opts.Store.CountActions(ctx, store.ActionScope{AgentID: t.ID, DryRun: t.DryRun}, day, day.Add(24*time.Hour))
+	done, err := r.opts.Store.CountActions(ctx, store.ActionScope{AgentID: t.ID, DryRun: t.DryRun}, dayStart, dayEnd)
 	b.PostsCapped = done.Posts >= t.Limits.PostsPerDay
 	return b, err
 }
@@ -177,32 +174,22 @@ func (r *Runtime) nextWake(ctx context.Context, now time.Time) (time.Time, error
 	return r.schedule.AfterQuiet(next), nil
 }
 
-func nextUTCDay(now time.Time) time.Time {
-	return now.UTC().Truncate(24 * time.Hour).Add(24 * time.Hour)
-}
-
-// capReset is when a capped day ends, or the zero time when it is not capped.
-// Spend resets at the next local midnight; both the post and the reply caps
-// used (in the template's mode, as the guard counts) reset at the next UTC
-// midnight. When both hold, the later one wins.
+// capReset is when a capped day ends, or the zero time when it is not capped:
+// the next local midnight, when spend or both the post and the reply caps (in
+// the template's mode, as the guard counts) are used up.
 func (r *Runtime) capReset(ctx context.Context, now time.Time) (time.Time, error) {
 	t := r.opts.Template
-	_, spendEnd, day := t.Limits.SpendDayBounds(now)
+	dayStart, dayEnd, day := t.Limits.DayBounds(now)
 	spent, err := r.opts.Store.LLMUsageForDayPhases(ctx, t.ID, day, "agent", "study")
 	if err != nil {
 		return time.Time{}, err
 	}
-	utcDay := now.UTC().Truncate(24 * time.Hour)
-	done, err := r.opts.Store.CountActions(ctx, store.ActionScope{AgentID: t.ID, DryRun: t.DryRun}, utcDay, utcDay.Add(24*time.Hour))
+	done, err := r.opts.Store.CountActions(ctx, store.ActionScope{AgentID: t.ID, DryRun: t.DryRun}, dayStart, dayEnd)
 	if err != nil {
 		return time.Time{}, err
 	}
-	var reset time.Time
-	if spent.CostUSD >= t.Limits.MaxUSDPerDay {
-		reset = spendEnd
+	if spent.CostUSD >= t.Limits.MaxUSDPerDay || (done.Posts >= t.Limits.PostsPerDay && done.Replies >= t.Limits.RepliesPerDay) {
+		return dayEnd, nil
 	}
-	if done.Posts >= t.Limits.PostsPerDay && done.Replies >= t.Limits.RepliesPerDay && nextUTCDay(now).After(reset) {
-		reset = nextUTCDay(now)
-	}
-	return reset, nil
+	return time.Time{}, nil
 }

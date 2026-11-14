@@ -2,6 +2,7 @@ package dashboard
 
 import (
 	"fmt"
+	"github.com/canhta/threadz/internal/config"
 	"github.com/canhta/threadz/internal/guard"
 	"net"
 	"strings"
@@ -54,7 +55,7 @@ func TestEngagementRateNeedsViews(t *testing.T) {
 func TestDailySeriesIsBoundedAndBreaksOnMissingDenominator(t *testing.T) {
 	now := time.Date(2026, 11, 12, 12, 0, 0, 0, time.UTC)
 	for _, days := range []int{7, 14, 30} {
-		starts := dayStarts(now, days)
+		starts := dayStarts(config.LimitsConfig{}, now, days)
 		if len(starts) != days {
 			t.Fatalf("bucket count = %d", len(starts))
 		}

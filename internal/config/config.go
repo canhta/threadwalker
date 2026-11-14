@@ -286,21 +286,29 @@ type LimitsConfig struct {
 	CriticRejectionsPerWake int
 }
 
-// SpendDayBounds is the half-open local calendar day containing at, in the
-// zone that counts spend. Day is its date, the ledger's day key.
-func (l LimitsConfig) SpendDayBounds(at time.Time) (start, end time.Time, day string) {
+// Location is schedule.timezone, the zone of every daily cap and of the
+// timestamps the model sees. An unknown or empty zone is UTC.
+func (l LimitsConfig) Location() *time.Location {
 	loc, err := time.LoadLocation(l.Timezone)
 	if err != nil {
-		loc = time.UTC
+		return time.UTC
 	}
+	return loc
+}
+
+// DayBounds is the half-open local calendar day containing at, in
+// schedule.timezone: the one day that posts, replies, threads and spend count
+// on. Day is its date, the ledger's day key.
+func (l LimitsConfig) DayBounds(at time.Time) (start, end time.Time, day string) {
+	loc := l.Location()
 	local := at.In(loc)
 	start = time.Date(local.Year(), local.Month(), local.Day(), 0, 0, 0, 0, loc)
 	return start, start.AddDate(0, 0, 1), start.Format(time.DateOnly)
 }
 
-// SpendDay is the ledger day key of at.
-func (l LimitsConfig) SpendDay(at time.Time) string {
-	_, _, day := l.SpendDayBounds(at)
+// Day is the ledger day key of at.
+func (l LimitsConfig) Day(at time.Time) string {
+	_, _, day := l.DayBounds(at)
 	return day
 }
 

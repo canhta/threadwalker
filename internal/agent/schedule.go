@@ -148,13 +148,6 @@ func (s *PhaseSchedule) StudyDue(now, last time.Time) (time.Time, string, bool) 
 	return candidate, s.phaseKey("study", candidate), true
 }
 
-// LocalDayBounds returns the half-open local-day interval containing at.
-func (s *PhaseSchedule) LocalDayBounds(at time.Time) (time.Time, time.Time) {
-	local := at.In(s.loc)
-	start := time.Date(local.Year(), local.Month(), local.Day(), 0, 0, 0, 0, s.loc)
-	return start, start.AddDate(0, 0, 1)
-}
-
 func (s *PhaseSchedule) localDay(at time.Time) string {
 	return at.In(s.loc).Format("2006-01-02")
 }

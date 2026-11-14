@@ -456,7 +456,7 @@ func (s *Service) notice(ctx context.Context, id, kind, event, extra string) err
 	if event == "" || len(event) > 200 {
 		return errors.New("queueing owner notice: event identity required")
 	}
-	notice := noticeText(kind, s.resetText(id, s.opts.Now().UTC().Truncate(24*time.Hour)), s.spendResetText(id))
+	notice := noticeText(kind, s.dayResetText(id))
 	if notice == "" {
 		return errors.New("queueing owner notice: unknown kind")
 	}
@@ -500,19 +500,17 @@ func (s *Service) BrowserRestored(ctx context.Context, id, event string) error {
 	return s.notice(ctx, id, "logged_in", event, "")
 }
 
-// summary reads the UTC limits day so far for the post and reply counts and
-// the local spend day for the spend.
+// summary reads the local day so far: post and reply counts and spend.
 func (s *Service) summary(ctx context.Context, id string) (store.OwnerSummary, error) {
-	now := s.opts.Now().UTC()
-	day := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
-	return s.opts.Store.OwnerSummary(ctx, id, s.templates[id].DryRun, day, day.Add(24*time.Hour), s.templates[id].Limits.SpendDay(now))
+	start, end, day := s.templates[id].Limits.DayBounds(s.opts.Now())
+	return s.opts.Store.OwnerSummary(ctx, id, s.templates[id].DryRun, start, end, day)
 }
 
 // report renders the daily report: the 24 hours up to now, with the spend of
 // the local spend day.
 func (s *Service) report(ctx context.Context, id string) (string, error) {
 	now := s.opts.Now()
-	window, err := s.opts.Store.OwnerSummary(ctx, id, s.templates[id].DryRun, now.Add(-24*time.Hour), now, s.templates[id].Limits.SpendDay(now))
+	window, err := s.opts.Store.OwnerSummary(ctx, id, s.templates[id].DryRun, now.Add(-24*time.Hour), now, s.templates[id].Limits.Day(now))
 	if err != nil {
 		return "", err
 	}
@@ -527,10 +525,9 @@ func (s *Service) report(ctx context.Context, id string) (string, error) {
 // hour that falls on the previous UTC date is not sent twice.
 func (s *Service) Tick(ctx context.Context) error {
 	now := s.opts.Now().UTC()
-	day := now.Format("2006-01-02")
 	for _, id := range s.ids {
 		tmpl := s.templates[id]
-		spendDay := tmpl.Limits.SpendDay(now)
+		spendDay := tmpl.Limits.Day(now)
 		summary, err := s.summary(ctx, id)
 		if err != nil {
 			return err
@@ -551,7 +548,7 @@ func (s *Service) Tick(ctx context.Context) error {
 			}
 		}
 		if (tmpl.Limits.PostsPerDay > 0 && summary.Posts >= tmpl.Limits.PostsPerDay) || (tmpl.Limits.RepliesPerDay > 0 && summary.Replies >= tmpl.Limits.RepliesPerDay) {
-			if err = s.Notice(ctx, id, "daily_limit", day); err != nil {
+			if err = s.Notice(ctx, id, "daily_limit", spendDay); err != nil {
 				return err
 			}
 		}

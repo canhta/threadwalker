@@ -186,16 +186,16 @@ func zoneLabel(t time.Time) string {
 }
 
 // noticeText is the body of a code-owned notice kind. Only these kinds exist.
-// actionReset is when the post and reply limits reset and spendReset when the
-// spend cap does, both in the owner's zone.
-func noticeText(kind, actionReset, spendReset string) string {
+// reset is when every daily cap resets (the next local midnight), in the
+// owner's zone.
+func noticeText(kind, reset string) string {
 	switch kind {
 	case "daily_limit":
-		return "Daily action limit reached. Posting and replying resume when the limits reset at " + actionReset + "."
+		return "Daily action limit reached. Posting and replying resume when the limits reset at " + reset + "."
 	case "budget_80":
 		return "Today's spend has reached 80% of the daily cap."
 	case "budget_100":
-		return "Daily spend cap reached. The agent stops until the spend cap resets at " + spendReset + "."
+		return "Daily spend cap reached. The agent stops until the spend cap resets at " + reset + "."
 	case "logged_out":
 		return "The Threads browser session is logged out. The agent is paused."
 	case "logged_in":
@@ -214,9 +214,9 @@ func (s *Service) resetText(id string, at time.Time) string {
 	return local.Format("15:04") + " " + zoneLabel(local)
 }
 
-// spendResetText is when the spend day ends (00:00 in schedule.timezone).
-func (s *Service) spendResetText(id string) string {
-	_, end, _ := s.templates[id].Limits.SpendDayBounds(s.opts.Now())
+// dayResetText is when the day ends (00:00 in schedule.timezone).
+func (s *Service) dayResetText(id string) string {
+	_, end, _ := s.templates[id].Limits.DayBounds(s.opts.Now())
 	return s.resetText(id, end)
 }
 
@@ -252,8 +252,8 @@ func (s *Service) nextRunLine(id string, summary store.OwnerSummary) string {
 	return summary.NextWake.In(s.location(id)).Format("15:04") + " (" + relativeTime(summary.NextWake.Sub(s.opts.Now())) + ")"
 }
 
-// statusText answers /status. Post and reply counts are for the UTC limits day
-// and spend for the local day; the next run is in the owner's zone.
+// statusText answers /status. Post, reply and spend counts are for the local
+// day in schedule.timezone; the next run is in the owner's zone.
 func (s *Service) statusText(id string, summary store.OwnerSummary) string {
 	tmpl := s.templates[id]
 	return strings.Join([]string{

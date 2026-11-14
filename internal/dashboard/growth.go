@@ -2,6 +2,7 @@ package dashboard
 
 import (
 	"fmt"
+	"github.com/canhta/threadz/internal/config"
 	"math"
 	"sort"
 	"time"
@@ -102,8 +103,8 @@ func earnedBetween(samples []metricSample, from, to time.Time) counts {
 	return total
 }
 
-func dayStarts(now time.Time, days int) []time.Time {
-	day := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
+func dayStarts(l config.LimitsConfig, now time.Time, days int) []time.Time {
+	day, _, _ := l.DayBounds(now)
 	out := make([]time.Time, days)
 	for i := range out {
 		out[i] = day.AddDate(0, 0, -(days - 1 - i))

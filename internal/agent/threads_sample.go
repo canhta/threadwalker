@@ -174,7 +174,7 @@ func (r *Runtime) opportunisticStudyDue(ctx context.Context, now time.Time) (tim
 	if maxPerDay <= 0 {
 		maxPerDay = 8
 	}
-	dayStart, dayEnd := r.schedule.LocalDayBounds(now)
+	dayStart, dayEnd, _ := r.opts.Template.Limits.DayBounds(now)
 	count, err := r.opts.Store.CountPhaseWakes(ctx, r.opts.Template.ID, store.WakeStudy, dayStart, dayEnd)
 	if err != nil {
 		return time.Time{}, false, err

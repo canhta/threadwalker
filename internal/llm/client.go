@@ -456,7 +456,7 @@ func (c *Client) requestAttempt(ctx context.Context, agentID string, wakeID int6
 		}
 		c.event(ctx, level, logging.LLMRequestFinished, agentID, wakeID, requestIndex, attempt, started, outcome, reason, usage, status, 0)
 	}()
-	day := c.limits.SpendDay(started)
+	day := c.limits.Day(started)
 	spent, err := c.spentForBudget(ctx, agentID, day)
 	if err != nil {
 		return completion{}, 0, 0, failure("checking daily LLM budget", "accounting_read_failed", err)

@@ -75,8 +75,8 @@ The `OPENAI_API_KEY` environment variable is also required at load for memory em
 
 | Key | Type | Default | Owner | Effect |
 |---|---|---|---|---|
-| `limits.posts_per_day` | int > 0 | required | code | Posts per UTC day (a series counts once) |
-| `limits.replies_per_day` | int > 0 | required | code | Replies per UTC day |
+| `limits.posts_per_day` | int > 0 | required | code | Posts per local day in `schedule.timezone` (a series counts once) |
+| `limits.replies_per_day` | int > 0 | required | code | Replies per local day in `schedule.timezone` |
 | `limits.replies_per_user_7d` | int > 0 | required | code | Replies to one username in the rolling 7 days |
 | `limits.replies_per_conversation` | int 0..100 | 2 | code | Own replies under one root post (the post, its replies and ours); 0 is off. Lifted for a conversation whose first reply of ours has reached `limits.conversation_hot_likes` likes or `limits.conversation_hot_replies` replies in its newest stored metric |
 | `limits.conversation_hot_likes` | int > 0 | 5 | code | Likes on the first reply that lift the conversation cap |
@@ -108,7 +108,7 @@ The `kpi:` block is optional; once any of its four keys exists all four are requ
 
 | Key | Type | Default | Owner | Effect |
 |---|---|---|---|---|
-| `schedule.timezone` | IANA name | `Asia/Ho_Chi_Minh` | code | Zone of dream and study times and of the posting-hour buckets in the outcome model |
+| `schedule.timezone` | IANA name | `Asia/Ho_Chi_Minh` | code | Zone of dream and study times, of the posting-hour buckets in the outcome model, of every daily cap and of the timestamps in the wake context (RFC3339 with this zone offset) |
 | `schedule.dream_at` | `HH:MM` local | empty (off) | code | Nightly dream, once per local day |
 | `schedule.quiet_from`, `schedule.quiet_until` | `HH:MM` local, both or neither | empty (off) | code | Night window with no agent wake; one scheduled inside it moves to `quiet_until`. May cross midnight. Dream and study keep their own times |
 | `schedule.study_slots` | list of `HH:MM` | empty (off) | code | Study sessions; a minimum cadence |

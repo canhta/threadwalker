@@ -92,7 +92,7 @@ func EmbeddingFailureReason(err error) string { return errorReason(err) }
 // Embed returns one vector per text and records the billed tokens under the
 // wake's phase; wakeID 0 records them under the agent phase.
 func (e *Embedder) Embed(ctx context.Context, agentID string, wakeID int64, texts []string) ([][]float32, error) {
-	day := e.limits.SpendDay(e.now())
+	day := e.limits.Day(e.now())
 	spent, err := spentForPhase(ctx, e.store, e.phase, agentID, day)
 	if err != nil {
 		return nil, failure("checking daily embedding budget", reasonEmbeddingAccount, err)

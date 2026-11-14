@@ -268,7 +268,7 @@ func RunIsolationSoak(ctx context.Context, dbPath string, hours int, logger *slo
 			if err != nil {
 				return e, err
 			}
-			_, dayEnd, day := t.Limits.SpendDayBounds(now)
+			_, dayEnd, day := t.Limits.DayBounds(now)
 			usage, err := st.LLMUsageForDay(ctx, t.ID, day)
 			if err != nil {
 				return e, err

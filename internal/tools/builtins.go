@@ -259,7 +259,7 @@ func searchCountry(language string) string {
 // other study spend.
 func (d *Dispatcher) webSearch(ctx context.Context, query string) (trends.WebSearchResult, error) {
 	now := d.opts.Now()
-	day := d.opts.Template.Limits.SpendDay(now)
+	day := d.opts.Template.Limits.Day(now)
 	spent, err := d.opts.Store.LLMUsageForDayPhases(ctx, d.opts.Template.ID, day, "agent", "study")
 	if err != nil {
 		return trends.WebSearchResult{}, err

@@ -106,11 +106,11 @@ func TestCommandMenuAndHelpShareOneTable(t *testing.T) {
 
 func TestNoticeKindsHaveCopy(t *testing.T) {
 	for _, kind := range []string{"daily_limit", "budget_80", "budget_100", "logged_out", "logged_in", "captcha", "killed"} {
-		if noticeText(kind, "07:00 UTC+07", "00:00 UTC+07") == "" {
+		if noticeText(kind, "00:00 UTC+07") == "" {
 			t.Fatalf("no copy for %s", kind)
 		}
 	}
-	if noticeText("other", "07:00 UTC+07", "00:00 UTC+07") != "" {
+	if noticeText("other", "00:00 UTC+07") != "" {
 		t.Fatal("unknown notice kind has copy")
 	}
 }

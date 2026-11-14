@@ -183,7 +183,7 @@ func (a *adminService) status(ctx context.Context, only string) ([]agentStatus, 
 		} else if ok {
 			s.NextWake, s.NextKind = work.Due, work.Kind
 		}
-		phases, err := a.store.LLMUsageByPhaseForDay(ctx, t.ID, t.Limits.SpendDay(now))
+		phases, err := a.store.LLMUsageByPhaseForDay(ctx, t.ID, t.Limits.Day(now))
 		if err != nil {
 			return nil, err
 		}
