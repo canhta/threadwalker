@@ -12,9 +12,6 @@ Use these terms and spellings in code, issues and docs.
 | `guard` | A check in code the agent cannot disable: limits, blocked phrases, safety categories, do-not-contact. |
 | `action` | One post or reply that was published, or logged in a dry run. |
 | `posted` | A real action whose stored `thread_url` passes the canonical own-account check, so it exists on Threads under the agent's own username. A dry run, draft or unconfirmed attempt is not posted. |
-| `playbook` | The agent's list of hypotheses about what works. |
-| `hypothesis` | One playbook entry: `testing`, `established` or `rejected`. |
-| `gate` | The code that changes a hypothesis's status from the posterior on its mean lift, which the code itself computes. |
 | `ledger` | Tokens and cost per agent, day and phase (`ledger_phases`), computed locally; a daily total is their sum. |
 | `dry_run` | Mode in which `post` and `reply` only log. |
 | `owner` | The human operator, reached over Telegram. |

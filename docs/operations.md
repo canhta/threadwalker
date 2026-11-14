@@ -8,7 +8,7 @@ Install, credentials, deploy, self-update steps, Cloudflare routing and the Meta
 |---|---|---|
 | `threadz ctl` | The running process over a Unix socket | File mode 0600 of the service user |
 | Telegram | The owner chat | Configured owner chat only |
-| Dashboard | A read-only page over the database | None for the public page; token for `--content` |
+| Dashboard | A read-only page over the database | None |
 | Journald, `wake-show`, `wake-diagnose` | Logs, stored transcripts and the audit of one wake | Host access |
 
 Nothing is exposed over the network from the harness except the loopback API behind the Cloudflare tunnel ([threads.md](threads.md)) and the dashboard listener. Remote use is `ssh vps threadz ctl ...`.
@@ -19,17 +19,15 @@ The service listens on a Unix socket (`--socket`, `THREADZ_ADMIN_SOCKET`, defaul
 
 | Command | Runs | Effect |
 |---|---|---|
-| `status [--agent]` | live process | Per agent: state, dry-run mode, next work and its kind (`agent`, `metrics`, `dream`, `study`), today's spend against the daily and dream caps, last wake and end reason, pending metric targets, live health rows |
-| `wake --agent --phase agent\|dream\|study [--dry-run]` | live process, scheduler loop | One wake now. The agent must be `running`; the schedule is skipped, every guard, limit and cap applies. `--dry-run` makes this wake's writes dry-run writes and lifts nothing |
+| `status [--agent]` | live process | Per agent: state, dry-run mode, next work and its kind (`agent`, `metrics`, `dream`), today's spend against the daily and dream caps, last wake and end reason, pending metric targets, live health rows |
+| `wake --agent --phase agent\|dream [--dry-run]` | live process, scheduler loop | One wake now. The agent must be `running`; the schedule is skipped, every guard, limit and cap applies. `--dry-run` makes this wake's writes dry-run writes and lifts nothing |
 | `pause`, `resume`, `kill` (`--agent`) | live process | The path Telegram uses. Kill is terminal |
 | `metrics run --agent` | live process, scheduler loop | Measures targets due now (a window is never measured early) |
 | `trends refresh --agent` | live process, scheduler loop | Replaces the trend snapshot as `fetch_trends` does |
-| `memory restore <journal-id> --agent` | live process | Puts an archived entry back into the index. The same as Telegram `/restore m<id>` |
-| `strategy revert --agent [--to N]` | live process | Writes revision N (default: the one before the newest) again as the newest `strategy_revisions` row with its citations; history is never deleted. The same as Telegram `/restore s<N>` |
 | `prune` | live process, scheduler loop | Applies the retention table ([data.md](data.md)) |
 | `threads connect --agent` | live process | Sends the owner a one-time authorization link over Telegram ([threads.md](threads.md)) |
 | `threads cookies --agent` | live process | Imports a cookie export (JSON, or a `Cookie:` header) read from stdin into the agent's browser profile, verifies the feed and resumes the agent, then prints one line. The same import as Telegram `/cookie` ([threads.md](threads.md#cookie-login)); `threadz ctl threads cookies --agent ID < cookies.json` |
-| `context --agent [--phase]` | live process | The exact messages the next wake of that phase sends, redacted, no model call. A study wake first samples Threads; that sample is not in the view |
+| `context --agent [--phase]` | live process | The exact messages the next wake of that phase sends, redacted, no model call. |
 | `wakes --agent [--since] [--limit]` | database, read-only | Wake list |
 | `wake-show <id> --agent` | database, read-only | One wake's stored transcript with its guard decisions |
 | `wake-diagnose <id> --agent` | database, read-only | One wake as a funnel; see [Diagnose a wake](#diagnose-a-wake) |
@@ -93,16 +91,16 @@ A call older than the details' retention shows its outcome and guard reason with
 | Item | Fact |
 |---|---|
 | Agent to owner | When it meets something outside its permissions, is logged out or hits a captcha (the notice says how to send cookies with `/cookie`), has no Threads token (carries the OAuth link, once a day), or is near its budget limit; once per local day when a running agent has published nothing for longer than `kpi.max_hours_without_publish` (hours, how the last run ended, top blocked reasons today); plus the daily report |
-| Owner commands | `/help`, `/start`, `/status`, `/report`, `/pause`, `/resume`, `/kill`, `/dnc <username>`, `/restore`, `/cookie <cookies>`, `/update`. With a shared bot, per-agent commands take the ID: `/pause <agent_id>`, `/dnc <agent_id> <username>`, `/status <agent_id>`, `/report <agent_id>`, `/restore <agent_id>`. `/restore` lists the last 5 archived memory entries (`m<journal id>`) and the last 5 replaced strategy revisions (`s<version>`); `/restore m123` or `/restore s4` restores one, owner chat only. Ambiguous or unknown agents fail safely. `/kill` is terminal; `/resume` cannot revive it |
+| Owner commands | `/help`, `/start`, `/status`, `/report`, `/pause`, `/resume`, `/kill`, `/dnc <username>`, `/cookie <cookies>`, `/update`. With a shared bot, per-agent commands take the ID: `/pause <agent_id>`, `/dnc <agent_id> <username>`, `/status <agent_id>`, `/report <agent_id>`. Ambiguous or unknown agents fail safely. `/kill` is terminal; `/resume` cannot revive it |
 | Replies | Replying to a delivered `ask_owner` question answers it. Free text that is neither a command nor a reply becomes an owner note for the next wake with one acknowledgement and no model call |
 | Access | One long poller per bot; conflicting owner chats for a bot are rejected. Only the configured owner chat can command or answer |
 | Persistence | Poll offsets, command receipts, question delivery IDs and reply correlation survive restarts |
 | Bot avatar | Set by hand, the Bot API cannot set it: `@BotFather` `/setuserpic` with [`docs/images/brand/threadz-avatar-1024.png`](images/brand/threadz-avatar-1024.png) |
 | Owner tools | `ask_owner` and `notify_owner` enqueue locally and return immediately. The agent's next wake sees only the latest ten answers, secrets redacted; raw updates and chat identifiers never enter its context |
-| Menu | On start the bot replaces its default-scope menu with `status`, `report`, `pause`, `resume`, `kill`, `dnc`, `restore`, `cookie`, `update`, `help`, `start`, from the same table `/help` prints; a failure is logged as `menu_failed` and does not stop polling. Each long poll sends `allowed_updates: ["message"]` |
+| Menu | On start the bot replaces its default-scope menu with `status`, `report`, `pause`, `resume`, `kill`, `dnc`, `cookie`, `update`, `help`, `start`, from the same table `/help` prints; a failure is logged as `menu_failed` and does not stop polling. Each long poll sends `allowed_updates: ["message"]` |
 | Copy | English plain text (no `parse_mode`, so nothing is escaped) built from code-owned facts; the model never writes counts, limits or times. A message starts with a title line: `Status`, `Daily report, <date>`, `Notice`, `Question from the agent` or `Message from the agent`, then short `Label: value` lines. With a shared bot the title is prefixed with `persona.name`. Times are `HH:MM` in `telegram.timezone`, money is USD with two decimals. `ask_owner` and `notify_owner` text is the model's, asked for in English |
 | Notices | Daily notices use the local day in `schedule.timezone` for action limits and the 80% and 100% budget thresholds, and give the reset time in the owner's zone; killed notices use the terminal state identity. The browser's `BrowserStopped` seam pauses the agent and dedupes its notice |
-| Report | Once per owner-local date from `telegram.report_hour` (default 21) in `telegram.timezone`; `/report` sends the same text on demand. It covers the 24 hours up to now, so consecutive reports leave no gap: state and next run, posts and replies, the latest metric sample of each action measured in that window, the top post by views with its engagements and permalink (never its text), followers with the change since the last count before the window, playbook changes, spend of the local day (resets at 00:00 in `schedule.timezone`) against the cap with the wake, study and dream split, failed runs with their top 3 end reasons, and the top 5 blocked reasons (`tool_calls.blocked_by`). A missing metric or follower count says "not measured", never 0 |
+| Report | Once per owner-local date from `telegram.report_hour` (default 21) in `telegram.timezone`; `/report` sends the same text on demand. It covers the 24 hours up to now, so consecutive reports leave no gap: state and next run, posts and replies, the latest metric sample of each action measured in that window, the top post by views with its engagements and permalink (never its text), followers with the change since the last count before the window, spend of the local day (resets at 00:00 in `schedule.timezone`) against the cap with the wake and dream split, failed runs with their top 3 end reasons, and the top 5 blocked reasons (`tool_calls.blocked_by`). A missing metric or follower count says "not measured", never 0 |
 | Outbox | Claims a message before HTTP and never retries a failed, in-flight or uncertain delivery after restart: a message may be lost, never duplicated. Static failure reasons are in `telegram.operation.finished`. Correlation uses local message row IDs and counters; credentials, chat IDs, bodies, usernames and raw HTTP errors are excluded |
 | Storage | Delivery DDL in [`schema.sql`](../internal/store/schema.sql); code in [`internal/telegram`](../internal/telegram). Real-bot behaviour is not measured |
 
@@ -137,10 +135,9 @@ Sections run in this order; missing values show `—`.
 |---|---|
 | Top bar | Agent, status, test mode, last and next run in the owner's zone (`telegram.timezone`, else schedule zone, else UTC), range links |
 | KPI cells | Posts, replies, followers with change, views with change against the previous period, spend today against the daily limit. Counts cover every real publication under the agent's own username, from a SQL aggregate, never truncated |
-| Posts | Own posts and replies ranked by engagement: text linked to the post, age, best/worst mark, viral/flop/Deleted label, views, likes, replies, reposts, engagement rate; blocked posts counted by rule. Content mode adds why each was made |
-| Learning | Counts of ideas testing, adopted and dropped, and tries; "Tried 3 times, ahead so far" (ahead when mean lift minus one deviation is above zero, behind when mean plus one deviation is below, else unclear). Content mode adds hypothesis text, decision evidence, notes, the memory journal, strategy revisions, craft entries with a `penalty_risk` |
-| Growth | Inline-SVG charts of views, engagement rate and followers per day; changes against the previous period; followers per post and per 1,000 views; "Scored N: x viral, y flop" |
-| Cost | Stacked daily spend by runs, research and planning against the daily limit |
+| Posts | Own posts and replies ranked by engagement: text linked to the post, age, best/worst mark, Deleted label, views, likes, replies, reposts, engagement rate; blocked posts counted by rule. |
+| Growth | Inline-SVG charts of views, engagement rate and followers per day; changes against the previous period; followers per post and per 1,000 views |
+| Cost | Stacked daily spend by runs and planning against the daily limit |
 | Unit cost | Total spent and cost per post, follower and 1,000 views; `$0.04`, `<$0.01` below a cent |
 | Tools | Ok, failed and blocked counts per tool |
 | Trends | Public headlines from `trend_stories`, ranked by recent days kept, with a source tag |
@@ -148,11 +145,10 @@ Sections run in this order; missing values show `—`.
 
 | Rule | Fact |
 |---|---|
-| Blocked vs failed | Blocked = a tool call with a non-empty `blocked_by`, or a failed `memory_add` with a `lesson_*` reason. Failed = the tool ran and errored; its `result_json` carries a `reason` (backend reason, lesson code, or `operation_failed`); unknown codes show as "failed". Outcomes are derived in Go; no query uses SQLite JSON functions |
+| Blocked vs failed | Blocked = a tool call with a non-empty `blocked_by`, or a failed call with a `lesson_*` reason. Failed = the tool ran and errored; its `result_json` carries a `reason` (backend reason, lesson code, or `operation_failed`); unknown codes show as "failed". Outcomes are derived in Go; no query uses SQLite JSON functions |
 | Layout | Phones (320 to 420 px) first, no horizontal overflow. One spacing scale (4, 8, 12, 16, 24, 32 px) and one type scale (12, 14, 16, 24 px). Charts are inline SVG from the standard library with a caption and a visually hidden text table; no JavaScript or chart library in charts; labels stay at least 12 px at 320 px |
 | Times | Clocks and dates for moments (posts, runs, stats read) are `<time datetime>` and show in the viewer's browser zone through one same-origin script (`script-src 'self'`); the configured zone is the no-script fallback, and chart day buckets and labels stay in it |
-| Public view | Post text, whitespace collapsed and cut to 220 characters, linked to the post on Threads; ideas cut to 160. Excludes notes, the reasons behind a post, prompts, raw tool arguments and results, free-text errors, foreign usernames, thread observations and arbitrary URLs. A link appears only for a confirmed own HTTP(S) publication passing the canonical path check in [`internal/dashboard/privacy.go`](../internal/dashboard/privacy.go); model in [`model.go`](../internal/dashboard/model.go). Trend headlines are public |
-| Content mode | `dashboard --content` requires `THREADZ_DASHBOARD_TOKEN`; the page needs it as a bearer header or the HttpOnly cookie from `POST /unlock`. Constant-time compare; never logged or rendered; unauthenticated gets 401; `Cache-Control: private, no-store`. Credentials, persona and system prompts, raw tool payloads, free-text errors, other people's usernames and Threads post bodies stay excluded |
+| Public view | Post text, whitespace collapsed and cut to 220 characters, linked to the post on Threads. Excludes the reasons behind a post, prompts, raw tool arguments and results, free-text errors, foreign usernames and arbitrary URLs. A link appears only for a confirmed own HTTP(S) publication passing the canonical path check in [`internal/dashboard/privacy.go`](../internal/dashboard/privacy.go); model in [`model.go`](../internal/dashboard/model.go). Trend headlines are public |
 | Data access | `store.DashboardSnapshot` returns one agent's rows in a single read-only transaction with a 3 s timeout; the package reads no database itself. Times are compared as instants. Queries use parameters and bounded row limits except the posted and draft totals. Public responses: `Cache-Control: public, max-age=10`, `ETag`, 304 on `If-None-Match` |
 | Abuse limits | Response cache per path and canonical query, one render per 10 s through a singleflight, stale copy for up to 2 minutes after a database error, 256 entries. Per-client token bucket 40 requests/s, burst 80, at most 4096 buckets, 429 with `Retry-After`; failed token attempts 5 per minute. Render semaphore of 16 returns 503 with `Retry-After`; 64 connections; headers 16 KiB; bounded bodies and timeouts |
 | Client address | `internal/ratelimit` holds the one limiter and rule both servers use: `CF-Connecting-IP` when the peer is loopback (the Cloudflare tunnel), else the peer address |

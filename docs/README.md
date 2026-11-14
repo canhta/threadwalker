@@ -9,7 +9,7 @@ Each doc answers one question, stated in its first line, and holds each fact onc
 | How is a post or reply made: ideas, writer, critic, guard, publish; what does each prompt own? | [content.md](content.md) |
 | Which tools exist, in which phase, with which arguments and checks? | [tools.md](tools.md) |
 | Which refusal reason codes exist and where is each enforced? | [guards.md](guards.md) |
-| What does the agent remember, how are outcomes measured, what changes the playbook? | [learning.md](learning.md) |
+| How are outcomes measured (metric jobs and samples)? | [learning.md](learning.md) |
 | Which operations use the API or the browser; permissions, App Review limits, reply routing? | [threads.md](threads.md) |
 | Which template keys exist, with type, default, owner and effect? | [template.md](template.md) |
 | Which tables exist, how long is each kept, what is stored about a Threads user? | [data.md](data.md) |

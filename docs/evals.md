@@ -8,8 +8,8 @@ popularity.
 ## Case kinds
 
 Every case carries a `kind` that selects its runner: `chat` (scripted client loop), `quality`,
-`guard`, `replay`, `runtime`, `owner`, `browser`, `metrics`, `playbook`, `dashboard` or `isolation`. The kinds
-`owner`, `browser`, `metrics`, `playbook`, `dashboard` and `isolation` take a `scenario`; `quality`,
+`guard`, `replay`, `runtime`, `owner`, `browser`, `metrics`, `dashboard` or `isolation`. The kinds
+`owner`, `browser`, `metrics`, `dashboard` and `isolation` take a `scenario`; `quality`,
 `guard`, `replay`, `runtime` and `briefs` carry their own payload object. Only `chat`, `quality` and `briefs` run live; `briefs` runs only live. The metrics
 suite is embedded in the binary, so `threadz eval metrics` runs from any directory.
 
@@ -285,8 +285,7 @@ The gate wants a profile and explicit cases, but the models are the template's `
 (the profile is not called). `--max-usd` stops the run before the next brief once the scratch
 ledger has spent it. Each brief is one writer call and one critic call, up to three rounds when the
 critic refuses. At the template's rates that is about 2 to 6 calls per brief; expect roughly USD 0.01 to 0.03 per brief at the viral template's rates (an estimate, not an invoice)
-and check the `spend:` line. The replay skips the guard's own content rules and the writer's
-`Learned` examples, which need the live database.
+and check the `spend:` line. The replay skips the guard's own content rules, which need the live database.
 
 ## Owner service cases
 
@@ -350,39 +349,6 @@ One `metrics.measured` event corresponds to one sample, and `metrics.target.comp
 target with its own lateness. This establishes local functional behavior, not elapsed runtime or
 live Threads metrics support.
 
-## Playbook mutation, outcomes and seeded learning simulations
-
-```sh
-go run ./cmd/threadz eval --suite internal/eval/testdata/playbook.json --seed 10 --out /tmp/playbook-eval.json
-go run ./cmd/threadz eval --suite internal/eval/testdata/learning.json --seed 10 --out /tmp/learning-eval.json
-go test ./internal/eval -run TestPredeclaredSimulationSuite -count=1 -v
-go test ./internal/eval -run 'TestCapturedPlaybookEvents|TestPlaybookSuite' -count=1
-go test -race ./internal/store ./internal/tools ./internal/agent ./internal/playbook -run 'Playbook|Amendment|Outcomes|Suggest' -count=1
-```
-
-The `playbook.json` suite runs the guarded playbook tools, SQLite revision snapshots, metric polling
-and the posterior decision: bounded mutation, code-owned counters and amended-revision exclusion. The
-acceptance suites cover strict schemas, the testing cap, immutable decided entries, selected-agent
-context, secret redaction, restart initialization and concurrent storage handles.
-
-`learning.json` holds the full-size `playbook_scenario` simulation cases. They run the production
-posterior, decision and Thompson code with the predeclared seeds and parameters in
-`internal/eval/testdata/simulation.json`: a null lift with heavy-tailed noise, and true lifts of 0.3
-and 0.5.
-
-The report's `simulation` object holds the configuration, the false-establish rate per run and per
-hypothesis, the hypotheses established and rejected at a true lift, and the median and 90th
-percentile of actions needed to establish one.
-
-`go test` runs the same configurations with 100 runs each. The CLI seed is report metadata; each
-simulation uses its configured seed. No provider is called, and live mode rejects these cases.
-
-The redacted trace `internal/eval/testdata/playbook-events.jsonl` is reproduced by
-`TestCapturedPlaybookEvents`. It records the established decision with the local hypothesis,
-revision, counted actions and a fixed reason, and no editable text, credentials, URLs or third-party
-data. Regenerate it after a deliberate change with
-`THREADZ_UPDATE_PLAYBOOK_TRACE=1 go test ./internal/eval -run TestCapturedPlaybookEvents`.
-
 ## Read-only dashboard
 
 ```sh
@@ -402,7 +368,7 @@ go test ./internal/eval -run 'TestCapturedIsolation|TestIsolationScenarios|TestA
 go test -race ./internal/config ./internal/guard ./internal/agent ./internal/eval ./cmd/threadz -run 'IsolationAcceptance|Promotion|OwnAccount|ConfirmedOwn|IsolationScenarios|CapturedIsolation|AgentScopedReport' -count=1
 ```
 
-`isolation` cases exercise the guarded data tools, the notes, playbook, contact and ledger
+`isolation` cases exercise the guarded data tools, the own-action, contact and ledger
 boundaries, independent owner and budget state, own-account and duplicate-link refusals, and a
 48-logical-hour two-agent run with metric maintenance and a SQLite restart.
 
@@ -462,6 +428,5 @@ The suite digest covers the template files and the rubric, so a persona or rubri
 ## Coverage limits
 
 The suites cover the client and protocol, configuration, accounting, the local runtime, owner-service
-and browser boundaries with synthetic data, metric polling, bounded playbook mutation and seeded
-learning simulations. Real-bot behavior, live browser and Threads compatibility, and the two-agent
-48-hour memory run on a real account are separate live measurements.
+and browser boundaries with synthetic data, and metric polling. Real-bot behavior, live browser and Threads compatibility, and the two-agent
+48-hour run on a real account are separate live measurements.

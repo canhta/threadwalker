@@ -44,7 +44,7 @@ A Trending-now topic joins the wake as a trend item whose ref is its topic URL a
 | No writer | The critic judges the agent's text once, with no revision |
 | Code-owned critic rule | A draft that repeats an image or joke of the recent own posts fails |
 | Code-owned closing check | Before the critic, a draft whose closing token (a trailing emoticon or emoji run, else its last 2 words) ends at least 3 of the last 10 own texts of the same mode goes back to the writer as a problem |
-| Billing | Writer, critic and `ideas` requests are billed to ledger phase `critic`, each at the prices of the block that served it, which counts toward `limits.max_usd_per_day` with agent and study |
+| Billing | Writer, critic and `ideas` requests are billed to ledger phase `critic`, each at the prices of the block that served it, which counts toward `limits.max_usd_per_day` with the agent phase |
 | Dry run | `threadz ctl draft --agent ID --input FILE` runs writer and critic on a fixed JSON list (`id`, `kind`, `text`, optional `angle`, `fact`) in a scratch database, no guard, no publishing; prints each try, verdict and spend |
 
 ## Learned examples
@@ -55,11 +55,10 @@ Code picks up to 3 of the account's own live posts (or replies, by kind) of the 
 
 | Prompt or text | Code owns | Template owns |
 |---|---|---|
-| Agent system prompt | Section order, hard-limits block, harness rules, phase job and tool list | Goal, persona identity, voice, examples, `style_avoid`, explore percent (`limits.explore_percent`) |
+| Agent system prompt | Section order, hard-limits block, harness rules, phase job and tool list | Goal, persona identity, voice, examples, `style_avoid` |
 | `ideas` | Role and JSON shape | `persona.audience`, identity, voice (the reader and topics to follow) |
 | Writer | Role, JSON shape, series limit, untrusted-data rule | `persona.audience`, identity, voice, `style_rules`, good examples, `style_avoid`, model and `reasoning_effort` |
 | Critic | Role, JSON shape and score axes, the repeated-image rule, untrusted-data rule | `persona.audience`, numbered `persona.critic_rules`, model and `reasoning_effort` |
-| Post-mortem judge | Rubric `post_mortem_instructions` and axes ([learning.md](learning.md)) | Persona voice and rules; `review.llm` model |
 | Owner-facing copy | All of it: English plain text with counts, limits and times (the model never writes them) | `persona.name` names the agent in a shared bot and in `/start` |
 
 The role prompts say nothing about the audience, the language or the style: those come from the template. The viral template carries the Vietnamese GenZ text and the research rules of `.research/viral-threads-vn.md`.
@@ -70,9 +69,9 @@ The first line of a post decides the scroll-past, which the feed ranker predicts
 
 | Element | Fact |
 |---|---|
-| Hook types | `number`, `contrarian`, `curiosity_gap`, `personal_stake`, `trend_detail` (`store.HookTypes`). A post or reply may name one in `hook`; a post under `guard.trend_anchor` must. Stored on the action and shown with matched viral and flop actions in the dream post-mortem, beside the `rationale` and the number of later parts. The template seeds one testing hypothesis per hook type and one for series, so the posterior learns which hooks work ([learning.md](learning.md)) |
+| Hook types | `number`, `contrarian`, `curiosity_gap`, `personal_stake`, `trend_detail` (`store.HookTypes`). A post or reply may name one in `hook`; a post under `guard.trend_anchor` must. Stored on the action beside the `rationale` |
 | Trend anchor | With `guard.trend_anchor`, a post carries `hook`, `rationale` and `trend_ref`; the first line stands alone as the hook, at most 80 characters. The rationale and hook are stored; the anchor set lives in guard memory for the wake only |
-| Series | A post of 2 to 5 parts chained by self-replies. Metrics and the outcome are measured on part 1 only; later parts are not scored. Series against single post is a playbook hypothesis (the `parts` count is in the post-mortem), not a code-owned label |
+| Series | A post of 2 to 5 parts chained by self-replies. Metrics are measured on part 1 only; later parts are not scored |
 | Comment loop | Each wake: `search` with `recent` true for posts under 60 minutes old, `profile` for the author's `follower_count`, and an early reply with one specific detail to accounts 2 to 10 times the agent's size. The ratio is the agent's choice, not a guard: an author of unknown size is not refused. Every reply cap, `do_not_contact`, and the identity and harassment rules apply unchanged |
 | Measuring a reply | The API gives no profile-visit count per reply. Account `views` of `threads_insights` (profile views) and `followers_count` come from `read_own_metrics`; per-reply results are the reply's own `/{id}/insights`. Any link between a reply and profile visits or followers is an approximation over the account series, not a measurement |
 

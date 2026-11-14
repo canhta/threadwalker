@@ -16,7 +16,7 @@ flowchart LR
     LLM --> Disp[tools.Dispatcher]
     Disp --> Guard[guard: audit, rules, intent]
     Guard --> Back[threads.Backend]
-    Sched --> Met[metrics: jobs, outcome lifts]
+    Sched --> Met[metrics: jobs and samples]
     Sched --> TG[telegram: owner poller and outbox]
     Admin[admin: unix socket] --> Sched
     API[api: OAuth and webhooks] --> Store
@@ -36,18 +36,16 @@ flowchart LR
 | `cmd/threadz` | CLI: `run`, `check`, `ctl`, `dashboard`, `eval`, `update`, `version` |
 | `internal/config` | Template loading, validation, redacting `Secret` values |
 | `internal/store` | SQLite, `schema.sql`, queries, retention |
-| `internal/llm` | Protocol adapters, shared tool loop, ledger, embeddings |
-| `internal/agent` | One wake: context assembly, scoreboard, cadence, dream and study, post-mortem, recall |
+| `internal/llm` | Protocol adapters, shared tool loop, ledger |
+| `internal/agent` | One wake: context assembly, scoreboard, cadence, dream |
 | `internal/tools` | Tool executors and the dispatcher |
 | `internal/guard` | Tool table (`Specs`), limits, safety rules, do-not-contact, intent reservation |
-| `internal/quality` | Writer, critic, ideas and judge calls; `rubric.json`; draft-quality scoring |
+| `internal/quality` | Writer, critic and ideas calls; `rubric.json`; draft-quality scoring and the eval judge |
 | `internal/threads` | API client, token lifecycle, `Backend` contract, `Memory` backend |
 | `internal/agentbrowser` | Pinned `agent-browser` client |
 | `internal/api` | Loopback HTTP for OAuth and webhooks |
-| `internal/metrics` | Metric jobs, outcome lifts, post-mortem pairs |
-| `internal/playbook` | Hypotheses, posterior, gate |
-| `internal/trends` | Trend fetch, ranking, study sources, brief, web search |
-| `internal/knowledge` | Embedded craft knowledge `threads.json` |
+| `internal/metrics` | Metric jobs and samples |
+| `internal/trends` | Trend fetch, ranking, sources, target and topic facts, web search |
 | `internal/telegram`, `internal/admin`, `internal/dashboard` | Owner channel, ctl socket, read-only page |
 | `internal/update`, `internal/ratelimit`, `internal/logging`, `internal/stdx` | Self-update, shared limiter, event names, helpers |
 | `internal/eval` | Fixtures and runner for offline evals |
@@ -60,11 +58,10 @@ Each fact about an agent lives in exactly one owner. The agent changes only the 
 
 | Owner | Holds | Changed by |
 |---|---|---|
-| Code (Go, same for every agent) | Wake loop: read, `ideas`, write, critic, guard, publish, measure; tools and argument schemas; role prompts of writer, critic and ideas (what the call does and its JSON shape, nothing about audience, language or style); hard limits (safety and privacy, untrusted-data boundaries, secret and link checks, ungrounded self-stat numbers, caps, budget and step limits, dry-run); measurement (metric jobs, outcome lifts, KPI scoreboard arithmetic, cadence from the KPI gap); storage, retention, dashboard, Telegram, self-update | A release |
-| Template (per agent, fixed while it runs) | Who it writes for (audience, language, identity, voice, topics, avoided topics); what good looks like (writer and critic rules, starting examples, seed hypotheses); numbers (KPI targets, caps, budget, intervals, the timezone and the quiet hours in which no wake runs, trend sources, models and reasoning effort); hard-limit lists (blocked phrases, off-limits subjects, own accounts) | The owner, by editing the template; every key in [template.md](template.md) |
-| Agent-learned (database) | Memory index and topic notes; playbook hypotheses and evidence; strategy revisions; which ideas, hooks, formats and hours won (inside the template's waking hours), measured from its own actions; contacts and do-not-contact marks | The agent through tools; code bounds every write ([learning.md](learning.md)) |
+| Code (Go, same for every agent) | Wake loop: read, `ideas`, write, critic, guard, publish, measure; tools and argument schemas; role prompts of writer, critic and ideas (what the call does and its JSON shape, nothing about audience, language or style); hard limits (safety and privacy, untrusted-data boundaries, secret and link checks, ungrounded self-stat numbers, caps, budget and step limits, dry-run); measurement (metric jobs, KPI scoreboard arithmetic, cadence from the KPI gap); storage, retention, dashboard, Telegram, self-update | A release |
+| Template (per agent, fixed while it runs) | Who it writes for (audience, language, identity, voice, topics, avoided topics); what good looks like (writer and critic rules, starting examples); numbers (KPI targets, caps, budget, intervals, the timezone and the quiet hours in which no wake runs, trend sources, models and reasoning effort); hard-limit lists (blocked phrases, off-limits subjects, own accounts) | The owner, by editing the template; every key in [template.md](template.md) |
+| Agent-learned (database) | Contacts and do-not-contact marks; the measured numbers of its own actions (inside the template's waking hours) | The agent through tools; code bounds every write |
 
-Code picks the writer's learned examples from the store; no tool is involved ([content.md](content.md)).
 
 ## Data flow
 
@@ -75,8 +72,7 @@ Code picks the writer's learned examples from the store; no tool is involved ([c
 | Draft | Brief (`angle`, `fact`, rough `text`) | Writer, then critic | Tool-free LLM calls ([content.md](content.md)) |
 | Gate | Tool call | Guard | Audit row, rules, atomic intent ([guards.md](guards.md)) |
 | Publish | Reserved intent | Backend | API container flow, or browser reply |
-| Measure | Published action | Metric jobs at +1h, +6h, +24h | Samples, then one outcome row |
-| Learn | Outcome lifts | Playbook posterior, strategy lift, dream | Counted by code, never by the agent |
+| Measure | Published action | Metric jobs at +1h, +6h, +24h | Samples |
 
 ## LLM layer
 
@@ -87,7 +83,7 @@ Code picks the writer's learned examples from the store; no tool is involved ([c
 | Anthropic | Pins API version `2023-06-01`. `max_tokens` is 1024 by default, 8192 when `reasoning_effort` is set (thinking tokens count against it), or the caller's output limit. Supports text and client-side function tools. Thinking is requested only when `reasoning_effort` is set |
 | Thinking blocks | `thinking` and `redacted_thinking` are opaque and replayed verbatim, signatures included, ahead of that turn's other blocks. Never shown to the agent, logged, stored or sent to an `openai` request. Usage comes from `usage.output_tokens`, which includes thinking |
 | Unsupported | Any other unknown content block fails closed after recording known usage. Multimodal input, streaming and server-side tools |
-| Model calls per post or reply | Besides the agent loop: `ideas`, writer, critic (tool-free, so they can reason). The post-mortem judge scores only published actions and blocks nothing |
+| Model calls per post or reply | Besides the agent loop: `ideas`, writer, critic (tool-free, so they can reason). The critic gates every draft; nothing else judges a published action |
 | Ledger | Local, per agent, priced from the template's inline rates. Both adapters record provider-reported input and output tokens. Flat rates do not model cache discounts, tier pricing or billed dollars; flat subscriptions expose no balance. Phases and caps: [wake.md](wake.md) |
 
 ## Runtime rules
@@ -96,7 +92,7 @@ Code picks the writer's learned examples from the store; no tool is involved ([c
 |---|---|
 | Template set validation | The runtime validates the whole set before initializing state: distinct IDs, operator-declared `threads.username` values (normalized, never inferred) and non-overlapping canonical profile paths, symlink ancestors included |
 | Scheduler | Installs the full own-username set before starting any agent. Wakes and metric maintenance share one serial loop |
-| Isolation | Notes, playbook, contacts, budgets, limits and owner controls are scoped by agent ID. Every table carries `agent_id` |
+| Isolation | Contacts, budgets, limits and owner controls are scoped by agent ID. Every table carries `agent_id` |
 | Secrets | Live only in environment variables named by `*_env`, never in a template, log or LLM context. Loading resolves keys into redacting `config.Secret` values. The CLI reads `./.env` without overriding set variables (`THREADZ_ENV_FILE` selects another) |
 | Backend | Default Threads stub is `threads.Memory`, the in-memory backend every test and eval uses; it requires `dry_run`. A configured browser or API backend permits guarded submissions |
 | Flags | GNU-style long flags, `-a`/`-d` shorthands for `--agents` and `--db`. A flag beats `THREADZ_AGENTS`/`THREADZ_DB`, which beat the defaults (`templates/`; `data/threadz.db`). Usage errors exit 2, runtime failures 1 |

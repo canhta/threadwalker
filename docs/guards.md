@@ -13,7 +13,7 @@ flowchart TD
   E --> F[API publishing quota]
   F --> G[Ungrounded numbers]
   G --> H[Audit row committed]
-  H --> I[Reserve under BEGIN IMMEDIATE: isolation, quotas, notes, repeat, hypotheses, explore]
+  H --> I[Reserve under BEGIN IMMEDIATE: isolation, quotas, notes, repeat]
   I --> J[Effect]
 ```
 
@@ -69,10 +69,8 @@ flowchart TD
 | `min_minutes_between_posts` | A post within `limits.min_minutes_between_posts` of the newest own post; replies are not affected; the hint names the next allowed time | template | reserve |
 | `owner_note_open` | An owner note is open and the post names none via `answers_note` | code | reserve |
 | `repeat_topic` | Post's `trend_ref` equals that of an own post of the last 24 h, or its first line shares at least two words (4+ letters, links left out) and half of the smaller word set with one | code | reserve |
-| `invalid_hypothesis` | More than 5, duplicate, foreign or decided `hypothesis_ids` | code | reserve |
-| `explore_budget` | Explore share would exceed `limits.explore_percent` of the newest 20 own actions, counting the new one | template | reserve |
 
-Dashboard-only codes: failed `memory_add` reasons `lesson_*`, and `stale_ref` and `dated_topic` of `memory_add`, `note_write` and `strategy_write` ([wake.md](wake.md)) show as "blocked", not as guard codes.
+Dashboard-only codes: the `lesson_*` reasons of a lesson the text gate refused, and `stale_ref`, show as "blocked", not as guard codes.
 
 ## Rules behind several codes
 
@@ -84,7 +82,6 @@ Dashboard-only codes: failed `memory_add` reasons `lesson_*`, and `stale_ref` an
 | Unit of length | The 500 ceiling counts Unicode code points |
 | Matching | Blocked and stop phrases: case-insensitive substring. Safety category patterns match case-folded text and are not configurable. `persona.style_avoid` never blocks; a phrase in both lists is a configuration error |
 | Facts sheet | USD spent and left today, tokens today, own post and reply counts, latest views and replies per own action, latest own follower count after a `read_own_metrics` read. Cent figures match USD times 100. Numbers without a listed unit are not checked; a follower figure is refused until a follower count has been read. A reply may quote the post it answers |
-| Reserve with hypotheses | The guard snapshots each tagged testing revision in the same transaction as the intent |
 | Pre-reserve cleanup | At the start of a normal wake, a live post intent with no thread URL and no media id is marked failed (stops counting toward `posts_per_day`) when the listing of the account's own threads shows no post with its text. A failed listing proves nothing |
 | Restart | Reserved intents are never replayed. A daily-quota refusal leaves the agent eligible for a later wake |
 
@@ -106,7 +103,7 @@ Local URL keys fold host case, remove `www.` and default ports, treat HTTP and H
 
 | Rule | Fact |
 |---|---|
-| No stranger profiles | Rate limiting stores only username and counters. Study may store bounded public post observations ([data.md](data.md)), never profile fields or inferred traits, never rendered publicly. Base rule: Meta Platform Terms 3.a.v; stored third-party content is also a memory-injection surface |
+| No stranger profiles | Rate limiting stores only username and counters. The store holds no profile fields or inferred traits. Base rule: Meta Platform Terms 3.a.v; stored third-party content is also an injection surface |
 | Untrusted data | Everything read from Threads is marked untrusted. Secrets never enter the LLM context. External tool strings are redacted against configured secrets before model delivery |
 | Audit detail | The database, not the logs, keeps a call's redacted arguments and what the guard knew when it refused it (given and nearest refs, writer and critic drafts, the browser stage), for 8 days ([data.md](data.md)); `ctl wake-diagnose` reads it ([operations.md](operations.md#diagnose-a-wake)) |
 | Log allowlist | Metadata only: no credentials, authorization headers, endpoint URLs, request or response bodies, system prompts, private notes, Threads text or strangers' usernames. Tool arguments, results and raw provider errors never enter logs; provider errors use static reasons. Log level never enables payload logging. Configured IDs and known tool-schema names are trusted; third-party tool IDs and names are not |

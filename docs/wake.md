@@ -1,6 +1,6 @@
 # Wake: what happens in one wake, per phase, and how the KPI scoreboard and cadence work?
 
-A wake is one bounded LLM conversation. Four harness-owned phases exist: `agent`, `study`, `dream`, `metrics`. Code, not the agent, schedules the next agent wake from the KPI gap.
+A wake is one bounded LLM conversation. Three harness-owned phases exist: `agent`, `dream`, `metrics`. Code, not the agent, schedules the next agent wake from the KPI gap.
 
 ## One agent wake
 
@@ -14,7 +14,7 @@ sequenceDiagram
   S->>R: wake due
   R->>DB: reserve fallback next_wake_at (now + 60 min)
   R->>D: reconcile unpublished intents, read followers
-  R->>L: messages (system, data, scoreboard, brief, recall)
+  R->>L: messages (system, data, scoreboard)
   loop until end, step limit or cap
     L->>D: tool call
     D->>DB: audit, then rules, then effect
@@ -27,34 +27,31 @@ sequenceDiagram
 | Step | Fact |
 |---|---|
 | 1. Wake | The harness wakes the agent at the time code set last wake, within the frequency limit |
-| 2. Context | One builder assembles every phase. System prompt from the template in fixed sections: who you are, starting voice, examples (rejected drafts labelled), hard limits, the phase's job and tools, harness rules. The voice is the agent's to evolve; the hard limits are the only blocks |
-| 3. Inbox | Before the first request code reads the conversation inbox ([threads.md](threads.md)). When it is not empty, the data message starts with an `inbox` section above everything else: per reply its `ref`, `target_id`, `author`, `text` (untrusted, redacted), `replying_to` (first line of our text it answered) and `age_minutes`, newest first, at most 10; replies of a conversation already at `limits.replies_per_conversation` ([guards.md](guards.md)) are left out. The wake text tells the agent to answer these first, each at most once, and to skip one that needs no answer and say why in the note. The writer and critic run as for any reply |
-| 4. Data message | Scoreboard (when `kpi:` exists), open owner notes as first task, playbook, strategy, code-computed metrics, remaining budget, memory index and topic list, the agent's own actions of the last 24 hours (newest first, at most 30 actions and 8 KiB of redacted text, each cut at 500 bytes) with today's counters against the limits |
+| 2. Context | One builder assembles every phase. System prompt from the template in fixed sections: who you are, starting voice, examples (rejected drafts labelled), hard limits, the phase's job and tools, harness rules. The hard limits are the only blocks |
+| 3. Inbox | Before the first request code reads the conversation inbox ([threads.md](threads.md)). When it is not empty, the data message starts with an `inbox` section above everything else: per reply its `ref`, `target_id`, `author`, `text` (untrusted, redacted), `replying_to` (first line of our text it answered) and `age_minutes`, newest first, at most 10; replies of a conversation already at `limits.replies_per_conversation` ([guards.md](guards.md)) are left out. The wake text tells the agent to answer these first, each at most once, and to skip one that needs no answer. The writer and critic run as for any reply |
+| 4. Data message | Scoreboard (when `kpi:` exists), open owner notes as first task, code-computed metrics, remaining budget, the agent's own actions of the last 24 hours (newest first, at most 30 actions and 8 KiB of redacted text, each cut at 500 bytes) with today's counters against the limits |
 | 5. Loop | The agent calls tools until it ends or hits the step or token limit. Results enter the conversation verbatim |
 | 6. Every call | Passes the guards, is written to the audit log, then executes ([guards.md](guards.md)) |
-| 7. End | The agent writes a note. Code sets `next_wake_at` |
+| 7. End | The agent ends in text. Code sets `next_wake_at` |
 
 Measured on the VPS dry-run database: 9 wakes of 9 to 15 steps carry 9,883 to 75,554 prompt tokens summed over all requests; the last request holds at most `2 × tokens_in ÷ steps` tokens (at most 12,658). Results are bounded and older ones summarized only for a request whose prompt exceeds 32,000 tokens; no wake has reached it. Stored `tool_calls.result_json` is a 29 to 34 byte stub, so per-tool result sizes are not recorded.
 
 | Context limit | Value |
 |---|---|
-| Playbook in context | At most 100 own entries, testing first, with code-owned status, revision and counts; editable text redacted |
 | Metrics in context | At most 20 recent own confirmed-action samples; absent samples stay absent |
 | Owner answers | Latest ten, secrets redacted |
-| Recalled memory | Up to 6 snippets under 4 KiB as a `recalled_memory` data message ([learning.md](learning.md)) |
 
 ## Phases
 
 | Phase | Trigger | Tools | Writes | Spend |
 |---|---|---|---|---|
-| `agent` | `next_wake_at`; a fresh webhook reply or mention | All, see [tools.md](tools.md) | Threads, notes, owner | `limits.max_usd_per_day` |
-| `study` | `schedule.study_slots`; a story-score spike | Reads, memory, notes, playbook, strategy, `knowledge_candidate`, `web_search` | None to Threads or owner | Counts toward the daily cap |
-| `dream` | `schedule.dream_at`, once per local day | Reads, memory, notes, playbook, strategy, `memory_supersede` | None to Threads or owner | `limits.max_usd_per_dream` (default 0.30), `limits.max_steps_per_dream` (default 20), excluded from the daily cap |
+| `agent` | `next_wake_at`; a fresh webhook reply or mention | All, see [tools.md](tools.md) | Threads, owner | `limits.max_usd_per_day` |
+| `dream` | `schedule.dream_at`, once per local day | Reads | None to Threads or owner | `limits.max_usd_per_dream` (default 0.30), `limits.max_steps_per_dream` (default 20), excluded from the daily cap |
 | `metrics` | Due metric targets | None (no model call) | Metric samples only | None |
 
-Study and dream wakes use `wakes.kind` and a durable `phase_key`; a partial unique index makes one dream per local day and one run per study slot unrepeatable, restarts included. A dream missed while the process was down runs once on the next start. Study and dream do not move `next_wake_at`. Spend rows carry the phase, so the dashboard and the daily report show wake, study and dream spend separately. `critic` is a fourth ledger phase for the pre-publish review ([content.md](content.md)).
+A dream wake uses `wakes.kind` and a durable `phase_key`; a partial unique index makes one dream per local day unrepeatable, restarts included. A dream missed while the process was down runs once on the next start. A dream does not move `next_wake_at`. Spend rows carry the phase, so the dashboard and the daily report show wake and dream spend separately. `critic` is a third ledger phase for the pre-publish review ([content.md](content.md)).
 
-Phase keys: `schedule.timezone` (IANA, default `Asia/Ho_Chi_Minh`), `schedule.dream_at`, `schedule.study_slots`. Full list: [template.md](template.md).
+Phase keys: `schedule.timezone` (IANA, default `Asia/Ho_Chi_Minh`), `schedule.dream_at`. Full list: [template.md](template.md).
 
 ## KPI scoreboard
 
@@ -88,7 +85,7 @@ An agent on target is never sent a stop check. A behind agent gets one extra tur
 | Wake ends normally or at a step, budget or action limit; behind | `limits.min_minutes_between_wakes` |
 | Same, on target | `kpi.on_target_minutes_between_wakes` |
 | Same, no `kpi:` block | One hour, or the minimum if longer |
-| Day capped: today's agent and study spend reached `max_usd_per_day` or both `posts_per_day` and `replies_per_day` used (in the template's mode, as the guard counts), all on the local day in `schedule.timezone` | The next local midnight, whatever the gap |
+| Day capped: today's agent spend reached `max_usd_per_day` or both `posts_per_day` and `replies_per_day` used (in the template's mode, as the guard counts), all on the local day in `schedule.timezone` | The next local midnight, whatever the gap |
 | Fresh webhook reply or mention arrived since the latest wake started | Now, but never closer than `min_minutes_between_wakes` after that wake started |
 | The inbox poll found a reply not seen before (every `inbox.poll_minutes` between wakes; 0 disables) | Now, but never closer than `inbox.min_minutes_after_wake` after the latest wake started. The poll is API reads only, no model call; a reply is remembered once polled or listed in a wake, so it asks for at most one early wake (the memory is lost on restart). A failed poll backs off 15 minutes, doubling up to 4 hours, and never stops the process. A paused or killed agent is not polled. Spend caps and pacing are unchanged |
 | Wake fails | The fallback below |
@@ -104,48 +101,30 @@ The agent has no tool to schedule a wake.
 | No replay | An interrupted wake is never re-run. A `post` or `reply` with an unknown outcome is recorded as sent and never retried |
 | Stall stop | Calls are keyed by tool name and canonical arguments; the dispatcher hashes each result. A call that failed the same way 3 times is refused without running (`repeat_refused`). The wake ends (`stall_stop`) at the second refusal, or when one call returns the same successful result 10 times. A different result resets the count |
 | Result trailer | Every tool result ends with `{"steps_left": N, "usd_left": X}` (steps left and USD left under the phase's daily cap) |
-| Notes | No instruction or nudge asks a wake to write memory or a note: a wake ends in text without one. It writes a topic note with `note_write` only when it learned something about a subject. `memory_add` is a dream tool only |
-| Durable text | `memory_add`, `note_write` (topic, description, text) and `strategy_write` refuse text naming a per-wake ref (`\br\d+\b`, such as `r58`): refs restart at r1 each wake and would point at another post next time (`stale_ref`). `note_write` refuses a topic that starts with an ISO date (`dated_topic`); a note is about a subject, not a day. Both reach the model as a blocked hint |
 | Browser | At most one browser per wake, started on the first `read_feed`, closed on every exit. A close failure is logged as `wake.cleanup.failed` and does not change `end_reason` ([threads.md](threads.md)) |
-| Dream lesson gate | A dream's `memory_add` lesson must cite exactly one own `action_id`. Code rejects it, logs `lesson.rejected` with a reason and writes nothing when: the id is missing or foreign (`lesson_missing_citation`, `lesson_foreign_citation`), a number is not a counter measured on that action (`lesson_number_mismatch`), a URL is not one of the agent's own action URLs (`lesson_foreign_url`), the text looks like a secret (`lesson_secret`), or the pass already accepted 6 lessons (`lesson_cap`) |
 
-## Dream
+## Trends and reply targets
 
-A private nightly review: the agent reads its own day (posts, replies, metrics, notes, playbook, owner notes), consolidates notes and proposes playbook updates. Its context starts with the `post_mortem` block ([learning.md](learning.md)). The dream prompt tells the agent to cite the `action_id` of a pair member in a lesson drawn from it.
-
-## Study
-
-Hunts trends: samples outside sources and Threads read-only, then writes a short brief of hot stories, why each is hot, the roast angle and whether to post or reply. Slots are a minimum cadence. A deterministic story-score spike may add a session within `study.min_minutes_between_sessions` (default 120), `study.max_sessions_per_day` (default 8), `study.spike_multiplier` (default 2) and `study.spike_min_score` (default 6).
-
-| Source group | Detail |
+| Item | Fact |
 |---|---|
-| Normal wake `fetch_trends` | Round-robin across Hacker News, Product Hunt, Google Trends VN unless `trends.sources` picks others; no model call |
-| Study sources | Google News (VN, global, per-topic), VN tech RSS (VietnamNet serves the former ICTnews feed), global tech RSS, Hacker News, Product Hunt, Google Trends VN, public GitHub trending, public YouTube channel feeds, optional Reddit app-only OAuth. IDs validated against a fixed set ([template.md](template.md)); Reddit skipped without `REDDIT_CLIENT_ID`/`REDDIT_CLIENT_SECRET` |
+| `fetch_trends` | Round-robin across Hacker News, Product Hunt, Google Trends VN unless `trends.sources` picks others; no model call |
+| Sources | Google News (VN, global, per-topic), VN tech RSS (VietnamNet serves the former ICTnews feed), global tech RSS, Hacker News, Product Hunt, Google Trends VN, public GitHub trending. IDs validated against a fixed set ([template.md](template.md)); none needs credentials |
 | Failure | Each source fails soft under per-source and overall timeouts; the same story across sources is clustered and scored once |
 | Not implemented | Open X/Facebook/TikTok feeds: no stable no-login source was measured |
 | Ranking | Deterministic for `trends.include_keywords`, dropping `trends.avoid_keywords`; omitted lists derive from persona topics, research focus and avoid topics |
-| Threads sample | Read-only through guarded tools (`study.threads_sample.max_reads` default 4, `pause_ms` default 1500, `keywords`); stores bounded observations ([data.md](data.md)) |
-
-**Trend brief.** Computed in code, no model call. Recent study stories and a compact `threads_trend_brief` enter the next agent wake and dream context as untrusted data.
-
-| Brief field | Meaning |
-|---|---|
-| Story and rising keyword | First seen and age, velocity, acceleration (difference of the newest two rates over its study samples), saturation (distinct Threads posts sharing at least two of its words), most posts sharing one bigram outside the story's own words, coverage, `heat` in [0,1] |
-| Window | `early` (saturation at most 2, acceleration not negative), `late` (saturation 8 or more, or falling; shown `recommended: false`), `peak` |
-| Hot post order | Reply-target score (below), with age counted from the first sighting, observed reply velocity as momentum, and room in the replies when the sample showed the reply count: author size tier (2 to 10 times our followers scores highest; `unknown` scores neutral and is never stored), novelty (one over one plus other observed posts sharing a bigram with the parent). A thread already replied in scores 0 |
-| Reply-target score of a read post | Mean of five terms in [0,1]: freshness (`1 - age / targets.max_age_minutes`; neutral 0.5 when the age is unknown), room (`1 - replies / targets.max_replies`, when the replies are known), momentum (likes per hour over `targets.min_likes_per_hour`: `x / (x + min)`; likes per hour is likes over the age in hours with the age floored at 10 minutes; observed reply velocity when likes are unknown), author size tier (`unknown` for a post read from the feed) and novelty. A post older than `max_age_minutes`, with more than `max_replies` replies, fewer than `min_likes_per_hour` likes per hour or, when `min_likes` is above 0, fewer than `min_likes` likes is flagged `outside window` with the knobs it breaks, scores 0 and is still listed; a reply to it is refused (`target_outside_window`, [guards.md](guards.md)). The same function scores the hot posts of the brief |
+| Reply-target score of a read post | Mean of five terms in [0,1]: freshness (`1 - age / targets.max_age_minutes`; neutral 0.5 when the age is unknown), room (`1 - replies / targets.max_replies`, when the replies are known), momentum (likes per hour over `targets.min_likes_per_hour`: `x / (x + min)`; likes per hour is likes over the age in hours with the age floored at 10 minutes), author size tier (`unknown` for a post read from the feed) and novelty. A post older than `max_age_minutes`, with more than `max_replies` replies, fewer than `min_likes_per_hour` likes per hour or, when `min_likes` is above 0, fewer than `min_likes` likes is flagged `outside window` with the knobs it breaks, scores 0 and is still listed; a reply to it is refused (`target_outside_window`, [guards.md](guards.md)) |
 | Topic heat | Mean of the terms with evidence, each in [0,1]: post volume (`n / (n + 1000)` of the Trending-now count), coverage (`(sources - 1) / (sources - 1 + 1)` of the distinct sources in the story's cluster this fetch), recency (`360 / (360 + minutes since the story was first listed by a fetch_trends of this agent)`; 1 for a story not listed before) and rank movement (`0.5 + 0.1 * places climbed since the previous fetch`, clamped). A Trending-now item has post volume only. A topic with no evidence has no heat |
-| Stored on a reply | The target's numeric score parts and `delay_minutes` (minutes from the target's story first sighting, or the post's first observation, to the action), read by the guard from stored observations. When the wake read the target, the guard stores that read instead: the target score with likes, likes per hour and the `outside_window` flags in `target_score_json`, plus `parent_replies` and `parent_age_minutes`; an action anchored to a topic with heat stores it as `topic_heat`. A figure the page did not show stays null. A never-observed, never-read target stays unscored. Buckets under 2 h, 2 to 6 h, 6 to 24 h derive at analysis |
+| Stored on a reply | When the wake read the target, the guard stores the target score with likes, likes per hour and the `outside_window` flags in `target_score_json`, plus `parent_replies` and `parent_age_minutes`; an action anchored to a topic with heat stores it as `topic_heat`. A figure the page did not show stays null. A never-read target stays unscored |
 
 ## Metrics phase
 
-A `wakes.kind='metrics'` scope calls the guarded `read_own_metrics` route with no model call, token spend, note change or write tool, and never changes `next_wake_at`. Paused and killed agents perform no reads. A pass that claims nothing leaves no `wakes` row. Job mechanics: [learning.md](learning.md).
+A `wakes.kind='metrics'` scope calls the guarded `read_own_metrics` route with no model call, token spend or write tool, and never changes `next_wake_at`. Paused and killed agents perform no reads. A pass that claims nothing leaves no `wakes` row. Job mechanics: [learning.md](learning.md).
 
 ## Offline and soak
 
 | Command | Behaviour |
 |---|---|
-| `run --once --offline` | Isolated temporary DB, built-in synthetic template with dummy credentials, scripted LLM transport, synthetic trend, study, web-search and Threads fixtures. No environment credentials, no network. Rejects non-dry-run templates. The dispatcher has no default outside fetchers; constructing it without injected trend, study and web-search fetchers is an error |
+| `run --once --offline` | Isolated temporary DB, built-in synthetic template with dummy credentials, scripted LLM transport, synthetic trend, web-search and Threads fixtures. No environment credentials, no network. Rejects non-dry-run templates. The dispatcher has no default outside fetchers; constructing it without injected trend and web-search fetchers is an error |
 | `eval soak --soak-hours` | Injected logical time and a real SQLite close/reopen to simulate a restart; evidence is synthetic |
 | `eval soak --soak-agents 2` | Two synthetic identities, independent pause/kill/quota/budget phases, serial metric maintenance, labelled Go memory samples with fake backends (no Chromium RSS) |
 

@@ -36,7 +36,7 @@ Fill the variables your integrations use, quoting values that contain shell char
 |---|---|
 | `LLM_API_KEY` | The selected provider |
 | `SECONDARY_LLM_API_KEY` | A second provider, if needed |
-| `OPENAI_API_KEY` | Memory embeddings, whatever LLM the agent uses |
+| `OPENAI_API_KEY` | The viral template's OpenAI blocks (`llm`, `writer`, `critic`) and its `web_search` |
 | `THREADS_ACCESS_TOKEN`, `THREADS_USER_ID` | Threads API (`threads.backend: api`): the long-lived token and the numeric account id |
 | `THREADS_APP_ID`, `THREADS_APP_SECRET` | `run --api-listen`: the Meta app id and secret, for the OAuth code exchange and the webhook signature |
 | `THREADS_WEBHOOK_VERIFY_TOKEN` | `run --api-listen`: the token Meta echoes in the webhook handshake |
@@ -69,7 +69,7 @@ Set each agent's goal, persona, limits and LLM, and keep `dry_run: true`. Agents
 `threads.username` values and browser profile paths. Replace the synthetic usernames before using a
 real account.
 
-## Dreaming, study and trends
+## Dreaming, trends and web search
 
 Per-agent template fields:
 
@@ -81,39 +81,25 @@ limits:
 schedule:
   timezone: Asia/Ho_Chi_Minh
   dream_at: "23:30"          # once per local day; a missed one runs once on next start
-  study_slots: ["09:00", "15:00", "20:30"]
 trends:
   sources:                   # wake's fetch_trends; omit for Hacker News + Product Hunt + Google Trends VN
     - google_trends
     - google_news_vn
   include_keywords: ["AI", "LLM", "agent", "benchmark"]
   avoid_keywords: ["crypto", "airdrop"]
-study:
-  sources: [google_news_vn, google_news_global, google_news_topics, vnexpress]
-  threads_sample:
-    max_reads: 4
-    pause_ms: 1500
-    keywords: ["AI thay dev", "agent tự động"]
-  web_search:                # optional, study and normal wake, reuses OPENAI_API_KEY
-    enabled: true
-    model: gpt-6-luna
-    max_results: 5
-    max_output_tokens: 512
+web_search:                  # optional; reuses the template's OpenAI key
+  enabled: true
+  model: gpt-6-luna
+  max_results: 5
+  max_output_tokens: 512
 ```
 
-Dream and study are read-only: `post`, `reply`, owner messages and schedule changes are refused with
-`phase_read_only`. Study slots are a minimum cadence; a score spike can add a session. Omit these
-fields to turn both phases off.
+The dream is read-only: `post`, `reply`, owner messages and schedule changes are refused with
+`phase_read_only`. Omit `schedule.dream_at` to turn it off.
 
-`study.sources` accepts `google_news_vn`, `google_news_global`, `google_news_topics`, `vnexpress`,
+`trends.sources` accepts `google_news_vn`, `google_news_global`, `google_news_topics`, `vnexpress`,
 `genk`, `tinhte`, `vietnamnet`, `the_verge`, `techcrunch`, `arstechnica`, `hacker_news`,
-`product_hunt`, `google_trends`, `reddit_localllama`, `reddit_openai`, `reddit_singularity`,
-`github_trending` and `youtube`. Omitted, it defaults to all credential-free sources.
-`youtube_channels` defaults to the measured public channel list; YouTube feeds need no key.
-
-The Reddit sources need an app-only OAuth client from <https://www.reddit.com/prefs/apps> in
-`REDDIT_CLIENT_ID` and `REDDIT_CLIENT_SECRET` (rename them with `study.reddit_client_id_env` and
-`study.reddit_client_secret_env`); without both they are skipped. `study.web_search` makes one
+`product_hunt`, `google_trends` and `github_trending`; none needs credentials. `web_search` makes one
 bounded Responses web-search call per call, at most 3 per normal wake, with the template's OpenAI key.
 
 ## Check and run
@@ -158,7 +144,7 @@ ssh <host> sudo install -o root -g root -m 0600 /tmp/threadz.env \
   /etc/threadz/threadz.env
 ```
 
-The env file holds only `OPENAI_API_KEY`, `TELEGRAM_BOT_TOKEN` and `TELEGRAM_OWNER_CHAT_ID`. The
+The env file holds only the LLM key (`OPENAI_API_KEY` for the viral template), `TELEGRAM_BOT_TOKEN` and `TELEGRAM_OWNER_CHAT_ID`. The
 service runs as `threadz` with `/opt/threadz/{data,profiles,bin}`; install the pinned
 Chrome and agent-browser there. [deploy/threadz.service](../deploy/threadz.service) caps
 memory at `MemoryMax=2400M` (3.6 GiB host).
@@ -296,7 +282,7 @@ which is also the zone of every displayed time. Every `getUpdates` sends `allowe
 Telegram persists the filter per bot.
 
 The bot registers its menu with `setMyCommands` at start: `/status`, `/report`, `/pause`, `/resume`,
-`/kill`, `/dnc`, `/restore`, `/cookie`, `/update`, `/help` and `/start`. With several agents the
+`/kill`, `/dnc`, `/cookie`, `/update`, `/help` and `/start`. With several agents the
 per-agent commands take the agent ID first: `/status <agent_id>`, `/dnc <agent_id> <username>`.
 `/help` lists them and `/start` adds one line on what the chat receives. Kill is terminal. Reply to a
 delivered question to answer it. A menu registration failure is logged as `menu_failed`.
@@ -313,7 +299,7 @@ are in [operations.md](operations.md):
 
 ```sh
 ssh vps threadz ctl status
-ssh vps threadz ctl wake --agent viral --phase study --dry-run
+ssh vps threadz ctl wake --agent viral --phase dream --dry-run
 ssh vps threadz ctl wake-show 42 --agent viral
 ```
 
@@ -336,16 +322,6 @@ go run ./cmd/threadz dashboard --agents /path/to/templates --db data/threadz.db
 Open `http://127.0.0.1:8080/` (`--listen` selects another loopback port). The DB must exist. It
 needs no credentials, opens SQLite read-only and accepts only `?agent=<id>` and `?range=7|14|30`.
 
-Private notes, hypothesis text and decision evidence need `--content` and a token in the
-environment (never a file or flag):
-
-```sh
-export THREADZ_DASHBOARD_TOKEN='replace-with-a-long-random-value'
-go run ./cmd/threadz dashboard --agents /path/to/templates --db data/threadz.db --content
-```
-
-Open `/unlock` and paste the token for a 12-hour HttpOnly cookie, or send
-`Authorization: Bearer $THREADZ_DASHBOARD_TOKEN`. Content responses are `private, no-store`.
 Behind the Cloudflare tunnel the limiter keys visitors by `CF-Connecting-IP`; from any other peer
 that header is ignored. `-rate`, `-burst` and `-max-concurrent` tune the limits.
 

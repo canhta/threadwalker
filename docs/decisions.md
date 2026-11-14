@@ -9,8 +9,7 @@ Each row is one decision with a one-line reason. A change to a decision edits it
 | Autonomy | Fully automatic; nobody approves posts | The experiment measures how far an agent runs, learns and improves with nobody approving its output |
 | Owner contact | Telegram, only when needed | The owner stays out of the loop except for limits, logouts, budget and questions ([operations.md](operations.md)) |
 | Template | Declares goal, persona and limits; the agent plans its own tactics | The owner sets ends and bounds; the agent finds the means ([template.md](template.md)) |
-| Self-editing | The agent edits its playbook and notes in the DB, never code or its template | Hard limits must stay out of the agent's reach ([architecture.md](architecture.md)) |
-| Playbook edits | Single entries only, no wholesale rewrite | Wholesale rewriting collapsed an agent's context from 18,282 to 122 tokens |
+| Self-editing | The agent never edits code or its template; what it learns lives in the database | Hard limits must stay out of the agent's reach ([architecture.md](architecture.md)) |
 | Outcome counting | Code counts outcomes; the agent never counts its own results | An agent's own tally cannot be trusted as evidence ([learning.md](learning.md)) |
 | Account | A disposable side account whose bio states it is an AI experiment | Limits the cost of a ban and keeps the account honest |
 | Threads access | Official Threads API for every own-account operation; the pinned `agent-browser` CLI reads the home feed and replies to feed posts | The API has no home-feed endpoint and rejects ids decoded from permalinks; the app's tester role needs no Business Verification ([threads.md](threads.md)) |
@@ -25,9 +24,6 @@ Each row is one decision with a one-line reason. A change to a decision edits it
 | Telegram outbox | A claimed message is never retried after restart | A message may be lost but is never duplicated |
 | Operator access | Unix socket, mode 0600, no network listener; remote use over SSH | Nothing is exposed for an attacker to reach |
 | Rate limits | Spacing between actions is only a rate limit | See non-goals |
-| Posterior and thresholds | A normal model with fixed prior weights; thresholds are implementation choices | Not a validated Threads learning algorithm; establishment is observational |
-| Search tokenizer | `unicode61 remove_diacritics 0` | Measured: precision 0.875 vs 0.535 at equal recall on accented queries |
-| Memory search | Hybrid BM25 plus embedding rank fusion | Measured: recall@5 0.917 vs 0.783 for FTS5 alone |
 | Writer and critic | Tool-free calls before the guard; the critic gates every draft | Reasoning models can reason without tools; style is judged before reservation ([content.md](content.md)) |
 | Content knowledge | Audience, language and style live in the template, not in code | One owner per fact ([architecture.md](architecture.md)) |
 | Cadence | Code derives the next wake from the KPI gap; the agent has no scheduling tool | Pressure must not be negotiable by the agent ([wake.md](wake.md)) |
@@ -63,11 +59,10 @@ Each row is one decision with a one-line reason. A change to a decision edits it
 | Whether Threads blocks or challenges logins from the VPS's datacenter IP | A conclusion needs measurement from that IP |
 | How long a browser-automated account survives | Not measured |
 | Whether a cheap model can sustain a long tool-calling loop without drifting | Not measured |
-| How many actions a real hypothesis needs to be decided at the real lift spread | Synthetic: median 34 to 90 actions for a true lift of 0.5 to 0.3 ([learning.md](learning.md)) |
-| Captcha and rate-limit banners, session portability, production memory | Not measured |
+| Captcha and rate-limit banners, session portability | Not measured |
 | Real-bot Telegram behaviour | Not measured |
 
-Live measurements are separate evidence: real-account browser checks, a 48-hour single-agent dry run, real-bot controls, six real Threads operations, the seven-day live experiment and the two-agent 48-hour memory observation. They run on a local machine or an operator-chosen host. Live posting needs an owner-named scope, an owner-provided account or session and explicit approval.
+Live measurements are separate evidence: real-account browser checks, a 48-hour single-agent dry run, real-bot controls, six real Threads operations, the seven-day live experiment and the two-agent 48-hour isolation observation. They run on a local machine or an operator-chosen host. Live posting needs an owner-named scope, an owner-provided account or session and explicit approval.
 
 ## Measured stack facts
 
