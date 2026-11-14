@@ -33,7 +33,7 @@ func TestLoadFile_ViralTemplate(t *testing.T) {
 	if tmpl.ID != "viral" {
 		t.Errorf("ID = %q, want %q", tmpl.ID, "viral")
 	}
-	if k := tmpl.KPI; k.EngagementsPerDay != 10 || k.FollowersPerWeek != 5 || k.MaxHoursWithoutPublish != 8 || k.OnTargetMinutes != 180 {
+	if k := tmpl.KPI; k.EngagementsPerDay != 10 || k.FollowersPerWeek != 5 || k.MaxHoursWithoutPublish != 8 || k.OnTargetMinutes != 60 {
 		t.Errorf("KPI = %+v", k)
 	}
 	if tmpl.Inbox.PollMinutes != 10 || tmpl.Inbox.MinMinutesAfterWake != 5 {
