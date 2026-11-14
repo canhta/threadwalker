@@ -79,6 +79,9 @@ func parseSuite(data []byte, dir string) (*Suite, error) {
 		}
 	}
 	for i := range suite.Cases {
+		if b := suite.Cases[i].Briefs; b != nil {
+			b.resolvedDir = resolveDir(dir, b.TemplateDir)
+		}
 		if q := suite.Cases[i].Quality; q != nil {
 			q.resolvedDir = filepath.Join(dir, q.TemplateDir)
 		}
@@ -168,6 +171,10 @@ func validateSuite(s *Suite) error {
 				if !reportCode(id) {
 					return invalid()
 				}
+			}
+		case "briefs":
+			if !validBriefs(c.Briefs) {
+				return invalid()
 			}
 		case "guard":
 			g := c.Guard
@@ -325,7 +332,7 @@ func validKind(c Case) bool {
 	if runners[c.Kind] == nil {
 		return false
 	}
-	if (c.Kind == "quality") != (c.Quality != nil) || (c.Kind == "guard") != (c.Guard != nil) || (c.Kind == "runtime") != (c.Runtime != nil) || (c.Kind == "replay") != (c.Replay != nil) {
+	if (c.Kind == "quality") != (c.Quality != nil) || (c.Kind == "guard") != (c.Guard != nil) || (c.Kind == "runtime") != (c.Runtime != nil) || (c.Kind == "replay") != (c.Replay != nil) || (c.Kind == "briefs") != (c.Briefs != nil) {
 		return false
 	}
 	valid := scenarios[c.Kind]

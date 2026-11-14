@@ -275,7 +275,7 @@ func (g *Guard) Execute(ctx context.Context, a Attempt, effect func() (string, e
 	// the cause of the refusal or the effect's own result.
 	defer func() {
 		if intent != nil {
-			detail.Detail, detail.Tries = intent.detail, intent.tries
+			detail.Detail, detail.Tries, detail.Brief = intent.detail, intent.tries, intent.brief
 		}
 		g.recordDetail(ctx, id, detail)
 	}()
@@ -390,6 +390,16 @@ func (g *Guard) review(ctx context.Context, a Attempt, intent *actionIntent) (re
 		}
 		return nil
 	}
+	redact := config.NewRedactor(g.opts.Template).String
+	capAll := func(in []string, n int) []string {
+		out := make([]string, len(in))
+		for i, s := range in {
+			out[i] = store.CapRunes(redact(s), n)
+		}
+		return out
+	}
+	intent.brief = &store.BriefTrace{Kind: a.Tool, Angle: store.CapRunes(redact(intent.Angle), store.MaxTraceText), Fact: store.CapRunes(redact(intent.Fact), store.MaxTraceText), Hook: intent.Hook,
+		Rough: capAll(intent.texts(), store.MaxTraceText), Parent: store.CapRunes(redact(parent), store.MaxTraceParent), Recent: capAll(recent, store.MaxTraceRecent)}
 	source := "agent"
 	if g.opts.Writer != nil {
 		source = "writer"
@@ -399,6 +409,7 @@ func (g *Guard) review(ctx context.Context, a Attempt, intent *actionIntent) (re
 	for _, t := range tries {
 		v := t.Verdict
 		intent.tries = append(intent.tries, draftTrace(source, t.Texts, &v))
+		intent.tries[len(intent.tries)-1].Texts = capAll(t.Texts, store.MaxTraceText)
 	}
 	if err != nil {
 		return "critic_unavailable", "", ""
@@ -437,7 +448,12 @@ func draftTrace(source string, texts []string, v *quality.CriticVerdict) store.T
 	first, _, _ := strings.Cut(strings.TrimSpace(texts[0]), "\n")
 	t.First = capLine(first)
 	if v != nil {
-		t.Pass, t.Problems = v.Pass, v.Problems
+		t.Pass = v.Pass
+		for i, p := range v.Problems {
+			if i < 8 {
+				t.Problems = append(t.Problems, store.CapRunes(p, 300))
+			}
+		}
 		if v.Scores != (quality.CriticScores{}) {
 			t.Scores, _ = json.Marshal(v.Scores)
 		}

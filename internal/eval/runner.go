@@ -53,6 +53,13 @@ func Run(ctx context.Context, suite *Suite, opts Options) (Report, error) {
 			}
 		}
 	}
+	if opts.Mode == "offline" {
+		for _, c := range suite.Cases {
+			if c.Kind == "briefs" {
+				return Report{}, errors.New("briefs eval calls the live model and requires live mode")
+			}
+		}
+	}
 	profiles := append([]Profile(nil), opts.Profiles...)
 	if len(profiles) == 0 {
 		for _, protocol := range []string{"openai", "anthropic"} {
@@ -142,6 +149,7 @@ var runners = map[string]runner{
 		return r
 	},
 	"quality": runQualityCase,
+	"briefs":  runBriefsCase,
 	"guard": func(ctx context.Context, c Case, p Profile, repeat int, opts Options, _ *reservation) CaseResult {
 		return runGuardCase(ctx, c, p, repeat, opts, nil)
 	},
@@ -172,7 +180,7 @@ var runners = map[string]runner{
 }
 
 // liveKind reports whether a live run may execute the kinds a live run may execute.
-func liveKind(kind string) bool { return kind == "chat" || kind == "quality" }
+func liveKind(kind string) bool { return kind == "chat" || kind == "quality" || kind == "briefs" }
 
 func runCase(ctx context.Context, c Case, p Profile, repeat int, opts Options, liveBudget *reservation) CaseResult {
 	return runners[c.Kind](ctx, c, p, repeat, opts, liveBudget)

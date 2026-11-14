@@ -7,6 +7,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"path/filepath"
 	"slices"
 
 	"github.com/canhta/threadz/internal/eval"
@@ -22,9 +23,10 @@ var (
 )
 
 func ctlWakeExport(ctx context.Context, getenv func(string) string, args []string, stdout, stderr io.Writer) int {
-	var keepText *bool
+	var keepText, briefs *bool
 	id, f, ok := wakeCommand("wake-export", getenv, args, stderr, func(fs *flag.FlagSet) {
 		keepText = fs.Bool("keep-text", false, "keep the text of posts other people wrote")
+		briefs = fs.Bool("briefs", false, "export the wake's writes as a briefs case for a live replay of the writer and critic, not as a replay case")
 	})
 	if !ok {
 		return exitUsage
@@ -38,6 +40,13 @@ func ctlWakeExport(ctx context.Context, getenv func(string) string, args []strin
 	if err != nil {
 		fmt.Fprintln(stderr, err)
 		return exitFailure
+	}
+	if *briefs {
+		abs, _ := filepath.Abs(*f.agents)
+		if suite, err = briefsSuite(suite, id, *f.agent, abs); err != nil {
+			fmt.Fprintln(stderr, err)
+			return exitFailure
+		}
 	}
 	enc := json.NewEncoder(stdout)
 	enc.SetIndent("", "  ")
@@ -91,6 +100,7 @@ func exportWake(ctx context.Context, st *store.Store, agentID string, id int64, 
 	}
 	rc := &eval.ReplayCase{}
 	var tools []string
+	var topLiked *eval.TopPost // the most-liked post read so far
 	for i, call := range issued {
 		name := call.Function.Name
 		isRead, isWrite := slices.Contains(replayReads, name), slices.Contains(replayWrites, name)
@@ -99,6 +109,7 @@ func exportWake(ctx context.Context, st *store.Store, agentID string, id int64, 
 		}
 		step := eval.ReplayStep{Call: llm.ToolCall{Type: "function", Function: call.Function}}
 		if isWrite {
+			step.Brief = briefOf(id, name, calls[i].Detail, topLiked, keepText)
 			step.ExpectedBlocked = calls[i].BlockedBy
 			if step.ExpectedBlocked == "" {
 				rc.ExpectedActions++
@@ -108,6 +119,9 @@ func exportWake(ctx context.Context, st *store.Store, agentID string, id int64, 
 				return nil, fmt.Errorf("exporting wake: the %s result was cut when it was stored", name)
 			}
 			output := json.RawMessage(r.Output)
+			if p := mostLiked(output); p != nil && (topLiked == nil || p.Likes > topLiked.Likes) {
+				topLiked = p
+			}
 			if !keepText {
 				output = withoutPostText(output)
 			}
@@ -158,4 +172,82 @@ func withoutPostText(output json.RawMessage) json.RawMessage {
 		return output
 	}
 	return out
+}
+
+// mostLiked is the post with the most likes among the posts of a recorded read, or nil.
+func mostLiked(output json.RawMessage) *eval.TopPost {
+	var best *eval.TopPost
+	var walk func(any)
+	walk = func(n any) {
+		switch n := n.(type) {
+		case map[string]any:
+			if posts, ok := n["posts"].([]any); ok {
+				for _, p := range posts {
+					m, _ := p.(map[string]any)
+					if likes, ok := m["likes"].(float64); ok && (best == nil || int64(likes) > best.Likes) {
+						text, _ := m["text"].(string)
+						user, _ := m["username"].(string)
+						best = &eval.TopPost{Username: user, Likes: int64(likes), Text: text}
+					}
+				}
+			}
+			for _, e := range n {
+				walk(e)
+			}
+		case []any:
+			for _, e := range n {
+				walk(e)
+			}
+		}
+	}
+	var v any
+	if json.Unmarshal(output, &v) == nil {
+		walk(v)
+	}
+	return best
+}
+
+// briefOf is the writer and critic exchange a write's detail recorded, or nil
+// when it recorded none. The text answered and the top-liked post are other
+// people's, so they are dropped unless keepText.
+func briefOf(wake int64, tool string, d store.CallDetail, top *eval.TopPost, keepText bool) *eval.Brief {
+	if d.Brief == nil {
+		return nil
+	}
+	b := &eval.Brief{Wake: wake, Kind: tool, Angle: d.Brief.Angle, Fact: d.Brief.Fact, Hook: d.Brief.Hook, Rough: d.Brief.Rough, Recent: d.Brief.Recent}
+	if top != nil {
+		t := *top
+		b.TopLiked = &t
+	}
+	if keepText {
+		b.Parent = d.Brief.Parent
+	} else if b.TopLiked != nil {
+		b.TopLiked.Text = ""
+	}
+	for _, t := range slices.Backward(d.Tries) {
+		if len(t.Texts) > 0 {
+			b.Recorded = t.Texts
+			break
+		}
+	}
+	return b
+}
+
+// briefsSuite turns an exported replay suite into a live-only briefs suite of
+// one case, from the briefs its write steps recorded.
+func briefsSuite(replay *eval.Suite, wake int64, agentID, templatesDir string) (*eval.Suite, error) {
+	if agentID == "" {
+		return nil, errors.New("exporting briefs: --agent is required")
+	}
+	bc := &eval.BriefsCase{TemplateDir: templatesDir, TemplateID: agentID}
+	for _, step := range replay.Cases[0].Replay.Steps {
+		if step.Brief != nil {
+			bc.Briefs = append(bc.Briefs, *step.Brief)
+		}
+	}
+	if len(bc.Briefs) == 0 {
+		return nil, errors.New("exporting briefs: the wake recorded no writer exchange (it wrote nothing, or ran before briefs were traced)")
+	}
+	c := eval.Case{ID: fmt.Sprintf("briefs_wake_%d", wake), Kind: "briefs", Description: fmt.Sprintf("Live replay of the writes of wake %d through the current writer and critic.", wake), Briefs: bc, Expect: eval.Expectation{EndReason: "completed"}}
+	return &eval.Suite{Description: "Briefs exported from a stored wake; live only.", Cases: []eval.Case{c}}, nil
 }

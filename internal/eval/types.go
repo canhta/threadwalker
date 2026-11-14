@@ -3,6 +3,7 @@ package eval
 
 import (
 	"encoding/json"
+	"io"
 	"time"
 
 	"github.com/canhta/threadz/internal/agent"
@@ -55,6 +56,7 @@ type Case struct {
 	Guard       *GuardCase            `json:"guard,omitempty"`
 	Runtime     *RuntimeCase          `json:"runtime,omitempty"`
 	Replay      *ReplayCase           `json:"replay,omitempty"`
+	Briefs      *BriefsCase           `json:"briefs,omitempty"`
 	ID          string                `json:"id"`
 	Description string                `json:"description,omitempty"`
 	Messages    []llm.Message         `json:"messages"`
@@ -101,6 +103,10 @@ type Options struct {
 	Now             func() time.Time
 	// Getenv resolves the live credential named by a profile.
 	Getenv func(string) string
+	// BriefReviewer replaces the template's own writer and critic in a briefs run; tests script it.
+	BriefReviewer *BriefReviewer
+	// BriefsOut receives the plain text report of a briefs run.
+	BriefsOut io.Writer
 }
 type Report struct {
 	SuiteDigest       string       `json:"suite_digest"`

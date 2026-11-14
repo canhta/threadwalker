@@ -10,7 +10,7 @@ popularity.
 Every case carries a `kind` that selects its runner: `chat` (scripted client loop), `quality`,
 `guard`, `replay`, `runtime`, `owner`, `browser`, `metrics`, `playbook`, `dashboard` or `isolation`. The kinds
 `owner`, `browser`, `metrics`, `playbook`, `dashboard` and `isolation` take a `scenario`; `quality`,
-`guard`, `replay` and `runtime` carry their own payload object. Only `chat` and `quality` run live. The metrics
+`guard`, `replay`, `runtime` and `briefs` carry their own payload object. Only `chat`, `quality` and `briefs` run live; `briefs` runs only live. The metrics
 suite is embedded in the binary, so `threadz eval metrics` runs from any directory.
 
 ## Reproduce
@@ -245,9 +245,48 @@ before the 64 KiB cap) or the transcript hit its bounds.
 
 Review an export before committing it. The text of other people's posts is blanked unless
 `--keep-text` is set, but usernames, post URLs and headlines stay, and a `writer` or `critic`
-script is never exported because the model outputs are not stored whole.
+script is never exported. Each write step carries a `brief` (below), which replay ignores.
 
 State carried over from earlier wakes (quotas, recent posts for `repeat_topic`) is not part of a replay.
+
+## Replaying briefs through the current writer and critic (live)
+
+Before a prompt or rubric deploy, see what the current writer and critic would make of real briefs. A
+`briefs` case holds writes recorded from live wakes: the angle, fact, hook and rough text, the post or
+trend answered, the recent own texts the writer was given, the most-liked post that wake read, and
+the text the wake posted. The run feeds each through the same `quality.Revise` path as the guard,
+with the template's own writer and critic, and prints a plain text report per brief: brief, parent,
+top-liked post, each draft, each verdict, and the result. **It calls the live model and costs money; it
+never runs offline** (an offline run of a suite with a `briefs` case fails, and the default suite has
+none). Nothing is published.
+
+The guard records the brief and every judged draft in the call's detail (no schema change), redacted
+and bounded in runes: angle and fact 600 each, rough text and draft parts 600 each, the parent 800, 20
+recent texts of 300, 8 problems of 300, so one call stays under about 30 KiB. Detail lives as long as
+transcripts (8 days). Wakes older than this change have no brief.
+
+On the host, against the host database (reads only; no model call):
+
+```sh
+deploy/live-briefs.sh viral 10 live-briefs.json     # the last 10 wakes that used the writer; KEEP_TEXT=1 keeps other people's text
+```
+
+It prints the `--cases` list to use. It runs `threadz ctl wake-export <id> --agent viral --briefs` for each recent wake and joins the
+cases with `jq`. Without `--keep-text` the parent and top-liked text are blank, so keep it for a useful
+report and do not commit the file. Then, with the model catalog and keys of [Optional live comparison](#optional-live-comparison):
+
+```sh
+go run ./cmd/threadz eval --live --suite live-briefs.json \
+  --llms llms.yaml --profiles fast --cases briefs_wake_412,briefs_wake_409 \
+  --max-usd 1 --max-steps 8 --max-output-tokens 1024
+```
+
+The gate wants a profile and explicit cases, but the models are the template's `writer` and `critic`
+(the profile is not called). `--max-usd` stops the run before the next brief once the scratch
+ledger has spent it. Each brief is one writer call and one critic call, up to three rounds when the
+critic refuses. At the template's rates that is about 2 to 6 calls per brief; expect roughly USD 0.01 to 0.03 per brief at the viral template's rates (an estimate, not an invoice)
+and check the `spend:` line. The replay skips the guard's own content rules and the writer's
+`Learned` examples, which need the live database.
 
 ## Owner service cases
 

@@ -211,3 +211,38 @@ func TestASpacingWaitThatPublishedIsNotABlock(t *testing.T) {
 		t.Fatalf("refused: %+v", refused)
 	}
 }
+
+func TestWakeExportBriefsCarriesTheWriterExchange(t *testing.T) {
+	w := seedWake(t, true)
+	export := func(extra ...string) string {
+		var out, errOut bytes.Buffer
+		args := append([]string{"wake-export", "1", "--agent", "diag", "--db", w.db, "--briefs", "--agents", t.TempDir()}, extra...)
+		if code := runCtl(context.Background(), args, func(string) string { return "" }, &out, &errOut, defaultCtlDeps()); code != exitOK {
+			t.Fatalf("exit %d: %s", code, errOut.String())
+		}
+		return out.String()
+	}
+	out := export()
+	if strings.Contains(out, "Synthetic headline") {
+		t.Fatal("the export kept the text answered without --keep-text")
+	}
+	path := filepath.Join(t.TempDir(), "live-briefs.json")
+	if err := os.WriteFile(path, []byte(export("--keep-text")), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	suite, err := eval.LoadSuite(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	b := suite.Cases[0].Briefs
+	if suite.Cases[0].Kind != "briefs" || b.TemplateID != "diag" || len(b.Briefs) != 1 {
+		t.Fatalf("%+v", suite.Cases[0])
+	}
+	got := b.Briefs[0]
+	if got.Wake != 1 || got.Kind != "post" || got.Angle != "price cut" || got.Fact != "synthetic" || got.Hook != "trend_detail" || !strings.Contains(got.Parent, "Synthetic headline") || len(got.Recorded) != 1 || got.Recorded[0] != "Giá model giảm nửa: hóa đơn dev có giảm không?" {
+		t.Fatalf("%+v", got)
+	}
+	if _, err = eval.Run(context.Background(), suite, eval.Options{Seed: 1}); err == nil {
+		t.Fatal("an offline run called the live writer")
+	}
+}

@@ -49,7 +49,7 @@ Commands that read the database or the host:
   wakes --agent ID [--since 24h|RFC3339] [--limit N]
   wake-show <id>                            the stored transcript of one wake
   wake-diagnose <id>                        one wake as a funnel: reads, every post and reply with its guard verdict, editor drafts, browser stage
-  wake-export <id> [--keep-text]            one wake as a replay eval case (post text of other people removed unless --keep-text)
+  wake-export <id> [--keep-text] [--briefs] one wake as a replay eval case, or with --briefs as a live-only writer/critic replay (post text of other people removed unless --keep-text)
   logs [--agent ID] [--wake ID] [--event NAME] [--follow] [--source journal|db]
   draft --agent ID --input FILE             run the writer and critic on fixed items, publish nothing
   capture-api --agent ID [--out DIR]        read-only API calls, redacted responses saved as contract-test fixtures (default internal/threads/testdata/live)

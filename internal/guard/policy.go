@@ -43,6 +43,7 @@ type actionIntent struct {
 	// ref and which drafts the editor judged; they never reach the model.
 	refTrace *store.RefTrace
 	tries    []store.TryTrace
+	brief    *store.BriefTrace
 	browser  bool
 	// inbox is true when the target is a reply to the account noted by NoteInbox.
 	inbox bool

@@ -22,6 +22,8 @@ type CallDetail struct {
 	Ref *RefTrace `json:"ref,omitempty"`
 	// Tries is every draft the writer and critic produced, oldest first.
 	Tries []TryTrace `json:"tries,omitempty"`
+	// Brief is what the writer and critic were given, for replaying the write.
+	Brief *BriefTrace `json:"brief,omitempty"`
 	// Counts is the length of each list a read returned.
 	Counts map[string]int `json:"counts,omitempty"`
 	// Stage and Evidence name the browser step that failed and the saved snapshot.
@@ -51,12 +53,44 @@ type NearRef struct {
 // TryTrace is one draft: who wrote it, its first line and part lengths in
 // runes, and the critic's verdict or the content rule that stopped it first.
 type TryTrace struct {
-	Source   string          `json:"source"`
-	First    string          `json:"first"`
+	Source string `json:"source"`
+	First  string `json:"first"`
+	// Texts is the whole draft, each part capped at MaxTraceText; set only for a draft the editor judged.
+	Texts    []string        `json:"texts,omitempty"`
 	Runes    []int           `json:"runes"`
 	Pass     bool            `json:"pass"`
 	Scores   json.RawMessage `json:"scores,omitempty"`
 	Problems []string        `json:"problems,omitempty"`
+}
+
+// Bounds of what a call's detail keeps of a brief, in runes. A call's detail
+// stays under about 30 KiB: 20 recent texts of 300, a parent of 800, and at
+// most 4 judged drafts of 5 parts of 600 each, 8 problems of 300 per draft.
+const (
+	MaxTraceText   = 600
+	MaxTraceParent = 800
+	MaxTraceRecent = 300
+)
+
+// BriefTrace is the brief a post or reply gave the writer and critic: the
+// agent's angle, fact, rough text and hook, the text answered (a feed post or
+// a trend, untrusted) and the account's recent own texts, all redacted and capped.
+type BriefTrace struct {
+	Kind   string   `json:"kind"`
+	Angle  string   `json:"angle,omitempty"`
+	Fact   string   `json:"fact,omitempty"`
+	Hook   string   `json:"hook,omitempty"`
+	Rough  []string `json:"rough,omitempty"`
+	Parent string   `json:"parent,omitempty"`
+	Recent []string `json:"recent,omitempty"`
+}
+
+// CapRunes cuts s to n runes.
+func CapRunes(s string, n int) string {
+	if r := []rune(s); len(r) > n {
+		return string(r[:n])
+	}
+	return s
 }
 
 // RecordCallArgs stores the redacted, capped arguments of an audited call.

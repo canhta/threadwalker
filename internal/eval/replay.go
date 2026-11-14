@@ -46,6 +46,8 @@ type ReplayStep struct {
 	ExpectedBlocked string          `json:"expected_blocked,omitempty"`
 	ExpectedDetail  string          `json:"expected_detail,omitempty"`
 	ExpectedStage   string          `json:"expected_stage,omitempty"`
+	// Brief is the writer and critic exchange the wake recorded for this write; replay ignores it.
+	Brief *Brief `json:"brief,omitempty"`
 }
 
 // ReplayFailure makes the fake backend fail the write with a browser reason

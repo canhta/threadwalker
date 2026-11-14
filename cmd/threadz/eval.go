@@ -91,6 +91,7 @@ func runEval(ctx context.Context, args []string, getenv func(string) string, std
 	opts := eval.Options{Seed: *seed, Repeat: *repeat, Mode: "offline", Revision: *revision, CaseIDs: cases, MaxUSD: *maxUSD, MaxSteps: *maxSteps, MaxOutputTokens: *maxOutput, Getenv: getenv}
 	if *live {
 		opts.Mode = "live"
+		opts.BriefsOut = stdout
 	}
 	if len(profiles) > 0 {
 		catalog, err := config.LoadCatalog(*catalogPath)

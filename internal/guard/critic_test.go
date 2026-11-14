@@ -2,13 +2,16 @@ package guard_test
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"strings"
 	"testing"
 	"time"
+	"unicode/utf8"
 
 	"github.com/canhta/threadz/internal/guard"
 	"github.com/canhta/threadz/internal/quality"
+	"github.com/canhta/threadz/internal/store"
 )
 
 func verdict(pass bool, problems ...string) quality.CriticVerdict {
@@ -219,5 +222,46 @@ func TestALimitRefusesBeforeTheWriterAndCriticSpendAnything(t *testing.T) {
 	}
 	if writes != 1 || reviews != 1 {
 		t.Fatalf("the refused reply still ran the writer %d and critic %d times", writes-1, reviews-1)
+	}
+}
+
+func TestTraceKeepsTheBriefAndEveryDraftBounded(t *testing.T) {
+	st, scope := setup(t)
+	scope.Writer = func(_ context.Context, in quality.WriterInput) ([]string, error) {
+		if len(in.Problems) == 0 {
+			return []string{"bản nháp đầu"}, nil
+		}
+		return []string{strings.Repeat("dài ", 400)}, nil
+	}
+	scope.Critic = func(_ context.Context, in quality.CriticInput) (quality.CriticVerdict, error) {
+		if in.Texts[0] == "bản nháp đầu" {
+			return verdict(false, "quá cứng"), nil
+		}
+		return verdict(true), nil
+	}
+	g := criticGuard(t, scope)
+	g.NoteRead("", "https://www.threads.com/@someone/post/abc", strings.Repeat("gốc ", 500))
+	args := `{"text":"nháp thô","target_url":"https://www.threads.com/@someone/post/abc","target_username":"someone","hook":"trend_detail","angle":"góc nhìn","fact":"một con số"}`
+	// The second draft is over the length rule, so the call is refused after it.
+	if _, err := g.Execute(context.Background(), guard.Attempt{Tool: "reply", Arguments: args}, func() (string, error) { return "sent", nil }); err == nil {
+		t.Fatal("an over-long draft was published")
+	}
+	var raw string
+	if err := st.DB().QueryRow(`SELECT detail_json FROM tool_call_details WHERE detail_json LIKE '%"brief"%'`).Scan(&raw); err != nil {
+		t.Fatal(err)
+	}
+	var d store.CallDetail
+	if err := json.Unmarshal([]byte(raw), &d); err != nil {
+		t.Fatal(err)
+	}
+	b := d.Brief
+	if b == nil || b.Kind != "reply" || b.Angle != "góc nhìn" || b.Fact != "một con số" || b.Hook != "trend_detail" || len(b.Rough) != 1 || b.Rough[0] != "nháp thô" {
+		t.Fatalf("brief %+v", b)
+	}
+	if n := utf8.RuneCountInString(b.Parent); n != store.MaxTraceParent {
+		t.Fatalf("parent kept %d runes", n)
+	}
+	if len(d.Tries) != 4 || len(d.Tries[0].Texts) != 0 || d.Tries[1].Texts[0] != "bản nháp đầu" || utf8.RuneCountInString(d.Tries[3].Texts[0]) != store.MaxTraceText || d.Tries[3].Pass {
+		t.Fatalf("tries %+v", d.Tries)
 	}
 }
