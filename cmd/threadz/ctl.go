@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"bytes"
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
@@ -203,7 +204,7 @@ func ctlStatus(ctx context.Context, getenv func(string) string, args []string, s
 			}
 			fmt.Fprintf(w, "%s  %s (%s)\n", s.Agent, s.State, mode)
 			if !s.NextWake.IsZero() {
-				fmt.Fprintf(w, "  next: %s at %s\n", s.NextKind, s.NextWake.UTC().Format(time.RFC3339))
+				fmt.Fprintf(w, "  next: %s at %s\n", cmp.Or(s.NextKind, "agent wake"), s.NextWake.UTC().Format(time.RFC3339))
 			}
 			fmt.Fprintf(w, "  spend today: $%.4f of $%.2f; dream $%.4f of $%.2f\n", s.SpentTodayUSD, s.DailyCapUSD, s.DreamSpentUSD, s.DreamCapUSD)
 			if s.TokensInToday > 0 {
