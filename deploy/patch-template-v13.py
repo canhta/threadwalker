@@ -43,7 +43,7 @@ REWRITES = [
 # writer model, and the study, playbook and learning settings and the owner copy of v0.1 and v0.2.
 REMOVED_KEYS = ["writer.post_llm", "study", "seed_playbook", "learning", "limits.explore_percent",
                 "schedule.study_slots", "telegram.digest_hour", "telegram.messages"]
-REMOVED = re.compile(r"\b(read_feed|read_topic|profile_posts|target_url|target_id|target_username|trend_ref)\b|\bsearch\b(?=[ ,.)])")
+REMOVED = re.compile(r"\b(read_feed|read_topic|profile_posts|target_url|target_id|target_username|trend_ref)\b")
 
 # sha256 of the persona: block of templates/viral.agent.yaml at v0.2.1 (after the REWRITES above), the only
 # block this script replaces. The Go test checks it against the v0.2.1 release tag.
