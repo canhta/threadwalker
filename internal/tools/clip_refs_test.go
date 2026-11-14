@@ -3,6 +3,7 @@ package tools_test
 import (
 	"context"
 	"fmt"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -45,5 +46,33 @@ func TestClippedFeedStillStoresEveryPostAndListsCandidates(t *testing.T) {
 	open, err := guard.OpenCandidates(context.Background(), st, opts.Template, nil, opts.Now(), false)
 	if err != nil || len(open) != guard.MaxCandidates {
 		t.Fatalf("%d open candidates, %v; want %d", len(open), err, guard.MaxCandidates)
+	}
+}
+
+// read_post on a post only a browser read showed returns what that read stored,
+// without another read.
+func TestReadPostOfABrowserPostReturnsTheStoredRead(t *testing.T) {
+	st, opts, _ := setup(t)
+	opts.Template.Targets = config.DefaultTargets
+	opts.Scope = guard.Scope{Store: st, Template: opts.Template, WakeID: 1, Now: opts.Now}
+	m := threads.NewMemory()
+	likes, replies, age := int64(120), int64(4), int64(20)
+	m.Pages[threads.OpReadFeed] = threads.Page{Kind: "feed", Posts: []threads.Post{{Username: "u", Text: "chuyện hôm nay ở concert", URL: "https://www.threads.com/@u/post/abc", Likes: &likes, Replies: &replies, AgeMinutes: &age}}}
+	opts.Threads = m
+	d, err := tools.NewDispatcher(opts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	out, err := d.Dispatch(context.Background(), call("find_posts", `{"source":"feed"}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	ref := regexp.MustCompile(`"ref":"(p\d+)"`).FindStringSubmatch(out)
+	if ref == nil {
+		t.Fatalf("no p ref in %s", out)
+	}
+	got, err := d.Dispatch(context.Background(), call("read_post", fmt.Sprintf(`{"id":%q}`, ref[1])))
+	if err != nil || !strings.Contains(got, "chuyện hôm nay ở concert") {
+		t.Fatalf("read_post %s: %s %v", ref[1], got, err)
 	}
 }

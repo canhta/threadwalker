@@ -13,6 +13,7 @@ import (
 	"github.com/canhta/threadz/internal/guard"
 	"github.com/canhta/threadz/internal/llm"
 	"github.com/canhta/threadz/internal/logging"
+	"github.com/canhta/threadz/internal/store"
 	"github.com/canhta/threadz/internal/threads"
 )
 
@@ -46,6 +47,11 @@ func (d *Dispatcher) browserRead(ctx context.Context, tool, operation string, a 
 	case threads.OpProfilePosts:
 		page, err = d.opts.Threads.ProfilePosts(ctx, a.Text("username"))
 	case threads.OpReadPost:
+		// A post only a browser read showed has no API id; what that read stored
+		// is all there is, so it is returned without another read.
+		if row, ok := d.guard.IssuedPost(a.Text("id")); ok && row.MediaID == "" {
+			return threads.Page{Kind: "post", Posts: []threads.Post{{Ref: store.PostRef(row.ID), Username: row.Author, Text: row.Text, URL: row.URL, Likes: row.Likes, Replies: row.Replies, AgeMinutes: row.AgeMinutes}}}, nil
+		}
 		id, rerr := d.apiPostID(a.Text("id"))
 		if rerr != nil {
 			return nil, rerr

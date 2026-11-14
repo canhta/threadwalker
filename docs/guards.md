@@ -27,7 +27,7 @@ flowchart TD
 | `unsupported_tool_type` | Only function tool calls | code | dispatcher |
 | `unknown_tool` | Tool not in `guard.Specs` | code | dispatcher |
 | `invalid_tool_arguments` | Arguments do not match the schema, naming the argument; also an unknown `source` or `hook` (enums in the schema). An optional argument sent empty (`""`, `[]` or `null`) counts as not sent | code | dispatcher, content, reserve |
-| `post_not_readable` | `read_post` or `read_replies` got a `p` ref of a post only a browser read showed (no API id); its text is already in that read | code | dispatcher |
+| `post_not_readable` | `read_replies` got a `p` ref of a post only a browser read showed (no API id), whose replies cannot be read. `read_post` on such a ref returns what the read stored | code | dispatcher |
 | `sensitive_arguments` | Arguments contain a configured secret | code | dispatcher |
 | `repeat_refused` | Same call failed the same way 3 times | code | dispatcher |
 | `stall_stop` | Second `repeat_refused`, or 10 identical successful results; ends the wake | code | dispatcher |
