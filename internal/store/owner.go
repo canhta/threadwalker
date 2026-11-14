@@ -325,7 +325,7 @@ func (s *Store) OwnerSilence(ctx context.Context, id string, dryRun bool) (since
 	return since, lastReason, nil
 }
 
-const failedWakeFilter = `end_reason NOT IN ('','completed','already_ran')`
+const failedWakeFilter = `end_reason NOT IN ('','completed','already_ran','too_few_episodes')`
 
 // dayFailures fills FailedWakes, their top three end reasons and the top
 // five guard refusals for [from,to).

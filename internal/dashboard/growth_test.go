@@ -143,7 +143,7 @@ func TestEveryEnumHasAPlainLabel(t *testing.T) {
 	if statusText("killed") != "Stopped" || statusText("new") != "Unknown" {
 		t.Fatal("status mapping")
 	}
-	if endReasonLabel("browser_error") != "Browser error" || endReasonLabel("provider_error") != "Model error" {
+	if endReasonBad("too_few_episodes") || endReasonLabel("too_few_episodes") != "Skipped: too few new results" || endReasonLabel("browser_error") != "Browser error" || endReasonLabel("provider_error") != "Model error" {
 		t.Fatal("end reason wording")
 	}
 }

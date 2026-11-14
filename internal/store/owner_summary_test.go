@@ -23,7 +23,7 @@ func TestOwnerSummaryFailuresAndSilence(t *testing.T) {
 	if since, reason, err := st.OwnerSilence(ctx, "a", false); err != nil || !since.IsZero() || reason != "" {
 		t.Fatalf("empty: %v %q %v", since, reason, err)
 	}
-	for i, reason := range []string{"completed", "step_limit", "step_limit", "provider_error", "already_ran"} {
+	for i, reason := range []string{"completed", "step_limit", "step_limit", "provider_error", "already_ran", "too_few_episodes"} {
 		if _, err = st.db.ExecContext(ctx, `INSERT INTO wakes(agent_id,started_at,ended_at,end_reason) VALUES('a',?,?,?)`, ts(i+1), ts(i+1), reason); err != nil {
 			t.Fatal(err)
 		}
@@ -41,7 +41,7 @@ func TestOwnerSummaryFailuresAndSilence(t *testing.T) {
 		t.Fatalf("summary=%+v", sum)
 	}
 	since, reason, err := st.OwnerSilence(ctx, "a", false)
-	if err != nil || !since.Equal(day.Add(time.Hour)) || reason != "already_ran" {
+	if err != nil || !since.Equal(day.Add(time.Hour)) || reason != "too_few_episodes" {
 		t.Fatalf("no publish: %v %q %v", since, reason, err)
 	}
 	if _, err = st.db.ExecContext(ctx, `INSERT INTO actions(agent_id,kind,text,dry_run,posted_at) VALUES('a','post','x',0,?)`, ts(9)); err != nil {
