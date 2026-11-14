@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"maps"
-	"slices"
 	"strings"
 	"time"
 
@@ -191,26 +190,30 @@ func (d *Dispatcher) findPosts(ctx context.Context, a arguments) (any, error) {
 	source := a.Text("source")
 	src, _ := guard.FindSourceOf(source)
 	scope := guard.FindScope(source)
-	given := map[string]bool{"topic": a.Text("topic") != "", "query": a.Text("query") != "", "username": a.Text("username") != "", "recent": a.Bool("recent")}
-	for arg, set := range given {
-		if set && !slices.Contains(src.Args, arg) {
-			return nil, &guard.BlockedError{Reason: "find_args"}
-		}
+	// Arguments a source does not take are ignored, not refused.
+	given := map[string]bool{}
+	for _, arg := range src.Args {
+		given[arg] = a.Text(arg) != "" || a.Bool(arg)
 	}
 	switch {
-	case source == "topic" && given["topic"] == given["query"],
-		source == "search" && !given["query"],
-		source == "profile" && !given["username"]:
-		return nil, &guard.BlockedError{Reason: "find_args"}
+	case source == "topic" && !given["topic"] && !given["query"]:
+		return nil, &guard.BlockedError{Reason: "find_args", Detail: "topic or query"}
+	case source == "search" && !given["query"]:
+		return nil, &guard.BlockedError{Reason: "find_args", Detail: "query"}
+	case source == "profile" && !given["username"]:
+		return nil, &guard.BlockedError{Reason: "find_args", Detail: "username"}
 	}
 	if given["topic"] {
-		seen, ok := d.guard.Trend(a.Text("topic"))
 		// Only a Threads topic link opens; a news link would fail in the
-		// browser and still use up a read.
-		if !ok || !threads.IsTopicURL(seen) {
-			return nil, &guard.BlockedError{Reason: "find_args"}
+		// browser and still use up a read. With a query too, the query is read.
+		seen, ok := d.guard.Trend(a.Text("topic"))
+		switch {
+		case ok && threads.IsTopicURL(seen):
+			a.Args = a.Args.WithText("url", seen).WithText("query", "")
+		case given["query"]:
+		default:
+			return nil, &guard.BlockedError{Reason: "find_args", Detail: "a topic ref from the Trending-now list, or query"}
 		}
-		a.Args = a.Args.WithText("url", seen)
 	}
 	if err := d.countCall(scope); err != nil {
 		return nil, err

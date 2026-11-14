@@ -113,7 +113,7 @@ var hints = map[string]string{
 	"browser_replies_per_day":     "the daily limit of replies through the browser is used and stays used for the rest of the wake; reply only to an inbox item or an open reply candidate (those have an api id), or post instead",
 	"api_quota_exhausted":         "Threads allows no more publishing right now; end the wake",
 	"api_quota_unreadable":        "the Threads publishing quota could not be read; end the wake and try next wake",
-	"find_args":                   "source feed takes no other argument, topic takes topic (a t ref from feed) or query, search takes query, profile takes username; send exactly those",
+	"find_args":                   "this source needs %s; send it and the call again",
 }
 
 // Hint returns the fixed text for reason with detail filled in.

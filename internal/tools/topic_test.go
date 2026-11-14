@@ -58,12 +58,20 @@ func TestReadTopicAfterTrendingPanel(t *testing.T) {
 	}
 }
 
-func TestReadTopicNeedsExactlyOneArgument(t *testing.T) {
+// A source refuses only when it is missing what it needs; arguments it does
+// not take are ignored.
+func TestFindPostsRefusesOnlyAMissingArgument(t *testing.T) {
 	h := newBrowserHarness(t, true)
-	for _, args := range []string{`{"source":"topic"}`, `{"source":"topic","topic":"t1","query":"x"}`, `{"source":"feed","query":"x"}`, `{"source":"search"}`, `{"source":"profile"}`} {
+	for _, args := range []string{`{"source":"topic"}`, `{"source":"search"}`, `{"source":"profile"}`} {
 		h.next()
 		if _, err := h.call("find_posts", args); err == nil || !strings.Contains(err.Error(), "find_args") {
 			t.Fatalf("args %s: %v", args, err)
+		}
+	}
+	for _, args := range []string{`{"source":"feed","query":"x","recent":true}`, `{"source":"topic","query":"x","username":"u"}`} {
+		h.next()
+		if _, err := h.call("find_posts", args); err != nil {
+			t.Fatalf("args %s refused: %v", args, err)
 		}
 	}
 }

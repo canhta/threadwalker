@@ -49,7 +49,7 @@ flowchart TD
 | `engagement_bait` | Asks for "comment X", "tag a friend", shares or follows | code | content |
 | `post_brief` | With `guard.trend_anchor`, a post lacks `hook` or `rationale`, or the rationale is multi-line or over 300 characters | template flag | content |
 | `too_many_parts` | A series with 5 or more later parts | code | content |
-| `find_args` | `find_posts` arguments do not fit the `source`, or `topic` is not the `t` ref of a Threads topic that `feed` returned this wake | code | executor |
+| `find_args` | `find_posts` lacks what its `source` needs (`query` for search, `username` for profile, `topic` or `query` for topic), or `topic` is not the `t` ref of a Threads topic that `feed` returned this wake and no `query` was sent; the refusal names what is missing | code | executor |
 | `no_trend_anchor` | With `guard.trend_anchor`, `trend` was not the `t` ref of a trend or source noted this wake, or the `p` ref of a post this wake issued | template flag | content |
 | `own_account` | Interaction with a configured own username, own profile or post URL, or a confirmed own publication URL, even when the supplied author disagrees; mentions and Threads links to own accounts | template (`threads.username`) | content, reserve |
 | `shared_promotion_link` | A post promotes a link already reserved by another agent; checks all prior intents including dry-run, failed and uncertain | code | reserve |
