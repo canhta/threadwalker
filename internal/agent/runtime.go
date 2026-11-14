@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"github.com/canhta/threadz/internal/stdx"
 	"log/slog"
-	"math/rand"
 	"net/http"
 	"slices"
 	"sync"
@@ -19,7 +18,6 @@ import (
 	"github.com/canhta/threadz/internal/llm"
 	"github.com/canhta/threadz/internal/logging"
 	"github.com/canhta/threadz/internal/metrics"
-	"github.com/canhta/threadz/internal/playbook"
 	"github.com/canhta/threadz/internal/quality"
 	"github.com/canhta/threadz/internal/store"
 	"github.com/canhta/threadz/internal/threads"
@@ -44,20 +42,13 @@ type Options struct {
 	HTTPClient  *http.Client
 	Logger      *slog.Logger
 	FetchTrends func(context.Context) ([]trends.Trend, error)
-	// FetchStudy is the broad study source fetch.
-	FetchStudy func(context.Context) (trends.StudyFeed, error)
-	// SearchWeb carries the study web-search transport.
+	// SearchWeb carries the web_search transport.
 	SearchWeb trends.WebSearcher
-	// EmbeddingBaseURL replaces the OpenAI embeddings endpoint, for the
-	// offline transport.
-	EmbeddingBaseURL string
 	// TokenMissing is told when a wake cannot start because the agent has no Threads token.
 	TokenMissing func(ctx context.Context, agentID string)
 	// ProfileHeld reports that a cookie import holds the agent's browser profile;
 	// no wake or session check runs while it does.
 	ProfileHeld func(agentID string) bool
-	// Rand draws the Thompson suggestion of a wake; nil seeds one from the clock.
-	Rand *rand.Rand
 }
 
 // ErrProfileHeld refuses a wake while a cookie import holds the browser profile.
@@ -175,11 +166,7 @@ func New(opts Options) (*Runtime, error) {
 	// ponytail: the check clock lives in memory, so a restart waits a full day
 	// before its next check; persist it in the store if restarts become frequent.
 	r := &Runtime{opts: opts, canPublish: canPublish, session: &sessionClock{due: opts.Now().Add(sessionCheckEvery)}, failure: &failureClock{}, inbox: &inboxClock{seen: map[string]bool{}}}
-	embedder, err := r.embedder(guard.PhaseAgent, 0)
-	if err != nil {
-		return nil, err
-	}
-	processor, err := metrics.New(metrics.Options{Embedder: embedder, Store: opts.Store, Template: opts.Template, Now: opts.Now, Logger: opts.Logger, ThreadsFactory: opts.ThreadsFactory, Owner: opts.Owner, Redactor: opts.Redactor, FetchTrends: opts.FetchTrends, FetchStudy: opts.FetchStudy, SearchWeb: opts.SearchWeb})
+	processor, err := metrics.New(metrics.Options{Store: opts.Store, Template: opts.Template, Now: opts.Now, Logger: opts.Logger, ThreadsFactory: opts.ThreadsFactory, Owner: opts.Owner, Redactor: opts.Redactor, FetchTrends: opts.FetchTrends, SearchWeb: opts.SearchWeb})
 	if err != nil {
 		return nil, err
 	}
@@ -222,18 +209,6 @@ func (r *Runtime) Start(ctx context.Context) error {
 	now := r.opts.Now()
 	before, err := r.opts.Store.AgentState(ctx, r.opts.Template.ID)
 	if err != nil {
-		return err
-	}
-	if before.Status == "running" {
-		if _, err = r.opts.Store.InitializePlaybook(ctx, r.opts.Template.ID, r.opts.Template.SeedPlaybook, now); err != nil {
-			// An owner pause or kill can land between the read above and the
-			// initialization; the agent is then skipped as if it was not running.
-			if state, stateErr := r.opts.Store.AgentState(ctx, r.opts.Template.ID); stateErr != nil || state.Status == "running" {
-				return err
-			}
-		}
-	}
-	if err = playbook.Process(ctx, r.opts.Store, r.opts.Template.ID, r.opts.Template.MinEffect, now, r.opts.Logger); err != nil {
 		return err
 	}
 	ids, err := r.opts.Store.RecoverWakes(ctx, r.opts.Template.ID, now, r.fallback(now))
@@ -294,7 +269,7 @@ func (r *Runtime) startWake(ctx context.Context, now time.Time) (WakeResult, err
 	})
 }
 
-// PhaseDue reports the next dream or study instant for this agent. A returned
+// PhaseDue reports the next dream instant for this agent. A returned
 // instant in the past is a missed occurrence and may run once on this start.
 func (r *Runtime) PhaseDue(ctx context.Context, now time.Time) (time.Time, string, string, bool, error) {
 	type candidate struct {
@@ -315,23 +290,6 @@ func (r *Runtime) PhaseDue(ctx context.Context, now time.Time) (time.Time, strin
 			candidates = append(candidates, candidate{due, store.WakeDream, key})
 		}
 	}
-	if r.schedule.StudyEnabled() {
-		last, ok, err := r.opts.Store.LastPhaseWake(ctx, r.opts.Template.ID, store.WakeStudy)
-		if err != nil {
-			return time.Time{}, "", "", false, err
-		}
-		if !ok {
-			last = time.Time{}
-		}
-		if due, key, enabled := r.schedule.StudyDue(now, last); enabled {
-			candidates = append(candidates, candidate{due, store.WakeStudy, key})
-		}
-		if due, spike, err := r.opportunisticStudyDue(ctx, now); err != nil {
-			return time.Time{}, "", "", false, err
-		} else if spike {
-			candidates = append(candidates, candidate{due, store.WakeStudy, "opp-" + now.UTC().Format("20060102T150405")})
-		}
-	}
 	if len(candidates) == 0 {
 		return time.Time{}, "", "", false, nil
 	}
@@ -344,7 +302,7 @@ func (r *Runtime) PhaseDue(ctx context.Context, now time.Time) (time.Time, strin
 	return best.due, best.kind, best.key, true, nil
 }
 
-// RunPhase executes one dream or study occurrence. It never changes the agent's
+// RunPhase executes one dream occurrence. It never changes the agent's
 // normal next wake; the durable phase key makes a repeat a no-op.
 func (r *Runtime) RunPhase(ctx context.Context, kind, phaseKey string) (WakeResult, error) {
 	state, err := r.opts.Store.AgentState(ctx, r.opts.Template.ID)
@@ -432,10 +390,6 @@ func (r *Runtime) execute(ctx context.Context, wake WakeResult, phase string, ca
 		}
 		r.browserEvent(closeCtx, phase, logging.BrowserClose, result.ID, closeOutcome, closeReason, closing)
 	}()
-	embedder, err := r.embedder(phase, capUSD)
-	if err != nil {
-		return result, err
-	}
 	hidden, err := r.opts.Store.RefusedTools(ctx, r.opts.Template.ID, r.opts.Now())
 	if err != nil {
 		return result, err
@@ -444,7 +398,7 @@ func (r *Runtime) execute(ctx context.Context, wake WakeResult, phase string, ca
 	if reviewer.Ideas == nil {
 		hidden = append(hidden, "ideas") // no writer block: the wake text must not name the tool
 	}
-	dispatcher, err := tools.NewDispatcher(tools.Options{Hidden: hidden, Scope: guard.Scope{Store: r.opts.Store, Template: r.opts.Template, OwnUsernames: r.opts.OwnUsernames, WakeID: result.ID, Phase: phase, Now: r.opts.Now, Logger: r.opts.Logger, AllowLive: r.canPublish, Critic: reviewer.Critic, Writer: reviewer.Writer, Ideas: reviewer.Ideas, Sleep: r.opts.Wait}, Embedder: embedder, FetchTrends: r.opts.FetchTrends, FetchStudy: r.opts.FetchStudy, SearchWeb: r.opts.SearchWeb, Owner: r.opts.Owner, Threads: backend, Redactor: r.redactor(), EvidenceDir: r.opts.EvidenceDir})
+	dispatcher, err := tools.NewDispatcher(tools.Options{Hidden: hidden, Scope: guard.Scope{Store: r.opts.Store, Template: r.opts.Template, OwnUsernames: r.opts.OwnUsernames, WakeID: result.ID, Phase: phase, Now: r.opts.Now, Logger: r.opts.Logger, AllowLive: r.canPublish, Critic: reviewer.Critic, Writer: reviewer.Writer, Ideas: reviewer.Ideas, Sleep: r.opts.Wait}, FetchTrends: r.opts.FetchTrends, SearchWeb: r.opts.SearchWeb, Owner: r.opts.Owner, Threads: backend, Redactor: r.redactor(), EvidenceDir: r.opts.EvidenceDir})
 	if err != nil {
 		return result, err
 	}
@@ -472,14 +426,6 @@ func (r *Runtime) execute(ctx context.Context, wake WakeResult, phase string, ca
 	} else if section != "" {
 		messages[1].Content = section + messages[1].Content
 	}
-	if phase == guard.PhaseStudy {
-		// Harness-owned sampling: bounded, paced, read-only, guard-audited.
-		// A failure never stops the wake.
-		if _, sampleErr := r.sampleThreads(ctx, dispatcher.Dispatch); sampleErr != nil {
-			r.event(ctx, phase, logging.TrendsSampled, "error", "sample_failed", result.ID, 0)
-		}
-	}
-	messages = r.withRecall(ctx, phase, result.ID, embedder, r.withBrief(ctx, phase, messages))
 	var stopCheck func(called map[string]bool, succeeded map[string]int) string
 	if phase == guard.PhaseAgent {
 		board, boardErr := r.scoreboard(ctx, r.opts.Now())
@@ -514,28 +460,6 @@ func (r *Runtime) execute(ctx context.Context, wake WakeResult, phase string, ca
 		}
 	}
 	return result, nil
-}
-
-// embedder builds the wake's embedding client. It spends under the wake's
-// phase and cap, like the chat client.
-func (r *Runtime) embedder(phase string, capUSD float64) (*llm.Embedder, error) {
-	key := r.opts.Template.EmbeddingAPIKey
-	base := r.opts.EmbeddingBaseURL
-	if base == "" {
-		base = llm.EmbeddingBaseURL
-	}
-	return llm.NewEmbedder(base, key, r.opts.Template.Limits, r.opts.Store, llm.Options{Logger: r.opts.Logger, Now: r.opts.Now, HTTPClient: r.opts.HTTPClient, Phase: phase, CapUSD: capUSD})
-}
-
-// BackfillEmbeddings embeds the agent's notes and actions that have no vector.
-// It runs once at startup and bills the agent phase.
-func (r *Runtime) BackfillEmbeddings(ctx context.Context) error {
-	embedder, err := r.embedder(guard.PhaseAgent, 0)
-	if err != nil {
-		return err
-	}
-	_, err = embedder.Sync(ctx, r.opts.Template.ID, 0)
-	return err
 }
 
 func wakeEndReason(err error) string {
@@ -590,8 +514,8 @@ type Work struct {
 	PhaseKey string
 }
 
-// NextWork returns the earliest of the agent's wake, metric job, dream, study
-// and session check. ok is false for an agent that is not running.
+// NextWork returns the earliest of the agent's wake, metric job, dream and
+// session check. ok is false for an agent that is not running.
 func (r *Runtime) NextWork(ctx context.Context, now time.Time) (Work, bool, error) {
 	state, err := r.opts.Store.AgentState(ctx, r.opts.Template.ID)
 	if err != nil {
@@ -823,7 +747,7 @@ func (s Scheduler) Run(ctx context.Context, once bool) error {
 				return nil
 			}
 			continue
-		case "dream", "study":
+		case "dream":
 			if _, err := selected.Runtime.RunPhase(ctx, selected.Kind, selected.PhaseKey); err != nil {
 				if errors.Is(err, ErrNotRunning) || errors.Is(err, ErrProfileHeld) || errors.Is(err, store.ErrPhaseAlreadyRan) {
 					continue
@@ -950,9 +874,6 @@ func NewReviewer(o ReviewerOptions, wakeID int64) Reviewer {
 			}
 			in.Angle, in.Fact, in.Parent = redact(in.Angle), redact(in.Fact), redact(in.Parent)
 			in.Draft, in.Problems, in.Recent = redactAll(in.Draft), redactAll(in.Problems), redactAll(in.Recent)
-			if in.Learned, err = o.Store.BestOwn(ctx, t.ID, in.Kind, o.Now().AddDate(0, 0, -30)); err != nil {
-				return nil, err
-			}
 			draft := write
 			if in.Kind == quality.Post {
 				draft = writePost

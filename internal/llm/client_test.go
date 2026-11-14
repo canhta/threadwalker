@@ -554,15 +554,14 @@ func TestInvalidLedgerCostFailsClosed(t *testing.T) {
 	}
 }
 
-func TestClientRedactsRedditCredentialsFromTranscript(t *testing.T) {
-	const id, secret = "reddit-id-canary", "reddit-secret-canary"
+func TestClientRedactsConfiguredSecretsFromTranscript(t *testing.T) {
+	const id, secret = "id-canary", "secret-canary"
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte(`{"choices":[{"message":{"role":"assistant","content":"echo ` + id + ` ` + secret + `"},"finish_reason":"stop"}],"usage":{"prompt_tokens":1,"completion_tokens":1}}`))
 	}))
 	defer server.Close()
-	var study config.StudyConfig
-	study.RedditClientID, study.RedditClientSecret = config.NewSecret(id), config.NewSecret(secret)
-	client, err := llm.New(config.LLMConfig{BaseURL: server.URL, Model: "test", APIKey: config.NewSecret("key")}, config.LimitsConfig{MaxStepsPerWake: 3, MaxUSDPerDay: 1}, &memoryLedger{}, llm.Options{Redactor: config.NewRedactor(study)})
+	secrets := struct{ ID, Secret config.Secret }{config.NewSecret(id), config.NewSecret(secret)}
+	client, err := llm.New(config.LLMConfig{BaseURL: server.URL, Model: "test", APIKey: config.NewSecret("key")}, config.LimitsConfig{MaxStepsPerWake: 3, MaxUSDPerDay: 1}, &memoryLedger{}, llm.Options{Redactor: config.NewRedactor(secrets)})
 	if err != nil {
 		t.Fatal(err)
 	}

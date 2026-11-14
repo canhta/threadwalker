@@ -132,10 +132,8 @@ func newBrowserHarnessWithLogger(t *testing.T, dryRun bool, logger *slog.Logger,
 			MinMinutesBetweenWakes:   15,
 		},
 	}
-	opts := tools.Options{Embedder: testEmbedder(t, st), Scope: guard.Scope{Store: st, Template: tmpl, WakeID: 1, Now: func() time.Time { return ho.now }, Logger: logger, AllowLive: !dryRun}, Threads: ho.backend, FetchTrends: func(context.Context) ([]trends.Trend, error) {
+	opts := tools.Options{Scope: guard.Scope{Store: st, Template: tmpl, WakeID: 1, Now: func() time.Time { return ho.now }, Logger: logger, AllowLive: !dryRun}, Threads: ho.backend, FetchTrends: func(context.Context) ([]trends.Trend, error) {
 		return []trends.Trend{{Source: "synthetic", Title: "synthetic-trend", URL: "https://example.test/trend"}}, nil
-	}, FetchStudy: func(context.Context) (trends.StudyFeed, error) {
-		return trends.StudyFeed{Items: []trends.Trend{{Source: "synthetic", Title: "synthetic-study", URL: "https://example.test/study"}}}, nil
 	}}
 	for _, apply := range mutate {
 		apply(&opts)
@@ -153,7 +151,11 @@ func newBrowserHarnessWithLogger(t *testing.T, dryRun bool, logger *slog.Logger,
 
 func (h *browserHarness) call(name, args string) (string, error) {
 	h.calls++
-	return h.dispatch.Dispatch(context.Background(), llm.ToolCall{
+	run := h.dispatch.Dispatch
+	if name == "read_own_metrics" {
+		run = h.dispatch.DispatchHarness
+	}
+	return run(context.Background(), llm.ToolCall{
 		ID:       fmt.Sprintf("browser-call-%d", h.calls),
 		Type:     "function",
 		Function: llm.CallFunction{Name: name, Arguments: args},

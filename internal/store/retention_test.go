@@ -53,8 +53,7 @@ type ageCase struct {
 }
 
 var ageCases = []ageCase{
-	{"trend_stories", `INSERT INTO trend_stories(agent_id,observed_at,phase,source,title,url) VALUES(?,?,'study','s','t','u')`, `SELECT COUNT(*) FROM trend_stories WHERE agent_id=?`, 7 * 24 * time.Hour},
-	{"threads_observations", `INSERT INTO threads_observations(agent_id,post_url,author,text_hash,snippet,kind,keyword,observed_at) VALUES(?,'u','au',?,'sn','feed','',?)`, `SELECT COUNT(*) FROM threads_observations WHERE agent_id=?`, 8 * 24 * time.Hour},
+	{"trend_stories", `INSERT INTO trend_stories(agent_id,observed_at,source,title,url) VALUES(?,?,'s','t','u')`, `SELECT COUNT(*) FROM trend_stories WHERE agent_id=?`, 7 * 24 * time.Hour},
 	{"tool_calls", `INSERT INTO tool_calls(agent_id,wake_id,tool,args_json,at) VALUES(?,1,'t','{}',?)`, `SELECT COUNT(*) FROM tool_calls WHERE agent_id=?`, 90 * 24 * time.Hour},
 	{"wakes", `INSERT INTO wakes(agent_id,started_at,ended_at) VALUES(?,'2000-01-01T00:00:00Z',?)`, `SELECT COUNT(*) FROM wakes WHERE agent_id=?`, 90 * 24 * time.Hour},
 	{"owner_msgs", `INSERT INTO owner_msgs(agent_id,direction,text,at) VALUES(?,'in','x',?)`, `SELECT COUNT(*) FROM owner_msgs WHERE agent_id=?`, 90 * 24 * time.Hour},
@@ -64,10 +63,6 @@ var ageCases = []ageCase{
 
 func insertAged(t *testing.T, s *store.Store, c ageCase, agent string, at time.Time) {
 	t.Helper()
-	if c.name == "threads_observations" {
-		exec(t, s, c.insert, agent, strings.Repeat("0", 64), stamp(at))
-		return
-	}
 	exec(t, s, c.insert, agent, stamp(at))
 }
 
@@ -107,7 +102,7 @@ func TestPruneTrendStoriesRowCapPerAgent(t *testing.T) {
 	s, _ := retentionStore(t)
 	insert := func(agent string, n int) {
 		for i := 0; i < n; i++ {
-			exec(t, s, `INSERT INTO trend_stories(agent_id,observed_at,phase,source,title,url) VALUES(?,?,'study','s',?,'u')`, agent, stamp(retentionNow.Add(-time.Duration(i)*time.Second)), fmt.Sprint(i))
+			exec(t, s, `INSERT INTO trend_stories(agent_id,observed_at,source,title,url) VALUES(?,?,'s',?,'u')`, agent, stamp(retentionNow.Add(-time.Duration(i)*time.Second)), fmt.Sprint(i))
 		}
 	}
 	insert("a", 503)
@@ -175,7 +170,7 @@ func TestPruneContacts(t *testing.T) {
 
 func TestPruneIsIdempotent(t *testing.T) {
 	s, _ := retentionStore(t)
-	insertAged(t, s, ageCases[2], "a", retentionNow.Add(-91*24*time.Hour))
+	insertAged(t, s, ageCases[1], "a", retentionNow.Add(-91*24*time.Hour))
 	if prune(t, s)["tool_calls"] != 1 || prune(t, s)["tool_calls"] != 0 {
 		t.Fatal("second prune deleted rows")
 	}

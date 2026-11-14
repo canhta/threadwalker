@@ -154,8 +154,7 @@ func runRuntime(ctx context.Context, args []string, getenv func(string) string, 
 		if *offline {
 			tmpl.LLM.BaseURL = "https://fixture.invalid"
 			tmpl.LLM.APIKey = config.NewSecret("offline-dummy-key")
-			tmpl.EmbeddingAPIKey = config.NewSecret("offline-dummy-key")
-			tmpl.Study.WebSearchBaseURL = "https://fixture.invalid"
+			tmpl.WebSearch.BaseURL = "https://fixture.invalid"
 		}
 		opts := agent.Options{Tokens: tokens, EvidenceDir: filepath.Join(filepath.Dir(*common.db), "evidence"), Store: st, Template: tmpl, OwnUsernames: ownUsernames, Logger: logger, Now: now, Wait: wait, Redactor: redactor, SearchWeb: trends.NewWebSearcher(client), TokenMissing: tokenMissingNotice(st, oauth, now, logger)}
 		opts.ProfileHeld = cookies.Held
@@ -166,26 +165,18 @@ func runRuntime(ctx context.Context, args []string, getenv func(string) string, 
 			fixture := agent.NewOfflineFixture(now)
 			opts.HTTPClient = fixture.Client()
 			opts.FetchTrends = fixture.Trends
-			opts.FetchStudy = fixture.Study
 			opts.SearchWeb = trends.NewWebSearcher(fixture.Client())
-			opts.EmbeddingBaseURL = "https://fixture.invalid"
 		} else {
 			opts.FetchTrends = func(ctx context.Context) ([]trends.Trend, error) {
 				return trends.FetchTrends(ctx, trends.TrendsOptions{HTTPClient: client})
 			}
 			if len(tmpl.Trends.Sources) > 0 {
-				wake := trends.StudySourcesFromTemplate(tmpl)
-				wake.HTTPClient = client
-				wake.Sources = tmpl.Trends.Sources
+				sources := trends.SourcesFromTemplate(tmpl)
+				sources.HTTPClient = client
 				opts.FetchTrends = func(ctx context.Context) ([]trends.Trend, error) {
-					feed, err := trends.FetchStudySources(ctx, wake)
+					feed, err := trends.FetchSources(ctx, sources)
 					return feed.Items, err
 				}
-			}
-			study := trends.StudySourcesFromTemplate(tmpl)
-			study.HTTPClient = client
-			opts.FetchStudy = func(ctx context.Context) (trends.StudyFeed, error) {
-				return trends.FetchStudySources(ctx, study)
 			}
 		}
 		runtime, err := agent.New(opts)
@@ -194,7 +185,6 @@ func runRuntime(ctx context.Context, args []string, getenv func(string) string, 
 			return exitFailure
 		}
 		runtimes = append(runtimes, runtime)
-		_ = runtime.BackfillEmbeddings(ctx)
 	}
 	// Owner polling has its own lifetime. A wake, browser cleanup or scheduler
 	// error must never cancel the Telegram poller through a shared cancel func;

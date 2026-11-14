@@ -84,20 +84,3 @@ func TestDashboardCLIFailuresDoNotExposeConfigurationOrPaths(t *testing.T) {
 		}
 	}
 }
-
-func TestDashboardCLIContentModeNeedsAToken(t *testing.T) {
-	dbPath := filepath.Join(t.TempDir(), "existing.db")
-	st, err := store.Open(context.Background(), dbPath)
-	if err != nil {
-		t.Fatal(err)
-	}
-	st.Close()
-	var out, errs bytes.Buffer
-	code := run(context.Background(), []string{"dashboard", "-agents", filepath.Join("..", "..", "templates"), "-db", dbPath, "-content"}, func(string) string { return "" }, &out, &errs)
-	if code != exitFailure || !strings.Contains(errs.String(), "THREADZ_DASHBOARD_TOKEN") {
-		t.Fatalf("content without token: code %d stderr %q", code, errs.String())
-	}
-	if strings.Contains(out.String()+errs.String(), "synthetic-token") {
-		t.Fatal("token value reflected")
-	}
-}

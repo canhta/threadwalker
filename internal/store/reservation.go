@@ -18,9 +18,6 @@ func (s *Store) Reserve(ctx context.Context, fn func(ReservationTx) error) error
 	return s.write(ctx, func(conn *sql.Conn) error { return fn(ReservationTx{conn}) })
 }
 
-// Playbook is the playbook view of this same transaction.
-func (t ReservationTx) Playbook() PlaybookTx { return PlaybookTx{t.conn} }
-
 // ReservedAction is one recorded action intent with its stored timestamp text.
 type ReservedAction struct {
 	Agent, Kind, Text, PostedAt, TargetUsername, TargetURL, ThreadURL string
@@ -92,18 +89,9 @@ func (t ReservationTx) DoNotContact(ctx context.Context, agentID, username strin
 	return dnc, nil
 }
 
-// TestingHypothesis reports whether the agent has a playbook entry in testing.
-func (t ReservationTx) TestingHypothesis(ctx context.Context, agentID string, id int64) (bool, error) {
-	var ok bool
-	if err := t.conn.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM playbook WHERE id=? AND agent_id=? AND status='testing')`, id, agentID).Scan(&ok); err != nil {
-		return false, fmt.Errorf("reading playbook hypothesis: %w", err)
-	}
-	return ok, nil
-}
-
 // NewIntent is one action intent to reserve.
 type NewIntent struct {
-	AgentID, Kind, Text, TargetURL, TargetUsername, HypothesisIDsJSON string
+	AgentID, Kind, Text, TargetURL, TargetUsername string
 	// Hook is the hook type of the first line, or empty. Parts are parts 2.. of a series.
 	Hook  string
 	Parts []string
@@ -116,20 +104,20 @@ type NewIntent struct {
 	CriticJSON string
 	// RootURL is the canonical URL of the root post of the conversation a reply
 	// belongs to; empty for a post.
-	RootURL                  string
-	DryRun, Explore, Browser bool
-	At                       time.Time
-	// TargetScoreJSON and DelayMinutes describe a reply's target; empty and nil
-	// when the target was never observed. TopicHeat and the parent figures are
-	// the posting context the outcome model fits on; nil when not observed.
-	TargetScoreJSON                               string
-	DelayMinutes, ParentReplies, ParentAgeMinutes *int64
-	TopicHeat                                     *float64
+	RootURL         string
+	DryRun, Browser bool
+	At              time.Time
+	// TargetScoreJSON describes a reply's target; empty when it was never read.
+	// TopicHeat and the parent figures are the posting context; nil when not
+	// observed.
+	TargetScoreJSON                 string
+	ParentReplies, ParentAgeMinutes *int64
+	TopicHeat                       *float64
 }
 
 // InsertIntent records the reservation and returns its action id.
 func (t ReservationTx) InsertIntent(ctx context.Context, n NewIntent) (int64, error) {
-	res, err := t.conn.ExecContext(ctx, `INSERT INTO actions(agent_id,kind,text,target_url,target_username,hypothesis_ids_json,dry_run,posted_at,thread_url,explore,target_score_json,delay_minutes,topic_heat,followers_at_post,parent_replies,parent_age_minutes,hook,rationale,browser,trend_ref,answers_note,critic_json,root_url) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,(SELECT followers FROM account_followers WHERE agent_id=?),?,?,?,?,?,?,?,?,?)`, n.AgentID, n.Kind, n.Text, n.TargetURL, n.TargetUsername, n.HypothesisIDsJSON, n.DryRun, n.At.Format(time.RFC3339Nano), "", n.Explore, n.TargetScoreJSON, n.DelayMinutes, n.TopicHeat, n.AgentID, n.ParentReplies, n.ParentAgeMinutes, n.Hook, n.Rationale, n.Browser, n.TrendRef, n.AnswersNote, n.CriticJSON, n.RootURL)
+	res, err := t.conn.ExecContext(ctx, `INSERT INTO actions(agent_id,kind,text,target_url,target_username,dry_run,posted_at,thread_url,target_score_json,topic_heat,followers_at_post,parent_replies,parent_age_minutes,hook,rationale,browser,trend_ref,answers_note,critic_json,root_url) VALUES(?,?,?,?,?,?,?,?,?,?,(SELECT followers FROM account_followers WHERE agent_id=?),?,?,?,?,?,?,?,?,?)`, n.AgentID, n.Kind, n.Text, n.TargetURL, n.TargetUsername, n.DryRun, n.At.Format(time.RFC3339Nano), "", n.TargetScoreJSON, n.TopicHeat, n.AgentID, n.ParentReplies, n.ParentAgeMinutes, n.Hook, n.Rationale, n.Browser, n.TrendRef, n.AnswersNote, n.CriticJSON, n.RootURL)
 	if err != nil {
 		return 0, fmt.Errorf("reserving action intent: %w", err)
 	}
@@ -143,15 +131,6 @@ func (t ReservationTx) InsertIntent(ctx context.Context, n NewIntent) (int64, er
 		}
 	}
 	return id, nil
-}
-
-// ExploreCounts counts the agent's newest limit actions and how many were explore actions.
-func (t ReservationTx) ExploreCounts(ctx context.Context, agentID string, limit int) (total, explored int, err error) {
-	err = t.conn.QueryRowContext(ctx, `SELECT COUNT(*), COALESCE(SUM(explore),0) FROM (SELECT explore FROM actions WHERE agent_id=? ORDER BY id DESC LIMIT ?)`, agentID, limit).Scan(&total, &explored)
-	if err != nil {
-		err = fmt.Errorf("reading explore counts: %w", err)
-	}
-	return
 }
 
 // MarkBlocked records why an audited attempt was refused.

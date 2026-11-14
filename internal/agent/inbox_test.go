@@ -38,7 +38,7 @@ func newInboxRig(t *testing.T, poll int) *inboxRig {
 	tmpl.Inbox = config.InboxConfig{PollMinutes: poll, MinMinutesAfterWake: 5}
 	fixture := agent.NewOfflineFixture(func() time.Time { return rig.now })
 	rig.fixture = fixture
-	rig.r, err = agent.New(agent.Options{Store: st, Template: tmpl, Now: func() time.Time { return rig.now }, HTTPClient: fixture.Client(), FetchTrends: fixture.Trends, FetchStudy: fixture.Study,
+	rig.r, err = agent.New(agent.Options{Store: st, Template: tmpl, Now: func() time.Time { return rig.now }, HTTPClient: fixture.Client(), FetchTrends: fixture.Trends,
 		OwnUsernames:   []string{"synthetic_offline"},
 		ThreadsFactory: func(context.Context, config.Template) (threads.Backend, error) { return rig.mem, nil }})
 	if err != nil {

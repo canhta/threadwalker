@@ -14,11 +14,9 @@ import (
 	"github.com/canhta/threadz/internal/trends"
 )
 
-// evalTrends and evalStudy satisfy dispatcher construction in scenarios that
-// never request outside content.
+// evalTrends satisfies dispatcher construction in scenarios that never request
+// outside content.
 func evalTrends(context.Context) ([]trends.Trend, error) { return []trends.Trend{}, nil }
-
-func evalStudy(context.Context) (trends.StudyFeed, error) { return trends.StudyFeed{}, nil }
 
 // caseRun is the setup every component runner shares: a temp directory, a
 // captured logger, the store and the result being filled in. The runner owns a

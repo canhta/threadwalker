@@ -20,7 +20,6 @@ func runDashboard(ctx context.Context, args []string, getenv func(string) string
 	fs.SetOutput(io.Discard)
 	common := addCommonFlags(fs, getenv, "data/threadz.db")
 	listen := fs.String("listen", "127.0.0.1:8080", "numeric loopback listen address")
-	content := fs.Bool("content", false, "show private notes and lessons")
 	rate := fs.Float64("rate", 0, "per-client requests per second (0 uses the safe default)")
 	burst := fs.Int("burst", 0, "per-client burst (0 uses the safe default)")
 	maxConcurrent := fs.Int("max-concurrent", 0, "concurrent renders (0 uses the safe default)")
@@ -63,14 +62,6 @@ func runDashboard(ctx context.Context, args []string, getenv func(string) string
 		}
 		selected = append(selected, dashboard.Agent{ID: t.ID, Username: t.Threads.Username, DryRun: t.DryRun, DailyBudgetUSD: t.Limits.MaxUSDPerDay, Timezone: tz, Limits: t.Limits})
 	}
-	var token string
-	if *content {
-		token = strings.TrimSpace(getenv("THREADZ_DASHBOARD_TOKEN"))
-		if token == "" {
-			fmt.Fprintln(stderr, "dashboard content mode requires THREADZ_DASHBOARD_TOKEN")
-			return exitFailure
-		}
-	}
 	openCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
 	st, err := store.OpenReadOnly(openCtx, *common.db)
 	cancel()
@@ -79,7 +70,7 @@ func runDashboard(ctx context.Context, args []string, getenv func(string) string
 		return exitFailure
 	}
 	defer st.Close()
-	options := dashboard.Options{Source: st, Agents: selected, Now: time.Now, Logger: logger, Content: *content, ContentToken: token, RatePerSec: *rate, RateBurst: *burst, MaxConcurrent: *maxConcurrent}
+	options := dashboard.Options{Source: st, Agents: selected, Now: time.Now, Logger: logger, RatePerSec: *rate, RateBurst: *burst, MaxConcurrent: *maxConcurrent}
 	handler, err := dashboard.New(options)
 	if err != nil {
 		fmt.Fprintln(stderr, "dashboard public configuration is invalid")

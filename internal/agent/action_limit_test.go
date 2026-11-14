@@ -3,6 +3,7 @@ package agent_test
 import (
 	"context"
 	"path/filepath"
+	"slices"
 	"testing"
 	"time"
 
@@ -22,8 +23,8 @@ func TestDailyActionLimitStopsWakeBeforeFurtherTools(t *testing.T) {
 	tmpl := agent.OfflineTemplate()
 	tmpl.Limits.PostsPerDay = 1
 	fixture := agent.NewOfflineFixture(func() time.Time { return now })
-	fixture.Calls = []llm.ToolCall{agent.SyntheticCall("post", `{"text":"synthetic cap boundary"}`), agent.SyntheticCall("post", `{"text":"synthetic refused boundary"}`), agent.SyntheticCall("note_write", `{"text":"must not run after daily cap"}`)}
-	runtime, err := agent.New(agent.Options{Store: st, Template: tmpl, Now: func() time.Time { return now }, HTTPClient: fixture.Client(), FetchTrends: fixture.Trends, FetchStudy: fixture.Study})
+	fixture.Calls = []llm.ToolCall{agent.SyntheticCall("post", `{"text":"synthetic cap boundary"}`), agent.SyntheticCall("post", `{"text":"synthetic refused boundary"}`), agent.SyntheticCall("fetch_trends", `{}`)}
+	runtime, err := agent.New(agent.Options{Store: st, Template: tmpl, Now: func() time.Time { return now }, HTTPClient: fixture.Client(), FetchTrends: fixture.Trends})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -34,8 +35,8 @@ func TestDailyActionLimitStopsWakeBeforeFurtherTools(t *testing.T) {
 	if err != nil || wake.EndReason != "action_limit" {
 		t.Fatalf("wake %+v err %v", wake, err)
 	}
-	index, err := st.MemoryIndex(ctx, tmpl.ID, false)
-	if err != nil || len(index) != 0 {
-		t.Fatalf("continued after cap %v %v", index, err)
+	calls, err := st.ToolCallNames(ctx, tmpl.ID, wake.ID)
+	if err != nil || slices.Contains(calls, "fetch_trends") {
+		t.Fatalf("continued after cap %v %v", calls, err)
 	}
 }

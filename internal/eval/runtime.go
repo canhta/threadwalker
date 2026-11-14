@@ -67,7 +67,7 @@ func runRuntimeCase(ctx context.Context, c Case, p Profile, repeat int, opts Opt
 		}
 	}
 	create := func() (*agent.Runtime, error) {
-		return agent.New(agent.Options{Store: st, Template: tmpl, Now: func() time.Time { return now }, HTTPClient: fixture.Client(), FetchTrends: fixture.Trends, FetchStudy: fixture.Study, Logger: logger})
+		return agent.New(agent.Options{Store: st, Template: tmpl, Now: func() time.Time { return now }, HTTPClient: fixture.Client(), FetchTrends: fixture.Trends, Logger: logger})
 	}
 	runtime, err := create()
 	if err != nil {
@@ -81,7 +81,7 @@ func runRuntimeCase(ctx context.Context, c Case, p Profile, repeat int, opts Opt
 		if err != nil {
 			return r
 		}
-		d, err := tools.NewDispatcher(tools.Options{Scope: guard.Scope{Store: st, Template: tmpl, WakeID: id, Now: func() time.Time { return now }, Logger: logger}, Threads: threads.NewMemory(), FetchTrends: fixture.Trends, FetchStudy: fixture.Study, Embedder: offlineEmbedder(st, tmpl, func() time.Time { return now }, logger)})
+		d, err := tools.NewDispatcher(tools.Options{Scope: guard.Scope{Store: st, Template: tmpl, WakeID: id, Now: func() time.Time { return now }, Logger: logger}, Threads: threads.NewMemory(), FetchTrends: fixture.Trends})
 		if err != nil {
 			return r
 		}
@@ -146,21 +146,14 @@ func runRuntimeCase(ctx context.Context, c Case, p Profile, repeat int, opts Opt
 	if tally, err := st.ActionTally(ctx, ""); err != nil || tally.DryRun != c.Runtime.ExpectedActions {
 		return fail("dry_run_actions_mismatch")
 	}
-	if c.Runtime.ExpectedNote != "" {
-		messages, err := runtime.Context(ctx, "agent")
-		topics, topicsErr := st.TopicList(ctx, tmpl.ID, tmpl.DryRun)
-		if err != nil || topicsErr != nil || len(topics) != 1 || topics[0].Description != c.Runtime.ExpectedNote || !strings.Contains(messages[1].Content, c.Runtime.ExpectedNote) {
-			return fail("topic_note_missing")
-		}
-	}
 	if c.Runtime.ExpectedBlocked != "" && !sawBlocked {
 		return fail("blocked_result_missing")
 	}
 	if c.Runtime.CheckUntrusted && (wrapped != len(c.Runtime.Calls) || invalidEnvelope) {
 		return fail("untrusted_envelope_missing")
 	}
-	for _, s := range []string{"eval-runtime-dummy-key", "Synthetic interrupted action.", "https://synthetic.invalid", c.Runtime.ExpectedNote} {
-		if s != "" && strings.Contains(logs.String(), s) {
+	for _, s := range []string{"eval-runtime-dummy-key", "Synthetic interrupted action.", "https://synthetic.invalid"} {
+		if strings.Contains(logs.String(), s) {
 			return fail("log_payload_leak")
 		}
 	}

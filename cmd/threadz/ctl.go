@@ -11,7 +11,6 @@ import (
 	"io"
 	"net/http"
 	"os"
-	"strconv"
 	"strings"
 	"time"
 
@@ -34,13 +33,11 @@ const ctlUsage = `usage: threadz ctl <command> [flags]
 
 Commands talk to the running service over its admin socket:
   status [--agent ID]                       state, next wake, spend, last wake, health
-  wake --agent ID [--phase agent|dream|study] [--dry-run]
+  wake --agent ID [--phase agent|dream] [--dry-run]
   pause|resume|kill --agent ID
   metrics run --agent ID                    measure the targets that are due now
   prune                                     apply the retention table now
   trends refresh --agent ID
-  memory restore <journal-id> --agent ID   put an archived memory entry back (ids are on the dashboard)
-  strategy revert --agent ID [--to REVISION]  restore an earlier strategy revision as a new one (default: the one before the newest)
   threads connect --agent ID                send the owner a one-time link to authorize Threads
   threads cookies --agent ID                import a cookie export (JSON or Cookie header) read from stdin into the Threads browser profile
   context --agent ID [--phase P]            the exact messages the next wake sends
@@ -118,10 +115,6 @@ func runCtl(ctx context.Context, args []string, getenv func(string) string, stdo
 		return ctlMaintenance(ctx, getenv, admin.TrendsRefresh, true, rest[1:], stdout, stderr)
 	case "prune":
 		return ctlMaintenance(ctx, getenv, admin.Prune, false, rest, stdout, stderr)
-	case "memory":
-		return ctlMemoryRestore(ctx, getenv, rest, stdout, stderr)
-	case "strategy":
-		return ctlStrategyRevert(ctx, getenv, rest, stdout, stderr)
 	case "threads":
 		if len(rest) > 0 && rest[0] == "cookies" {
 			return ctlCookies(ctx, getenv, rest[1:], stdout, stderr, deps)
@@ -237,15 +230,15 @@ func writeHealth(w io.Writer, results []healthResult, indent string) {
 
 func ctlWake(ctx context.Context, getenv func(string) string, args []string, stdout, stderr io.Writer) int {
 	f := newCtlFlags("wake", getenv)
-	phase := f.fs.String("phase", "agent", "agent, dream or study")
+	phase := f.fs.String("phase", "agent", "agent or dream")
 	dry := f.fs.Bool("dry-run", false, "force dry-run writes for this wake only")
 	if _, ok := f.parse(args, true, stderr); !ok {
 		return exitUsage
 	}
 	switch *phase {
-	case "agent", "dream", "study":
+	case "agent", "dream":
 	default:
-		return ctlUsageError(stderr, "--phase is agent, dream or study")
+		return ctlUsageError(stderr, "--phase is agent or dream")
 	}
 	return ctlCall(ctx, f, admin.Request{Command: admin.Wake, Agent: *f.agent, Phase: *phase, DryRun: *dry}, stdout, stderr, func(w io.Writer, o wakeOutcome) {
 		fmt.Fprintf(w, "%s %s wake #%d ended: %s after %d steps (dry run: %t)\n", o.Agent, o.Phase, o.WakeID, o.EndReason, o.Steps, o.DryRun)
@@ -295,39 +288,9 @@ func ctlCookies(ctx context.Context, getenv func(string) string, args []string, 
 	})
 }
 
-func ctlMemoryRestore(ctx context.Context, getenv func(string) string, args []string, stdout, stderr io.Writer) int {
-	f := newCtlFlags("memory restore", getenv)
-	if len(args) < 2 || args[0] != "restore" {
-		return ctlUsageError(stderr, "memory takes restore <journal-id>")
-	}
-	rest, ok := f.parse(args[2:], true, stderr)
-	id, err := strconv.ParseInt(args[1], 10, 64)
-	if !ok || len(rest) != 0 || err != nil || id < 1 {
-		return ctlUsageError(stderr, "memory restore takes one journal id")
-	}
-	return ctlCall(ctx, f, admin.Request{Command: admin.MemoryRestore, Agent: *f.agent, ID: id}, stdout, stderr, func(w io.Writer, o maintenanceOutcome) {
-		fmt.Fprintf(w, "restored journal row %d\n", id)
-	})
-}
-
-func ctlStrategyRevert(ctx context.Context, getenv func(string) string, args []string, stdout, stderr io.Writer) int {
-	f := newCtlFlags("strategy revert", getenv)
-	to := f.fs.Int64("to", 0, "revision to restore; default the one before the newest")
-	if len(args) < 1 || args[0] != "revert" {
-		return ctlUsageError(stderr, "strategy takes the subcommand revert")
-	}
-	rest, ok := f.parse(args[1:], true, stderr)
-	if !ok || len(rest) != 0 || *to < 0 {
-		return ctlUsageError(stderr, "strategy revert takes --agent and optionally --to REVISION")
-	}
-	return ctlCall(ctx, f, admin.Request{Command: admin.StrategyRevert, Agent: *f.agent, ID: *to}, stdout, stderr, func(w io.Writer, o maintenanceOutcome) {
-		fmt.Fprintf(w, "strategy restored as revision %d\n", o.Count)
-	})
-}
-
 func ctlContext(ctx context.Context, getenv func(string) string, args []string, stdout, stderr io.Writer) int {
 	f := newCtlFlags("context", getenv)
-	phase := f.fs.String("phase", "agent", "agent, dream or study")
+	phase := f.fs.String("phase", "agent", "agent or dream")
 	if _, ok := f.parse(args, true, stderr); !ok {
 		return exitUsage
 	}

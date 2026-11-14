@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	"github.com/canhta/threadz/internal/config"
-	"github.com/canhta/threadz/internal/store"
 )
 
 // viralEnv supplies only the inline LLM key the live template names. The test
@@ -68,8 +67,8 @@ func TestLoadFile_ViralTemplate(t *testing.T) {
 	}
 	t.Error("StyleRules do not avoid the tao/mày self-address")
 avoided:
-	if len(tmpl.Persona.ResearchFocus) != 4 {
-		t.Errorf("len(ResearchFocus) = %d, want 4", len(tmpl.Persona.ResearchFocus))
+	if len(tmpl.Persona.ResearchFocus) != 3 {
+		t.Errorf("len(ResearchFocus) = %d, want 3", len(tmpl.Persona.ResearchFocus))
 	}
 	if len(tmpl.Persona.StyleRules) < 5 {
 		t.Errorf("len(StyleRules) = %d, want at least 5", len(tmpl.Persona.StyleRules))
@@ -116,15 +115,6 @@ avoided:
 		if !strings.Contains(forbidden, marker) {
 			t.Errorf("StyleAvoid does not list the lecture marker %q", marker)
 		}
-	}
-	seeds := strings.Join(tmpl.SeedPlaybook, "\n")
-	for _, hook := range store.HookTypes {
-		if !strings.Contains(seeds, "Hook kiểu "+hook+" ") {
-			t.Errorf("SeedPlaybook has no hypothesis for hook type %q", hook)
-		}
-	}
-	if len(tmpl.SeedPlaybook) != len(store.HookTypes)+4 {
-		t.Errorf("len(SeedPlaybook) = %d, want the hook types plus reply, early reply, self-directed and series seeds", len(tmpl.SeedPlaybook))
 	}
 	if !tmpl.Guard.TrendAnchor {
 		t.Error("Guard.TrendAnchor = false, want every viral post to rest on a trend read this wake")
@@ -177,7 +167,7 @@ func TestViralTemplateHasWriterCriticAndNoStartupPersona(t *testing.T) {
 		t.Errorf("writer %+v critic %+v", tmpl.Writer, tmpl.Critic)
 	}
 	raw, _ := os.ReadFile(viralTemplatePath())
-	persona := string(raw)[strings.Index(string(raw), "persona:"):strings.Index(string(raw), "seed_playbook:")]
+	persona := string(raw)[strings.Index(string(raw), "persona:"):strings.Index(string(raw), "\nllm:")]
 	// The rejected live drafts stay in bad_examples; nothing else may push the startup punchline.
 	for _, line := range strings.Split(persona, "\n") {
 		if strings.Contains(strings.ToLower(line), "startup") && !strings.HasPrefix(strings.TrimSpace(line), "- \"") {

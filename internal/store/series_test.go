@@ -22,7 +22,7 @@ func TestSeriesPartsAreReservedWithTheActionAndConfirmedOnce(t *testing.T) {
 	}
 	var id int64
 	err = st.Reserve(ctx, func(tx store.ReservationTx) error {
-		id, err = tx.InsertIntent(ctx, store.NewIntent{AgentID: "a", Kind: "post", Text: "một", Hook: "number", Rationale: "r", Parts: []string{"hai", "ba"}, HypothesisIDsJSON: "[]", At: time.Now()})
+		id, err = tx.InsertIntent(ctx, store.NewIntent{AgentID: "a", Kind: "post", Text: "một", Hook: "number", Rationale: "r", Parts: []string{"hai", "ba"}, At: time.Now()})
 		return err
 	})
 	if err != nil {

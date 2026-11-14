@@ -339,7 +339,7 @@ func (d *Dispatcher) ReconcileUnpublished(ctx context.Context) {
 // latest own follower count. An unreadable count is nil; only cancellation and
 // audit failures are errors.
 func (d *Dispatcher) ReadFollowers(ctx context.Context, id string) (*int64, error) {
-	output, err := d.Dispatch(ctx, llm.ToolCall{ID: id, Type: "function", Function: llm.CallFunction{Name: "read_own_metrics", Arguments: "{}"}})
+	output, err := d.DispatchHarness(ctx, llm.ToolCall{ID: id, Type: "function", Function: llm.CallFunction{Name: "read_own_metrics", Arguments: "{}"}})
 	if err != nil {
 		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) || errors.Is(err, guard.ErrAudit) {
 			return nil, fmt.Errorf("reading followers: %w", err)

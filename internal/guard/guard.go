@@ -27,8 +27,8 @@ type Scope struct {
 	OwnUsernames []string
 	// AllowLive is an operator capability, never a model tool argument.
 	AllowLive bool
-	// Phase is the harness-owned wake phase: agent (default), dream or study.
-	// Dream and study allow only read and note/playbook tools.
+	// Phase is the harness-owned wake phase: agent (default) or dream. The
+	// dream cannot write to Threads, message the owner or change the schedule.
 	Phase    string
 	Store    *store.Store
 	Template config.Template
@@ -131,7 +131,7 @@ func New(opts Scope) (*Guard, error) {
 	if opts.Store == nil || opts.Template.ID == "" || opts.WakeID <= 0 || (!opts.Template.DryRun && !opts.AllowLive) {
 		return nil, errors.New("configuring guard: store, agent, wake and action capability required")
 	}
-	if opts.Phase != "" && opts.Phase != PhaseAgent && opts.Phase != PhaseDream && opts.Phase != PhaseStudy {
+	if opts.Phase != "" && opts.Phase != PhaseAgent && opts.Phase != PhaseDream {
 		return nil, errors.New("configuring guard: unknown wake phase")
 	}
 	if opts.Phase == "" {
@@ -282,10 +282,6 @@ func (g *Guard) Execute(ctx context.Context, a Attempt, effect func() (string, e
 	g.event(ctx, logging.AuditRecorded, "success", "attempt_recorded", a.Tool)
 	if reason == "" && intent != nil {
 		var reserved int64
-		if intent.posting, err = trends.ContextOf(ctx, g.opts.Store, g.opts.Template, g.opts.OwnUsernames, intent.Text, intent.TargetURL, now); err != nil {
-			g.event(ctx, "guard.checked", "error", "reservation_failed", a.Tool)
-			return "", &auditError{err}
-		}
 		g.overlayFacts(&intent.posting, intent, a.Tool)
 		reserved, reason, err = g.reserve(ctx, a, intent, id, now, false)
 		if err == nil && reason == "min_seconds_between_actions" && intent.criticJSON != "" && g.opts.Sleep != nil {
@@ -525,11 +521,10 @@ func (g *Guard) recheck(a Attempt, texts []string) (reason, detail string) {
 const (
 	PhaseAgent = "agent"
 	PhaseDream = "dream"
-	PhaseStudy = "study"
 )
 
 // phaseBlock is the hard phase boundary: a tool runs only in the phases its
-// spec lists, so dream and study cannot write to Threads, message the owner or
+// spec lists, so the dream cannot write to Threads, message the owner or
 // change the schedule. It is enforced here, not by prompting.
 func (g *Guard) phaseBlock(tool string) string {
 	if spec, ok := Spec(tool); ok && spec.AllowedIn(g.opts.Phase) {

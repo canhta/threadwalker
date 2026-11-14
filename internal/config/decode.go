@@ -88,7 +88,6 @@ func (d *decoder) nonEmpty(field string, items []string, what string) {
 func (d *decoder) root(t *Template) {
 	t.ID = d.str("id")
 	t.Goal = d.str("goal")
-	t.SeedPlaybook = d.list("seed_playbook")
 	if raw, ok := d.doc.scalars["dry_run"]; !ok || strings.TrimSpace(raw) == "" {
 		d.fail("dry_run", "required field is missing")
 	} else if b, err := strconv.ParseBool(strings.TrimSpace(raw)); err != nil {
@@ -146,19 +145,6 @@ func (d *decoder) persona(t *Template) {
 // llm reads the inline llm block, the only way a template configures its LLM.
 func (d *decoder) llm(t *Template) {
 	d.llmBlock("llm", &t.LLM)
-}
-
-// review reads the optional review.llm block: the independent model that judges
-// published actions. It must not be the model that writes them.
-func (d *decoder) review(t *Template) {
-	if !d.has("review.llm") {
-		return
-	}
-	t.Review.Enabled = true
-	d.llmBlock("review.llm", &t.Review.LLM)
-	if t.Review.LLM.Model == t.LLM.Model {
-		d.fail("review.llm.model", "must differ from llm.model: the judge is not the agent's own model")
-	}
 }
 
 // critic reads the optional critic.llm block; without it the critic uses the agent's own llm.
@@ -240,19 +226,6 @@ func (d *decoder) limits(t *Template) {
 		l.MaxStepsPerDream = d.posInt("limits.max_steps_per_dream")
 	}
 	l.CriticRejectionsPerWake = d.boundedInt("limits.critic_rejections_per_wake", 2, 1, 20)
-	if d.has("limits.explore_percent") {
-		l.ExplorePercent = d.posInt("limits.explore_percent")
-		if l.ExplorePercent > 100 {
-			d.fail("limits.explore_percent", "must be at most 100")
-		}
-	}
-}
-
-func (d *decoder) learning(t *Template) {
-	t.MinEffect = 0.2
-	if d.has("learning.min_effect") {
-		t.MinEffect = d.float("learning.min_effect", false)
-	}
 }
 
 // kpi reads the optional kpi block; once any key is present all four are required.
@@ -309,16 +282,6 @@ func (d *decoder) schedule(t *Template) {
 			d.fail("schedule.quiet_until", "must differ from quiet_from")
 		}
 	}
-	if d.has("schedule.study_slots") {
-		seen := map[string]bool{}
-		for _, slot := range d.list("schedule.study_slots") {
-			parsed := d.clock("schedule.study_slots", slot)
-			if parsed != "" && !seen[parsed] {
-				t.Schedule.StudySlots = append(t.Schedule.StudySlots, parsed)
-				seen[parsed] = true
-			}
-		}
-	}
 }
 
 func (d *decoder) trends(t *Template) {
@@ -371,10 +334,10 @@ func (d *decoder) boolean(field string) bool {
 	return v
 }
 
-// sourceList reads a list of unique names from StudySourceNames.
+// sourceList reads a list of unique names from SourceNames.
 func (d *decoder) sourceList(field string) []string {
 	known := map[string]bool{}
-	for _, name := range StudySourceNames {
+	for _, name := range SourceNames {
 		known[name] = true
 	}
 	seen := map[string]bool{}
@@ -397,103 +360,43 @@ func (d *decoder) inbox(t *Template) {
 	t.Inbox.MinMinutesAfterWake = d.boundedInt("inbox.min_minutes_after_wake", 5, 1, 1440)
 }
 
-func (d *decoder) study(t *Template) {
-	s := &t.Study
-	if d.has("study.sources") {
-		s.Sources = d.sourceList("study.sources")
-	}
-	s.YouTubeChannels = append([]string{}, DefaultYouTubeChannels...)
-	if d.has("study.youtube_channels") {
-		s.YouTubeChannels = nil
-		for _, channel := range d.list("study.youtube_channels") {
-			if len(channel) < 10 || len(channel) > 64 || strings.ContainsAny(channel, " \t/?#&=\"'<>") {
-				d.fail("study.youtube_channels", "must be a YouTube channel ID")
-				continue
-			}
-			s.YouTubeChannels = append(s.YouTubeChannels, channel)
-		}
-	}
-	s.RedditClientIDEnv = "REDDIT_CLIENT_ID"
-	s.RedditClientSecretEnv = "REDDIT_CLIENT_SECRET"
-	if d.has("study.reddit_client_id_env") {
-		s.RedditClientIDEnv = d.str("study.reddit_client_id_env")
-	}
-	if d.has("study.reddit_client_secret_env") {
-		s.RedditClientSecretEnv = d.str("study.reddit_client_secret_env")
-	}
-	s.MaxThreadsReads = 4
-	if d.has("study.threads_sample.max_reads") {
-		s.MaxThreadsReads = d.posInt("study.threads_sample.max_reads")
-		if s.MaxThreadsReads > 20 {
-			d.fail("study.threads_sample.max_reads", "must be at most 20")
-		}
-	}
-	s.ReadPauseMS = d.boundedInt("study.threads_sample.pause_ms", 1500, 0, 60000)
-	if d.has("study.threads_sample.keywords") {
-		s.ThreadsKeywords = d.list("study.threads_sample.keywords")
-		d.nonEmpty("study.threads_sample.keywords", s.ThreadsKeywords, "keywords")
-	}
-	s.MaxStudiesPerDay = 8
-	if d.has("study.max_sessions_per_day") {
-		s.MaxStudiesPerDay = d.posInt("study.max_sessions_per_day")
-	}
-	s.MinMinutesBetweenStudies = 120
-	if d.has("study.min_minutes_between_sessions") {
-		s.MinMinutesBetweenStudies = d.posInt("study.min_minutes_between_sessions")
-	}
-	s.SpikeMultiplier = 2.0
-	if d.has("study.spike_multiplier") {
-		v, err := strconv.ParseFloat(strings.TrimSpace(d.doc.scalars["study.spike_multiplier"]), 64)
-		if err != nil || v < 1 || v > 20 {
-			d.fail("study.spike_multiplier", "must be a number within 1..20")
-		} else {
-			s.SpikeMultiplier = v
-		}
-	}
-	s.SpikeMinScore = 6
-	if d.has("study.spike_min_score") {
-		s.SpikeMinScore = d.posInt("study.spike_min_score")
-	}
-	d.webSearch(t)
-}
-
 func (d *decoder) webSearch(t *Template) {
-	s := &t.Study
-	s.WebSearch = d.boolean("study.web_search.enabled")
-	s.WebSearchBaseURL = "https://api.openai.com/v1"
-	if d.has("study.web_search.base_url") {
-		raw := strings.TrimSpace(d.doc.scalars["study.web_search.base_url"])
+	s := &t.WebSearch
+	s.Enabled = d.boolean("web_search.enabled")
+	s.BaseURL = "https://api.openai.com/v1"
+	if d.has("web_search.base_url") {
+		raw := strings.TrimSpace(d.doc.scalars["web_search.base_url"])
 		u, err := url.Parse(raw)
 		if err != nil || u == nil || (u.Scheme != "http" && u.Scheme != "https") || u.Hostname() == "" || u.User != nil || u.RawQuery != "" || u.Fragment != "" {
-			d.fail("study.web_search.base_url", "must be an HTTP(S) endpoint without query or fragment")
+			d.fail("web_search.base_url", "must be an HTTP(S) endpoint without query or fragment")
 		} else {
-			s.WebSearchBaseURL = strings.TrimRight(raw, "/")
+			s.BaseURL = strings.TrimRight(raw, "/")
 		}
 	}
-	s.WebSearchModel = strings.TrimSpace(d.doc.scalars["study.web_search.model"])
-	s.WebSearchMaxResults = 5
-	if d.has("study.web_search.max_results") {
-		s.WebSearchMaxResults = d.posInt("study.web_search.max_results")
-		if s.WebSearchMaxResults > 10 {
-			d.fail("study.web_search.max_results", "must be at most 10")
+	s.Model = strings.TrimSpace(d.doc.scalars["web_search.model"])
+	s.MaxResults = 5
+	if d.has("web_search.max_results") {
+		s.MaxResults = d.posInt("web_search.max_results")
+		if s.MaxResults > 10 {
+			d.fail("web_search.max_results", "must be at most 10")
 		}
 	}
-	s.WebSearchMaxOutput = 512
-	if d.has("study.web_search.max_output_tokens") {
-		s.WebSearchMaxOutput = d.posInt("study.web_search.max_output_tokens")
-		if s.WebSearchMaxOutput > 1024 {
-			d.fail("study.web_search.max_output_tokens", "must be at most 1024")
+	s.MaxOutput = 512
+	if d.has("web_search.max_output_tokens") {
+		s.MaxOutput = d.posInt("web_search.max_output_tokens")
+		if s.MaxOutput > 1024 {
+			d.fail("web_search.max_output_tokens", "must be at most 1024")
 		}
 	}
-	if s.WebSearch {
-		if s.WebSearchModel == "" {
-			s.WebSearchModel = t.LLM.Model
+	if s.Enabled {
+		if s.Model == "" {
+			s.Model = t.LLM.Model
 		}
 		if t.LLM.Protocol != "openai" {
-			d.fail("study.web_search.enabled", "requires the openai protocol")
+			d.fail("web_search.enabled", "requires the openai protocol")
 		}
-		if s.WebSearchModel == "" {
-			d.fail("study.web_search.model", "required when web search is enabled")
+		if s.Model == "" {
+			d.fail("web_search.model", "required when web search is enabled")
 		}
 	}
 }
@@ -598,10 +501,6 @@ func (d *decoder) secrets(t *Template, opts Options) {
 	if t.PostWriter.Model != "" {
 		t.PostWriter.APIKey = resolve("writer.post_llm.api_key_env", t.PostWriter.APIKeyEnv)
 	}
-	if t.Review.Enabled {
-		t.Review.LLM.APIKey = resolve("review.llm.api_key_env", t.Review.LLM.APIKeyEnv)
-	}
-	t.EmbeddingAPIKey = resolve("embedding.api_key_env", EmbeddingKeyEnv)
 	if t.Threads.Backend == "api" {
 		if opts.Getenv != nil {
 			// The token seed is optional; a sealed OAuth token takes precedence.
@@ -615,13 +514,5 @@ func (d *decoder) secrets(t *Template, opts Options) {
 	if t.Telegram.Enabled {
 		t.Telegram.BotToken = resolve("telegram.bot_token_env", t.Telegram.BotTokenEnv)
 		t.Telegram.OwnerChatID = resolve("telegram.owner_chat_id_env", t.Telegram.OwnerChatIDEnv)
-	}
-	if opts.Getenv != nil && studyRedditEnabled(t.Study.Sources) {
-		id := opts.Getenv(t.Study.RedditClientIDEnv)
-		secret := opts.Getenv(t.Study.RedditClientSecretEnv)
-		if id != "" && secret != "" {
-			t.Study.RedditClientID = NewSecret(id)
-			t.Study.RedditClientSecret = NewSecret(secret)
-		}
 	}
 }

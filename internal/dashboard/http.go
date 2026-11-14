@@ -3,7 +3,6 @@ package dashboard
 import (
 	"bytes"
 	"context"
-	"crypto/subtle"
 	"embed"
 	"errors"
 	"github.com/canhta/threadz/internal/ratelimit"
@@ -26,7 +25,6 @@ var assets embed.FS
 
 var pageTemplate = template.Must(template.New("index.html").Funcs(template.FuncMap{
 	"statusText":  statusText,
-	"ideaStatus":  ideaStatus,
 	"formatCount": formatCount,
 	"deltaTone":   deltaTone,
 	"formatUSD":   formatUSD,
@@ -153,25 +151,6 @@ func (h *Handler) parseQuery(u *url.URL) (pageQuery, error) {
 	return q, nil
 }
 
-func (h *Handler) authorized(r *http.Request) bool {
-	if !h.content || h.token == "" {
-		return false
-	}
-	presented := ""
-	if header := r.Header.Get("Authorization"); len(header) > 7 && strings.EqualFold(header[:7], "bearer ") {
-		presented = strings.TrimSpace(header[7:])
-	}
-	if presented == "" {
-		if cookie, err := r.Cookie("tw_dashboard"); err == nil {
-			presented = cookie.Value
-		}
-	}
-	if presented == "" || len(presented) > 256 {
-		return false
-	}
-	return subtle.ConstantTimeCompare([]byte(presented), []byte(h.token)) == 1
-}
-
 func securityHeaders(w http.ResponseWriter) {
 	w.Header().Set("Content-Security-Policy", "default-src 'none'; script-src 'self'; style-src 'self'; font-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'")
 	w.Header().Set("X-Content-Type-Options", "nosniff")
@@ -201,8 +180,6 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		h.serveStatic(w, r, "font", "font/woff2", mustAsset(fontAssets[path]))
 	case brandAssets[path].file != "":
 		h.serveStatic(w, r, "brand", brandAssets[path].contentType, mustAsset(brandAssets[path].file))
-	case path == "/unlock" && h.content:
-		h.serveUnlock(w, r)
 	default:
 		writeError(w, r, http.StatusNotFound, "Page not found.\n", "unknown_path")
 		h.emitRequest(r, "unknown", "unknown_path", http.StatusNotFound)
@@ -252,76 +229,38 @@ func (h *Handler) servePage(w http.ResponseWriter, r *http.Request) {
 		writeError(w, r, status, "Only agent and range are accepted.\n", reason)
 		return
 	}
-	ip := ratelimit.ClientIP(r)
-	authed := false
-	if h.content {
-		authed = h.authorized(r)
-		if !authed {
-			if ok, retry := h.auth.Allow(ip); !ok {
-				w.Header().Set("Retry-After", strconv.Itoa(int(retry.Seconds())))
-				status, reason = http.StatusTooManyRequests, "auth_rate_limited"
-				writeError(w, r, status, "Too many attempts. Try again later.\n", reason)
-				logging.Emit(r.Context(), h.logger, slog.LevelWarn, logging.Record{Event: logging.DashboardAuthFailed, Operation: operation, Outcome: "blocked", Reason: "auth_rate_limited", HTTPStatus: status})
-				return
-			}
-			status, reason = http.StatusUnauthorized, "auth_required"
-			w.Header().Set("WWW-Authenticate", `Bearer realm="threadz"`)
-			writeError(w, r, status, "Access token required. Open /unlock.\n", reason)
-			logging.Emit(r.Context(), h.logger, slog.LevelWarn, logging.Record{Event: logging.DashboardAuthFailed, Operation: operation, Outcome: "blocked", Reason: "auth_required", HTTPStatus: status})
-			return
-		}
-	}
-
 	now := h.now().UTC()
 	var resp pageResponse
-	if authed {
+	var stale bool
+	resp, stale, err = h.cache.do(q.origin+"/?"+q.canonical, func() (pageResponse, error) {
 		if !h.acquire() {
+			return pageResponse{}, errBusy
+		}
+		defer h.release()
+		return h.render(ctxWithRequest(r), q, now)
+	})
+	if err != nil {
+		if errors.Is(err, errBusy) {
 			w.Header().Set("Retry-After", "1")
 			status, reason = http.StatusServiceUnavailable, "busy"
 			writeError(w, r, status, "The dashboard is busy. Try again.\n", reason)
 			return
 		}
-		resp, err = h.render(ctxWithRequest(r), q, now, true)
-		h.release()
-		if err != nil {
-			status, reason = http.StatusServiceUnavailable, "state_unavailable"
-			writeError(w, r, status, "Activity is temporarily unavailable. Please try again.\n", reason)
-			return
-		}
-		w.Header().Set("Cache-Control", "private, no-store")
-		w.Header().Set("Vary", "Authorization, Cookie")
-	} else {
-		var stale bool
-		resp, stale, err = h.cache.do(q.origin+"/?"+q.canonical, func() (pageResponse, error) {
-			if !h.acquire() {
-				return pageResponse{}, errBusy
-			}
-			defer h.release()
-			return h.render(ctxWithRequest(r), q, now, false)
-		})
-		if err != nil {
-			if errors.Is(err, errBusy) {
-				w.Header().Set("Retry-After", "1")
-				status, reason = http.StatusServiceUnavailable, "busy"
-				writeError(w, r, status, "The dashboard is busy. Try again.\n", reason)
-				return
-			}
-			status, reason = http.StatusServiceUnavailable, "state_unavailable"
-			writeError(w, r, status, "Activity is temporarily unavailable. Please try again.\n", reason)
-			return
-		}
-		w.Header().Set("Cache-Control", "public, max-age="+strconv.Itoa(int(h.ttl.Seconds())))
-		w.Header().Set("ETag", resp.etag)
-		w.Header().Set("X-Cache", map[bool]string{true: "stale", false: "miss"}[stale])
-		if stale {
-			w.Header().Set("Warning", `110 - "Response is stale"`)
-			reason = "stale_served"
-		}
-		if match := r.Header.Get("If-None-Match"); match != "" && match == resp.etag {
-			status, reason = http.StatusNotModified, "not_modified"
-			w.WriteHeader(status)
-			return
-		}
+		status, reason = http.StatusServiceUnavailable, "state_unavailable"
+		writeError(w, r, status, "Activity is temporarily unavailable. Please try again.\n", reason)
+		return
+	}
+	w.Header().Set("Cache-Control", "public, max-age="+strconv.Itoa(int(h.ttl.Seconds())))
+	w.Header().Set("ETag", resp.etag)
+	w.Header().Set("X-Cache", map[bool]string{true: "stale", false: "miss"}[stale])
+	if stale {
+		w.Header().Set("Warning", `110 - "Response is stale"`)
+		reason = "stale_served"
+	}
+	if match := r.Header.Get("If-None-Match"); match != "" && match == resp.etag {
+		status, reason = http.StatusNotModified, "not_modified"
+		w.WriteHeader(status)
+		return
 	}
 	status = resp.status
 	w.Header().Set("Content-Type", resp.contentType)
@@ -336,8 +275,8 @@ func (h *Handler) emitRequest(r *http.Request, operation, reason string, status 
 	logging.Emit(r.Context(), h.logger, slog.LevelInfo, logging.Record{Event: logging.DashboardRequestFinished, Operation: operation, Outcome: map[bool]string{true: "success", false: "error"}[status < 400], Reason: reason, HTTPStatus: status})
 }
 
-func (h *Handler) render(ctx context.Context, q pageQuery, now time.Time, content bool) (pageResponse, error) {
-	p, err := h.readPage(ctx, q.agent, q.days, q.view, now, content)
+func (h *Handler) render(ctx context.Context, q pageQuery, now time.Time) (pageResponse, error) {
+	p, err := h.readPage(ctx, q.agent, q.days, q.view, now)
 	if err != nil {
 		return pageResponse{}, queryError(ctx)
 	}
@@ -364,61 +303,6 @@ func (h *Handler) acquire() bool {
 }
 
 func (h *Handler) release() { <-h.sem }
-
-func (h *Handler) serveUnlock(w http.ResponseWriter, r *http.Request) {
-	ip := ratelimit.ClientIP(r)
-	switch r.Method {
-	case "GET", "HEAD":
-		if h.authorized(r) {
-			w.Header().Set("Location", "/")
-			w.WriteHeader(http.StatusSeeOther)
-			return
-		}
-		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		w.Header().Set("Cache-Control", "private, no-store")
-		status := http.StatusOK
-		w.WriteHeader(status)
-		if r.Method != "HEAD" {
-			_, _ = w.Write([]byte(unlockHTML("")))
-		}
-	case "POST":
-		if ok, retry := h.auth.Allow(ip); !ok {
-			w.Header().Set("Retry-After", strconv.Itoa(int(retry.Seconds())))
-			writeError(w, r, http.StatusTooManyRequests, "Too many attempts. Try again later.\n", "auth_rate_limited")
-			return
-		}
-		r.Body = http.MaxBytesReader(w, r.Body, 4<<10)
-		if err := r.ParseForm(); err != nil {
-			writeError(w, r, http.StatusBadRequest, "Bad request.\n", "invalid_form")
-			return
-		}
-		presented := r.PostForm.Get("token")
-		if presented == "" || len(presented) > 256 || subtle.ConstantTimeCompare([]byte(presented), []byte(h.token)) != 1 {
-			logging.Emit(r.Context(), h.logger, slog.LevelWarn, logging.Record{Event: logging.DashboardAuthFailed, Operation: "unlock", Outcome: "blocked", Reason: "auth_invalid", HTTPStatus: http.StatusUnauthorized})
-			w.Header().Set("Content-Type", "text/html; charset=utf-8")
-			w.Header().Set("Cache-Control", "private, no-store")
-			w.WriteHeader(http.StatusUnauthorized)
-			if r.Method != "HEAD" {
-				_, _ = w.Write([]byte(unlockHTML("That token did not match.")))
-			}
-			return
-		}
-		http.SetCookie(w, &http.Cookie{Name: "tw_dashboard", Value: h.token, Path: "/", HttpOnly: true, SameSite: http.SameSiteStrictMode, MaxAge: int((12 * time.Hour).Seconds())})
-		w.Header().Set("Location", "/")
-		w.WriteHeader(http.StatusSeeOther)
-	default:
-		w.Header().Set("Allow", "GET, HEAD, POST")
-		writeError(w, r, http.StatusMethodNotAllowed, "Use the form.\n", "method_not_allowed")
-	}
-}
-
-func unlockHTML(message string) string {
-	msg := ""
-	if message != "" {
-		msg = `<p class="unlock-error" role="alert">` + template.HTMLEscapeString(message) + `</p>`
-	}
-	return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Unlock Threadz</title><link rel="stylesheet" href="` + cssHref + `"></head><body class="unlock-page"><main class="unlock"><h1>Threadz</h1><p>This page shows private notes and lessons.</p>` + msg + `<form method="post" action="/unlock"><label for="token">Access token</label><input id="token" name="token" type="password" autocomplete="current-password" required><button type="submit">Open</button></form></main></body></html>`
-}
 
 func writeError(w http.ResponseWriter, r *http.Request, status int, body, reason string) {
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")

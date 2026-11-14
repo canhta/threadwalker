@@ -34,13 +34,9 @@ type Options struct {
 	Redactor    *config.Redactor
 	Owner       Owner
 	FetchTrends func(context.Context) ([]trends.Trend, error)
-	// FetchStudy and SearchWeb are required: the dispatcher never builds a
-	// default that could reach the network.
-	FetchStudy func(context.Context) (trends.StudyFeed, error)
-	SearchWeb  trends.WebSearcher
-	// Embedder embeds notes, actions and search queries. It is required; a
-	// search ranks by BM25 alone only when embedding the query fails.
-	Embedder *llm.Embedder
+	// SearchWeb is required when the template enables web_search: the
+	// dispatcher never builds a default that could reach the network.
+	SearchWeb trends.WebSearcher
 	// Wait spaces the parts of a series; nil sleeps for real.
 	Wait func(context.Context, time.Duration) error
 	// EvidenceDir holds the page snapshots of failed browser steps, one folder
@@ -80,7 +76,6 @@ type Dispatcher struct {
 	seen         map[[32]byte]seenCall
 	refusals     int
 	stopped      error
-	lessons      int
 	redactor     *config.Redactor
 	trendProfile trends.TrendProfile
 	webSearches  int
@@ -115,11 +110,8 @@ func NewDispatcher(opts Options) (*Dispatcher, error) {
 	if err != nil {
 		return nil, fmt.Errorf("configuring tools: %w", err)
 	}
-	if opts.Embedder == nil {
-		return nil, errors.New("configuring tools: embedder required")
-	}
-	if opts.FetchTrends == nil || opts.FetchStudy == nil || (opts.Template.Study.WebSearch && opts.SearchWeb == nil) {
-		return nil, errors.New("configuring tools: injected trend, study and web-search fetchers required")
+	if opts.FetchTrends == nil || (opts.Template.WebSearch.Enabled && opts.SearchWeb == nil) {
+		return nil, errors.New("configuring tools: injected trend and web-search fetchers required")
 	}
 	d := &Dispatcher{guard: g, opts: opts, registry: map[string]executor{}, seen: map[[32]byte]seenCall{}}
 	include, avoid := opts.Template.TrendKeywords()
@@ -168,7 +160,7 @@ func (d *Dispatcher) OpenTargets(ctx context.Context) []string {
 func (d *Dispatcher) Definitions() []llm.Tool {
 	definitions := []llm.Tool{}
 	for _, spec := range guard.Specs() {
-		if _, ok := d.registry[spec.Name]; ok && spec.AllowedIn(d.opts.Phase) && !slices.Contains(d.opts.Hidden, spec.Name) {
+		if _, ok := d.registry[spec.Name]; ok && !spec.Harness && spec.AllowedIn(d.opts.Phase) && !slices.Contains(d.opts.Hidden, spec.Name) {
 			definitions = append(definitions, definition(spec))
 		}
 	}
@@ -184,12 +176,24 @@ func (d *Dispatcher) ConfigureClient(base llm.Options) llm.Options {
 	return base
 }
 
+type harnessKey struct{}
+
+// DispatchHarness is Dispatch for the harness's own reads (Spec.Harness): the
+// metrics wake and the follower count. A model call goes through Dispatch,
+// which refuses them.
+func (d *Dispatcher) DispatchHarness(ctx context.Context, call llm.ToolCall) (string, error) {
+	return d.Dispatch(context.WithValue(ctx, harnessKey{}, true), call)
+}
+
 func (d *Dispatcher) Dispatch(ctx context.Context, call llm.ToolCall) (string, error) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	started := d.opts.Now()
 	run, known := d.registry[call.Function.Name]
 	spec, _ := guard.Spec(call.Function.Name)
+	if harness, _ := ctx.Value(harnessKey{}).(bool); known && spec.Harness && !harness {
+		known = false
+	}
 	safeTool := "unknown"
 	if known {
 		safeTool = spec.Name

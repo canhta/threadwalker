@@ -12,6 +12,7 @@ import (
 	"github.com/canhta/threadz/internal/config"
 	"github.com/canhta/threadz/internal/llm"
 	"github.com/canhta/threadz/internal/store"
+	"github.com/canhta/threadz/internal/threads"
 )
 
 func transcriptRuntime(t *testing.T, calls []llm.ToolCall, redactor *config.Redactor) (*agent.Runtime, *store.Store, string) {
@@ -26,7 +27,12 @@ func transcriptRuntime(t *testing.T, calls []llm.ToolCall, redactor *config.Reda
 	tmpl := agent.OfflineTemplate()
 	fixture := agent.NewOfflineFixture(func() time.Time { return now })
 	fixture.Calls = calls
-	r, err := agent.New(agent.Options{Store: st, Template: tmpl, Redactor: redactor, Now: func() time.Time { return now }, HTTPClient: fixture.Client(), FetchTrends: fixture.Trends, FetchStudy: fixture.Study})
+	factory := func(context.Context, config.Template) (threads.Backend, error) {
+		m := threads.NewMemory()
+		m.Pages[threads.OpReadFeed] = threads.Page{Kind: "feed", Posts: []threads.Post{{Text: strings.Repeat("é", llm.MaxTranscriptToolBytes)}}}
+		return m, nil
+	}
+	r, err := agent.New(agent.Options{Store: st, Template: tmpl, Redactor: redactor, Now: func() time.Time { return now }, HTTPClient: fixture.Client(), FetchTrends: fixture.Trends, ThreadsFactory: factory})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -40,10 +46,10 @@ func TestWakeStoresRedactedBoundedTranscript(t *testing.T) {
 	const secret = "TOPSECRET-value"
 	big := strings.Repeat("é", llm.MaxTranscriptToolBytes)
 	calls := []llm.ToolCall{
-		agent.SyntheticCall("memory_add", `{"text":"`+secret+`"}`),
-		agent.SyntheticCall("note_write", `{"topic":"big","description":"d","text":"`+big+`"}`),
-		agent.SyntheticCall("note_read", `{"ref":"topic:big"}`),
+		agent.SyntheticCall("search", `{"query":"`+secret+`"}`),
+		agent.SyntheticCall("search", `{"query":"`+big+`"}`),
 		agent.SyntheticCall("read_feed", `{}`),
+		agent.SyntheticCall("read_replies", `{}`),
 	}
 	r, st, id := transcriptRuntime(t, calls, config.NewRedactor(config.NewSecret(secret)))
 	wake, err := r.Wake(context.Background())
@@ -75,7 +81,7 @@ func TestWakeStoresRedactedBoundedTranscript(t *testing.T) {
 				t.Fatalf("tool result not capped: %d err=%v", len(body.Output), err)
 			}
 			truncated = truncated || body.Truncated
-			if outside := body.Tool == "read_feed"; body.Untrusted != outside {
+			if !body.Untrusted {
 				t.Fatalf("%s untrusted=%v", body.Tool, body.Untrusted)
 			}
 		}

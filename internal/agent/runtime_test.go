@@ -29,7 +29,7 @@ func TestWakeReadsWritesDryRunAndSchedules(t *testing.T) {
 	defer st.Close()
 	now := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 	fixture := agent.NewOfflineFixture(func() time.Time { return now })
-	r, err := agent.New(agent.Options{Store: st, Template: agent.OfflineTemplate(), Now: func() time.Time { return now }, HTTPClient: fixture.Client(), FetchTrends: fixture.Trends, FetchStudy: fixture.Study})
+	r, err := agent.New(agent.Options{Store: st, Template: agent.OfflineTemplate(), Now: func() time.Time { return now }, HTTPClient: fixture.Client(), FetchTrends: fixture.Trends})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -44,12 +44,12 @@ func TestWakeReadsWritesDryRunAndSchedules(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	const memory = "Synthetic note for the next wake."
-	if topics, _ := st.TopicList(ctx, "synthetic-offline", true); len(topics) != 1 || topics[0].Description != memory || !state.NextWake.Equal(now.Add(time.Hour)) {
+	if !state.NextWake.Equal(now.Add(time.Hour)) {
 		t.Fatalf("%+v", state)
 	}
 	var count int
-	st.DB().QueryRow(`SELECT COUNT(*) FROM actions WHERE dry_run=1`).Scan(&count)
+	var memory string
+	st.DB().QueryRow(`SELECT COUNT(*),COALESCE(MAX(text),'') FROM actions WHERE dry_run=1`).Scan(&count, &memory)
 	if count != 1 {
 		t.Fatalf("actions=%d", count)
 	}
@@ -58,7 +58,7 @@ func TestWakeReadsWritesDryRunAndSchedules(t *testing.T) {
 		t.Fatal(err)
 	}
 	if !strings.Contains(messages[1].Content, memory) {
-		t.Fatal("memory index absent in next context")
+		t.Fatal("own action absent in next context")
 	}
 	for _, m := range messages {
 		if strings.Contains(m.Content, "offline-dummy-key") {
@@ -76,7 +76,7 @@ func TestWakeReadsWritesDryRunAndSchedules(t *testing.T) {
 		t.Fatal(err)
 	}
 	if !observedCarryover {
-		t.Fatal("next wake did not receive prior self-note")
+		t.Fatal("next wake did not receive its prior action")
 	}
 }
 
@@ -89,8 +89,8 @@ func TestWakeStopReasonsAndScheduleDefaults(t *testing.T) {
 		after  time.Duration
 	}{
 		{"default", nil, 30, "completed", time.Hour},
-		{"step_limit", []agentCall{{"read_feed", `{}`}, {"read_own_metrics", `{}`}}, 1, "step_limit", time.Hour},
-		{"stall_stop", slices.Repeat([]agentCall{{"note_search", `{"query":"synthetic"}`}}, 10), 30, "stall_stop", time.Hour},
+		{"step_limit", []agentCall{{"read_feed", `{}`}, {"fetch_trends", `{}`}}, 1, "step_limit", time.Hour},
+		{"stall_stop", slices.Repeat([]agentCall{{"search", `{"query":"synthetic"}`}}, 10), 30, "stall_stop", time.Hour},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx := context.Background()
@@ -109,7 +109,7 @@ func TestWakeStopReasonsAndScheduleDefaults(t *testing.T) {
 			tmpl.Limits.MaxStepsPerWake = tc.steps
 			var logs bytes.Buffer
 			logger, _ := logging.New(&logs, "debug", "json")
-			r, err := agent.New(agent.Options{Store: st, Template: tmpl, Logger: logger, Now: func() time.Time { return now }, HTTPClient: fixture.Client(), FetchTrends: fixture.Trends, FetchStudy: fixture.Study})
+			r, err := agent.New(agent.Options{Store: st, Template: tmpl, Logger: logger, Now: func() time.Time { return now }, HTTPClient: fixture.Client(), FetchTrends: fixture.Trends})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -126,9 +126,6 @@ func TestWakeStopReasonsAndScheduleDefaults(t *testing.T) {
 			}
 			if !strings.Contains(logs.String(), `"event":"`+event+`"`) || !strings.Contains(logs.String(), `"reason":"`+tc.reason+`"`) {
 				t.Fatal("wake stop reason missing from captured logs")
-			}
-			if tc.name == "stall_stop" && !strings.Contains(logs.String(), `"event":"note.searched"`) {
-				t.Fatal("note-search outcome missing")
 			}
 
 			state, err := st.AgentState(ctx, tmpl.ID)
@@ -166,7 +163,7 @@ func TestSchedulerRestartDoesNotReplayAndHonorsOwnerControls(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer st.Close()
-	r, err := agent.New(agent.Options{Store: st, Template: tmpl, Now: func() time.Time { return now }, HTTPClient: fixture.Client(), FetchTrends: fixture.Trends, FetchStudy: fixture.Study})
+	r, err := agent.New(agent.Options{Store: st, Template: tmpl, Now: func() time.Time { return now }, HTTPClient: fixture.Client(), FetchTrends: fixture.Trends})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -211,7 +208,7 @@ func TestEveryExternalToolResultIsUntrustedAndLogsAreRedacted(t *testing.T) {
 	defer st.Close()
 	now := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 	fixture := agent.NewOfflineFixture(func() time.Time { return now })
-	fixture.Calls = []llm.ToolCall{agent.SyntheticCall("read_feed", `{}`), agent.SyntheticCall("search", `{"query":"private query"}`), agent.SyntheticCall("read_post", `{"id":"fixture-post"}`), agent.SyntheticCall("read_own_metrics", `{}`), agent.SyntheticCall("fetch_trends", `{}`), agent.SyntheticCall("note_write", `{"topic":"own","text":"private own note"}`)}
+	fixture.Calls = []llm.ToolCall{agent.SyntheticCall("read_feed", `{}`), agent.SyntheticCall("search", `{"query":"private query"}`), agent.SyntheticCall("read_post", `{"id":"fixture-post"}`), agent.SyntheticCall("read_replies", `{}`), agent.SyntheticCall("fetch_trends", `{}`)}
 	seen := 0
 	fixture.Observe = func(messages []llm.Message) {
 		for _, m := range messages {
@@ -224,9 +221,6 @@ func TestEveryExternalToolResultIsUntrustedAndLogsAreRedacted(t *testing.T) {
 				Data      json.RawMessage `json:"data"`
 			}
 			json.NewDecoder(strings.NewReader(m.Content)).Decode(&v)
-			if v.Source == "note_write" {
-				continue
-			}
 			if seen < 5 {
 				if !v.Untrusted || v.Source == "" || len(v.Data) == 0 {
 					t.Fatalf("external tool result not wrapped: %s", m.Content)
@@ -237,7 +231,7 @@ func TestEveryExternalToolResultIsUntrustedAndLogsAreRedacted(t *testing.T) {
 	}
 	var logs bytes.Buffer
 	logger, _ := logging.New(&logs, "debug", "json")
-	r, err := agent.New(agent.Options{Store: st, Template: agent.OfflineTemplate(), Now: func() time.Time { return now }, HTTPClient: fixture.Client(), FetchTrends: fixture.Trends, FetchStudy: fixture.Study, Logger: logger})
+	r, err := agent.New(agent.Options{Store: st, Template: agent.OfflineTemplate(), Now: func() time.Time { return now }, HTTPClient: fixture.Client(), FetchTrends: fixture.Trends, Logger: logger})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -248,12 +242,12 @@ func TestEveryExternalToolResultIsUntrustedAndLogsAreRedacted(t *testing.T) {
 	if seen != 5 {
 		t.Fatalf("external results=%d", seen)
 	}
-	for _, s := range []string{"offline-dummy-key", "private own note", "private query", "https://synthetic.invalid", "Synthetic offline trend"} {
+	for _, s := range []string{"offline-dummy-key", "private query", "https://synthetic.invalid", "Synthetic offline trend"} {
 		if strings.Contains(logs.String(), s) {
 			t.Fatalf("log leaked %q", s)
 		}
 	}
-	for _, event := range []string{"wake.started", "wake.finished", "tool.started", "tool.finished", "guard.checked", "audit.recorded", "context.built", "scheduler.scheduled", "note.written", "trends.fetched"} {
+	for _, event := range []string{"wake.started", "wake.finished", "tool.started", "tool.finished", "guard.checked", "audit.recorded", "context.built", "scheduler.scheduled", "trends.fetched"} {
 		if !strings.Contains(logs.String(), `"event":"`+event+`"`) {
 			t.Errorf("missing %s", event)
 		}
@@ -289,7 +283,7 @@ func TestSchedulerWaitsAndSerializesConfiguredAgents(t *testing.T) {
 				cancel()
 			}
 		}
-		r, err := agent.New(agent.Options{Store: st, Template: tmpl, Now: func() time.Time { return now }, HTTPClient: fixture.Client(), FetchTrends: fixture.Trends, FetchStudy: fixture.Study})
+		r, err := agent.New(agent.Options{Store: st, Template: tmpl, Now: func() time.Time { return now }, HTTPClient: fixture.Client(), FetchTrends: fixture.Trends})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -328,7 +322,7 @@ func TestRuntimeFailsClosedAndRecordsBudgetStops(t *testing.T) {
 	}
 	now := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 	fixture := agent.NewOfflineFixture(func() time.Time { return now })
-	r, err := agent.New(agent.Options{Store: st, Template: tmpl, Now: func() time.Time { return now }, HTTPClient: fixture.Client(), FetchTrends: fixture.Trends, FetchStudy: fixture.Study})
+	r, err := agent.New(agent.Options{Store: st, Template: tmpl, Now: func() time.Time { return now }, HTTPClient: fixture.Client(), FetchTrends: fixture.Trends})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -372,7 +366,7 @@ func TestSchedulerOwnerPauseBetweenSelectionAndWake(t *testing.T) {
 		return now
 	}
 	fixture := agent.NewOfflineFixture(clock)
-	r, err := agent.New(agent.Options{Store: st, Template: tmpl, Now: clock, HTTPClient: fixture.Client(), FetchTrends: fixture.Trends, FetchStudy: fixture.Study})
+	r, err := agent.New(agent.Options{Store: st, Template: tmpl, Now: clock, HTTPClient: fixture.Client(), FetchTrends: fixture.Trends})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -408,7 +402,7 @@ func TestWakeForwardsConfiguredReasoningEffort(t *testing.T) {
 	tmpl.LLM.BaseURL = server.URL
 	tmpl.LLM.ReasoningEffort = "none"
 	fixture := agent.NewOfflineFixture(func() time.Time { return now })
-	r, err := agent.New(agent.Options{Store: st, Template: tmpl, Now: func() time.Time { return now }, HTTPClient: &http.Client{}, FetchTrends: fixture.Trends, FetchStudy: fixture.Study})
+	r, err := agent.New(agent.Options{Store: st, Template: tmpl, Now: func() time.Time { return now }, HTTPClient: &http.Client{}, FetchTrends: fixture.Trends})
 	if err != nil {
 		t.Fatal(err)
 	}

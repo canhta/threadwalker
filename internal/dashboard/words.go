@@ -12,17 +12,7 @@ var toolLabels = map[string]string{
 	"read_topic":          "Read topic",
 	"read_own_metrics":    "Own stats",
 	"fetch_trends":        "Trends",
-	"playbook_read":       "Lessons",
-	"playbook_propose":    "Lessons",
-	"knowledge_read":      "Craft notes",
-	"knowledge_candidate": "Technique",
-	"memory_add":          "Add memory",
-	"memory_supersede":    "Replace memory",
-	"strategy_write":      "Strategy",
 	"read_replies":        "Read replies",
-	"note_write":          "Write note",
-	"note_search":         "Note search",
-	"note_read":           "Note read",
 	"read_post":           "Read post",
 	"profile":             "Look up profile",
 	"post":                "Post",
@@ -44,7 +34,6 @@ var kindLabels = map[string]string{
 	"agent":   "Run",
 	"metrics": "Stats",
 	"dream":   "Planning",
-	"study":   "Research",
 }
 
 func kindLabel(raw string) string {
@@ -96,9 +85,9 @@ func endReasonBad(raw string) bool {
 // blockedReasons is the fixed guard vocabulary. Anything not listed is shown
 // as a generic stop reason, never as raw text from the database.
 var blockedReasons = []string{
-	"agent_not_running", "invalid_hypothesis", "invalid_policy",
+	"agent_not_running", "invalid_policy",
 	"invalid_tool_arguments", "no_trend_anchor", "own_account", "phase_read_only",
-	"blocked_phrase", "identity_targeting", "political_recommendation", "engagement_bait", "explore_budget", "repeat_topic", "owner_note_open", "sensitive_arguments", "min_seconds_between_actions", "min_minutes_between_posts",
+	"blocked_phrase", "identity_targeting", "political_recommendation", "engagement_bait", "repeat_topic", "owner_note_open", "sensitive_arguments", "min_seconds_between_actions", "min_minutes_between_posts",
 	"posts_per_day", "replies_per_day", "browser_replies_per_day", "replies_per_hour", "reply_breaker", "replies_per_user_7d", "replies_per_conversation", "reply_mention",
 	"reply_target_host", "reply_target_mismatch", "reply_target_unread", "target_outside_window",
 	"critic_rejected", "critic_limit", "critic_unavailable", "ungrounded_number",
@@ -109,12 +98,11 @@ var blockedReasons = []string{
 	"persistence_error", "unknown_outcome", "browser_error", "timeout",
 	"malformed_page", "unknown_page", "error",
 	"lesson_missing_citation", "lesson_foreign_citation", "lesson_number_mismatch",
-	"lesson_foreign_url", "lesson_secret", "lesson_cap", "stale_ref", "dated_topic",
+	"lesson_foreign_url", "lesson_secret", "stale_ref",
 }
 
 var blockedLabels = map[string]string{
 	"agent_not_running":           "Not running",
-	"invalid_hypothesis":          "Invalid lesson",
 	"invalid_policy":              "Limit not set",
 	"invalid_tool_arguments":      "Bad input",
 	"own_account":                 "Own account",
@@ -123,7 +111,6 @@ var blockedLabels = map[string]string{
 	"identity_targeting":          "Targets identity",
 	"political_recommendation":    "Political pick",
 	"engagement_bait":             "Engagement bait",
-	"explore_budget":              "Explore budget used",
 	"repeat_topic":                "Topic repeated",
 	"owner_note_open":             "Owner note unanswered",
 	"sensitive_arguments":         "Private data",
@@ -175,9 +162,7 @@ var blockedLabels = map[string]string{
 	"lesson_number_mismatch":      "Lesson number not measured",
 	"lesson_foreign_url":          "Lesson link not its own",
 	"lesson_secret":               "Lesson looks like a secret",
-	"lesson_cap":                  "Lesson limit",
 	"stale_ref":                   "Text names a per-wake ref",
-	"dated_topic":                 "Note topic starts with a date",
 }
 
 // failureReasons is the fixed vocabulary of a failed step's reason code.
@@ -186,7 +171,7 @@ var failureReasons = []string{
 	"malformed_page", "metrics_unavailable", "media_not_found", "write_refused", "quota_exhausted",
 	"api_error", "close_failed", "cancelled", "timeout",
 	"lesson_missing_citation", "lesson_foreign_citation", "lesson_number_mismatch",
-	"lesson_foreign_url", "lesson_secret", "lesson_cap",
+	"lesson_foreign_url", "lesson_secret",
 }
 
 var failureLabels = map[string]string{
@@ -273,31 +258,4 @@ func statusText(status string) string {
 	default:
 		return "Unknown"
 	}
-}
-
-func ideaStatus(status string) string {
-	switch status {
-	case "testing":
-		return "Testing"
-	case "established":
-		return "Adopted"
-	case "rejected":
-		return "Dropped"
-	default:
-		return "Unknown"
-	}
-}
-
-var penaltyLabels = map[string]string{
-	"engagement_bait":           "Asking for comments or shares",
-	"rage_bait":                 "Rage bait",
-	"unoriginal_content":        "Unoriginal content",
-	"political_recommendations": "Political content",
-}
-
-func penaltyLabel(raw string) string {
-	if label, ok := penaltyLabels[raw]; ok {
-		return label
-	}
-	return "Demotion risk"
 }

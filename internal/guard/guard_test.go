@@ -90,7 +90,7 @@ func TestGuardRejectsBeforeEffects(t *testing.T) {
 			g, _ := guard.New(opts)
 			st.DB().Exec(tc.sql)
 			called := false
-			_, err := g.Execute(context.Background(), guard.Attempt{Tool: "note_write", Arguments: "{}"}, func() (string, error) { called = true; return "", nil })
+			_, err := g.Execute(context.Background(), guard.Attempt{Tool: "fetch_trends", Arguments: "{}"}, func() (string, error) { called = true; return "", nil })
 			if err == nil || called {
 				t.Fatalf("called %v err %v", called, err)
 			}
@@ -142,7 +142,7 @@ func TestGuardEffectFailureAndOptions(t *testing.T) {
 	st, opts := setup(t)
 	g, _ := guard.New(opts)
 	sentinel := errors.New("effect failure")
-	_, err := g.Execute(context.Background(), guard.Attempt{Tool: "note_write", Arguments: "{}"}, func() (string, error) { return "", sentinel })
+	_, err := g.Execute(context.Background(), guard.Attempt{Tool: "fetch_trends", Arguments: "{}"}, func() (string, error) { return "", sentinel })
 	if !errors.Is(err, sentinel) {
 		t.Fatal(err)
 	}

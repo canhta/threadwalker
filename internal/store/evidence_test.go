@@ -117,9 +117,6 @@ func TestEvidenceSeedsAndReadsBack(t *testing.T) {
 	if n, _ := st.StopRequestContacts(ctx, "a"); n != 1 {
 		t.Fatalf("contacts=%d", n)
 	}
-	if n, err := st.PlaybookOutcomeCount(ctx, "a"); err != nil || n != 0 {
-		t.Fatalf("outcomes=%d %v", n, err)
-	}
 	if err = st.SetAgentStatus(ctx, "a", "paused"); err != nil {
 		t.Fatal(err)
 	}

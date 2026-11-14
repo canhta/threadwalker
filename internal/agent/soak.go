@@ -68,7 +68,7 @@ func RunOfflineSoak(ctx context.Context, path string, hours int, logger *slog.Lo
 	tmpl.Limits.PostsPerDay = 24
 	fixture := NewOfflineFixture(func() time.Time { return now })
 	create := func() (*Runtime, error) {
-		return New(Options{Store: st, Template: tmpl, Now: func() time.Time { return now }, HTTPClient: fixture.Client(), FetchTrends: fixture.Trends, FetchStudy: fixture.Study, Logger: logger})
+		return New(Options{Store: st, Template: tmpl, Now: func() time.Time { return now }, HTTPClient: fixture.Client(), FetchTrends: fixture.Trends, Logger: logger})
 	}
 	runtime, err := create()
 	if err != nil {
@@ -87,11 +87,7 @@ func RunOfflineSoak(ctx context.Context, path string, hours int, logger *slog.Lo
 				return evidence, err
 			}
 			runtime.event(ctx, "", "wake.started", "started", "due", id, 0)
-			embedder, err := runtime.embedder(guard.PhaseAgent, 0)
-			if err != nil {
-				return evidence, err
-			}
-			d, err := tools.NewDispatcher(tools.Options{Scope: guard.Scope{Store: st, Template: tmpl, WakeID: id, Now: func() time.Time { return now }, Logger: logger}, Threads: threads.NewMemory(), FetchTrends: fixture.Trends, FetchStudy: fixture.Study, Embedder: embedder})
+			d, err := tools.NewDispatcher(tools.Options{Scope: guard.Scope{Store: st, Template: tmpl, WakeID: id, Now: func() time.Time { return now }, Logger: logger}, Threads: threads.NewMemory(), FetchTrends: fixture.Trends})
 			if err != nil {
 				return evidence, err
 			}

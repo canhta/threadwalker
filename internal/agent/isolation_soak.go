@@ -101,7 +101,6 @@ func RunIsolationSoak(ctx context.Context, dbPath string, hours int, logger *slo
 		t.ID = id
 		t.Goal = markers[i]
 		t.Persona.Name = id
-		t.SeedPlaybook = []string{markers[i]}
 		t.Threads.Username = fmt.Sprintf("synthetic_isolation_%c", 'a'+i)
 		t.Threads.ProfileDir = filepath.Join(filepath.Dir(dbPath), fmt.Sprintf("profile-%d", i))
 		t.Limits.PostsPerDay = 6
@@ -113,7 +112,7 @@ func RunIsolationSoak(ctx context.Context, dbPath string, hours int, logger *slo
 		if err = st.EnsureAgent(ctx, id); err != nil {
 			return e, err
 		}
-		if _, err = st.WriteTopic(ctx, id, "isolation", "", markers[i], now); err != nil {
+		if _, err = st.SeedAction(ctx, store.SeededAction{AgentID: id, Kind: "post", Text: markers[i], DryRun: t.DryRun, PostedAt: now.Add(-time.Hour)}); err != nil {
 			return e, err
 		}
 	}
@@ -139,7 +138,7 @@ func RunIsolationSoak(ctx context.Context, dbPath string, hours int, logger *slo
 				e.MaxActiveBackends = max(e.MaxActiveBackends, active)
 				return isolationBackend(&active, "https://fixture.invalid/@"+chosen.Threads.Username+"/post/seed"), nil
 			}
-			r, err := New(Options{Store: st, Template: t, Now: clock, HTTPClient: fixture.Client(), FetchTrends: fixture.Trends, FetchStudy: fixture.Study, Logger: logger, ThreadsFactory: factory})
+			r, err := New(Options{Store: st, Template: t, Now: clock, HTTPClient: fixture.Client(), FetchTrends: fixture.Trends, Logger: logger, ThreadsFactory: factory})
 			if err != nil {
 				return err
 			}
@@ -149,8 +148,7 @@ func RunIsolationSoak(ctx context.Context, dbPath string, hours int, logger *slo
 			// A blocked own-account reply is nonterminal and cannot reach the backend.
 			fixture.Calls = []llm.ToolCall{
 				SyntheticCall("read_feed", `{}`),
-				SyntheticCall("note_write", string(mustJSON(map[string]string{"text": markers[i]}))),
-				SyntheticCall("playbook_read", `{}`),
+				SyntheticCall("fetch_trends", `{}`),
 				SyntheticCall("reply", string(mustJSON(map[string]string{"text": "Synthetic refused own-account reply.", "target_username": templates[1-i].Threads.Username, "target_id": "fixture-id", "target_url": "https://threads.net/@" + templates[1-i].Threads.Username + "/post/1"}))),
 				SyntheticCall("post", ""),
 			}
@@ -273,7 +271,7 @@ func RunIsolationSoak(ctx context.Context, dbPath string, hours int, logger *slo
 			if err != nil {
 				return e, err
 			}
-			if agentUsage, err := st.LLMUsageForDayPhases(ctx, t.ID, day, "agent", "study"); err != nil {
+			if agentUsage, err := st.LLMUsageForDayPhases(ctx, t.ID, day, "agent"); err != nil {
 				return e, err
 			} else if state.Status == "running" && agentUsage.CostUSD >= t.Limits.MaxUSDPerDay {
 				if state.NextWake.Before(dayEnd) {

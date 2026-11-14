@@ -14,7 +14,7 @@ func TestDashboardShowsSpendAndPlainPhaseWords(t *testing.T) {
 	today := now.Format("2006-01-02")
 	snap := started()
 	snap.Ledger = []store.DashboardLedgerDay{{Day: today, CostUSD: 0.7}}
-	snap.Phases = []store.DashboardPhaseSpend{{Day: today, Phase: "agent", CostUSD: 0.4}, {Day: today, Phase: "dream", CostUSD: 0.1}, {Day: today, Phase: "study", CostUSD: 0.2}}
+	snap.Phases = []store.DashboardPhaseSpend{{Day: today, Phase: "agent", CostUSD: 0.4}, {Day: today, Phase: "dream", CostUSD: 0.1}}
 	snap.Wakes = []store.DashboardWake{finishedWake(1, "dream", "completed", 0)}
 	h, err := dashboard.New(dashboard.Options{Source: newSource(snap), Now: func() time.Time { return now }, Agents: []dashboard.Agent{{ID: "alpha", DailyBudgetUSD: 2}}})
 	if err != nil {
@@ -33,7 +33,7 @@ func TestDashboardShowsSpendAndPlainPhaseWords(t *testing.T) {
 	if page.Burn.PercentText != "35.0% of the $2.00 limit" {
 		t.Fatalf("percent=%q", page.Burn.PercentText)
 	}
-	if page.Burn.PhaseText != "Runs $0.40, Research $0.20, Planning $0.10" {
+	if page.Burn.PhaseText != "Runs $0.40, Planning $0.10" {
 		t.Fatalf("phases=%q", page.Burn.PhaseText)
 	}
 	if len(page.Wakes.Rows) != 1 || page.Wakes.Rows[0].Kind != "Planning" {

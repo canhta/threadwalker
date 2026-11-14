@@ -73,8 +73,8 @@ func (s *Store) ConfirmPublished(ctx context.Context, agentID string, actionID i
 	return n == 1, nil
 }
 
-// HookTypes are the hook types an action may name, the one list the guard, the
-// post-mortem and the template's seed hypotheses are checked against.
+// HookTypes are the hook types an action may name, the one list the guard
+// and the writer are checked against.
 var HookTypes = []string{"number", "contrarian", "curiosity_gap", "personal_stake", "trend_detail"}
 
 // MaxSeriesParts is the most parts a series post has, the hook included.
@@ -161,4 +161,41 @@ func (s *Store) ConversationReplies(ctx context.Context, agentID, root string, c
 // ConversationReplies is the guard's view of the same rule inside its transaction.
 func (t ReservationTx) ConversationReplies(ctx context.Context, agentID, root string, c ConversationCap) (int, bool, error) {
 	return conversationReplies(ctx, t.conn, agentID, root, c)
+}
+
+// RepliedSince returns the target URLs the agent replied to since a time.
+func (s *Store) RepliedSince(ctx context.Context, agentID string, dryRun bool, since time.Time) (map[string]bool, error) {
+	rows, err := s.db.QueryContext(ctx, `SELECT target_url FROM actions WHERE agent_id=? AND kind='reply' AND dry_run=? AND target_url<>'' AND posted_at>=?`, agentID, dryRun, since.UTC().Format(time.RFC3339Nano))
+	if err != nil {
+		return nil, fmt.Errorf("reading replied targets: %w", err)
+	}
+	defer rows.Close()
+	out := map[string]bool{}
+	for rows.Next() {
+		var u string
+		if err = rows.Scan(&u); err != nil {
+			return nil, fmt.Errorf("reading replied target: %w", err)
+		}
+		out[u] = true
+	}
+	return out, rows.Err()
+}
+
+// RecentOwnTexts returns the texts of the scope's newest limit posts and
+// replies that did not fail, newest first.
+func (s *Store) RecentOwnTexts(ctx context.Context, scope ActionScope, limit int) ([]string, error) {
+	rows, err := s.db.QueryContext(ctx, `SELECT text FROM actions WHERE agent_id=? AND dry_run=? AND failed=0 ORDER BY id DESC LIMIT ?`, scope.AgentID, scope.DryRun, limit)
+	if err != nil {
+		return nil, fmt.Errorf("reading recent own texts: %w", err)
+	}
+	defer rows.Close()
+	out := []string{}
+	for rows.Next() {
+		var t string
+		if err = rows.Scan(&t); err != nil {
+			return nil, fmt.Errorf("reading recent own text: %w", err)
+		}
+		out = append(out, t)
+	}
+	return out, rows.Err()
 }

@@ -177,7 +177,7 @@ func deploymentChecks(deps ctlDeps, getenv func(string) string, templates []conf
 func requiredEnvNames(templates []config.Template) []string {
 	seen := map[string]bool{}
 	for _, t := range templates {
-		names := []string{t.LLM.APIKeyEnv, config.EmbeddingKeyEnv}
+		names := []string{t.LLM.APIKeyEnv}
 		if t.Telegram.Enabled {
 			names = append(names, t.Telegram.BotTokenEnv, t.Telegram.OwnerChatIDEnv)
 		}

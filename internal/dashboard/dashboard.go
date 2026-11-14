@@ -17,9 +17,8 @@ import (
 )
 
 const (
-	RowLimit        = 20
-	HypothesisLimit = 20
-	AgentLimit      = 100
+	RowLimit   = 20
+	AgentLimit = 100
 
 	defaultCacheTTL   = 10 * time.Second
 	defaultStaleTTL   = 2 * time.Minute
@@ -29,8 +28,6 @@ const (
 	defaultMaxBuckets = 4096
 	defaultConcurrent = 16
 	defaultConns      = 64
-	defaultAuthRate   = 5.0 / 60.0
-	defaultAuthBurst  = 5
 )
 
 // Agent is explicitly selected operator metadata. Username is used solely to
@@ -64,9 +61,6 @@ type Options struct {
 	RateBurst      int
 	MaxConcurrent  int
 	MaxConnections int
-
-	Content      bool
-	ContentToken string
 }
 
 type Handler struct {
@@ -76,11 +70,8 @@ type Handler struct {
 	logger   *slog.Logger
 	cache    *pageCache
 	limiter  *ratelimit.Limiter
-	auth     *ratelimit.Limiter
 	sem      chan struct{}
 	maxConns int
-	content  bool
-	token    string
 	ttl      time.Duration
 }
 
@@ -105,9 +96,6 @@ func New(o Options) (*Handler, error) {
 		}
 		a.Location = loc
 		agents = append(agents, a)
-	}
-	if o.Content && strings.TrimSpace(o.ContentToken) == "" {
-		return nil, errors.New("creating dashboard: content mode requires a token")
 	}
 	cacheTTL := o.CacheTTL
 	if cacheTTL <= 0 {
@@ -147,32 +135,29 @@ func New(o Options) (*Handler, error) {
 		logger:   o.Logger,
 		cache:    newPageCache(cacheTTL, staleTTL, cacheMax, now),
 		limiter:  ratelimit.New(rate, float64(burst), defaultMaxBuckets, now),
-		auth:     ratelimit.New(defaultAuthRate, defaultAuthBurst, defaultMaxBuckets, now),
 		sem:      make(chan struct{}, concurrent),
 		maxConns: conns,
-		content:  o.Content,
-		token:    o.ContentToken,
 		ttl:      cacheTTL,
 	}, nil
 }
 
 // Page is the default public projection used by offline evaluation and tests.
 func (h *Handler) Page(ctx context.Context) (Page, error) {
-	p, err := h.readPage(ctx, h.agents[0], 7, postView{}, h.now().UTC(), false)
+	p, err := h.readPage(ctx, h.agents[0], 7, postView{}, h.now().UTC())
 	if err != nil {
 		return Page{}, queryError(ctx)
 	}
 	return p, nil
 }
 
-func (h *Handler) readPage(ctx context.Context, a Agent, days int, view postView, now time.Time, content bool) (Page, error) {
+func (h *Handler) readPage(ctx context.Context, a Agent, days int, view postView, now time.Time) (Page, error) {
 	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
 	defer cancel()
-	snap, err := h.source.DashboardSnapshot(ctx, store.DashboardQuery{AgentID: a.ID, From: dayStarts(a.Limits, now, days)[0], Now: now, Content: content})
+	snap, err := h.source.DashboardSnapshot(ctx, store.DashboardQuery{AgentID: a.ID, From: dayStarts(a.Limits, now, days)[0], Now: now})
 	if err != nil {
 		return Page{}, err
 	}
-	return buildPage(snap, h.agents, a, days, view, now, content)
+	return buildPage(snap, h.agents, a, days, view, now)
 }
 
 func (h *Handler) agent(id string) (Agent, bool) {

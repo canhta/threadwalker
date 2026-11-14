@@ -48,30 +48,10 @@ func TestDreamDueUsesLocalZoneAndRunsOncePerLocalDay(t *testing.T) {
 	}
 }
 
-func TestStudyDueUsesLocalSlotsAndCollapsesMissedSlots(t *testing.T) {
-	s := mustPhaseSchedule(t, config.ScheduleConfig{Timezone: "Asia/Ho_Chi_Minh", StudySlots: []string{"08:00", "13:00"}})
-	now := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC) // 07:00 local
-	due, key, ok := s.StudyDue(now, time.Time{})
-	if !ok || key != "2026-01-01T08:00" || !due.Equal(time.Date(2026, 1, 1, 1, 0, 0, 0, time.UTC)) {
-		t.Fatalf("next slot: due=%v key=%s ok=%v", due, key, ok)
-	}
-	// 08:10 local: the 08:00 slot is due (one catch-up) and the next is 13:00.
-	now = time.Date(2026, 1, 1, 1, 10, 0, 0, time.UTC)
-	due, key, ok = s.StudyDue(now, time.Time{})
-	if !ok || key != "2026-01-01T08:00" || due.After(now) {
-		t.Fatalf("missed slot: due=%v key=%s ok=%v", due, key, ok)
-	}
-	last := time.Date(2026, 1, 1, 1, 15, 0, 0, time.UTC)
-	due, key, ok = s.StudyDue(now.Add(2*time.Hour), last)
-	if !ok || key != "2026-01-01T13:00" || !due.Equal(time.Date(2026, 1, 1, 6, 0, 0, 0, time.UTC)) {
-		t.Fatalf("next slot after study: due=%v key=%s ok=%v", due, key, ok)
-	}
-}
-
 func TestPhaseScheduleDisabledAndInvalid(t *testing.T) {
 	s := mustPhaseSchedule(t, config.ScheduleConfig{})
-	if s.DreamEnabled() || s.StudyEnabled() {
-		t.Fatal("empty schedule should disable both phases")
+	if s.DreamEnabled() {
+		t.Fatal("empty schedule should disable the dream")
 	}
 	if _, err := agent.NewPhaseSchedule(config.ScheduleConfig{DreamAt: "25:00"}); err == nil {
 		t.Fatal("invalid dream time accepted")
@@ -107,7 +87,7 @@ func TestDreamRunsOnceAcrossRestartAndDoesNotMoveNextWake(t *testing.T) {
 	}
 	makeRuntime := func() *agent.Runtime {
 		fixture := agent.NewOfflineFixture(clock)
-		runtime, newErr := agent.New(agent.Options{Store: st, Template: tmpl, Now: clock, HTTPClient: fixture.Client(), FetchTrends: fixture.Trends, FetchStudy: fixture.Study})
+		runtime, newErr := agent.New(agent.Options{Store: st, Template: tmpl, Now: clock, HTTPClient: fixture.Client(), FetchTrends: fixture.Trends})
 		if newErr != nil {
 			t.Fatal(newErr)
 		}

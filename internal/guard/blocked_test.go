@@ -45,7 +45,7 @@ func TestBlockedResultNamesTheFixablePart(t *testing.T) {
 }
 
 func TestEveryReasonCodeHasAFixedHint(t *testing.T) {
-	for _, reason := range []string{"unknown_tool", "unsupported_tool_type", "invalid_tool_call_id", "invalid_tool_arguments", "sensitive_arguments", "agent_not_running", "wake_not_open", "phase_read_only", "text_length", "blocked_phrase", "identity_targeting", "political_recommendation", "engagement_bait", "explore_budget", "own_account", "reply_target_host", "reply_target_mismatch", "reply_target_unread", "reply_url", "reply_mention", "invalid_policy", "invalid_hypothesis", "shared_promotion_link", "do_not_contact", "replies_per_user_7d", "replies_per_hour", "reply_breaker", "thread_per_day", "replies_per_conversation", "target_outside_window", "min_seconds_between_actions", "limit_per_wake", "topic_args", "min_minutes_between_posts", "lesson_missing_citation", "lesson_foreign_citation", "lesson_number_mismatch", "lesson_foreign_url", "lesson_secret", "lesson_cap", "strategy_input", "playbook_input", "unknown_knowledge", "budget", "stale_ref", "dated_topic"} {
+	for _, reason := range []string{"unknown_tool", "unsupported_tool_type", "invalid_tool_call_id", "invalid_tool_arguments", "sensitive_arguments", "agent_not_running", "wake_not_open", "phase_read_only", "text_length", "blocked_phrase", "identity_targeting", "political_recommendation", "engagement_bait", "own_account", "reply_target_host", "reply_target_mismatch", "reply_target_unread", "reply_url", "reply_mention", "invalid_policy", "shared_promotion_link", "do_not_contact", "replies_per_user_7d", "replies_per_hour", "reply_breaker", "thread_per_day", "replies_per_conversation", "target_outside_window", "min_seconds_between_actions", "limit_per_wake", "topic_args", "min_minutes_between_posts", "lesson_missing_citation", "lesson_foreign_citation", "lesson_number_mismatch", "lesson_foreign_url", "lesson_secret", "budget", "stale_ref"} {
 		b, hint := modelResult(t, &guard.BlockedError{Reason: reason, Detail: "x"})
 		if b != reason || hint == "" || strings.Contains(hint, "%!") {
 			t.Errorf("%s: %q", reason, hint)
@@ -66,12 +66,4 @@ func TestPostsAreSpacedApart(t *testing.T) {
 	}
 	h.clock.Advance(111 * time.Minute)
 	h.allow("post", postArgs(3))
-}
-
-func TestMemoryAddIsOnlyADreamTool(t *testing.T) {
-	for _, spec := range guard.Specs() {
-		if spec.Name == "memory_add" && (len(spec.Phases) != 1 || spec.Phases[0] != guard.PhaseDream) {
-			t.Fatalf("memory_add phases %v", spec.Phases)
-		}
-	}
 }

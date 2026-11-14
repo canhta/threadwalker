@@ -58,7 +58,7 @@ func newCtlServer(t *testing.T) *ctlServer {
 	s.id = tmpl.ID
 	now := func() time.Time { return ctlNow }
 	s.fixture = agent.NewOfflineFixture(now)
-	r, err := agent.New(agent.Options{Store: s.st, Template: tmpl, Now: now, HTTPClient: s.fixture.Client(), FetchTrends: s.fixture.Trends, FetchStudy: s.fixture.Study})
+	r, err := agent.New(agent.Options{Store: s.st, Template: tmpl, Now: now, HTTPClient: s.fixture.Client(), FetchTrends: s.fixture.Trends})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -146,7 +146,7 @@ func TestCtlWakeRunsInsideTheLimitsAndShowsItsTranscript(t *testing.T) {
 	for _, e := range view.Entries {
 		kinds[e.Kind]++
 	}
-	if kinds[store.TranscriptContext] != 1 || kinds[store.TranscriptToolResult] != 4 || kinds[store.TranscriptEnd] != 1 || len(view.Guard) != 5 || view.Wake.ID != 1 {
+	if kinds[store.TranscriptContext] != 1 || kinds[store.TranscriptToolResult] != 3 || kinds[store.TranscriptEnd] != 1 || len(view.Guard) != 4 || view.Wake.ID != 1 {
 		t.Fatalf("kinds=%v guard=%d view=%s", kinds, len(view.Guard), out)
 	}
 	if _, out, _ = s.ctl("wake-show", "1", "--agent", s.id); !strings.Contains(out, "wake #1") || !strings.Contains(out, "tool_result") || !strings.Contains(out, "guard: post allowed") {
@@ -189,7 +189,7 @@ func TestCtlSecondConcurrentTriggerIsRefused(t *testing.T) {
 	done := make(chan int, 1)
 	go func() { code, _, _ := s.ctl("wake", "--agent", s.id); done <- code }()
 	<-inWake
-	code, _, stderr := s.ctl("wake", "--agent", s.id, "--phase", "study")
+	code, _, stderr := s.ctl("wake", "--agent", s.id, "--phase", "dream")
 	if code != exitFailure || !strings.Contains(stderr, "another operator job") {
 		t.Fatalf("second trigger: code=%d %s", code, stderr)
 	}
@@ -443,28 +443,5 @@ func TestDraftSampleInputParses(t *testing.T) {
 	}
 	if !ap || posts < 3 || replies < 5 {
 		t.Fatalf("posts %d replies %d ap %v", posts, replies, ap)
-	}
-}
-
-func TestCtlStrategyRevertAppendsAnEarlierRevision(t *testing.T) {
-	s := newCtlServer(t)
-	if code, _, stderr := s.ctl("strategy", "revert", "--agent", s.id); code == 0 || !strings.Contains(stderr, "no revision") {
-		t.Fatalf("empty history: %d %s", code, stderr)
-	}
-	if _, err := s.st.DB().Exec(`INSERT INTO notes(agent_id,text,created_at) VALUES(?,'n',?)`, s.id, ctlNow.Format(time.RFC3339Nano)); err != nil {
-		t.Fatal(err)
-	}
-	for _, text := range []string{"first", "second"} {
-		if _, err := s.st.WriteStrategy(context.Background(), s.id, text, []string{"note:1"}, ctlNow); err != nil {
-			t.Fatal(err)
-		}
-	}
-	_, out, stderr := s.ctl("strategy", "revert", "--agent", s.id, "--to", "1", "--json")
-	if got := decode[maintenanceOutcome](t, out); got.Step != admin.StrategyRevert || got.Count != 3 {
-		t.Fatalf("revert=%s %s", out, stderr)
-	}
-	history, err := s.st.StrategyHistory(context.Background(), s.id)
-	if err != nil || len(history) != 3 || history[2].Text != "first" {
-		t.Fatalf("history=%+v err=%v", history, err)
 	}
 }

@@ -13,11 +13,11 @@ import (
 // the generic error, and both log the same code.
 func TestModelFacingFailures(t *testing.T) {
 	var blocked *guard.BlockedError
-	fixable := modelFacing(fmt.Errorf("writing strategy: %w", store.ErrStrategyInput))
-	if !errors.As(fixable, &blocked) || blocked.Reason != "strategy_input" || guard.Hint(blocked.Reason, "") == "" || failureReason(fixable) != "strategy_input" {
+	fixable := modelFacing(fmt.Errorf("checking lesson: %w", errLessonSecret))
+	if !errors.As(fixable, &blocked) || blocked.Reason != "lesson_secret" || guard.Hint(blocked.Reason, "") == "" || failureReason(fixable) != "lesson_secret" {
 		t.Fatalf("fixable: %v", fixable)
 	}
-	if !errors.Is(modelFacing(fmt.Errorf("adding memory entry: %w", errLessonCap)), errLessonCap) {
+	if !errors.Is(modelFacing(fmt.Errorf("checking lesson: %w", errStaleRef)), errStaleRef) {
 		t.Fatal("the cause was lost")
 	}
 	other := modelFacing(errors.New("disk full"))
@@ -38,5 +38,27 @@ func TestLessonNumbersIgnoreDatesAndIds(t *testing.T) {
 	}
 	if err := checkLesson("action 43 có 22,959 view", ev); !errors.Is(err, errLessonNumber) {
 		t.Fatalf("an unmeasured number passed: %v", err)
+	}
+}
+
+func TestCheckLessonGate(t *testing.T) {
+	ev := store.ActionEvidence{Counters: map[int64]bool{7: true, 120: true}, URLs: map[string]bool{"https://threads.example/p/1": true}}
+	for _, tc := range []struct {
+		name, text string
+		want       error
+	}{
+		{"measured counters", "Post 120 views, 7 likes: short roasts work", nil},
+		{"no numbers", "Short roasts work", nil},
+		{"own url", "see https://threads.example/p/1 for the shape", nil},
+		{"unmeasured number", "Post got 121 views", errLessonNumber},
+		{"decimal", "Post got 7.5 likes", errLessonNumber},
+		{"foreign url", "see https://threads.example/p/2", errLessonURL},
+		{"secret key", "key sk-abcdefghijklmnopqrstuvwx", errLessonSecret},
+		{"bearer token", "use Bearer abcdefghijklmnopqrstuvwx", errLessonSecret},
+		{"per-wake ref", "post r58 got the reaction", errStaleRef},
+	} {
+		if err := checkLesson(tc.text, ev); !errors.Is(err, tc.want) && (err != nil || tc.want != nil) {
+			t.Errorf("%s: err %v, want %v", tc.name, err, tc.want)
+		}
 	}
 }

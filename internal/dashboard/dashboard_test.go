@@ -1,35 +1,24 @@
 package dashboard_test
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"math"
 	"net/http/httptest"
-	"net/url"
 	"regexp"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/canhta/threadz/internal/dashboard"
-	"github.com/canhta/threadz/internal/logging"
 	"github.com/canhta/threadz/internal/store"
 )
 
 func get(h *dashboard.Handler, target string) *httptest.ResponseRecorder {
 	rr := httptest.NewRecorder()
 	h.ServeHTTP(rr, httptest.NewRequest("GET", target, nil))
-	return rr
-}
-
-func getWithAuth(h *dashboard.Handler, target, token string) *httptest.ResponseRecorder {
-	req := httptest.NewRequest("GET", target, nil)
-	req.Header.Set("Authorization", "Bearer "+token)
-	rr := httptest.NewRecorder()
-	h.ServeHTTP(rr, req)
 	return rr
 }
 
@@ -48,11 +37,6 @@ func TestPageProjectsOnlySelectedSafeMetadata(t *testing.T) {
 	// A foreign-link action and its samples must never become a public row.
 	snap.Publications = append([]store.DashboardPublication{pub(2, "reply", ago(3*day), "https://www.threads.net/@foreign_handle/post/XYZ")}, snap.Publications...)
 	snap.Metrics = append(snap.Metrics, sample(2, ago(2*day), 999, 99, 9, 9))
-	snap.MemoryIndex = []string{private}
-	snap.NoteCount = 1
-	snap.Notes = []store.DashboardNote{{Text: private, CreatedAt: fixedNow()}}
-	snap.Playbook = store.DashboardPlaybook{Testing: 1, Samples: 4}
-	snap.Hypotheses = []store.DashboardHypothesis{{ID: 1, Status: "testing", N: 4, Text: "an idea", Decision: &store.DashboardDecision{Status: "rejected", Reason: private}}}
 	snap.ToolCalls = []store.DashboardToolCall{call(1, 1, "search", private, "")}
 	snap.Wakes = []store.DashboardWake{finishedWake(1, "agent", "provider_error", 3)}
 	snap.Ledger = []store.DashboardLedgerDay{{Day: fixedNow().Format("2006-01-02"), CostUSD: 0.25}}
@@ -77,15 +61,6 @@ func TestPageProjectsOnlySelectedSafeMetadata(t *testing.T) {
 	if page.Growth == nil || len(page.Growth.Posts) != 1 || page.Growth.Posts[0].URL != "https://www.threads.net/@own_alpha/post/ABC123" {
 		t.Fatalf("post projection: %+v", page.Growth)
 	}
-	if page.Learned.Notes != 1 || len(page.Learned.NotesRows) != 0 || page.Learned.MemoryIndex != "" {
-		t.Fatalf("content leaked without opt in: %+v", page.Learned)
-	}
-	if len(page.Learned.Hypotheses) != 1 || page.Learned.Hypotheses[0].Text != "an idea" || page.Learned.Hypotheses[0].Evidence != "" {
-		t.Fatalf("hypothesis evidence leaked: %+v", page.Learned.Hypotheses)
-	}
-	if page.Content {
-		t.Fatal("content mode on by default")
-	}
 	if page.Growth.Views != 300 || page.Growth.Likes != 30 || page.Growth.Replies != 6 || page.Growth.Reposts != 2 {
 		t.Fatalf("growth totals: %+v", page.Growth)
 	}
@@ -95,7 +70,7 @@ func TestPageProjectsOnlySelectedSafeMetadata(t *testing.T) {
 	if page.Return.CostPer1000 == "" {
 		t.Fatalf("return panel missing: %+v", page.Return)
 	}
-	if q := src.queries[0]; q.AgentID != "alpha" || q.Content || !q.Now.Equal(fixedNow()) || !q.From.Equal(time.Date(2026, 11, 6, 0, 0, 0, 0, time.UTC)) {
+	if q := src.queries[0]; q.AgentID != "alpha" || !q.Now.Equal(fixedNow()) || !q.From.Equal(time.Date(2026, 11, 6, 0, 0, 0, 0, time.UTC)) {
 		t.Fatalf("snapshot query: %+v", q)
 	}
 	if _, err := h.Page(cancelled()); err == nil {
@@ -228,31 +203,20 @@ func TestBoundsAndPlainEnumLabels(t *testing.T) {
 	for i := 0; i < 60; i++ {
 		snap.ToolCalls = append(snap.ToolCalls, call(int64(i+1), 1, "private-tool", `{"outcome":"sk-secret"}`, "private_code"))
 	}
-	for i := 0; i < 20; i++ {
-		snap.Hypotheses = append(snap.Hypotheses, store.DashboardHypothesis{ID: int64(20 - i), Status: "testing", N: 1, Text: "private"})
-	}
-	for i := 0; i < 40; i++ {
-		snap.Notes = append(snap.Notes, store.DashboardNote{Text: "private", CreatedAt: fixedNow()})
-	}
-	snap.NoteCount = 60
 	for i := 0; i < 60; i++ {
 		snap.Publications = append(snap.Publications, pub(int64(60-i), "post", ago(time.Duration(i)*time.Hour), ownLink(idCode("P", i))))
 		snap.Metrics = append(snap.Metrics, sample(int64(60-i), ago(time.Duration(i)*time.Minute), int64(i), 1, 0, 0))
 	}
-	h := newHandler(newSource(snap), func(o *dashboard.Options) { o.Content = true; o.ContentToken = "token-123456789" })
-	rr := getWithAuth(h, "/", "token-123456789")
+	rr := get(newHandler(newSource(snap)), "/")
 	if rr.Code != 200 {
 		t.Fatalf("status %d", rr.Code)
 	}
-	if !strings.Contains(rr.Body.String(), "Older runs") || !strings.Contains(rr.Body.String(), "Older ideas") || !strings.Contains(rr.Body.String(), "Older notes") {
+	if !strings.Contains(rr.Body.String(), "Older runs") {
 		t.Fatal("older bounded rows not present")
 	}
 	page := mustPage(t, newHandler(newSource(snap)))
 	if len(page.Wakes.Rows) != 5 || len(page.Wakes.Older) != 15 {
 		t.Fatalf("wake bounds: %d + %d", len(page.Wakes.Rows), len(page.Wakes.Older))
-	}
-	if len(page.Learned.Hypotheses) != 10 || len(page.Learned.OlderHypotheses) != 10 {
-		t.Fatalf("idea bounds: %d + %d", len(page.Learned.Hypotheses), len(page.Learned.OlderHypotheses))
 	}
 	// The first page is one step; the panel knows the whole bounded total.
 	if got, total := len(page.Growth.Posts), page.Growth.Total; got != 6 || total != 42 {
@@ -269,124 +233,10 @@ func TestBoundsAndPlainEnumLabels(t *testing.T) {
 	}
 }
 
-func TestContentModeRequiresTokenAndNeverLeaksIt(t *testing.T) {
-	const token = "synthetic-token-123456"
-	const hostile = `<script>alert("x")</script> private lesson`
-	snap := measured()
-	snap.NoteCount = 1
-	snap.Notes = []store.DashboardNote{{Text: hostile, CreatedAt: time.Date(2026, 11, 12, 10, 0, 0, 0, time.UTC)}}
-	snap.Playbook = store.DashboardPlaybook{Testing: 1, Samples: 2}
-	snap.Hypotheses = []store.DashboardHypothesis{{ID: 1, Status: "testing", N: 2, Text: "a private idea"}}
-	snap.MemoryIndex = []string{"private self note"}
-	snap.Drafts = 1
-	snap.ToolCalls = []store.DashboardToolCall{call(1, 1, "post", `{"outcome":"success","text":"sk-content-secret"}`, "")}
-	src := newSource(snap)
-	var logs bytes.Buffer
-	logger, _ := logging.New(&logs, "debug", "json")
-	h := newHandler(src, func(o *dashboard.Options) {
-		o.Content = true
-		o.ContentToken = token
-		o.Logger = logger
-	})
-
-	rr := get(h, "/")
-	if rr.Code != 401 || strings.Contains(rr.Body.String(), "private lesson") {
-		t.Fatalf("unauthenticated content: %d %s", rr.Code, rr.Body.String())
-	}
-	if rr.Header().Get("WWW-Authenticate") == "" {
-		t.Fatal("missing challenge")
-	}
-	rr = getWithAuth(h, "/", token)
-	if rr.Code != 200 {
-		t.Fatalf("token page: %d %s", rr.Code, rr.Body.String())
-	}
-	if q := src.queries[len(src.queries)-1]; !q.Content {
-		t.Fatalf("content page did not ask for content: %+v", q)
-	}
-	if rr.Header().Get("Cache-Control") != "private, no-store" || rr.Header().Get("ETag") != "" {
-		t.Fatalf("private cache headers: %q %q", rr.Header().Get("Cache-Control"), rr.Header().Get("ETag"))
-	}
-	for _, want := range []string{"a private idea", "private self note", "&lt;script&gt;", "Testing, tried 2 times"} {
-		if !strings.Contains(rr.Body.String(), want) {
-			t.Fatalf("content missing %q", want)
-		}
-	}
-	if strings.Contains(rr.Body.String(), "<script>alert") {
-		t.Fatal("hostile content not escaped")
-	}
-	for _, forbidden := range []string{"private draft text", "private args", "sk-content-secret"} {
-		if strings.Contains(rr.Body.String(), forbidden) {
-			t.Fatalf("content mode leaked %q", forbidden)
-		}
-	}
-
-	form := url.Values{"token": {"wrong-token"}}
-	req := httptest.NewRequest("POST", "/unlock", strings.NewReader(form.Encode()))
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	bad := httptest.NewRecorder()
-	h.ServeHTTP(bad, req)
-	if bad.Code != 401 {
-		t.Fatalf("wrong token: %d", bad.Code)
-	}
-	if strings.Contains(logs.String(), token) || strings.Contains(logs.String(), "wrong-token") {
-		t.Fatal("token reached the logs")
-	}
-
-	form = url.Values{"token": {token}}
-	req = httptest.NewRequest("POST", "/unlock", strings.NewReader(form.Encode()))
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	ok := httptest.NewRecorder()
-	h.ServeHTTP(ok, req)
-	if ok.Code != 303 || !strings.Contains(ok.Header().Get("Set-Cookie"), "tw_dashboard=") {
-		t.Fatalf("unlock: %d %q", ok.Code, ok.Header().Get("Set-Cookie"))
-	}
-	cookieReq := httptest.NewRequest("GET", "/", nil)
-	for _, c := range ok.Result().Cookies() {
-		cookieReq.AddCookie(c)
-	}
-	withCookie := httptest.NewRecorder()
-	h.ServeHTTP(withCookie, cookieReq)
-	if withCookie.Code != 200 || !strings.Contains(withCookie.Body.String(), "a private idea") {
-		t.Fatalf("cookie access: %d", withCookie.Code)
-	}
-
-	// Content responses are not served from the public cache.
-	src.err = errors.New("no such table: wakes")
-	if rr = getWithAuth(h, "/", token); rr.Code != 503 || strings.Contains(rr.Body.String(), "private") {
-		t.Fatalf("content cached or leaked: %d %s", rr.Code, rr.Body.String())
-	}
-	public := newHandler(newSource(snap))
-	if rr = get(public, "/unlock"); rr.Code != 404 {
-		t.Fatalf("unlock exposed without content mode: %d", rr.Code)
-	}
-	if rr = get(public, "/"); strings.Contains(rr.Body.String(), "a private idea") || strings.Contains(rr.Body.String(), "private self note") {
-		t.Fatal("content present without the flag")
-	}
-}
-
-func TestContentModeProjectsDecisionEvidenceAndNotes(t *testing.T) {
-	snap := started()
-	snap.NoteCount = 2
-	snap.Notes = []store.DashboardNote{{Text: "dated", CreatedAt: time.Date(2026, 11, 12, 10, 5, 0, 0, time.UTC)}, {Text: "undated"}}
-	snap.Playbook = store.DashboardPlaybook{Established: 2}
-	snap.Hypotheses = []store.DashboardHypothesis{
-		{ID: 2, Status: "established", DecidedAt: time.Date(2026, 11, 10, 0, 0, 0, 0, time.UTC), Text: "dated change", Outcomes: 3,
-			Decision: &store.DashboardDecision{Status: "established", Reason: "beat control", At: time.Date(2026, 11, 10, 8, 0, 0, 0, time.UTC)}},
-		{ID: 1, Status: "established", Text: "undated change", Decision: &store.DashboardDecision{Status: "rejected"}},
-	}
-	h := newHandler(newSource(snap), func(o *dashboard.Options) { o.Content = true; o.ContentToken = "token-123456789" })
-	body := getWithAuth(h, "/", "token-123456789").Body.String()
-	for _, want := range []string{"Changed to Adopted on 10 Nov: beat control", "Changed to Dropped", "12 Nov 10:05", "undated change"} {
-		if !strings.Contains(body, want) {
-			t.Fatalf("content page missing %q", want)
-		}
-	}
-}
-
 func TestEmptyDryRunAndPopulatedStates(t *testing.T) {
 	h := newHandler(newSource(started()))
 	body := get(h, "/?agent=beta").Body.String()
-	for _, want := range []string{"No data yet.", "None yet.", "No results yet."} {
+	for _, want := range []string{"No data yet.", "None yet."} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("dry-run page missing %q", want)
 		}
@@ -420,19 +270,13 @@ func TestEmptyDryRunAndPopulatedStates(t *testing.T) {
 	}
 	today := fixedNow().Format("2006-01-02")
 	full.Ledger = []store.DashboardLedgerDay{{Day: today, CostUSD: 0.20}}
-	full.Phases = []store.DashboardPhaseSpend{{Day: today, Phase: "agent", CostUSD: 0.15}, {Day: today, Phase: "study", CostUSD: 0.05}}
+	full.Phases = []store.DashboardPhaseSpend{{Day: today, Phase: "agent", CostUSD: 0.20}}
 	full.Trends = []store.DashboardTrend{{Title: "Synthetic topic A", Source: "hacker_news", Rank: 1, ObservedAt: fixedNow()}}
-	full.Playbook = store.DashboardPlaybook{Testing: 1, Samples: 4}
-	full.Hypotheses = []store.DashboardHypothesis{{ID: 1, Status: "testing", N: 4}}
-	full.NoteCount = 1
 	body = get(newHandler(newSource(full)), "/").Body.String()
-	for _, want := range []string{"1,200", "best", "worst", "Synthetic topic A", "12.5%", "$0.20", "Per 1,000 views", "ideas being tested"} {
+	for _, want := range []string{"1,200", "best", "worst", "Synthetic topic A", "12.5%", "$0.20", "Per 1,000 views"} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("populated page missing %q", want)
 		}
-	}
-	if strings.Contains(body, "a note") || strings.Contains(body, ">idea<") {
-		t.Fatal("content rendered without opt in")
 	}
 }
 
@@ -478,7 +322,7 @@ func TestFailClosedOnSourceErrorsAndInvalidNumbers(t *testing.T) {
 			s.Ledger = []store.DashboardLedgerDay{{Day: "2026-11-12", CostUSD: nan}}
 		},
 		"negative phase": func(s *store.DashboardSnapshot) {
-			s.Phases = []store.DashboardPhaseSpend{{Day: "2026-11-12", Phase: "study", CostUSD: -1}}
+			s.Phases = []store.DashboardPhaseSpend{{Day: "2026-11-12", Phase: "mystery", CostUSD: -1}}
 		},
 		"negative steps":   func(s *store.DashboardSnapshot) { s.Wakes = []store.DashboardWake{{ID: 1, Steps: -1}} },
 		"negative cost":    func(s *store.DashboardSnapshot) { s.Wakes = []store.DashboardWake{{ID: 1, CostUSD: -1}} },
@@ -548,7 +392,6 @@ func TestValidatesOptionsAndEscapesAgentMetadata(t *testing.T) {
 		{Source: src, Now: now, Agents: []dashboard.Agent{{ID: strings.Repeat("a", 129), DailyBudgetUSD: 1}}},
 		{Source: src, Now: now, Agents: []dashboard.Agent{{ID: "alpha", DailyBudgetUSD: math.Inf(1)}}},
 		{Source: src, Now: now, Agents: []dashboard.Agent{{ID: "alpha", DailyBudgetUSD: 1, Timezone: "Mars/Olympus"}}},
-		{Source: src, Now: now, Agents: []dashboard.Agent{{ID: "alpha", DailyBudgetUSD: 1}}, Content: true},
 	} {
 		if _, err := dashboard.New(options); err == nil {
 			t.Fatal("accepted invalid options")
@@ -604,7 +447,7 @@ func TestStatsStepRowOnlyAfterAPost(t *testing.T) {
 
 func TestGuardRefusalIsCountedAsBlockedNotFailed(t *testing.T) {
 	snap := started()
-	snap.Wakes = []store.DashboardWake{finishedWake(1, "study", "completed", 1)}
+	snap.Wakes = []store.DashboardWake{finishedWake(1, "mystery", "completed", 1)}
 	// A research run tried to message the owner while the phase is read-only.
 	// The guard refused it and wrote no result.
 	snap.ToolCalls = []store.DashboardToolCall{call(1, 1, "notify_owner", "", "phase_read_only")}
@@ -694,7 +537,6 @@ func TestRenderedCountsUseSingularForms(t *testing.T) {
 	snap.Publications = []store.DashboardPublication{pub(1, "post", ago(time.Hour), ownLink("ONE1"))}
 	snap.Metrics = []store.DashboardMetric{sample(1, ago(30*time.Minute), 1, 0, 0, 0)}
 	snap.Trends = []store.DashboardTrend{{Title: "A synthetic topic", Source: "hacker_news", Rank: 1, ObservedAt: fixedNow()}}
-	snap.NoteCount = 1
 	body := pageText(get(newHandler(newSource(snap)), "/").Body.String())
 	for _, want := range []string{"1 hour"} {
 		if !strings.Contains(body, want) {
@@ -734,41 +576,6 @@ func pageText(s string) string {
 	return strings.Join(strings.Fields(pageTagRE.ReplaceAllString(s, " ")), " ")
 }
 
-func TestContentModeShowsCandidatesAndPenaltyKnowledge(t *testing.T) {
-	snap := started()
-	snap.Candidates = []store.KnowledgeCandidate{{Technique: "friday recap threads", SourceURL: "https://x.test/recap", CreatedAt: time.Date(2026, 11, 12, 0, 0, 0, 0, time.UTC)}}
-	h := newHandler(newSource(snap), func(o *dashboard.Options) { o.Content = true; o.ContentToken = "token-123456789" })
-	body := getWithAuth(h, "/", "token-123456789").Body.String()
-	for _, want := range []string{"friday recap threads", "https://x.test/recap", "Asking for comments or shares", "Could cost reach"} {
-		if !strings.Contains(body, want) {
-			t.Fatalf("content page missing %q", want)
-		}
-	}
-	h = newHandler(newSource(snap))
-	if body = get(h, "/").Body.String(); strings.Contains(body, "friday recap threads") {
-		t.Fatal("candidate text leaked without content mode")
-	}
-}
-
-func TestContentModeShowsEachStrategyRevisionAsADiff(t *testing.T) {
-	snap := started()
-	at := time.Date(2026, 11, 12, 10, 0, 0, 0, time.UTC)
-	snap.Strategy = []store.DashboardStrategy{
-		{Version: 2, Text: "keep short roasts\nnew series <b>Q&A</b>", Citations: []string{"action:7"}, CreatedAt: at},
-		{Version: 1, Text: "keep short roasts\ndrop hashtags", Citations: []string{"note:1"}, CreatedAt: at.Add(-24 * time.Hour)},
-	}
-	h := newHandler(newSource(snap), func(o *dashboard.Options) { o.Content = true; o.ContentToken = "token-123456789" })
-	body := strings.ReplaceAll(getWithAuth(h, "/", "token-123456789").Body.String(), "&#43;", "+")
-	for _, want := range []string{"v2", "action:7", ">  keep short roasts<", "+ new series &lt;b&gt;Q&amp;A&lt;/b&gt;", "- drop hashtags", "+ drop hashtags"} {
-		if !strings.Contains(body, want) {
-			t.Fatalf("strategy diff missing %q in %s", want, body)
-		}
-	}
-	if public := get(newHandler(newSource(snap)), "/").Body.String(); strings.Contains(public, "keep short roasts") {
-		t.Fatal("strategy text on the public page")
-	}
-}
-
 func TestFailedStepsShowReasonCodes(t *testing.T) {
 	snap := started()
 	snap.Wakes = []store.DashboardWake{finishedWake(1, "agent", "completed", 4)}
@@ -776,13 +583,13 @@ func TestFailedStepsShowReasonCodes(t *testing.T) {
 		call(1, 1, "search", `{"outcome":"error","reason":"timeout"}`, ""),
 		call(2, 1, "search", `{"outcome":"error","reason":"timeout"}`, ""),
 		call(3, 1, "search", `{"outcome":"error","reason":"private text"}`, ""),
-		call(4, 1, "memory_add", `{"outcome":"error","reason":"lesson_number_mismatch"}`, ""),
+		call(4, 1, "post", `{"outcome":"error","reason":"lesson_number_mismatch"}`, ""),
 	}
 	page := mustPage(t, newHandler(newSource(snap)))
 	if wt := wakeTool(page.Wakes.Rows[0].ToolSummary, "Search"); wt == nil || wt.Failed != 3 || wt.Why != "timeout 2, failed 1" {
 		t.Fatalf("failed search reasons: %+v", page.Wakes.Rows[0].ToolSummary)
 	}
-	if row := toolRow(page.ToolCalls.Rows, "Add memory"); row == nil || row.Failed != 0 || row.Blocked != 1 {
+	if row := toolRow(page.ToolCalls.Rows, "Post"); row == nil || row.Failed != 0 || row.Blocked != 1 {
 		t.Fatalf("a lesson refusal is a block, not a failure: %+v", row)
 	}
 }

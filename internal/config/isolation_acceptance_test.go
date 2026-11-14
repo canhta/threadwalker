@@ -33,7 +33,6 @@ func isolationTemplateYAML(id, username, profileDir string) string {
 	b.WriteString("  good_replies:\n    - \"synthetic reply\"\n")
 	b.WriteString("  bad_examples:\n    - \"synthetic bad example\"\n")
 	b.WriteString("  style_avoid:\n    - \"synthetic avoided phrase\"\n")
-	b.WriteString("seed_playbook:\n  - \"synthetic hypothesis\"\n")
 	b.WriteString("llm:\n")
 	b.WriteString("  base_url: https://api.example.invalid\n")
 	b.WriteString("  model: synthetic-model\n")
@@ -81,9 +80,6 @@ func isolationProfileDirs(t *testing.T) (string, string) {
 func isolationGetenv(name string) string {
 	if name == "LLM_API_KEY" {
 		return "synthetic-isolation-test-key"
-	}
-	if name == "OPENAI_API_KEY" {
-		return "synthetic-embedding-key"
 	}
 	return ""
 }

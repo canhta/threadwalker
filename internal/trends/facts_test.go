@@ -75,19 +75,18 @@ func TestTopicFactsNormalisesHeat(t *testing.T) {
 	}
 }
 
-func TestStoryHeatsReadsTheHistoryOfAgentFetches(t *testing.T) {
+func TestStoryHeatsReadsTheHistoryOfEarlierFetches(t *testing.T) {
 	stories := []Story{{Title: "AI thay dev", Sources: []string{"a", "b"}}, {Title: "Chuyện mới", Sources: []string{"a"}}}
 	history := []store.TrendStory{
-		{Phase: "agent", Title: "ai thay dev", ObservedAt: at(-60), Rank: 4},
-		{Phase: "agent", Title: "AI thay dev", ObservedAt: at(-300), Rank: 1},
-		{Phase: "study", Title: "Chuyện mới", ObservedAt: at(-500), Rank: 0},
+		{Title: "ai thay dev", ObservedAt: at(-60), Rank: 4},
+		{Title: "AI thay dev", ObservedAt: at(-300), Rank: 1},
 	}
 	heats := StoryHeats(stories, history, at(0))
 	if heats[0].Sources != 2 || !heats[0].FirstSeen.Equal(at(-300)) || heats[0].PrevRank == nil || *heats[0].PrevRank != 4 || heats[0].Rank != 0 {
 		t.Fatalf("seen story: %+v", heats[0])
 	}
 	if heats[1].PrevRank != nil || !heats[1].FirstSeen.Equal(at(0)) || heats[1].Rank != 1 {
-		t.Fatalf("new story (a study row is another phase): %+v", heats[1])
+		t.Fatalf("new story: %+v", heats[1])
 	}
 }
 

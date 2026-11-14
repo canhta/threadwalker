@@ -163,7 +163,6 @@ func (h *pipelineHarness) templateFor(agentID string) config.Template {
 func (h *pipelineHarness) newProcessor(agentID string, withReader bool, mutate func(*metrics.Options)) *metrics.Processor {
 	h.t.Helper()
 	opts := metrics.Options{
-		Embedder:      testEmbedder(h.t, h.store),
 		Store:         h.store,
 		Template:      h.templateFor(agentID),
 		Now:           h.clock.Now,
@@ -173,7 +172,6 @@ func (h *pipelineHarness) newProcessor(agentID string, withReader bool, mutate f
 		RetryDelay:    5 * time.Minute,
 		BatchSize:     10,
 		FetchTrends:   metricTrends,
-		FetchStudy:    metricStudy,
 		ThreadsFactory: func(context.Context, config.Template) (threads.Backend, error) {
 			h.factories++
 			return h.source, nil

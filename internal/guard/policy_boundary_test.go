@@ -88,14 +88,8 @@ func newPolicyHarness(t *testing.T, mutate func(*config.Template)) *policyHarnes
 		t.Fatal(err)
 	}
 	clock := &policyClock{at: time.Date(2026, 11, 11, 10, 0, 0, 0, time.UTC)}
-	embedder, err := llm.NewOfflineEmbedder(config.LimitsConfig{MaxUSDPerDay: 1}, st, llm.Options{})
-	if err != nil {
-		t.Fatal(err)
-	}
-	d, err := tools.NewDispatcher(tools.Options{Embedder: embedder, Scope: guard.Scope{Store: st, Template: tmpl, WakeID: 1, Now: clock.Now}, FetchTrends: func(context.Context) ([]trends.Trend, error) {
+	d, err := tools.NewDispatcher(tools.Options{Scope: guard.Scope{Store: st, Template: tmpl, WakeID: 1, Now: clock.Now}, FetchTrends: func(context.Context) ([]trends.Trend, error) {
 		return []trends.Trend{{Source: "synthetic", Title: "synthetic-trend", URL: "https://example.test/trend"}}, nil
-	}, FetchStudy: func(context.Context) (trends.StudyFeed, error) {
-		return trends.StudyFeed{Items: []trends.Trend{{Source: "synthetic", Title: "synthetic-study", URL: "https://example.test/study"}}}, nil
 	}})
 	if err != nil {
 		t.Fatal(err)

@@ -87,7 +87,7 @@ func RunMetricSimulation(ctx context.Context, path string, hours int, logger *sl
 	create := func() error {
 		processors = nil
 		for _, tmpl := range templates {
-			p, err := metrics.New(metrics.Options{Embedder: offlineEmbedder(st, tmpl, clock, logger), Store: st, Template: tmpl, Now: clock, Logger: logger, ThreadsFactory: factory, FetchTrends: simulationTrends, FetchStudy: simulationStudy})
+			p, err := metrics.New(metrics.Options{Store: st, Template: tmpl, Now: clock, Logger: logger, ThreadsFactory: factory, FetchTrends: simulationTrends})
 			if err != nil {
 				return err
 			}
@@ -149,12 +149,12 @@ func RunMetricSimulation(ctx context.Context, path string, hours int, logger *sl
 			if err != nil || len(jobs) == 0 {
 				return e, errors.New("metric simulation: missing crash claim")
 			}
-			d, err := tools.NewDispatcher(tools.Options{Scope: guard.Scope{Store: st, Template: templates[0], WakeID: id, Now: clock, Logger: logger}, Threads: source, FetchTrends: simulationTrends, FetchStudy: simulationStudy, Embedder: offlineEmbedder(st, templates[0], clock, logger)})
+			d, err := tools.NewDispatcher(tools.Options{Scope: guard.Scope{Store: st, Template: templates[0], WakeID: id, Now: clock, Logger: logger}, Threads: source, FetchTrends: simulationTrends})
 			if err != nil {
 				return e, err
 			}
 			call := llm.ToolCall{ID: "synthetic-crash-read", Type: "function", Function: llm.CallFunction{Name: "read_own_metrics", Arguments: fmt.Sprintf(`{"action_id":%d}`, jobs[0].ActionID)}}
-			_, readErr := d.Dispatch(ctx, call)
+			_, readErr := d.DispatchHarness(ctx, call)
 			closeErr := source.Close(ctx)
 			if readErr != nil || closeErr != nil {
 				return e, errors.New("metric simulation: guarded crash read failed")
@@ -245,5 +245,3 @@ func RunMetricSimulation(ctx context.Context, path string, hours int, logger *sl
 }
 
 func simulationTrends(context.Context) ([]trends.Trend, error) { return nil, nil }
-
-func simulationStudy(context.Context) (trends.StudyFeed, error) { return trends.StudyFeed{}, nil }

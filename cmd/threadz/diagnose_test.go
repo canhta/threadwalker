@@ -73,11 +73,7 @@ func seedWake(t *testing.T, writer bool) seededWake {
 	}
 	mem := threads.NewMemory()
 	mem.Pages[threads.OpReadFeed] = threads.Page{Kind: "feed", Posts: []threads.Post{{Username: "synthetic_author", URL: "https://www.threads.com/@synthetic_author/post/FixtureOne", Text: "a stranger's words"}}}
-	emb, err := llm.NewOfflineEmbedder(tmpl.Limits, st, llm.Options{Now: func() time.Time { return now }})
-	if err != nil {
-		t.Fatal(err)
-	}
-	d, err := tools.NewDispatcher(tools.Options{Scope: scope, Threads: mem, Embedder: emb, FetchStudy: func(context.Context) (trends.StudyFeed, error) { return trends.StudyFeed{}, nil },
+	d, err := tools.NewDispatcher(tools.Options{Scope: scope, Threads: mem,
 		FetchTrends: func(context.Context) ([]trends.Trend, error) {
 			return []trends.Trend{{Source: "google_trends_vn", Title: "Synthetic headline about a price cut", URL: diagnoseNews}}, nil
 		}})

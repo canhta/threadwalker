@@ -73,18 +73,16 @@ func (d *dialRecorder) RoundTrip(request *http.Request) (*http.Response, error) 
 	return nil, errors.New("offline run: network disabled")
 }
 
-// TestOfflineStudyWakeInjectsEveryOutsideFetch drives the real study phase with
-// a template that schedules study before its first normal wake and enables web
-// search. Any request through the default transport fails the test.
-func TestOfflineStudyWakeInjectsEveryOutsideFetch(t *testing.T) {
+// TestOfflineWakeInjectsEveryOutsideFetch drives a real wake with the viral
+// template, which enables web search. Any request through the default transport
+// fails the test.
+func TestOfflineWakeInjectsEveryOutsideFetch(t *testing.T) {
 	raw, err := os.ReadFile("../../templates/viral.agent.yaml")
 	if err != nil {
 		t.Fatal(err)
 	}
-	// 07:00 local at the fixed offline clock; an earlier slot is due at once.
-	text := strings.Replace(string(raw), `    - "09:00"`, `    - "00:00"`, 1)
 	dir := t.TempDir()
-	if err = os.WriteFile(filepath.Join(dir, "viral.yaml"), []byte(text), 0600); err != nil {
+	if err = os.WriteFile(filepath.Join(dir, "viral.yaml"), raw, 0600); err != nil {
 		t.Fatal(err)
 	}
 	recorder := &dialRecorder{t: t}
@@ -96,13 +94,13 @@ func TestOfflineStudyWakeInjectsEveryOutsideFetch(t *testing.T) {
 	var out, stderr bytes.Buffer
 	code := run(ctx, []string{"run", "-once", "-offline", "-agents", dir, "-db", db}, noSecretEnv(t, "offline read environment credentials"), &out, &stderr)
 	if code != 0 {
-		t.Fatalf("offline study run failed %d: %s", code, &stderr)
+		t.Fatalf("offline run failed %d: %s", code, &stderr)
 	}
 	recorder.mu.Lock()
 	hosts := append([]string{}, recorder.hosts...)
 	recorder.mu.Unlock()
 	if len(hosts) != 0 {
-		t.Fatalf("offline study run made requests: %v", hosts)
+		t.Fatalf("offline run made requests: %v", hosts)
 	}
 	st, err := store.Open(ctx, db)
 	if err != nil {
@@ -111,14 +109,14 @@ func TestOfflineStudyWakeInjectsEveryOutsideFetch(t *testing.T) {
 	defer st.Close()
 	var kind string
 	var searches, stories int
-	if err = st.DB().QueryRow(`SELECT kind FROM wakes ORDER BY id DESC LIMIT 1`).Scan(&kind); err != nil || kind != store.WakeStudy {
+	if err = st.DB().QueryRow(`SELECT kind FROM wakes ORDER BY id DESC LIMIT 1`).Scan(&kind); err != nil || kind != store.WakeAgent {
 		t.Fatalf("wake kind=%q err=%v", kind, err)
 	}
 	if err = st.DB().QueryRow(`SELECT COUNT(*) FROM tool_calls WHERE tool='web_search' AND result_json LIKE '%"outcome":"success"%'`).Scan(&searches); err != nil || searches != 1 {
 		t.Fatalf("successful web searches=%d err=%v", searches, err)
 	}
-	if err = st.DB().QueryRow(`SELECT COUNT(*) FROM trend_stories WHERE phase='study'`).Scan(&stories); err != nil || stories == 0 {
-		t.Fatalf("study stories=%d err=%v", stories, err)
+	if err = st.DB().QueryRow(`SELECT COUNT(*) FROM trend_stories`).Scan(&stories); err != nil || stories == 0 {
+		t.Fatalf("trend stories=%d err=%v", stories, err)
 	}
 }
 

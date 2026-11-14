@@ -3,7 +3,6 @@ package dashboard_test
 import (
 	"context"
 	"fmt"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -98,18 +97,4 @@ func TestGlobalRenderCapAnswers503(t *testing.T) {
 	}
 	close(g.release)
 	<-done
-}
-
-func TestWrongTokenAttemptsAreRateLimited(t *testing.T) {
-	h := newHandler(newSource(started()), func(o *dashboard.Options) {
-		o.Content, o.ContentToken = true, "synthetic-token-123456"
-		o.RatePerSec, o.RateBurst = 1000, 1000
-	})
-	var last int
-	for i := 0; i < 12; i++ {
-		last = getWithAuth(h, "/", "wrong-"+strings.Repeat("x", i)).Code
-	}
-	if last != 429 {
-		t.Fatalf("12 wrong tokens ended with %d", last)
-	}
 }

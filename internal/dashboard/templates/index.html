@@ -92,7 +92,7 @@
         {{with index .KPIs 3}}<div><dt>Posts</dt><dd>{{.Value}}</dd></div>{{end}}
         {{with index .KPIs 4}}<div><dt>Replies sent</dt><dd>{{.Value}}</dd></div>{{end}}
       </dl>
-      <p class="foot">Stats read {{tm "clock" .Growth.MeasuredAt .Growth.LastMeasured}}{{if .Outcomes.HasData}}. Scored {{.Outcomes.Scored}}: {{.Outcomes.Viral}} viral, {{.Outcomes.Flop}} flop{{end}}</p>
+      <p class="foot">Stats read {{tm "clock" .Growth.MeasuredAt .Growth.LastMeasured}}</p>
       {{else}}
       <p class="empty">{{.Growth.EmptyText}}</p>
       {{end}}
@@ -124,24 +124,6 @@
     <h2 class="behind">Behind the scenes</h2>
     <div class="folds">
 
-      {{if not .Learned.HasRows}}<div class="fold flat"><span class="ft">Learning</span><span class="fs">No results yet.</span></div>
-      {{else}}<details class="fold"><summary><span class="ft">Learning</span><span class="fs">{{.Learned.Testing}} ideas being tested{{if .Learned.Established}}, adopted {{.Learned.Established}}{{end}}{{if .Learned.Rejected}}, dropped {{.Learned.Rejected}}{{end}}, {{.Learned.Samples}} results measured</span></summary>
-        <div class="fb">
-        {{if .Learned.Posteriors}}<ul class="items">{{range .Learned.Posteriors}}<li><p>{{.Text}}</p><p class="sub">{{.Standing}}</p></li>{{end}}</ul>{{end}}
-        {{if .Content}}
-          {{if .Learned.Hypotheses}}<h3>Ideas</h3><ul class="items">{{range .Learned.Hypotheses}}<li><p>{{.Text}}</p><p class="sub">{{ideaStatus .Status}}, tried {{.Tried}}{{if .Evidence}}. {{.Evidence}}{{end}}</p></li>{{end}}</ul>{{end}}
-          {{if .Learned.OlderHypotheses}}<details class="more"><summary>Older ideas ({{len .Learned.OlderHypotheses}})</summary><ul class="items">{{range .Learned.OlderHypotheses}}<li><p>{{.Text}}</p><p class="sub">{{ideaStatus .Status}}, tried {{.Tried}}{{if .Evidence}}. {{.Evidence}}{{end}}</p></li>{{end}}</ul></details>{{end}}
-          {{if .Learned.Candidates}}<h3>Techniques</h3><ul class="items">{{range .Learned.Candidates}}<li><p class="note">{{.Text}}</p><p class="sub">Unverified. <a href="{{.Source}}" rel="noreferrer noopener">{{.Source}}</a>, {{tm "day" .At .When}}</p></li>{{end}}</ul>{{end}}
-          {{if .Learned.Penalties}}<h3>Could cost reach</h3><ul class="items">{{range .Learned.Penalties}}<li><p class="note">{{.Risk}}: {{.Claim}}</p><p class="sub"><a href="{{.Source}}" rel="noreferrer noopener">Source</a></p></li>{{end}}</ul>{{end}}
-          {{if .Learned.MemoryIndex}}<h3>Memory</h3><p class="note">{{.Learned.MemoryIndex}}</p>{{end}}
-          {{if .Learned.MemoryJournal}}<h3>Recent memory</h3><p class="note">{{.Learned.MemoryJournal}}</p>{{end}}
-          {{if .Learned.Strategy}}<h3>Strategy changes</h3><ul class="items">{{range .Learned.Strategy}}<li><p class="sub">v{{.Version}}, {{tm "stamp" .At .When}}{{if .Citations}}. {{.Citations}}{{end}}</p><div class="diff">{{range .Diff}}<p class="note">{{.Mark}} {{.Text}}</p>{{end}}</div></li>{{end}}</ul>{{end}}
-          {{if .Learned.NotesRows}}<h3>Notes</h3><ul class="items">{{range .Learned.NotesRows}}<li><p class="note">{{.Text}}</p><p class="sub">{{tm "stamp" .At .When}}</p></li>{{end}}</ul>{{end}}
-          {{if .Learned.OlderNotes}}<details class="more"><summary>Older notes ({{len .Learned.OlderNotes}})</summary><ul class="items">{{range .Learned.OlderNotes}}<li><p class="note">{{.Text}}</p><p class="sub">{{tm "stamp" .At .When}}</p></li>{{end}}</ul></details>{{end}}
-        {{end}}
-        </div></details>
-      {{end}}
-
       {{if .Blocked.Total}}<details class="fold"><summary><span class="ft">Held back</span><span class="fs">{{.Blocked.Total}} {{plural .Blocked.Total "attempt" "attempts"}} refused by its rules</span></summary>
         <div class="fb"><ul class="tally">{{range $i, $r := .Blocked.Rows}}{{if lt $i 5}}<li title="{{$r.Raw}}"><span>{{$r.Code}}</span><b>{{$r.Count}}</b></li>{{end}}{{end}}</ul>
         {{if gt (len .Blocked.Rows) 5}}<details class="more"><summary>Other reasons</summary><ul class="tally">{{range $i, $r := .Blocked.Rows}}{{if ge $i 5}}<li title="{{$r.Raw}}"><span>{{$r.Code}}</span><b>{{$r.Count}}</b></li>{{end}}{{end}}</ul></details>{{end}}</div></details>{{end}}
@@ -153,7 +135,7 @@
           {{if not .Burn.HasRows}}<p class="empty">No spend yet.</p>
           {{else if .Burn.MultiDay}}
             {{template "chart" .Burn.Chart}}
-            <p class="key"><span class="dot wake"></span>Runs <span class="dot study"></span>Research <span class="dot dream"></span>Planning</p>
+            <p class="key"><span class="dot wake"></span>Runs <span class="dot dream"></span>Planning</p>
           {{else}}
             <div class="track" aria-hidden="true"><svg viewBox="0 0 100 8" preserveAspectRatio="none" focusable="false"><rect class="ok" x="0" y="0" width="{{printf "%.2f" .Burn.BarPct}}" height="8"/></svg></div>
             <p class="sub">{{.Burn.PercentText}}{{if .Burn.PhaseText}}. {{.Burn.PhaseText}}{{end}}</p>
@@ -221,7 +203,6 @@
   <p class="pmeta"><span class="kind">{{.Kind}}</span>{{if .Age}}<time datetime="{{iso .PostedAt}}" data-title="full" title="{{.AgeTitle}}">{{.Age}} ago</time>{{end}}{{if .Mark}}<span class="tag {{.Mark}}">{{.Mark}}</span>{{end}}{{if .Label}}<span class="tag">{{.Label}}</span>{{end}}</p>
   <a class="ptext" href="{{.URL}}" rel="noreferrer noopener">{{.Link}}</a>
   {{if .HasSample}}<p class="pstats">{{template "stats" .}}</p>{{else}}<p class="sub">No stats yet</p>{{end}}
-  {{if .Why}}<p class="sub">{{range $i, $w := .Why}}{{if $i}}; {{end}}{{$w}}{{end}}</p>{{end}}
 </li>{{end}}
 
 {{define "tone"}}{{if eq . "up"}}{{template "i-up"}}{{else if eq . "down"}}{{template "i-down"}}{{end}}{{end}}

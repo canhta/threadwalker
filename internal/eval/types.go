@@ -22,7 +22,6 @@ type RuntimeCase struct {
 	Restart             bool           `json:"restart,omitempty"`
 	ExpectedNextMinutes int            `json:"expected_next_minutes"`
 	ExpectedActions     int            `json:"expected_actions"`
-	ExpectedNote        string         `json:"expected_note,omitempty"`
 	CheckUntrusted      bool           `json:"check_untrusted,omitempty"`
 	BlockedPhrases      []string       `json:"blocked_phrases,omitempty"`
 	ExpectedBlocked     string         `json:"expected_blocked,omitempty"`
@@ -122,7 +121,6 @@ type Report struct {
 type CaseResult struct {
 	Quality       []quality.Check                `json:"quality,omitempty"`
 	Agents        []agent.IsolationAgentEvidence `json:"agents,omitempty"`
-	Simulation    *PlaybookSimulationReport      `json:"simulation,omitempty"`
 	CaseID        string                         `json:"case_id"`
 	ProfileID     string                         `json:"profile_id"`
 	ProviderID    string                         `json:"provider_id"`

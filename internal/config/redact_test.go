@@ -16,13 +16,10 @@ func TestRedactorCollectsEverySecretFieldByConstruction(t *testing.T) {
 	p := NewSecret("ptr-secret")
 	f := fixture{Added: NewSecret("added-secret"), Inner: nested{NewSecret("inner-secret")}, List: []Secret{NewSecret("list-secret")}, ByName: map[string]Secret{"k": NewSecret("map-secret")}, Ptr: &p, private: NewSecret("hidden")}
 	f.LLM.APIKey = NewSecret("llm-secret")
-	f.EmbeddingAPIKey = NewSecret("embedding-secret")
-	f.Study.RedditClientID = NewSecret("reddit-id")
-	f.Study.RedditClientSecret = NewSecret("reddit-secret")
 	f.Telegram.BotToken = NewSecret("bot-secret")
 	f.Telegram.OwnerChatID = NewSecret("12345")
 	r := NewRedactor(f, (*fixture)(nil), nil)
-	for _, raw := range []string{"added-secret", "inner-secret", "list-secret", "map-secret", "ptr-secret", "llm-secret", "embedding-secret", "reddit-id", "reddit-secret", "bot-secret", "12345"} {
+	for _, raw := range []string{"added-secret", "inner-secret", "list-secret", "map-secret", "ptr-secret", "llm-secret", "bot-secret", "12345"} {
 		if got := r.String("a " + raw + " b"); got != "a [REDACTED] b" {
 			t.Errorf("%s: got %q", raw, got)
 		}

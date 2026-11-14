@@ -13,9 +13,6 @@ import (
 	_ "time/tzdata"
 )
 
-// EmbeddingKeyEnv names the environment variable holding the embedding key.
-const EmbeddingKeyEnv = "OPENAI_API_KEY"
-
 // Secret holds a sensitive value that redacts itself when formatted.
 type Secret struct {
 	value string
@@ -43,14 +40,11 @@ func (s Secret) GoString() string {
 
 // Template represents an agent template loaded from YAML.
 type Template struct {
-	ID           string
-	Goal         string
-	Persona      PersonaConfig
-	Guard        GuardConfig
-	SeedPlaybook []string
-	LLM          LLMConfig
-	// Review is the optional independent judge of published actions.
-	Review LLMReview
+	ID      string
+	Goal    string
+	Persona PersonaConfig
+	Guard   GuardConfig
+	LLM     LLMConfig
 	// Critic is the model that reviews every post and reply before it is reserved.
 	// Its Model is empty without a critic.llm block; the critic then uses LLM.
 	Critic LLMConfig
@@ -60,22 +54,16 @@ type Template struct {
 	// PostWriter, when set, replaces Writer for the draft of a post or series;
 	// replies and ideas keep Writer. It requires Writer.
 	PostWriter LLMConfig
-	// EmbeddingAPIKey is the OpenAI key for memory embeddings, read from
-	// EmbeddingKeyEnv whatever LLM the template chats with.
-	EmbeddingAPIKey Secret
-	Limits          LimitsConfig
-	// MinEffect is the smallest mean lift (log scale) worth acting on: the
-	// playbook establishes a hypothesis only above it.
-	MinEffect float64
-	Schedule  ScheduleConfig
-	KPI       KPIConfig
-	Study     StudyConfig
-	Inbox     InboxConfig
-	Trends    TrendsConfig
-	Targets   TargetsConfig
-	Threads   ThreadsConfig
-	Telegram  TelegramConfig
-	DryRun    bool
+	Limits     LimitsConfig
+	Schedule   ScheduleConfig
+	KPI        KPIConfig
+	WebSearch  WebSearchConfig
+	Inbox      InboxConfig
+	Trends     TrendsConfig
+	Targets    TargetsConfig
+	Threads    ThreadsConfig
+	Telegram   TelegramConfig
+	DryRun     bool
 }
 
 // KPIConfig is the pressure on the agent. Without a kpi block every field is
@@ -93,14 +81,13 @@ type KPIConfig struct {
 // Enabled reports whether the template declared a kpi block.
 func (k KPIConfig) Enabled() bool { return k.EngagementsPerDay > 0 }
 
-// ScheduleConfig holds the agent's own local-time phases. An empty DreamAt or
-// StudySlots disables that phase; normal wakes are unaffected.
+// ScheduleConfig holds the agent's own local-time phases. An empty DreamAt
+// disables dreaming; normal wakes are unaffected.
 type ScheduleConfig struct {
-	// Timezone is the operator's IANA zone for dream and study times. It is
+	// Timezone is the operator's IANA zone for the dream time and the quiet window. It is
 	// independent of the Telegram display zone and defaults to Asia/Ho_Chi_Minh.
-	Timezone   string
-	DreamAt    string   // "HH:MM" local time; empty disables dreaming.
-	StudySlots []string // "HH:MM" local times; empty disables study wakes.
+	Timezone string
+	DreamAt  string // "HH:MM" local time; empty disables dreaming.
 	// QuietFrom and QuietUntil ("HH:MM" local, both or neither) bound the night
 	// in which no agent wake is scheduled; a window may cross midnight.
 	QuietFrom, QuietUntil string
@@ -109,7 +96,7 @@ type ScheduleConfig struct {
 // TrendsConfig holds deterministic ranking keywords for fetch_trends. Omitted
 // lists derive keywords from the persona topics and avoid_topics.
 type TrendsConfig struct {
-	// Sources picks the wake's fetch_trends sources from StudySourceNames.
+	// Sources picks the wake's fetch_trends sources from SourceNames.
 	// Empty keeps the built-in Hacker News, Product Hunt and Google Trends VN.
 	Sources         []string
 	IncludeKeywords []string
@@ -129,33 +116,14 @@ type TargetsConfig struct {
 // DefaultTargets applies to every field a template omits.
 var DefaultTargets = TargetsConfig{MaxAgeMinutes: 240, MaxReplies: 30, MinLikesPerHour: 5}
 
-// StudySourceNames is the canonical bounded set of study-phase sources. Reddit
-// needs an app-only OAuth client; every other source needs no credentials.
-var StudySourceNames = []string{
+// SourceNames is the canonical bounded set of fetch_trends sources; none needs
+// credentials.
+var SourceNames = []string{
 	"google_news_vn", "google_news_global", "google_news_topics",
 	"vnexpress", "genk", "tinhte", "vietnamnet",
 	"the_verge", "techcrunch", "arstechnica",
 	"hacker_news", "product_hunt", "google_trends",
-	"reddit_localllama", "reddit_openai", "reddit_singularity",
-	"github_trending", "youtube",
-}
-
-// DefaultStudySources keeps credential-free sources on by default. Reddit is
-// opt-in because unauthenticated access is blocked.
-var DefaultStudySources = []string{
-	"google_news_vn", "google_news_global", "google_news_topics",
-	"vnexpress", "genk", "tinhte", "vietnamnet",
-	"the_verge", "techcrunch", "arstechnica",
-	"hacker_news", "product_hunt", "google_trends",
-	"github_trending", "youtube",
-}
-
-// DefaultYouTubeChannels are public, no-login channel feeds verified locally.
-var DefaultYouTubeChannels = []string{
-	"UCXZCJLdBC09xxGZ6gcdrc6A", // OpenAI
-	"UCP7jMXSY2xbc3KCAE0MHQ-A", // Google DeepMind
-	"UCSHZKyawb77ixDdsGog4iWA", // Lex Fridman
-	"UCddiUEpeqJcYeBxX1IVBKvQ", // The Verge
+	"github_trending",
 }
 
 // InboxConfig tunes the conversation inbox (replies to the account's own
@@ -168,34 +136,14 @@ type InboxConfig struct {
 	MinMinutesAfterWake int
 }
 
-// StudyConfig selects study sources per agent. Empty Sources selects
-// DefaultStudySources. Reddit is optional and reads its app credentials from
-// environment variables only when both are set.
-type StudyConfig struct {
-	Sources               []string
-	YouTubeChannels       []string
-	RedditClientIDEnv     string
-	RedditClientSecretEnv string
-	RedditClientID        Secret
-	RedditClientSecret    Secret
-	// Threads-native sampling during study. MaxThreadsReads bounds total
-	// page reads (one feed plus keyword searches), ReadPauseMS paces them and
-	// ThreadsKeywords defaults to the first persona keywords.
-	MaxThreadsReads int
-	ThreadsKeywords []string
-	ReadPauseMS     int
-	// Opportunistic study triggers on a deterministic story-score spike.
-	MaxStudiesPerDay         int
-	MinMinutesBetweenStudies int
-	SpikeMultiplier          float64
-	SpikeMinScore            int
-	// WebSearch is an optional, bounded OpenAI Responses web-search call made
-	// only in study. It stays disabled unless the template enables it.
-	WebSearch           bool
-	WebSearchModel      string
-	WebSearchBaseURL    string
-	WebSearchMaxResults int
-	WebSearchMaxOutput  int
+// WebSearchConfig is the optional, bounded OpenAI Responses web-search call
+// behind the web_search tool. It stays disabled unless the template enables it.
+type WebSearchConfig struct {
+	Enabled    bool
+	Model      string
+	BaseURL    string
+	MaxResults int
+	MaxOutput  int
 }
 
 // GuardConfig holds the hard, code-enforced text limits the agent cannot change.
@@ -234,7 +182,7 @@ type PersonaConfig struct {
 	GoodReplies   []string
 	BadExamples   []string
 	// StyleAvoid is the starting voice's list of phrases to steer clear of. It
-	// is shown to the agent and the post-mortem judge and never blocks a post.
+	// is shown to the agent and never blocks a post.
 	StyleAvoid []string
 }
 
@@ -251,12 +199,6 @@ type LLMConfig struct {
 	// ReasoningEffort is an optional provider-specific hint, sent when nonempty: openai
 	// reasoning_effort, or anthropic adaptive thinking with output_config.effort. Values are operator inputs, not an allowlist.
 	ReasoningEffort string
-}
-
-// LLMReview configures the post-mortem judge; it is off without a review.llm block.
-type LLMReview struct {
-	Enabled bool
-	LLM     LLMConfig
 }
 
 type LimitsConfig struct {
@@ -286,9 +228,6 @@ type LimitsConfig struct {
 	// Dreaming has its own spend and step caps and is excluded from MaxUSDPerDay.
 	MaxUSDPerDream   float64
 	MaxStepsPerDream int
-	// ExplorePercent is the share of the last ExploreWindow own actions that may
-	// be marked explore.
-	ExplorePercent int
 	// CriticRejectionsPerWake is how many drafts the critic may reject in one
 	// wake before further writes are refused (critic_limit).
 	CriticRejectionsPerWake int
@@ -414,16 +353,14 @@ func loadFile(path string, opts Options) (Template, error) {
 	d.guard(&tmpl)
 	d.persona(&tmpl)
 	d.llm(&tmpl)
-	d.review(&tmpl)
 	d.critic(&tmpl)
 	d.writer(&tmpl)
 	d.limits(&tmpl)
-	d.learning(&tmpl)
 	d.kpi(&tmpl)
 	d.schedule(&tmpl)
 	d.trends(&tmpl)
 	d.targets(&tmpl)
-	d.study(&tmpl)
+	d.webSearch(&tmpl)
 	d.inbox(&tmpl)
 	d.threads(&tmpl)
 	d.telegram(&tmpl)

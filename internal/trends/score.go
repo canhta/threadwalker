@@ -3,84 +3,10 @@ package trends
 import (
 	"fmt"
 	"math"
-	"sort"
 	"strings"
-	"time"
 
 	"github.com/canhta/threadz/internal/config"
 )
-
-// Window says where a story is in its life.
-type Window string
-
-const (
-	WindowEarly Window = "early"
-	WindowPeak  Window = "peak"
-	WindowLate  Window = "late"
-)
-
-const (
-	earlySaturation = 2
-	lateSaturation  = 8
-	// externalScoreHalf and repliesHalf are the values at which a story score or
-	// a reply velocity contributes half of its heat weight.
-	externalScoreHalf = 10.0
-	repliesHalf       = 2.0
-)
-
-// StorySignal is the code-computed life-cycle of one story or keyword.
-type StorySignal struct {
-	FirstSeen    time.Time `json:"first_seen"`
-	AgeMinutes   int64     `json:"age_minutes"`
-	Velocity     float64   `json:"velocity_per_hour"`
-	Acceleration float64   `json:"acceleration_per_hour2"`
-	// Saturation counts distinct Threads posts already on the story; SameAngle is
-	// the most posts that share one bigram outside the story's own words.
-	Saturation  int     `json:"saturation_posts"`
-	SameAngle   int     `json:"same_angle_posts"`
-	Heat        float64 `json:"heat"`
-	Window      Window  `json:"window"`
-	Recommended bool    `json:"recommended"`
-}
-
-type sample struct {
-	At    time.Time
-	Value float64
-}
-
-// rates returns velocity (per hour, newest pair) and acceleration (second
-// difference over the newest three samples). Fewer samples give zero.
-func rates(samples []sample) (velocity, acceleration float64) {
-	sort.SliceStable(samples, func(i, j int) bool { return samples[i].At.Before(samples[j].At) })
-	n := len(samples)
-	if n < 2 {
-		return 0, 0
-	}
-	h2 := samples[n-1].At.Sub(samples[n-2].At).Hours()
-	if h2 <= 0 {
-		return 0, 0
-	}
-	velocity = (samples[n-1].Value - samples[n-2].Value) / h2
-	if n < 3 {
-		return velocity, 0
-	}
-	h1 := samples[n-2].At.Sub(samples[n-3].At).Hours()
-	if h1 <= 0 {
-		return velocity, 0
-	}
-	previous := (samples[n-2].Value - samples[n-3].Value) / h1
-	return velocity, (velocity - previous) / ((h1 + h2) / 2)
-}
-
-func windowOf(saturation int, velocity, acceleration float64) Window {
-	switch {
-	case saturation >= lateSaturation || velocity < 0:
-		return WindowLate
-	case saturation <= earlySaturation && acceleration >= 0:
-		return WindowEarly
-	}
-	return WindowPeak
-}
 
 func unit(x, half float64) float64 {
 	if x <= 0 {
@@ -90,65 +16,6 @@ func unit(x, half float64) float64 {
 }
 
 func round2(x float64) float64 { return math.Round(x*100) / 100 }
-
-// signalOf computes the signal of a story or keyword from its samples, first
-// sighting and saturation.
-func signalOf(samples []sample, first time.Time, level, half float64, saturation, sameAngle int, now time.Time) StorySignal {
-	velocity, acceleration := rates(samples)
-	window := windowOf(saturation, velocity, acceleration)
-	factor := map[Window]float64{WindowEarly: 1, WindowPeak: 0.8, WindowLate: 0.3}[window]
-	heat := (0.5*unit(level, half) + 0.5*unit(velocity, repliesHalf)) * factor
-	return StorySignal{
-		FirstSeen: first, AgeMinutes: int64(now.Sub(first).Minutes()),
-		Velocity: round2(velocity), Acceleration: round2(acceleration),
-		Saturation: saturation, SameAngle: sameAngle,
-		Heat: round2(heat), Window: window, Recommended: window != WindowLate,
-	}
-}
-
-// saturationOf counts the posts that share at least two title tokens, and the
-// most of them that share one bigram not made of title tokens alone.
-func saturationOf(titleTokens []string, posts []string) (saturation, sameAngle int) {
-	title := map[string]bool{}
-	for _, token := range titleTokens {
-		title[token] = true
-	}
-	perBigram := map[string]int{}
-	for _, post := range posts {
-		tokens := config.TopicTokens(post)
-		shared := 0
-		for _, token := range tokens {
-			if title[token] {
-				shared++
-			}
-		}
-		if shared < 2 {
-			continue
-		}
-		saturation++
-		for bigram := range bigrams(tokens) {
-			if !title[bigram.a] || !title[bigram.b] {
-				perBigram[bigram.a+" "+bigram.b]++
-			}
-		}
-	}
-	for _, n := range perBigram {
-		if n > sameAngle {
-			sameAngle = n
-		}
-	}
-	return saturation, sameAngle
-}
-
-type bigram struct{ a, b string }
-
-func bigrams(tokens []string) map[bigram]bool {
-	set := map[bigram]bool{}
-	for i := 1; i < len(tokens); i++ {
-		set[bigram{tokens[i-1], tokens[i]}] = true
-	}
-	return set
-}
 
 // TargetParts are the numeric reasons a post is worth a reply. They hold no
 // text and no author data.
@@ -191,22 +58,6 @@ const (
 	TierTarget  = "target"
 	TierMega    = "mega"
 )
-
-// sizeTier prefers authors 2 to 10 times our size. Missing counts give
-// TierUnknown, which scores neutral.
-func sizeTier(author, own int64) string {
-	if author <= 0 || own <= 0 {
-		return TierUnknown
-	}
-	ratio := float64(author) / float64(own)
-	switch {
-	case ratio < 2:
-		return TierNear
-	case ratio <= 10:
-		return TierTarget
-	}
-	return TierMega
-}
 
 func clamp01(x float64) float64 { return math.Max(0, math.Min(1, x)) }
 

@@ -61,7 +61,7 @@ func runMetricsCase(ctx context.Context, c Case, p Profile, repeat int, opts Opt
 	source := threads.NewMemory()
 	source.Actions[mediaOf(ownURL)] = threads.Metrics{Views: 42, Likes: 3, Replies: 2, Reposts: 1}
 	processor := func() (*metrics.Processor, error) {
-		return metrics.New(metrics.Options{Embedder: offlineEmbedder(st, tmpl, clock, logger), Store: st, Template: tmpl, Now: clock, Logger: logger, ThreadsFactory: func(context.Context, config.Template) (threads.Backend, error) { return source, nil }, FetchTrends: evalTrends, FetchStudy: evalStudy})
+		return metrics.New(metrics.Options{Store: st, Template: tmpl, Now: clock, Logger: logger, ThreadsFactory: func(context.Context, config.Template) (threads.Backend, error) { return source, nil }, FetchTrends: evalTrends})
 	}
 	proc, err := processor()
 	if err != nil {

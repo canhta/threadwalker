@@ -140,7 +140,7 @@ func (s *Store) Close() error {
 
 // schemaVersion is the one schema this build reads and writes. It is stored in
 // SQLite's user_version; bump it whenever schema.sql changes.
-const schemaVersion = 11
+const schemaVersion = 12
 
 // create builds the schema in an empty database; a database holding any other
 // schema version is refused rather than altered.
@@ -196,4 +196,8 @@ func (s *Store) WakeOpenSince(ctx context.Context, since time.Time) (bool, error
 		return false, fmt.Errorf("reading open wakes: %w", err)
 	}
 	return open, nil
+}
+
+func formatStoreTimestamp(at time.Time) string {
+	return at.UTC().Format(time.RFC3339Nano)
 }

@@ -214,8 +214,6 @@ func (s *Service) handle(ctx context.Context, u Update) error {
 		}
 		s.event(ctx, "", "update", outcome, reason, 0)
 		return nil
-	case "restore":
-		return s.handleRestore(ctx, fields[1:], key)
 	case "pause", "resume", "kill", "dnc", "status", "report":
 	default:
 		s.event(ctx, "", "command", "ignored", "unknown_command", 0)
@@ -308,65 +306,6 @@ func (s *Service) handleHelp(ctx context.Context, command string, args []string,
 	}
 	s.event(ctx, id, "help", outcome, reason, n)
 	return err
-}
-
-// handleRestore lists the last archived memory entries and replaced strategy
-// revisions with short ids, or restores one: /restore m<journal id> puts a
-// memory entry back, /restore s<revision> re-writes that strategy as the
-// newest revision. Nothing is deleted either way.
-func (s *Service) handleRestore(ctx context.Context, args []string, key string) error {
-	id := s.ids[0]
-	if len(s.ids) > 1 && len(args) > 0 {
-		if _, ok := s.templates[args[0]]; ok {
-			id, args = args[0], args[1:]
-		}
-	}
-	now := s.opts.Now()
-	reply := func(reason, text string) error {
-		n, err := s.opts.Store.QueueOwner(ctx, id, "command", text, "restore:"+key, now)
-		outcome := "success"
-		if err != nil {
-			outcome, reason = "error", "restore_failed"
-		}
-		s.event(ctx, id, "restore", outcome, reason, n)
-		return err
-	}
-	if len(args) == 0 {
-		journal, err := s.opts.Store.MemoryJournal(ctx, id, 50)
-		if err != nil {
-			return err
-		}
-		history, err := s.opts.Store.StrategyHistory(ctx, id)
-		if err != nil {
-			return err
-		}
-		var lines []string
-		for _, j := range journal {
-			if len(lines) < 5 && (j.Change == store.ChangeOverflow || j.Change == store.ChangeExpired || j.Change == store.ChangeSuperseded) {
-				lines = append(lines, fmt.Sprintf("m%d %s", j.ID, snippet(j.OldText)))
-			}
-		}
-		for i, n := len(history)-2, 0; i >= 0 && n < 5; i, n = i-1, n+1 {
-			lines = append(lines, fmt.Sprintf("s%d %s", history[i].Version, snippet(history[i].Text)))
-		}
-		return reply("restore_listed", restoreListText(lines))
-	}
-	if len(args) != 1 || len(args[0]) < 2 || (args[0][0] != 'm' && args[0][0] != 's') {
-		return reply("restore_invalid", restoreResultText("invalid"))
-	}
-	n, err := strconv.ParseInt(args[0][1:], 10, 64)
-	if err != nil || n < 1 {
-		return reply("restore_invalid", restoreResultText("invalid"))
-	}
-	if args[0][0] == 'm' {
-		err = s.opts.Store.RestoreMemory(ctx, id, n, now)
-	} else {
-		_, err = s.opts.Store.RevertStrategy(ctx, id, n, now)
-	}
-	if err != nil {
-		return reply("restore_refused", restoreResultText("failed"))
-	}
-	return reply("restore_done", restoreResultText("ok"))
 }
 
 // handleNote keeps an owner's free text for the next wake without spending a

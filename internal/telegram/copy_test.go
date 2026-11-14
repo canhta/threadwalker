@@ -30,8 +30,8 @@ func TestReportText(t *testing.T) {
 	followers, before := int64(1034), int64(1022)
 	full := store.OwnerSummary{
 		Status: "running", NextWake: day.Add(14*time.Hour + 45*time.Minute),
-		Posts: 2, Replies: 5, CostUSD: 0.42, WakeCostUSD: 0.3, StudyCostUSD: 0.1, DreamCostUSD: 0.02,
-		MetricSamples: 4, Views: 3400, Likes: 120, Responses: 30, Reposts: 8, PlaybookChanges: 1,
+		Posts: 2, Replies: 5, CostUSD: 0.42, WakeCostUSD: 0.4, DreamCostUSD: 0.02,
+		MetricSamples: 4, Views: 3400, Likes: 120, Responses: 30, Reposts: 8,
 		Top:       store.TopPost{ActionID: 7, URL: "https://www.threads.com/@a/post/x", Views: 1234, Engagements: 56},
 		Followers: &followers, FollowersBefore: &before,
 		FailedWakes: 1, FailReasons: []store.Refusal{{Reason: "step_limit", Count: 1}},
@@ -47,8 +47,7 @@ Metrics (4 measured): 3400 views, 120 likes, 30 replies, 8 reposts
 Top post: 1234 views, 56 engagements
 https://www.threads.com/@a/post/x
 Followers: 1034 (+12)
-Playbook changes: 1
-Spend today (resets at 00:00 local): $0.42 of $0.50 (84%); wake $0.30, study $0.10, dream $0.02
+Spend today (resets at 00:00 local): $0.42 of $0.50 (84%); wake $0.40, dream $0.02
 
 Failed runs: 1 (step_limit ×1)
 Blocked actions: blocked_phrase ×3, quota ×1`
@@ -62,7 +61,7 @@ Blocked actions: blocked_phrase ×3, quota ×1`
 			t.Fatalf("empty report missing %q:\n%s", part, empty)
 		}
 	}
-	if strings.Contains(empty, "Top post") || strings.Contains(empty, "Playbook") {
+	if strings.Contains(empty, "Top post") {
 		t.Fatalf("empty report shows absent facts:\n%s", empty)
 	}
 }

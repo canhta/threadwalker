@@ -5,22 +5,8 @@ import (
 	"sort"
 	"time"
 
-	"github.com/canhta/threadz/internal/playbook"
 	"github.com/canhta/threadz/internal/store"
 )
-
-// outcomeWords names the outcome model's label and shows its lifts as
-// multiples of what the model expected (lifts are log-scale).
-// outcomeWord names a scored post that beat or missed its expected reach.
-func outcomeWord(p store.DashboardPublication) string {
-	switch p.Label {
-	case store.LabelViral:
-		return "viral"
-	case store.LabelFlop:
-		return "flop"
-	}
-	return ""
-}
 
 // followersAt is the newest follower count read at or before t.
 func followersAt(ms metricSet, t time.Time) (int64, bool) {
@@ -102,24 +88,6 @@ func buildFollowers(ms metricSet, pubs []store.DashboardPublication, daysList []
 	return f
 }
 
-func buildOutcomes(pubs []store.DashboardPublication) OutcomesPanel {
-	var o OutcomesPanel
-	for _, p := range pubs {
-		switch p.Label {
-		case store.LabelViral:
-			o.Viral++
-		case store.LabelFlop:
-			o.Flop++
-		case store.LabelOrdinary:
-		default:
-			continue
-		}
-		o.Scored++
-	}
-	o.HasData = o.Scored > 0
-	return o
-}
-
 // buildBlocked counts the guard's refusals of a post or reply, by reason.
 func buildBlocked(tools []rawTool) BlockedPanel {
 	var b BlockedPanel
@@ -148,41 +116,14 @@ func buildBlocked(tools []rawTool) BlockedPanel {
 	return b
 }
 
-// buildStandings fills the learned panel with how each testing idea stands:
-// ahead when its mean lift is above zero by more than one deviation, behind
-// when below by more than one, unclear otherwise.
-func buildStandings(l *LearnedPanel, snap store.DashboardSnapshot) {
-	text := map[int64]string{}
-	for _, h := range snap.Hypotheses {
-		text[h.ID] = h.Text
-	}
-	for _, s := range playbook.Standings(snap.Lifts) {
-		if s.Status != "testing" {
-			continue
-		}
-		l.HasRows = true
-		if s.N == 0 {
-			continue
-		}
-		verdict := "unclear"
-		switch {
-		case s.Mean-s.SD > 0:
-			verdict = "ahead"
-		case s.Mean+s.SD < 0:
-			verdict = "behind"
-		}
-		l.Posteriors = append(l.Posteriors, PosteriorRow{Text: truncate(text[s.ID], ideaChars), N: s.N, Verdict: verdict})
-	}
-}
-
-func rangeSpend(ledger map[string]float64, phases map[string][3]float64, daysList []time.Time) float64 {
+func rangeSpend(ledger map[string]float64, phases map[string][2]float64, daysList []time.Time) float64 {
 	total := 0.0
 	for _, day := range daysList {
 		key := day.Format("2006-01-02")
 		v := phases[key]
 		total += ledger[key]
 		if ledger[key] == 0 {
-			total += v[0] + v[1] + v[2]
+			total += v[0] + v[1]
 		}
 	}
 	return total
@@ -190,7 +131,7 @@ func rangeSpend(ledger map[string]float64, phases map[string][3]float64, daysLis
 
 // buildCost adds what a post, a follower and 1,000 views cost, and the spend
 // since the start, to the unit cost panel.
-func buildCost(r *ReturnPanel, snap store.DashboardSnapshot, ledger map[string]float64, phases map[string][3]float64, daysList []time.Time, currentStart time.Time, f FollowersPanel, views int64) {
+func buildCost(r *ReturnPanel, snap store.DashboardSnapshot, ledger map[string]float64, phases map[string][2]float64, daysList []time.Time, currentStart time.Time, f FollowersPanel, views int64) {
 	spend := rangeSpend(ledger, phases, daysList)
 	per := func(n float64) string {
 		if spend > 0 && n > 0 {

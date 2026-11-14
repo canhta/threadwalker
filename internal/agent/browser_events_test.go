@@ -34,7 +34,7 @@ func TestWakeLogsBrowserLaunchAndClose(t *testing.T) {
 			}
 			var logs bytes.Buffer
 			logger, _ := logging.New(&logs, "", "")
-			r, err := agent.New(agent.Options{Store: st, Template: tmpl, Logger: logger, Now: func() time.Time { return now }, HTTPClient: fixture.Client(), FetchTrends: fixture.Trends, FetchStudy: fixture.Study,
+			r, err := agent.New(agent.Options{Store: st, Template: tmpl, Logger: logger, Now: func() time.Time { return now }, HTTPClient: fixture.Client(), FetchTrends: fixture.Trends,
 				ThreadsFactory: func(context.Context, config.Template) (threads.Backend, error) {
 					if mode == "launch_failed" {
 						return nil, errors.New("launch detail")

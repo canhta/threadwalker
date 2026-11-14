@@ -105,7 +105,7 @@ func runReplayCase(ctx context.Context, c Case, p Profile, repeat int, opts Opti
 			return rc.Critic[judged-1], nil
 		}
 	}
-	d, err := tools.NewDispatcher(tools.Options{Scope: scope, Threads: mem, EvidenceDir: run.Path("evidence"), FetchTrends: func(context.Context) ([]trends.Trend, error) { return fetched, nil }, FetchStudy: evalStudy, Embedder: offlineEmbedder(st, tmpl, func() time.Time { return now }, run.Logger)})
+	d, err := tools.NewDispatcher(tools.Options{Scope: scope, Threads: mem, EvidenceDir: run.Path("evidence"), FetchTrends: func(context.Context) ([]trends.Trend, error) { return fetched, nil }})
 	if err != nil {
 		return r
 	}

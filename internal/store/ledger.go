@@ -55,8 +55,6 @@ func (s *Store) RecordLLMUsage(ctx context.Context, agentID string, wakeID int64
 		phase = "critic"
 	case "dream":
 		phase = "dream"
-	case "study":
-		phase = "study"
 	}
 
 	_, err = tx.ExecContext(ctx, `

@@ -111,7 +111,6 @@ type WriterInput struct {
 	Draft    []string // the agent's rough text, or the writer's last try
 	Problems []string // the editor's problems with Draft; empty on the first try
 	Recent   []string // the account's last own posts, newest first
-	Learned  []string // the account's own best live posts or replies of this kind, from the store
 }
 
 // WriterMessages builds the writer prompt from the persona and the brief.
@@ -128,12 +127,6 @@ func WriterMessages(r Rubric, p config.PersonaConfig, in WriterInput) []llm.Mess
 	if len(examples) > 0 {
 		b.WriteString("Examples of the register:\n")
 		for _, s := range examples {
-			fmt.Fprintf(&b, "- %q\n", s)
-		}
-	}
-	if len(in.Learned) > 0 {
-		b.WriteString("Your own best published ones so far (they worked; keep what made them work):\n")
-		for _, s := range in.Learned {
 			fmt.Fprintf(&b, "- %q\n", s)
 		}
 	}

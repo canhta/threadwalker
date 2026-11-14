@@ -12,7 +12,7 @@
           "read_feed",
           "search",
           "read_post",
-          "read_own_metrics",
+          "read_replies",
           "post",
           "reply"
         ]

@@ -2,49 +2,11 @@ package store
 
 import (
 	"context"
-	"errors"
 	"path/filepath"
 	"slices"
 	"testing"
 	"time"
 )
-
-func TestRevertStrategyAppendsOldText(t *testing.T) {
-	ctx := context.Background()
-	st, err := Open(ctx, filepath.Join(t.TempDir(), "revert.db"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer st.Close()
-	if err = st.EnsureAgent(ctx, "a"); err != nil {
-		t.Fatal(err)
-	}
-	at := time.Date(2026, 11, 1, 12, 0, 0, 0, time.UTC)
-	if _, err = st.RevertStrategy(ctx, "a", 0, at); !errors.Is(err, ErrStrategyInput) {
-		t.Fatalf("empty history: %v", err)
-	}
-	if _, err = st.db.ExecContext(ctx, `INSERT INTO notes(agent_id,text,created_at) VALUES('a','n','`+formatTime(at)+`')`); err != nil {
-		t.Fatal(err)
-	}
-	for _, text := range []string{"one", "two", "three"} {
-		if _, err = st.WriteStrategy(ctx, "a", text, []string{"note:1"}, at); err != nil {
-			t.Fatal(err)
-		}
-	}
-	if v, err := st.RevertStrategy(ctx, "a", 0, at); err != nil || v != 4 {
-		t.Fatalf("revert previous: v=%d err=%v", v, err)
-	}
-	if v, err := st.RevertStrategy(ctx, "a", 1, at); err != nil || v != 5 {
-		t.Fatalf("revert to 1: v=%d err=%v", v, err)
-	}
-	if _, err = st.RevertStrategy(ctx, "a", 5, at); !errors.Is(err, ErrStrategyInput) {
-		t.Fatalf("revert to newest: %v", err)
-	}
-	history, err := st.StrategyHistory(ctx, "a")
-	if err != nil || len(history) != 5 || history[3].Text != "two" || history[4].Text != "one" || history[4].Citations[0] != "note:1" {
-		t.Fatalf("history=%+v err=%v", history, err)
-	}
-}
 
 func TestOwnerSummaryFailuresAndSilence(t *testing.T) {
 	ctx := context.Background()

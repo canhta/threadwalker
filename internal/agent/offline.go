@@ -21,9 +21,9 @@ import (
 func OfflineTemplate() config.Template {
 	return config.Template{ID: "synthetic-offline", Goal: "Exercise a synthetic local dry-run wake.", DryRun: true,
 		Persona: config.PersonaConfig{Name: "Synthetic fixture", Language: "en", Identity: "Synthetic offline agent", Voice: "Brief", BioMustInclude: "AI experiment"},
-		LLM:     config.LLMConfig{Protocol: "openai", BaseURL: "https://fixture.invalid", Model: "synthetic-script", APIKey: config.NewSecret("offline-dummy-key"), PricePerMTokInUSD: 1, PricePerMTokOutUSD: 2}, EmbeddingAPIKey: config.NewSecret("offline-dummy-key"),
+		LLM:     config.LLMConfig{Protocol: "openai", BaseURL: "https://fixture.invalid", Model: "synthetic-script", APIKey: config.NewSecret("offline-dummy-key"), PricePerMTokInUSD: 1, PricePerMTokOutUSD: 2},
 		Threads: config.ThreadsConfig{Username: "synthetic_offline"},
-		Limits:  config.LimitsConfig{PostsPerDay: 3, RepliesPerDay: 15, RepliesPerUser7d: 2, MinSecondsBetweenActions: 1, MaxStepsPerWake: 30, MaxUSDPerDay: 1, MinMinutesBetweenWakes: 20}, Targets: config.DefaultTargets, MinEffect: 0.2}
+		Limits:  config.LimitsConfig{PostsPerDay: 3, RepliesPerDay: 15, RepliesPerUser7d: 2, MinSecondsBetweenActions: 1, MaxStepsPerWake: 30, MaxUSDPerDay: 1, MinMinutesBetweenWakes: 20}, Targets: config.DefaultTargets}
 }
 
 // OfflineFixture runs the real LLM wire adapter using an in-process transport;
@@ -32,7 +32,7 @@ type OfflineFixture struct {
 	Now     func() time.Time
 	Calls   []llm.ToolCall
 	Observe func([]llm.Message)
-	// Reply is the answer to a request that offers no tools, such as the post-mortem judge.
+	// Reply is the answer to a request that offers no tools, such as the quality judge.
 	Reply string
 }
 
@@ -48,25 +48,12 @@ func (f *OfflineFixture) Trends(ctx context.Context) ([]trends.Trend, error) {
 	return []trends.Trend{{Source: "synthetic", Title: "Synthetic offline trend", URL: "https://synthetic.invalid/trend"}}, nil
 }
 
-// Study returns synthetic study items for an offline study wake.
-func (f *OfflineFixture) Study(ctx context.Context) (trends.StudyFeed, error) {
-	if err := ctx.Err(); err != nil {
-		return trends.StudyFeed{}, err
-	}
-	return trends.StudyFeed{Items: []trends.Trend{
-		{Source: "synthetic", Title: "Synthetic offline study story", URL: "https://synthetic.invalid/study"},
-		{Source: "synthetic", Title: "Synthetic offline follow-up story", URL: "https://synthetic.invalid/study-follow-up"},
-	}}, nil
-}
 func (f *OfflineFixture) RoundTrip(req *http.Request) (*http.Response, error) {
 	if err := req.Context().Err(); err != nil {
 		return nil, err
 	}
 	if req.URL.Host != "fixture.invalid" || req.Method != http.MethodPost {
 		return nil, errors.New("offline transport: unexpected request")
-	}
-	if req.URL.Path == "/embeddings" {
-		return llm.OfflineEmbeddingsResponse(req)
 	}
 	if req.URL.Path == "/responses" {
 		data, _ := json.Marshal(map[string]any{
@@ -144,10 +131,10 @@ func (f *OfflineFixture) RoundTrip(req *http.Request) (*http.Response, error) {
 		calls := f.Calls
 		if calls == nil {
 			now := f.Now()
-			calls = []llm.ToolCall{SyntheticCall("read_feed", `{}`), SyntheticCall("fetch_trends", `{}`), SyntheticCall("note_write", `{"topic":"synthetic","description":"Synthetic note for the next wake.","text":"Synthetic note body."}`), SyntheticCall("post", fmt.Sprintf(`{"text":"local%d"}`, now.UnixNano()))}
+			calls = []llm.ToolCall{SyntheticCall("read_feed", `{}`), SyntheticCall("fetch_trends", `{}`), SyntheticCall("post", fmt.Sprintf(`{"text":"local%d"}`, now.UnixNano()))}
 			for _, tool := range raw.Tools {
 				if tool.Function.Name == "web_search" {
-					calls = append([]llm.ToolCall{SyntheticCall("web_search", `{"query":"Synthetic offline study story."}`)}, calls...)
+					calls = append([]llm.ToolCall{SyntheticCall("web_search", `{"query":"Synthetic offline trend."}`)}, calls...)
 					break
 				}
 			}

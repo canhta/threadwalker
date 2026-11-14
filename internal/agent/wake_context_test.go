@@ -126,51 +126,6 @@ func TestWakeContextRedactsOwnActions(t *testing.T) {
 	}
 }
 
-func TestWakeContextLoadsOnlyTheMemoryIndex(t *testing.T) {
-	now := time.Date(2026, 1, 2, 12, 0, 0, 0, time.UTC)
-	tmpl := agent.OfflineTemplate()
-	r, st := contextRuntime(t, tmpl, now)
-	ctx := context.Background()
-	if _, err := st.WriteTopic(ctx, tmpl.ID, "hooks", "opening lines", "TOPIC BODY NOT LOADED", now); err != nil {
-		t.Fatal(err)
-	}
-	if err := st.AddMemoryEntry(ctx, tmpl.ID, "indexed fact, detail in topic hooks", now, store.MemoryActor{}); err != nil {
-		t.Fatal(err)
-	}
-	if err := st.AddMemoryEntry(ctx, tmpl.ID, "leaked offline-dummy-key here", now, store.MemoryActor{}); err != nil {
-		t.Fatal(err)
-	}
-	if err := st.EnsureAgent(ctx, "other"); err != nil {
-		t.Fatal(err)
-	}
-	if err := st.AddMemoryEntry(ctx, "other", "OTHER AGENT ENTRY", now, store.MemoryActor{}); err != nil {
-		t.Fatal(err)
-	}
-	messages, err := r.Context(ctx, "agent")
-	if err != nil {
-		t.Fatal(err)
-	}
-	var data struct {
-		MemoryIndex []store.MemoryEntry  `json:"memory_index"`
-		Topics      []store.TopicSummary `json:"topics"`
-	}
-	if err := json.Unmarshal([]byte(messages[1].Content), &data); err != nil {
-		t.Fatal(err)
-	}
-	if len(data.MemoryIndex) != 2 || data.MemoryIndex[1].Text != "indexed fact, detail in topic hooks" || data.MemoryIndex[0].Text != "leaked [REDACTED] here" {
-		t.Fatalf("memory_index=%v", data.MemoryIndex)
-	}
-	if len(data.Topics) != 1 || data.Topics[0] != (store.TopicSummary{Topic: "hooks", Description: "opening lines"}) {
-		t.Fatalf("topics=%+v, want the name and description only", data.Topics)
-	}
-	all := messages[0].Content + messages[1].Content
-	for _, absent := range []string{"TOPIC BODY NOT LOADED", "OTHER AGENT ENTRY", "offline-dummy-key"} {
-		if strings.Contains(all, absent) {
-			t.Fatalf("context holds %q", absent)
-		}
-	}
-}
-
 func TestWakeContextIsBoundedWith500Actions(t *testing.T) {
 	now := time.Date(2026, 1, 2, 12, 0, 0, 0, time.UTC)
 	tmpl := agent.OfflineTemplate()

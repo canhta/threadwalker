@@ -89,7 +89,7 @@ func runGuardCase(ctx context.Context, c Case, p Profile, repeat int, opts Optio
 	if err != nil {
 		return r
 	}
-	toolOpts := tools.Options{Scope: guard.Scope{Store: st, Template: tmpl, WakeID: wakeID, Now: func() time.Time { return now }, Logger: logger}, Threads: threads.NewMemory(), FetchTrends: evalTrends, FetchStudy: evalStudy, Embedder: offlineEmbedder(st, tmpl, func() time.Time { return now }, logger)}
+	toolOpts := tools.Options{Scope: guard.Scope{Store: st, Template: tmpl, WakeID: wakeID, Now: func() time.Time { return now }, Logger: logger}, Threads: threads.NewMemory(), FetchTrends: evalTrends}
 	d, err := tools.NewDispatcher(toolOpts)
 	if err != nil {
 		return r

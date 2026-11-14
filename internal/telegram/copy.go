@@ -10,7 +10,7 @@ import (
 
 // Owner-facing copy is English plain text: the client sends no parse_mode, so
 // nothing needs escaping. Every value comes from code-owned facts; Threads text
-// appears only in /restore previews and in the agent's own owner messages.
+// appears only in the agent's own owner messages.
 
 // ownerCommand is one entry of the command surface; the same table feeds
 // setMyCommands and /help so the two cannot drift. Telegram setMyCommands
@@ -28,7 +28,6 @@ var ownerCommandList = []ownerCommand{
 	{"resume", "", "Resume a paused agent", true},
 	{"kill", "", "Stop the agent permanently", true},
 	{"dnc", "<username>", "Never contact a Threads user", true},
-	{"restore", "[m123 | s4]", "List or restore archived memory and strategy", true},
 	{"cookie", "<cookies>", "Sign in to Threads again with browser cookies", true},
 	{"update", "", "Install the latest release", false},
 	{"help", "", "List commands", false},
@@ -239,8 +238,8 @@ func (s *Service) spendLine(id string, summary store.OwnerSummary) string {
 	if limit := s.templates[id].Limits.MaxUSDPerDay; limit > 0 {
 		line += fmt.Sprintf(" of %s (%.0f%%)", money(limit), 100*summary.CostUSD/limit)
 	}
-	if summary.StudyCostUSD > 0 || summary.DreamCostUSD > 0 {
-		line += fmt.Sprintf("; wake %s, study %s, dream %s", money(summary.WakeCostUSD), money(summary.StudyCostUSD), money(summary.DreamCostUSD))
+	if summary.DreamCostUSD > 0 {
+		line += fmt.Sprintf("; wake %s, dream %s", money(summary.WakeCostUSD), money(summary.DreamCostUSD))
 	}
 	return line
 }
@@ -300,9 +299,6 @@ func (s *Service) reportText(id string, summary store.OwnerSummary) string {
 	default:
 		lines = append(lines, fmt.Sprintf("Followers: %d (%+d)", *summary.Followers, *summary.Followers-*summary.FollowersBefore))
 	}
-	if summary.PlaybookChanges > 0 {
-		lines = append(lines, fmt.Sprintf("Playbook changes: %d", summary.PlaybookChanges))
-	}
 	lines = append(lines, "Spend today (resets at 00:00 local): "+s.spendLine(id, summary), "")
 	failed := fmt.Sprintf("Failed runs: %d", summary.FailedWakes)
 	if len(summary.FailReasons) > 0 {
@@ -313,15 +309,6 @@ func (s *Service) reportText(id string, summary store.OwnerSummary) string {
 		blocked = "Blocked actions: " + refusalList(summary.Blocked)
 	}
 	return strings.Join(append(lines, failed, blocked), "\n")
-}
-
-// snippet is the one-line preview of an archived entry in the /restore list.
-func snippet(text string) string {
-	text = strings.Join(strings.Fields(text), " ")
-	if r := []rune(text); len(r) > 80 {
-		return string(r[:80]) + "…"
-	}
-	return text
 }
 
 func refusalList(refusals []store.Refusal) string {
@@ -342,22 +329,4 @@ func silentText(hours int, lastReason string, blocked []store.Refusal) string {
 		top = refusalList(blocked)
 	}
 	return fmt.Sprintf("No post or reply for %d hours.\nLast run ended: %s\nBlocked actions today: %s", hours, lastReason, top)
-}
-
-// restoreListText answers /restore with IDs the owner can send back.
-func restoreListText(lines []string) string {
-	if len(lines) == 0 {
-		return "Nothing to restore"
-	}
-	return "Restorable items\nm = archived memory entry, s = earlier strategy revision. Send /restore m123 or /restore s4 to restore one.\n\n" + strings.Join(lines, "\n")
-}
-
-func restoreResultText(status string) string {
-	switch status {
-	case "ok":
-		return "Restored"
-	case "invalid":
-		return "Send /restore for the list, then /restore m123 or /restore s4."
-	}
-	return "Could not restore: the ID is unknown, expired, or already the newest."
 }

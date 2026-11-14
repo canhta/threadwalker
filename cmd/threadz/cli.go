@@ -156,7 +156,7 @@ Examples:
 `,
 	"ctl":    ctlUsage,
 	"update": updateUsage,
-	"dashboard": `usage: threadz dashboard [--agents DIR] [--db PATH] [--listen ADDR] [--content]
+	"dashboard": `usage: threadz dashboard [--agents DIR] [--db PATH] [--listen ADDR]
                          [--rate N] [--burst N] [--max-concurrent N]
 
 Serve the read-only dashboard on a numeric loopback address.

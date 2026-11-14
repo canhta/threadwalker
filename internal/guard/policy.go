@@ -15,7 +15,6 @@ import (
 	"unicode/utf8"
 
 	"github.com/canhta/threadz/internal/config"
-	"github.com/canhta/threadz/internal/playbook"
 	"github.com/canhta/threadz/internal/quality"
 	"github.com/canhta/threadz/internal/stdx"
 	"github.com/canhta/threadz/internal/store"
@@ -31,8 +30,6 @@ type actionIntent struct {
 	Hook           string   `json:"hook"`
 	TrendRef       string   `json:"trend_ref"`
 	Rationale      string   `json:"rationale"`
-	HypothesisIDs  []int64  `json:"hypothesis_ids"`
-	Explore        bool     `json:"explore"`
 	AnswersNote    int64    `json:"answers_note"`
 	Angle          string   `json:"angle"`
 	Fact           string   `json:"fact"`
@@ -50,7 +47,7 @@ type actionIntent struct {
 	// root is the canonical URL of the root post of the conversation a reply
 	// joins: the inbox item's root, else the replied-to post itself.
 	root string
-	// posting is harness-computed from stored observations.
+	// posting is what this wake's reads showed about the item the action rests on.
 	posting trends.PostingContext
 }
 
@@ -161,9 +158,8 @@ func (g *Guard) NoteFacts(ref string, f trends.ItemFacts) {
 	g.facts[factKey(ref)] = f
 }
 
-// overlayFacts replaces the stored-observation context of an action with what
-// this wake's reads showed: the figures of the replied-to post and the heat of
-// the anchored topic. Absent figures keep the observed ones.
+// overlayFacts fills the context of an action from what this wake's reads
+// showed: the figures of the replied-to post and the heat of the anchored topic.
 func (g *Guard) overlayFacts(pc *trends.PostingContext, intent *actionIntent, tool string) {
 	ref, ok := g.Trend(intent.TrendRef)
 	if !ok {
@@ -516,49 +512,11 @@ func (g *Guard) reserve(ctx context.Context, a Attempt, intent *actionIntent, au
 				return err
 			}
 		}
-		if reason == "" {
-			seen := map[int64]bool{}
-			for _, hypothesis := range intent.HypothesisIDs {
-				if hypothesis <= 0 || seen[hypothesis] || len(intent.HypothesisIDs) > 5 {
-					reason = "invalid_hypothesis"
-					break
-				}
-				seen[hypothesis] = true
-				valid, err := tx.TestingHypothesis(ctx, agent, hypothesis)
-				if err != nil {
-					return err
-				}
-				if !valid {
-					reason = "invalid_hypothesis"
-					break
-				}
-			}
-		}
-		if reason == "" && intent.Explore {
-			total, explored, err := tx.ExploreCounts(ctx, agent, store.ExploreWindow)
-			if err != nil {
-				return err
-			}
-			// A new explore action is allowed only while explore actions stay within
-			// limits.explore_percent of the newest store.ExploreWindow own actions,
-			// counting the new one.
-			if (explored+1)*100 > g.opts.Template.Limits.ExplorePercent*(total+1) {
-				reason = "explore_budget"
-			}
-		}
 		if checkOnly {
 			return nil
 		}
 		if reason == "" {
-			ids := intent.HypothesisIDs
-			if ids == nil {
-				ids = []int64{}
-			}
-			encoded, _ := json.Marshal(ids)
-			if id, err = tx.InsertIntent(ctx, store.NewIntent{AgentID: agent, Kind: a.Tool, Text: intent.Text, TargetURL: intent.TargetURL, TargetUsername: intent.TargetUsername, Hook: intent.Hook, Rationale: intent.Rationale, TrendRef: strings.TrimSpace(intent.TrendRef), AnswersNote: intent.AnswersNote, CriticJSON: intent.criticJSON, RootURL: intent.root, Parts: intent.Parts, HypothesisIDsJSON: string(encoded), Explore: intent.Explore, TargetScoreJSON: intent.posting.TargetScoreJSON, DelayMinutes: intent.posting.DelayMinutes, TopicHeat: intent.posting.TopicHeat, ParentReplies: intent.posting.ParentReplies, ParentAgeMinutes: intent.posting.ParentAgeMinutes, DryRun: g.opts.Template.DryRun, Browser: intent.browser, At: now}); err != nil {
-				return err
-			}
-			if err = playbook.Reserve(ctx, tx.Playbook(), agent, id, ids); err != nil {
+			if id, err = tx.InsertIntent(ctx, store.NewIntent{AgentID: agent, Kind: a.Tool, Text: intent.Text, TargetURL: intent.TargetURL, TargetUsername: intent.TargetUsername, Hook: intent.Hook, Rationale: intent.Rationale, TrendRef: strings.TrimSpace(intent.TrendRef), AnswersNote: intent.AnswersNote, CriticJSON: intent.criticJSON, RootURL: intent.root, Parts: intent.Parts, TargetScoreJSON: intent.posting.TargetScoreJSON, TopicHeat: intent.posting.TopicHeat, ParentReplies: intent.posting.ParentReplies, ParentAgeMinutes: intent.posting.ParentAgeMinutes, DryRun: g.opts.Template.DryRun, Browser: intent.browser, At: now}); err != nil {
 				return err
 			}
 			if a.Tool == "reply" {

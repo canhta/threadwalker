@@ -291,9 +291,6 @@ func suiteDigest(s *Suite) string {
 	if fixture := browserFixtureDigest(s.Cases); fixture != "" {
 		b = append(b, []byte("\x00browser-snapshots:"+fixture)...)
 	}
-	if fixture := playbookFixtureDigest(s.Cases); fixture != "" {
-		b = append(b, []byte("\x00playbook:"+fixture)...)
-	}
 	if fixture := qualityFixtureDigest(s.Cases); fixture != "" {
 		b = append(b, []byte("\x00quality:"+fixture)...)
 	}
@@ -306,7 +303,6 @@ func suiteDigest(s *Suite) string {
 var scenarios = map[string]func(string) bool{
 	"isolation": validIsolationScenario,
 	"dashboard": validDashboardScenario,
-	"playbook":  validPlaybookScenario,
 	"metrics": func(s string) bool {
 		switch s {
 		case "windows", "catchup_restart", "isolation", "cancelled", "missing", "db_failure", "logical_soak":

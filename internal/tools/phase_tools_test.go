@@ -28,7 +28,7 @@ func phaseDispatcher(t *testing.T, phase string) *tools.Dispatcher {
 	t.Cleanup(func() { _ = st.Close() })
 	now := time.Date(2026, 1, 1, 9, 0, 0, 0, time.UTC)
 	tmpl := config.Template{ID: "agent", DryRun: true, Limits: config.LimitsConfig{PostsPerDay: 3, RepliesPerDay: 5, RepliesPerUser7d: 1, MinSecondsBetweenActions: 1, MaxStepsPerWake: 10, MaxUSDPerDay: 1, MinMinutesBetweenWakes: 15}}
-	tmpl.Study.WebSearch = true
+	tmpl.WebSearch.Enabled = true
 	if err = st.EnsureAgent(ctx, tmpl.ID); err != nil {
 		t.Fatal(err)
 	}
@@ -36,8 +36,6 @@ func phaseDispatcher(t *testing.T, phase string) *tools.Dispatcher {
 	switch phase {
 	case guard.PhaseDream:
 		wakeID, err = st.BeginPhaseWake(ctx, tmpl.ID, store.WakeDream, "2026-01-01", now)
-	case guard.PhaseStudy:
-		wakeID, err = st.BeginPhaseWake(ctx, tmpl.ID, store.WakeStudy, "2026-01-01T09:00", now)
 	default:
 		wakeID, err = st.BeginWake(ctx, tmpl.ID, now, now.Add(time.Hour))
 	}
@@ -45,7 +43,7 @@ func phaseDispatcher(t *testing.T, phase string) *tools.Dispatcher {
 		t.Fatal(err)
 	}
 	clock := func() time.Time { return now }
-	d, err := tools.NewDispatcher(tools.Options{Embedder: testEmbedder(t, st), Scope: guard.Scope{Store: st, Template: tmpl, WakeID: wakeID, Phase: phase, Now: clock}, Owner: fakeOwner{}, SearchWeb: trends.NewWebSearcher(http.DefaultClient), FetchTrends: func(context.Context) ([]trends.Trend, error) { return nil, nil }, FetchStudy: func(context.Context) (trends.StudyFeed, error) { return trends.StudyFeed{}, nil }})
+	d, err := tools.NewDispatcher(tools.Options{Scope: guard.Scope{Store: st, Template: tmpl, WakeID: wakeID, Phase: phase, Now: clock}, Owner: fakeOwner{}, SearchWeb: trends.NewWebSearcher(http.DefaultClient), FetchTrends: func(context.Context) ([]trends.Trend, error) { return nil, nil }})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -53,7 +51,7 @@ func phaseDispatcher(t *testing.T, phase string) *tools.Dispatcher {
 }
 
 func TestPhasesAreOfferedOnlyToolsTheyMayCall(t *testing.T) {
-	for _, phase := range []string{guard.PhaseAgent, guard.PhaseDream, guard.PhaseStudy} {
+	for _, phase := range []string{guard.PhaseAgent, guard.PhaseDream} {
 		t.Run(phase, func(t *testing.T) {
 			offered := map[string]bool{}
 			for _, def := range phaseDispatcher(t, phase).Definitions() {
@@ -67,7 +65,7 @@ func TestPhasesAreOfferedOnlyToolsTheyMayCall(t *testing.T) {
 					t.Fatalf("%s offered=%v in %s", name, offered[name], phase)
 				}
 			}
-			if offered["web_search"] != (phase != guard.PhaseDream) {
+			if offered["web_search"] != (phase == guard.PhaseAgent) {
 				t.Fatalf("web_search offered=%v in %s", offered["web_search"], phase)
 			}
 		})

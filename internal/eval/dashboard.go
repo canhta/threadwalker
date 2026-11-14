@@ -57,12 +57,9 @@ func runDashboardCaseCaptured(ctx context.Context, c Case, p Profile, repeat int
 		args  []any
 	}{
 		{`INSERT INTO wakes(agent_id,started_at,ended_at,end_reason) VALUES('synthetic-dashboard',?,?,?)`, []any{private, private, private}},
-		{`INSERT INTO actions(agent_id,kind,text,target_url,target_username,hypothesis_ids_json,dry_run,posted_at,thread_url) VALUES('synthetic-dashboard','reply',?,?,?,?,0,?,?)`, []any{private, private, private, private, private, "https://threads.net/@foreign_handle/post/ABC"}},
-		{`INSERT INTO playbook(agent_id,text,status,n,created_at,decided_at) VALUES('synthetic-dashboard','An idea is public text.','testing',4,?,?)`, []any{private, private}},
+		{`INSERT INTO actions(agent_id,kind,text,target_url,target_username,dry_run,posted_at,thread_url) VALUES('synthetic-dashboard','reply',?,?,?,0,?,?)`, []any{private, private, private, private, "https://threads.net/@foreign_handle/post/ABC"}},
 		{`INSERT INTO tool_calls(agent_id,wake_id,tool,args_json,result_json,blocked_by,at) VALUES('synthetic-dashboard',1,?,?,?,?,?)`, []any{private, private, private, private, private}},
 		{`INSERT INTO tool_calls(agent_id,wake_id,tool,args_json,result_json,at) VALUES('synthetic-dashboard',1,'read_own_metrics',?,?,?)`, []any{`{"secret":"` + private + `"}`, `{"outcome":"success","bytes":12,"text":"` + private + `"}`, private}},
-		{`INSERT INTO notes(agent_id,text,created_at) VALUES('synthetic-dashboard',?,?)`, []any{private, private}},
-		{`INSERT INTO memory_index(agent_id,text,created_at) VALUES('synthetic-dashboard',?,?)`, []any{private, private}},
 		{`INSERT INTO contacts(agent_id,username,reason) VALUES('synthetic-dashboard',?,?)`, []any{private, private}},
 		{`INSERT INTO owner_msgs(agent_id,direction,text,at) VALUES('synthetic-dashboard',?,?,?)`, []any{private, private, private}},
 		{`INSERT INTO ledger_phases(agent_id,day,phase,cost_usd) VALUES('synthetic-dashboard',?,'agent',0.25)`, []any{now.Format("2006-01-02")}},

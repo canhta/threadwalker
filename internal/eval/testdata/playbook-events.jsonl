@@ -1,1 +1,0 @@
-{"agent_id":"synthetic-playbook","attempt":0,"cost_usd":0,"duration_ms":0,"event":"playbook.decided","http_status":0,"hypothesis_id":1,"level":"INFO","msg":"threadz event","n":8,"operation":"playbook_decision","outcome":"established","reason":"positive_evidence","request":0,"revision":1,"steps":0,"tokens_in":0,"tokens_out":0,"wake_id":0}

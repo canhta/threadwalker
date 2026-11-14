@@ -2,7 +2,7 @@
   "description": "Guarded local runtime: synthetic services and logical time; no real qualification.",
   "cases": [
     {
-      "id": "runtime_note_dry_action",
+      "id": "runtime_dry_action",
       "kind": "runtime",
       "runtime": {
         "calls": [
@@ -16,28 +16,19 @@
           {
             "type": "function",
             "function": {
-              "name": "note_write",
-              "arguments": "{\"topic\": \"synthetic\", \"description\": \"Synthetic persistent self note.\", \"text\": \"Synthetic note body.\"}"
-            }
-          },
-          {
-            "type": "function",
-            "function": {
               "name": "post",
               "arguments": "{\"text\": \"Synthetic local action.\"}"
             }
           }
         ],
         "expected_next_minutes": 60,
-        "expected_actions": 1,
-        "expected_note": "Synthetic persistent self note."
+        "expected_actions": 1
       },
       "expect": {
         "end_reason": "completed",
         "tools": [
           "read_own_metrics",
           "read_feed",
-          "note_write",
           "post"
         ]
       }
@@ -92,70 +83,70 @@
           {
             "type": "function",
             "function": {
-              "name": "note_search",
+              "name": "search",
               "arguments": "{\"query\": \"synthetic\"}"
             }
           },
           {
             "type": "function",
             "function": {
-              "name": "note_search",
+              "name": "search",
               "arguments": "{\"query\": \"synthetic\"}"
             }
           },
           {
             "type": "function",
             "function": {
-              "name": "note_search",
+              "name": "search",
               "arguments": "{\"query\": \"synthetic\"}"
             }
           },
           {
             "type": "function",
             "function": {
-              "name": "note_search",
+              "name": "search",
               "arguments": "{\"query\": \"synthetic\"}"
             }
           },
           {
             "type": "function",
             "function": {
-              "name": "note_search",
+              "name": "search",
               "arguments": "{\"query\": \"synthetic\"}"
             }
           },
           {
             "type": "function",
             "function": {
-              "name": "note_search",
+              "name": "search",
               "arguments": "{\"query\": \"synthetic\"}"
             }
           },
           {
             "type": "function",
             "function": {
-              "name": "note_search",
+              "name": "search",
               "arguments": "{\"query\": \"synthetic\"}"
             }
           },
           {
             "type": "function",
             "function": {
-              "name": "note_search",
+              "name": "search",
               "arguments": "{\"query\": \"synthetic\"}"
             }
           },
           {
             "type": "function",
             "function": {
-              "name": "note_search",
+              "name": "search",
               "arguments": "{\"query\": \"synthetic\"}"
             }
           },
           {
             "type": "function",
             "function": {
-              "name": "note_search",
+              "name": "search",
               "arguments": "{\"query\": \"synthetic\"}"
             }
           }
@@ -167,16 +158,16 @@
         "end_reason": "stall_stop",
         "tools": [
           "read_own_metrics",
-          "note_search",
-          "note_search",
-          "note_search",
-          "note_search",
-          "note_search",
-          "note_search",
-          "note_search",
-          "note_search",
-          "note_search",
-          "note_search"
+          "search",
+          "search",
+          "search",
+          "search",
+          "search",
+          "search",
+          "search",
+          "search",
+          "search",
+          "search"
         ]
       }
     },
@@ -188,7 +179,7 @@
           {
             "type": "function",
             "function": {
-              "name": "read_own_metrics",
+              "name": "read_replies",
               "arguments": "{}"
             }
           }
@@ -201,7 +192,7 @@
         "end_reason": "completed",
         "tools": [
           "read_own_metrics",
-          "read_own_metrics"
+          "read_replies"
         ]
       }
     },
@@ -234,7 +225,7 @@
           {
             "type": "function",
             "function": {
-              "name": "read_own_metrics",
+              "name": "read_replies",
               "arguments": "{}"
             }
           },
@@ -257,7 +248,7 @@
           "read_feed",
           "search",
           "read_post",
-          "read_own_metrics",
+          "read_replies",
           "fetch_trends"
         ]
       }

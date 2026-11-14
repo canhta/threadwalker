@@ -37,10 +37,7 @@ func setup(t *testing.T) (*store.Store, tools.Options, *tools.Dispatcher) {
 	}
 	opts := tools.Options{Scope: guard.Scope{Store: st, Template: config.Template{ID: "agent", DryRun: true, Limits: config.LimitsConfig{PostsPerDay: 100, RepliesPerDay: 100, RepliesPerUser7d: 10, MinSecondsBetweenActions: 1, MinMinutesBetweenWakes: 15}}, WakeID: 1, Now: func() time.Time { return time.Date(2026, 11, 11, 0, 0, 0, 0, time.UTC) }}, Threads: threads.NewMemory(), FetchTrends: func(context.Context) ([]trends.Trend, error) {
 		return []trends.Trend{{Source: "synthetic", Title: "untrusted-external-text", URL: "https://example.invalid/synthetic"}}, nil
-	}, FetchStudy: func(context.Context) (trends.StudyFeed, error) {
-		return trends.StudyFeed{Items: []trends.Trend{{Source: "synthetic", Title: "untrusted-study-text", URL: "https://example.invalid/study"}}}, nil
 	}}
-	opts.Embedder = testEmbedder(t, st)
 	opts.Scope = guard.Scope{Store: st, Template: opts.Template, WakeID: 1, Now: opts.Now}
 	d, err := tools.NewDispatcher(opts)
 	if err != nil {
@@ -49,20 +46,16 @@ func setup(t *testing.T) (*store.Store, tools.Options, *tools.Dispatcher) {
 	return st, opts, d
 }
 
-func testEmbedder(t *testing.T, st *store.Store) *llm.Embedder {
-	t.Helper()
-	e, err := llm.NewOfflineEmbedder(config.LimitsConfig{MaxUSDPerDay: 1}, st, llm.Options{})
-	if err != nil {
-		t.Fatal(err)
-	}
-	return e
-}
 func call(name, args string) llm.ToolCall {
 	return llm.ToolCall{ID: "id", Type: "function", Function: llm.CallFunction{Name: name, Arguments: args}}
 }
 func dispatch(t *testing.T, d *tools.Dispatcher, name, args string) string {
 	t.Helper()
-	out, err := d.Dispatch(context.Background(), call(name, args))
+	run := d.Dispatch
+	if name == "read_own_metrics" {
+		run = d.DispatchHarness
+	}
+	out, err := run(context.Background(), call(name, args))
 	if err != nil {
 		t.Fatalf("%s: %v", name, err)
 	}
@@ -71,7 +64,7 @@ func dispatch(t *testing.T, d *tools.Dispatcher, name, args string) string {
 func TestDefinitionsAndConstructor(t *testing.T) {
 	_, opts, d := setup(t)
 	defs := d.Definitions()
-	if len(defs) != 19 {
+	if len(defs) != 11 {
 		t.Fatalf("definitions %d", len(defs))
 	}
 	names := map[string]bool{}
@@ -112,8 +105,7 @@ func TestNewDispatcherRequiresInjectedFetchers(t *testing.T) {
 	_, opts, _ := setup(t)
 	for name, mutate := range map[string]func(*tools.Options){
 		"trends":     func(o *tools.Options) { o.FetchTrends = nil },
-		"study":      func(o *tools.Options) { o.FetchStudy = nil },
-		"web_search": func(o *tools.Options) { o.Template.Study.WebSearch = true },
+		"web_search": func(o *tools.Options) { o.Template.WebSearch.Enabled = true },
 	} {
 		t.Run(name, func(t *testing.T) {
 			bad := opts
@@ -122,34 +114,6 @@ func TestNewDispatcherRequiresInjectedFetchers(t *testing.T) {
 				t.Fatal("missing fetcher accepted")
 			}
 		})
-	}
-}
-func TestNotes(t *testing.T) {
-	st, _, d := setup(t)
-	dispatch(t, d, "note_write", `{"topic":"robots","description":"about robots","text":"remember deterministic robots"}`)
-	var note string
-	st.DB().QueryRow(`SELECT text FROM notes WHERE topic='robots'`).Scan(&note)
-	if note != "remember deterministic robots" {
-		t.Fatal(note)
-	}
-	if out := dispatch(t, d, "note_read", `{"ref":"topic:robots"}`); !strings.Contains(out, "remember deterministic robots") {
-		t.Fatal(out)
-	}
-	if _, err := d.Dispatch(context.Background(), call("memory_add", `{"text":"robots topic holds the plan"}`)); err == nil || !strings.Contains(err.Error(), "phase_read_only") {
-		t.Fatalf("an agent wake wrote memory: %v", err)
-	}
-	out := dispatch(t, d, "note_search", `{"query":"robots"}`)
-	if !strings.Contains(out, "remember deterministic [robots]") || !strings.Contains(out, `"ref":"note:1"`) {
-		t.Fatal(out)
-	}
-	if out := dispatch(t, d, "note_search", `{"query":"\"robots\" AND co-op:","since":"2026-11-10T00:00:00Z","until":"2026-11-12T00:00:00Z"}`); !strings.Contains(out, "note:1") {
-		t.Fatal(out)
-	}
-	if out := dispatch(t, d, "note_search", `{"query":"robots","since":"2026-11-12T00:00:00Z"}`); out != "[]" {
-		t.Fatal(out)
-	}
-	if out := dispatch(t, d, "note_read", `{"ref":"note:1"}`); !strings.Contains(out, "remember deterministic robots") {
-		t.Fatal(out)
 	}
 }
 func TestExternalWrappersAndDryRunActions(t *testing.T) {
@@ -201,8 +165,15 @@ func repeatDispatcher(t *testing.T, changing bool) (*store.Store, *tools.Dispatc
 	d, _ := tools.NewDispatcher(opts)
 	return st, d
 }
+func failingDispatcher(t *testing.T) (*store.Store, *tools.Dispatcher) {
+	st, opts, _ := setup(t)
+	opts.FetchTrends = func(context.Context) ([]trends.Trend, error) { return nil, errors.New("source down") }
+	opts.Scope = guard.Scope{Store: st, Template: opts.Template, WakeID: 1, Now: opts.Now}
+	d, _ := tools.NewDispatcher(opts)
+	return st, d
+}
 func TestRepeatGuard(t *testing.T) {
-	fail := `{"ref":"note:999"}`
+	const fail = "{}"
 	blockedCount := func(st *store.Store, reason string) (n int) {
 		st.DB().QueryRow(`SELECT COUNT(*) FROM tool_calls WHERE blocked_by=?`, reason).Scan(&n)
 		return
@@ -216,18 +187,18 @@ func TestRepeatGuard(t *testing.T) {
 		}
 	})
 	t.Run("three identical failures refuse without ending", func(t *testing.T) {
-		st, d := repeatDispatcher(t, false)
+		st, d := failingDispatcher(t)
 		for i := 0; i < 3; i++ {
-			if _, err := d.Dispatch(context.Background(), call("note_read", fail)); err == nil || errors.Is(err, tools.ErrStallStop) {
+			if _, err := d.Dispatch(context.Background(), call("fetch_trends", fail)); err == nil || errors.Is(err, tools.ErrStallStop) {
 				t.Fatalf("failure %d: %v", i, err)
 			}
 		}
-		_, err := d.Dispatch(context.Background(), call("note_read", `{ "ref": "note:999" }`))
+		_, err := d.Dispatch(context.Background(), call("fetch_trends", ` {} `))
 		var b *guard.BlockedError
 		if !errors.As(err, &b) || b.Reason != "repeat_refused" || errors.Is(err, tools.ErrStallStop) {
 			t.Fatalf("want one refusal, got %v", err)
 		}
-		if _, err := d.Dispatch(context.Background(), call("note_search", `{"query":"x"}`)); err != nil {
+		if _, err := d.Dispatch(context.Background(), call("read_feed", "{}")); err != nil {
 			t.Fatalf("other call refused: %v", err)
 		}
 		if n := blockedCount(st, "repeat_refused"); n != 1 {
@@ -235,11 +206,11 @@ func TestRepeatGuard(t *testing.T) {
 		}
 	})
 	t.Run("two refusals end the wake", func(t *testing.T) {
-		st, d := repeatDispatcher(t, false)
+		st, d := failingDispatcher(t)
 		for i := 0; i < 5; i++ {
-			d.Dispatch(context.Background(), call("note_read", fail))
+			d.Dispatch(context.Background(), call("fetch_trends", fail))
 		}
-		_, err := d.Dispatch(context.Background(), call("note_search", `{"query":"x"}`))
+		_, err := d.Dispatch(context.Background(), call("read_feed", "{}"))
 		if !errors.Is(err, tools.ErrStallStop) {
 			t.Fatal("stopped dispatcher accepted more calls:", err)
 		}
@@ -258,7 +229,7 @@ func TestRepeatGuard(t *testing.T) {
 	})
 }
 func TestInvalidToolsAreAuditedAndCannotMutate(t *testing.T) {
-	for _, tc := range []struct{ name, args string }{{"unknown", "{}"}, {"post", "{"}, {"post", "[]"}, {"post", "null"}, {"post", `{"text":""}`}, {"post", `{"text":null}`}, {"post", `{"text":"x","extra":true}`}, {"post", `{"text":"x"} {}`}, {"reply", `{"text":"x"}`}, {"search", `{"query":""}`}, {"read_post", `{"id":""}`}, {"note_write", `{"text":""}`}, {"note_search", `{"query":"x","limit":0}`}, {"note_search", `{"query":"x","limit":101}`}, {"note_search", `{"query":"x","since":"yesterday"}`}, {"note_search", `{"query":"x","until":"2026-11-11"}`}, {"note_read", `{"ref":""}`}, {"note_read", `{"ref":"note:999"}`}, {"note_read", `{"ref":"note:1","limit":1}`}, {"read_feed", `{"query":"x"}`}, {"post", `{"text":"x","hypothesis_ids":[1]}`}} {
+	for _, tc := range []struct{ name, args string }{{"unknown", "{}"}, {"post", "{"}, {"post", "[]"}, {"post", "null"}, {"post", `{"text":""}`}, {"post", `{"text":null}`}, {"post", `{"text":"x","extra":true}`}, {"post", `{"text":"x"} {}`}, {"reply", `{"text":"x"}`}, {"search", `{"query":""}`}, {"read_post", `{"id":""}`}, {"note_write", `{"text":"x"}`}, {"playbook_read", `{}`}, {"read_own_metrics", `{}`}, {"read_feed", `{"query":"x"}`}, {"post", `{"text":"x","hypothesis_ids":[1]}`}, {"post", `{"text":"x","explore":true}`}} {
 		t.Run(tc.name+tc.args, func(t *testing.T) {
 			st, _, d := setup(t)
 			_, err := d.Dispatch(context.Background(), call(tc.name, tc.args))
@@ -321,7 +292,7 @@ func TestAuditFailureAndPausedStatePreventExternalEffects(t *testing.T) {
 	}
 }
 func TestGuardClientAuditsRejectedAndRefusesRepeatedFailures(t *testing.T) {
-	for _, tc := range []struct{ name, args, kind string }{{"unknown", "{}", "function"}, {"post", "{", "function"}, {"post", "{}", "bad"}, {"note_write", `{"text":"same"}`, "function"}} {
+	for _, tc := range []struct{ name, args, kind string }{{"unknown", "{}", "function"}, {"post", "{", "function"}, {"post", "{}", "bad"}, {"read_post", `{"id":""}`, "function"}} {
 		t.Run(tc.name+tc.args+tc.kind, func(t *testing.T) {
 			st, _, d := setup(t)
 			requests := 0
@@ -354,12 +325,11 @@ func TestToolsLogsContainMetadataOnly(t *testing.T) {
 	opts.Logger = logger
 	opts.Scope = guard.Scope{Store: st, Template: opts.Template, WakeID: 1, Now: opts.Now, Logger: logger}
 	d, _ := tools.NewDispatcher(opts)
-	dispatch(t, d, "note_write", `{"topic":"canary","text":"private-note-canary"}`)
 	dispatch(t, d, "fetch_trends", "{}")
 	d.Dispatch(context.Background(), call("unknown-secret-canary", "{}"))
 	d.Guard().NoteRead("tid", "https://threads.com/@stranger_canary/post/private-url-canary", "")
 	dispatch(t, d, "reply", `{"text":"own-post-canary","target_id": "tid", "target_url":"https://threads.com/@stranger_canary/post/private-url-canary","target_username":"stranger_canary"}`)
-	for _, canary := range []string{"private-note-canary", "untrusted-external-text", "unknown-secret-canary", "own-post-canary", "private-url-canary", "stranger_canary"} {
+	for _, canary := range []string{"untrusted-external-text", "unknown-secret-canary", "own-post-canary", "private-url-canary", "stranger_canary"} {
 		if strings.Contains(buf.String(), canary) {
 			t.Fatalf("log leaked %s", canary)
 		}
@@ -367,7 +337,7 @@ func TestToolsLogsContainMetadataOnly(t *testing.T) {
 	if strings.Contains(buf.String(), `"tool":"unknown"`) {
 		t.Fatal("unknown tool must be omitted from operational metadata")
 	}
-	for _, event := range []string{"tool.started", "tool.finished", "guard.checked", "audit.recorded", "tool.blocked", "note.written", "trends.fetched"} {
+	for _, event := range []string{"tool.started", "tool.finished", "guard.checked", "audit.recorded", "tool.blocked", "trends.fetched"} {
 		if !strings.Contains(buf.String(), event) {
 			t.Errorf("missing %s", event)
 		}
@@ -375,25 +345,16 @@ func TestToolsLogsContainMetadataOnly(t *testing.T) {
 }
 
 func TestBuiltinFailuresAreAuditedWithoutResultsOrEffects(t *testing.T) {
-	for _, mode := range []string{"trends", "note-write", "note-search", "action", "hypothesis"} {
+	for _, mode := range []string{"trends", "action"} {
 		t.Run(mode, func(t *testing.T) {
 			st, opts, _ := setup(t)
 			name, args := "fetch_trends", "{}"
 			switch mode {
 			case "trends":
 				opts.FetchTrends = func(context.Context) ([]trends.Trend, error) { return nil, errors.New("private-source-error") }
-			case "note-write":
-				name, args = "note_write", `{"topic":"t","text":"note"}`
-				st.DB().Exec(`CREATE TRIGGER fail_note BEFORE INSERT ON notes BEGIN SELECT RAISE(FAIL,'private-store-error'); END`)
-			case "note-search":
-				name, args = "note_search", `{"query":"note","limit":2}`
-				st.DB().Exec(`DROP TABLE notes_fts`)
 			case "action":
 				name, args = "post", `{"text":"post"}`
 				st.DB().Exec(`CREATE TRIGGER fail_action BEFORE INSERT ON actions BEGIN SELECT RAISE(FAIL,'private-store-error'); END`)
-			case "hypothesis":
-				name, args = "post", `{"text":"post","hypothesis_ids":[1]}`
-				st.DB().Exec(`DROP TABLE playbook`)
 			}
 			opts.Scope = guard.Scope{Store: st, Template: opts.Template, WakeID: 1, Now: opts.Now}
 			d, _ := tools.NewDispatcher(opts)
@@ -406,7 +367,7 @@ func TestBuiltinFailuresAreAuditedWithoutResultsOrEffects(t *testing.T) {
 			}
 			var actions, count int
 			st.DB().QueryRow(`SELECT COUNT(*) FROM actions`).Scan(&actions)
-			if mode == "action" || mode == "hypothesis" {
+			if mode == "action" {
 				st.DB().QueryRow(`SELECT COUNT(*) FROM tool_calls WHERE result_json=''`).Scan(&count)
 			} else {
 				st.DB().QueryRow(`SELECT COUNT(*) FROM tool_calls WHERE result_json='{"outcome":"error","bytes":0,"reason":"operation_failed"}'`).Scan(&count)
@@ -415,25 +376,6 @@ func TestBuiltinFailuresAreAuditedWithoutResultsOrEffects(t *testing.T) {
 				t.Fatalf("actions %d audits %d", actions, count)
 			}
 		})
-	}
-}
-func TestHypothesisTagsRequireOwnTestingEntries(t *testing.T) {
-	st, _, d := setup(t)
-	_, err := st.DB().Exec(`INSERT INTO playbook(id,agent_id,text,status,created_at) VALUES(1,'agent','own hypothesis','testing','2026-11-11'),(2,'other','foreign hypothesis','testing','2026-11-11'),(3,'agent','established hypothesis','established','2026-11-11'),(4,'agent','rejected hypothesis','rejected','2026-11-11')`)
-	if err != nil {
-		t.Fatal(err)
-	}
-	dispatch(t, d, "post", `{"text":"own experiment","hypothesis_ids":[1]}`)
-	for _, args := range []string{`{"text":"foreign","hypothesis_ids":[2]}`, `{"text":"established","hypothesis_ids":[3]}`, `{"text":"rejected","hypothesis_ids":[4]}`, `{"text":"unknown","hypothesis_ids":[99]}`} {
-		if _, err := d.Dispatch(context.Background(), call("post", args)); err == nil {
-			t.Fatal("accepted unavailable hypothesis")
-		}
-	}
-	var count int
-	var ids string
-	st.DB().QueryRow(`SELECT COUNT(*),hypothesis_ids_json FROM actions`).Scan(&count, &ids)
-	if count != 1 || ids != "[1]" {
-		t.Fatalf("actions %d ids %s", count, ids)
 	}
 }
 func TestDispatcherKeepsConfiguredSecretsOutOfEffectsAndAudit(t *testing.T) {
@@ -446,21 +388,8 @@ func TestDispatcherKeepsConfiguredSecretsOutOfEffectsAndAudit(t *testing.T) {
 			t.Fatal("accepted secret in action")
 		}
 	}
-	for _, c := range []struct{ name, args string }{
-		{"memory_add", `{"text":"key private-key-canary"}`},
-		{"memory_add", `{"text":"key private-key-can\u0061ry"}`},
-		{"note_write", `{"topic":"t","text":"key private-key-canary"}`},
-		{"note_write", `{"topic":"private-key-canary","text":"x"}`},
-		{"note_write", `{"topic":"t","description":"private-key-canary","text":"x"}`},
-	} {
-		if _, err := d.Dispatch(context.Background(), call(c.name, c.args)); err == nil {
-			t.Fatalf("accepted secret in %s %s", c.name, c.args)
-		}
-	}
-	var memory int
-	st.DB().QueryRow(`SELECT (SELECT COUNT(*) FROM memory_index) + (SELECT COUNT(*) FROM notes)`).Scan(&memory)
-	if memory != 0 {
-		t.Fatalf("%d memory rows stored from calls carrying a secret", memory)
+	if _, err := d.Dispatch(context.Background(), call("mark_do_not_contact", `{"username":"private-key-canary"}`)); err == nil {
+		t.Fatal("accepted secret in mark_do_not_contact")
 	}
 	var actions, leaked int
 	st.DB().QueryRow(`SELECT COUNT(*) FROM actions`).Scan(&actions)
@@ -471,12 +400,12 @@ func TestDispatcherKeepsConfiguredSecretsOutOfEffectsAndAudit(t *testing.T) {
 }
 func TestLocalValidationBeforeEffects(t *testing.T) {
 	_, _, d := setup(t)
-	for _, tc := range []struct{ name, args string }{{"note_write", `{"topic":"t","text":1}`}, {"note_write", `{"text":"x"}`}, {"note_write", `{"topic":"a\nb","text":"x"}`}, {"memory_add", `{"text":1}`}, {"note_search", `{"query":"x","limit":"1"}`}, {"note_search", `{"query":"x","limit":null}`}, {"post", `{"text":"x","hypothesis_ids":null}`}, {"post", `{"text":"x","hypothesis_ids":[0]}`}, {"post", `{"text":"x","hypothesis_ids":["1"]}`}} {
+	for _, tc := range []struct{ name, args string }{{"post", `{"text":1}`}, {"post", `{"text":"x","parts":null}`}, {"post", `{"text":"x","parts":[""]}`}, {"search", `{"query":"x","recent":"1"}`}, {"search", `{"query":"x","recent":null}`}, {"reply", `{"text":"x","answers_note":0}`}, {"reply", `{"text":"x","answers_note":"1"}`}} {
 		if _, err := d.Dispatch(context.Background(), call(tc.name, tc.args)); err == nil {
 			t.Fatal("accepted invalid typed input")
 		}
 	}
-	c := call("note_write", `{"topic":"t","text":"x"}`)
+	c := call("fetch_trends", `{}`)
 	c.ID = ""
 	if _, err := d.Dispatch(context.Background(), c); err == nil {
 		t.Fatal("accepted missing id")
@@ -513,13 +442,13 @@ func TestClientStopsImmediatelyOnAuditFailure(t *testing.T) {
 		})
 	}
 }
-func TestDispatcherRejectsRedditCredentialsInToolArguments(t *testing.T) {
+func TestDispatcherRejectsConfiguredSecretsInToolArguments(t *testing.T) {
 	st, opts, _ := setup(t)
-	opts.Template.Study.RedditClientID = config.NewSecret("reddit-id-canary")
-	opts.Template.Study.RedditClientSecret = config.NewSecret("reddit-secret-canary")
+	opts.Template.LLM.APIKey = config.NewSecret("llm-key-canary")
+	opts.Template.Telegram.BotToken = config.NewSecret("bot-token-canary")
 	opts.Scope = guard.Scope{Store: st, Template: opts.Template, WakeID: 1, Now: opts.Now}
 	d, _ := tools.NewDispatcher(opts)
-	for _, canary := range []string{"reddit-id-canary", "reddit-secret-canary"} {
+	for _, canary := range []string{"llm-key-canary", "bot-token-canary"} {
 		if _, err := d.Dispatch(context.Background(), call("post", `{"text":"`+canary+`"}`)); err == nil {
 			t.Fatalf("accepted %s in action", canary)
 		}
@@ -538,14 +467,6 @@ func TestReplyTargetMustComeFromAReadResult(t *testing.T) {
 	}
 	dispatch(t, d, "search", `{"query":"golang"}`)
 	dispatch(t, d, "reply", reply)
-}
-
-func TestDispatcherRequiresAnEmbedder(t *testing.T) {
-	_, opts, _ := setup(t)
-	opts.Embedder = nil
-	if _, err := tools.NewDispatcher(opts); err == nil {
-		t.Fatal("dispatcher built without an embedder")
-	}
 }
 
 func TestReconcileUnpublishedFailsOnlyProvenUnpublished(t *testing.T) {

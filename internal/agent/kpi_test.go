@@ -62,7 +62,7 @@ func kpiRuntimeFull(t *testing.T, zone string, publishedAgo time.Duration, engag
 		}
 	}
 	fixture := agent.NewOfflineFixture(func() time.Time { return kpiNow })
-	r, err := agent.New(agent.Options{Store: st, Template: tmpl, Now: func() time.Time { return kpiNow }, HTTPClient: fixture.Client(), FetchTrends: fixture.Trends, FetchStudy: fixture.Study})
+	r, err := agent.New(agent.Options{Store: st, Template: tmpl, Now: func() time.Time { return kpiNow }, HTTPClient: fixture.Client(), FetchTrends: fixture.Trends})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -138,24 +138,6 @@ func TestScoreboardOnTargetHasNoStopRule(t *testing.T) {
 	}
 }
 
-func TestBehindAgentIsNeverPressedToWriteANote(t *testing.T) {
-	r, _, fixture := kpiRuntime(t, 9*time.Hour, 3)
-	fixture.Calls = []llm.ToolCall{} // the model stops at once
-	nudges := 0
-	fixture.Observe = func(messages []llm.Message) {
-		nudges = 0
-		for _, m := range messages[2:] {
-			if m.Role == "user" && strings.Contains(m.Content, "note_write") {
-				nudges++
-			}
-		}
-	}
-	wake, err := r.Wake(context.Background())
-	if err != nil || wake.EndReason != "completed" || nudges != 0 {
-		t.Fatalf("wake %+v err %v nudges %d", wake, err, nudges)
-	}
-}
-
 func TestOnTargetAgentMayStopIdle(t *testing.T) {
 	r, _, fixture := kpiRuntime(t, time.Hour, 12)
 	fixture.Calls = []llm.ToolCall{}
@@ -218,7 +200,7 @@ func TestCappedDayWaitsForTheNextUTCDayWithoutAZone(t *testing.T) {
 	}{
 		{"nothing capped: behind still wakes at the minimum", func(*testing.T, *store.Store) {}, kpiNow.Add(20 * time.Minute)},
 		{"daily USD spent", func(t *testing.T, st *store.Store) {
-			if _, err := st.DB().Exec(`INSERT INTO ledger_phases(agent_id,day,phase,cost_usd) VALUES('synthetic-offline','2026-01-01','study',0.9)`); err != nil {
+			if _, err := st.DB().Exec(`INSERT INTO ledger_phases(agent_id,day,phase,cost_usd) VALUES('synthetic-offline','2026-01-01','agent',0.9) ON CONFLICT(agent_id,day,phase) DO UPDATE SET cost_usd=cost_usd+0.9`); err != nil {
 				t.Fatal(err)
 			}
 		}, tomorrow},
@@ -256,7 +238,7 @@ func TestCappedSpendWaitsForLocalMidnight(t *testing.T) {
 	localMidnight := time.Date(2026, 1, 1, 17, 0, 0, 0, time.UTC)
 	spend := func(day string) func(t *testing.T, st *store.Store) {
 		return func(t *testing.T, st *store.Store) {
-			if _, err := st.DB().Exec(`INSERT INTO ledger_phases(agent_id,day,phase,cost_usd) VALUES('synthetic-offline',?,'study',0.9)`, day); err != nil {
+			if _, err := st.DB().Exec(`INSERT INTO ledger_phases(agent_id,day,phase,cost_usd) VALUES('synthetic-offline',?,'agent',0.9) ON CONFLICT(agent_id,day,phase) DO UPDATE SET cost_usd=cost_usd+0.9`, day); err != nil {
 				t.Fatal(err)
 			}
 		}

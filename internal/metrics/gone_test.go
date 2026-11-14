@@ -31,7 +31,7 @@ func goneRun(t *testing.T, own []threads.Post) (*store.Store, metrics.Result) {
 	source := threads.NewMemory()
 	source.Errors[threads.OpReadOwnMetrics] = threads.ErrMediaNotFound
 	source.Pages[threads.OpReadOwnPosts] = threads.Page{Kind: "own_posts", Posts: own}
-	p, err := metrics.New(metrics.Options{Embedder: testEmbedder(t, st), Store: st, Template: tmpl, Now: func() time.Time { return start.Add(time.Hour) }, FetchTrends: metricTrends, FetchStudy: metricStudy, ThreadsFactory: func(context.Context, config.Template) (threads.Backend, error) { return source, nil }})
+	p, err := metrics.New(metrics.Options{Store: st, Template: tmpl, Now: func() time.Time { return start.Add(time.Hour) }, FetchTrends: metricTrends, ThreadsFactory: func(context.Context, config.Template) (threads.Backend, error) { return source, nil }})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -76,7 +76,7 @@ func TestMetricsPassWithNothingDueLeavesNoWake(t *testing.T) {
 	if err = st.EnsureAgent(ctx, tmpl.ID); err != nil {
 		t.Fatal(err)
 	}
-	p, err := metrics.New(metrics.Options{Embedder: testEmbedder(t, st), Store: st, Template: tmpl, Now: func() time.Time { return now }, FetchTrends: metricTrends, FetchStudy: metricStudy})
+	p, err := metrics.New(metrics.Options{Store: st, Template: tmpl, Now: func() time.Time { return now }, FetchTrends: metricTrends})
 	if err != nil {
 		t.Fatal(err)
 	}

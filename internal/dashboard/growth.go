@@ -279,7 +279,7 @@ func barGeometry(rows [][]float64, max float64) (rects []ChartRect, axisMax floa
 	}
 	step := chartW / float64(len(rows))
 	width := step * 0.62
-	classes := []string{"wake", "study", "dream"}
+	classes := []string{"wake", "dream"}
 	for i, row := range rows {
 		base := chartH
 		x := float64(i)*step + (step-width)/2

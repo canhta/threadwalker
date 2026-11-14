@@ -93,8 +93,8 @@ func (s Scheduler) idle(ctx context.Context, d time.Duration) error {
 	}
 }
 
-// WakeRequest asks for one wake outside the schedule. Phase is agent, dream or
-// study. DryRun makes every write of this wake a dry-run write.
+// WakeRequest asks for one wake outside the schedule. Phase is agent or dream.
+// DryRun makes every write of this wake a dry-run write.
 type WakeRequest struct {
 	Phase  string
 	DryRun bool
@@ -112,7 +112,7 @@ func (r *Runtime) WakeNow(ctx context.Context, req WakeRequest) (WakeResult, err
 	switch req.Phase {
 	case guard.PhaseAgent:
 		return run.wakeNow(ctx)
-	case guard.PhaseDream, guard.PhaseStudy:
+	case guard.PhaseDream:
 		return run.RunPhase(ctx, req.Phase, "manual-"+r.opts.Now().UTC().Format("20060102T150405.000000000"))
 	}
 	return WakeResult{}, fmt.Errorf("starting wake: unknown phase %q", req.Phase)

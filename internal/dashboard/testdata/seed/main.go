@@ -63,17 +63,6 @@ var replyB = []string{
 
 var users = []string{"mai.codes", "hoang_ml", "linh.dev", "bao_data", "thu.writes", "nam_sre", "an.builds", "quynh_pm"}
 
-var hypotheses = []struct {
-	text, kind string
-}{
-	{"Bài mở đầu bằng một con số cụ thể nhận nhiều bình luận hơn bài mở đầu bằng khẳng định.", "post"},
-	{"Thêm emoji vào dòng đầu làm tăng lượt xem.", "post"},
-	{"Đăng vào 12h trưa được xem nhiều hơn đăng lúc 20h.", "post"},
-	{"Bài kết thúc bằng một câu hỏi mở nhận nhiều trả lời hơn.", "post"},
-	{"Trả lời bài mới dưới 30 phút có nhiều lượt xem hơn trả lời bài cũ.", "reply"},
-	{"Trả lời kèm một con số cụ thể được người đăng bài gốc phản hồi nhiều hơn.", "reply"},
-}
-
 var trendPool = []struct{ source, title string }{
 	{"hn", "I gave an agent a lakehouse and control of the budget"}, {"hn", "Show HN: a tiny SQLite-backed job queue"},
 	{"hn", "The hidden cost of model context"}, {"gt", "giá xăng dầu hôm nay"}, {"gt", "học lập trình năm 2026"},
@@ -90,7 +79,6 @@ type event struct {
 
 type result struct {
 	views, likes, replies, reposts int64
-	label                          string
 }
 
 func main() {
@@ -142,14 +130,9 @@ func seed(ctx context.Context, s *store.Store, now time.Time) error {
 		return int64(80 + 320*math.Pow(x, 1.25))
 	}
 	must(s.EnsureAgent(ctx, agent))
-	texts := make([]string, len(hypotheses))
-	for i, h := range hypotheses {
-		texts[i] = h.text
-	}
-	_, err := s.InitializePlaybook(ctx, agent, texts, first)
-	must(err)
+	var err error
 
-	// Wake slots (UTC+7 local): four runs a day at 08/12/16/20, a plan at 22, a study at 06.
+	// Wake slots (UTC+7 local): four runs a day at 08/12/16/20 and a plan at 22.
 	type slot struct {
 		at   time.Time
 		kind string
@@ -157,7 +140,6 @@ func seed(ctx context.Context, s *store.Store, now time.Time) error {
 	var slots []slot
 	for d := 0; d < days; d++ {
 		day := first.AddDate(0, 0, d)
-		slots = append(slots, slot{day.Add(-time.Hour), "study"}) // 06:00 local
 		for _, h := range []int{1, 5, 9, 13} {
 			slots = append(slots, slot{day.Add(time.Duration(h) * time.Hour), "agent"})
 		}
@@ -193,8 +175,6 @@ func seed(ctx context.Context, s *store.Store, now time.Time) error {
 
 	var events []event
 	results := map[int64]result{}
-	kinds := map[int64]string{}
-	var postIDs, replyIDs []int64
 	var postCount, replyCount, blockedCount, trendDay int
 	lastTrend := -1
 	for i, sl := range live {
@@ -232,7 +212,6 @@ func seed(ctx context.Context, s *store.Store, now time.Time) error {
 			} else {
 				do("search")
 			}
-			do("playbook_read")
 			if lastTrend != sl.at.YearDay() {
 				do("fetch_trends")
 				lastTrend = sl.at.YearDay()
@@ -241,17 +220,14 @@ func seed(ctx context.Context, s *store.Store, now time.Time) error {
 				for r, p := range pick {
 					stories = append(stories, store.TrendStory{Source: trendPool[p].source, Title: trendPool[p].title, URL: fmt.Sprintf("https://example.com/trend/%d", p), Score: 400 - 40*r})
 				}
-				must(s.RecordTrendStories(ctx, agent, "agent", stories, t, 10))
+				must(s.RecordTrendStories(ctx, agent, stories, t, 10))
 				trendDay++
 			}
 			must(s.RecordFollowers(ctx, agent, followersAt(t), t))
 			if postAt[i] {
 				idx := postCount
 				postCount++
-				hyp := int64(idx%4) + 1
-				id := publish(ctx, s, must, store.NewIntent{AgentID: agent, Kind: "post", Text: posts[idx], HypothesisIDsJSON: fmt.Sprintf("[%d]", hyp), Hook: store.HookTypes[idx%len(store.HookTypes)], Rationale: "Chủ đề đang được quan tâm; câu mở đầu gợi tò mò.", At: t.Add(2 * time.Minute)}, hyp, fmt.Sprintf("https://www.threads.com/@%s/post/DR%05d", username, 100+idx*7), idx)
-				kinds[id] = "post"
-				postIDs = append(postIDs, id)
+				id := publish(ctx, s, must, store.NewIntent{AgentID: agent, Kind: "post", Text: posts[idx], Hook: store.HookTypes[idx%len(store.HookTypes)], Rationale: "Chủ đề đang được quan tâm; câu mở đầu gợi tò mò.", At: t.Add(2 * time.Minute)}, fmt.Sprintf("https://www.threads.com/@%s/post/DR%05d", username, 100+idx*7), idx)
 				do("post")
 				base = 700
 				switch {
@@ -266,12 +242,9 @@ func seed(ctx context.Context, s *store.Store, now time.Time) error {
 			if replyAt[i] {
 				idx := replyCount
 				replyCount++
-				hyp := int64(idx%2) + 5
 				user := users[idx%len(users)]
 				text := replyA[idx%len(replyA)] + " " + replyB[(idx/len(replyA)+idx)%len(replyB)]
-				id := publish(ctx, s, must, store.NewIntent{AgentID: agent, Kind: "reply", Text: text, TargetURL: fmt.Sprintf("https://www.threads.com/@%s/post/DQ%05d", user, 500+idx*13), TargetUsername: user, HypothesisIDsJSON: fmt.Sprintf("[%d]", hyp), At: t.Add(4 * time.Minute)}, hyp, fmt.Sprintf("https://www.threads.com/@%s/post/DR%05d", username, 900+idx*5), 100+idx)
-				kinds[id] = "reply"
-				replyIDs = append(replyIDs, id)
+				id := publish(ctx, s, must, store.NewIntent{AgentID: agent, Kind: "reply", Text: text, TargetURL: fmt.Sprintf("https://www.threads.com/@%s/post/DQ%05d", user, 500+idx*13), TargetUsername: user, At: t.Add(4 * time.Minute)}, fmt.Sprintf("https://www.threads.com/@%s/post/DR%05d", username, 900+idx*5), 100+idx)
 				do("reply")
 				base = 90
 				switch {
@@ -288,17 +261,9 @@ func seed(ctx context.Context, s *store.Store, now time.Time) error {
 				blockedCount++
 				steps++
 			}
-			do("note_write")
 			base = 0.04 + rng.Float64()*0.045
-		case "study":
-			do("fetch_trends")
-			do("knowledge_read")
-			do("web_search")
-			base = 0.04 + rng.Float64()*0.015
 		case "dream":
-			do("playbook_read")
-			do("note_search")
-			do("strategy_write")
+			do("read_replies")
 			base = 0.035 + rng.Float64()*0.015
 		}
 		end := t.Add(3 * time.Minute)
@@ -343,101 +308,20 @@ func seed(ctx context.Context, s *store.Store, now time.Time) error {
 		_, err = s.CompleteMetricJobs(ctx, jobs, at, store.MetricValues{Views: sc(r.views), Likes: sc(r.likes), Replies: sc(r.replies), Reposts: sc(r.reposts), Followers: &f})
 		must(err)
 	}
-	// Outcomes for every action with a 24h sample.
-	measured, err := s.MeasuredActions(ctx, agent)
-	must(err)
-	counted := map[int64]bool{}
-	for _, m := range measured {
-		r := results[m.ActionID]
-		views := float64(m.Views)
-		lift, res := 1.0, 1.0
-		switch r.label {
-		case store.LabelViral:
-			lift, res = 3.2+rng.Float64(), 2.1+rng.Float64()
-		case store.LabelFlop:
-			lift, res = 0.15, 0.2
-		default:
-			lift, res = 0.7+rng.Float64()*0.6, 0.7+rng.Float64()*0.6
-		}
-		amp, per1k, app := float64(m.Reposts)/views, 2.0+3*lift, float64(m.Likes)/views/0.04
-		must(s.InsertOutcome(ctx, agent, store.Outcome{ActionID: m.ActionID, MeasuredAt: m.MeasuredAt, Views: m.Views, ConversationRate: float64(m.Replies) / views, AmplificationRate: &amp, ApplauseRate: float64(m.Likes) / views, FollowersPer1k: &per1k, ReachLift: lift, ResonanceLift: res, ApplauseLift: app, Label: r.label}))
-		counted[m.ActionID] = true
-	}
-	// Playbook: counted outcomes decide hypotheses 1 (adopted) and 2 (dropped); the rest keep testing.
-	want := map[int64]int{1: 5, 2: 5, 3: 3, 4: 2, 5: 6, 6: 4}
-	final := map[int64]string{1: "established", 2: "rejected"}
-	byHyp := map[int64][]int64{}
-	for _, id := range append(append([]int64{}, postIDs...), replyIDs...) {
-		if counted[id] {
-			h := hypothesisOf(id, postIDs, replyIDs)
-			byHyp[h] = append(byHyp[h], id)
-		}
-	}
-	err = s.PlaybookOutcomes(ctx, func(tx store.PlaybookTx) error {
-		for h := int64(1); h <= 6; h++ {
-			rev, err := tx.TestingRevision(ctx, agent, h)
-			if err != nil {
-				return err
-			}
-			c := 0
-			for _, id := range byHyp[h] {
-				if c == want[h] {
-					break
-				}
-				if err = tx.RecordOutcome(ctx, agent, store.PlaybookOutcome{Action: id, Hypothesis: h, Revision: rev, MeasuredAt: now.Format(time.RFC3339Nano), Reason: "counted", Counted: true}); err != nil {
-					return err
-				}
-				c++
-			}
-			status, decided := "testing", (*time.Time)(nil)
-			if f, ok := final[h]; ok && c > 0 {
-				d := now.Add(-26 * time.Hour)
-				status, decided = f, &d
-				reason := "Cải thiện rõ so với mức nền sau số lần thử đủ lớn."
-				if f == "rejected" {
-					reason = "Không khác biệt so với mức nền sau số lần thử đủ lớn."
-				}
-				if err = tx.RecordDecision(ctx, agent, store.PlaybookDecision{Hypothesis: h, Revision: rev, N: int64(c), Status: f, Reason: reason, DecidedAt: d}); err != nil {
-					return err
-				}
-			}
-			if err = tx.Count(ctx, agent, h, rev, int64(c), hypotheses[h-1].kind, status, decided); err != nil {
-				return err
-			}
-		}
-		return nil
-	})
-	must(err)
-	_, err = s.WriteStrategy(ctx, agent, "Giữ ba bài ổn định mỗi ngày, mở đầu bằng một con số cụ thể, đăng vào giờ nghỉ trưa. Trả lời trong 30 phút đầu của bài mới thay vì bài đã đông.", []string{fmt.Sprintf("action:%d", postIDs[4])}, now.Add(-3*time.Hour))
-	must(err)
 	must(s.RecordFollowers(ctx, agent, followersAt(now), now))
 	must(s.SetNextWake(ctx, agent, now.Add(2*time.Hour)))
 	return nil
 }
 
-func hypothesisOf(id int64, posts, replies []int64) int64 {
-	for i, p := range posts {
-		if p == id {
-			return int64(i%4) + 1
-		}
-	}
-	for i, r := range replies {
-		if r == id {
-			return int64(i%2) + 5
-		}
-	}
-	return 0
-}
-
 func pickResult(rng *rand.Rand, base, engage float64, viral, flop bool) result {
 	views := int64(base * (0.7 + rng.Float64()*0.6))
 	rate := 0.045 + rng.Float64()*0.02
-	r := result{views: views, label: store.LabelOrdinary}
+	r := result{views: views}
 	switch {
 	case viral:
-		r.label, rate = store.LabelViral, 0.09
+		rate = 0.09
 	case flop:
-		r.label, rate = store.LabelFlop, 0.01
+		rate = 0.01
 	}
 	r.likes = int64(float64(views) * rate)
 	r.replies = int64(float64(views) * rate * 0.22)
@@ -445,14 +329,12 @@ func pickResult(rng *rand.Rand, base, engage float64, viral, flop bool) result {
 	return r
 }
 
-func publish(ctx context.Context, s *store.Store, must func(error), in store.NewIntent, hyp int64, url string, n int) int64 {
+func publish(ctx context.Context, s *store.Store, must func(error), in store.NewIntent, url string, n int) int64 {
 	var id int64
 	must(s.Reserve(ctx, func(tx store.ReservationTx) error {
 		var err error
-		if id, err = tx.InsertIntent(ctx, in); err != nil {
-			return err
-		}
-		return tx.Playbook().SnapshotRevision(ctx, in.AgentID, id, hyp, 1)
+		id, err = tx.InsertIntent(ctx, in)
+		return err
 	}))
 	ok, err := s.ConfirmPublished(ctx, in.AgentID, id, url, fmt.Sprintf("1790%06d", n))
 	must(err)

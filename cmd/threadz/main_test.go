@@ -12,7 +12,7 @@ import (
 func TestRun_CheckPassesWithValidEnvAndLeaksNoSecrets(t *testing.T) {
 	secrets := map[string]string{
 		"LLM_API_KEY":            "super-secret-deepseek-key-999",
-		"OPENAI_API_KEY":         "super-secret-embedding-key-555",
+		"OPENAI_API_KEY":         "super-secret-llm-key-555",
 		"TELEGRAM_BOT_TOKEN":     "super-secret-telegram-token-888",
 		"TELEGRAM_OWNER_CHAT_ID": "super-secret-owner-chat-777",
 	}

@@ -4,7 +4,6 @@ import (
 	"cmp"
 	"errors"
 	"fmt"
-	"github.com/canhta/threadz/internal/knowledge"
 	"github.com/canhta/threadz/internal/stdx"
 	"math"
 	"net/url"
@@ -22,10 +21,7 @@ const (
 	visiblePosts    = 6
 	postStep        = 12 // how many more rows a "Show more" adds
 	topPosts        = 5
-	visibleIdeas    = 10
 	postChars       = 220 // a post's text as its link, cut to fit a card
-	ideaChars       = 160
-	visibleNotes    = 10
 	maxTrendVisible = 8
 	maxToolRows     = 8
 )
@@ -70,7 +66,6 @@ type trendItem struct {
 type daySpend struct {
 	Start time.Time
 	Wake  float64
-	Study float64
 	Dream float64
 	Total float64
 }
@@ -158,8 +153,8 @@ func historyDays(table string, days int) int {
 	return min(days, int(age/(24*time.Hour)))
 }
 
-func buildPage(snap store.DashboardSnapshot, agents []Agent, a Agent, days int, view postView, now time.Time, content bool) (Page, error) {
-	p := Page{Range: days, RangeLabel: countText(days, "day", "days"), Content: content}
+func buildPage(snap store.DashboardSnapshot, agents []Agent, a Agent, days int, view postView, now time.Time) (Page, error) {
+	p := Page{Range: days, RangeLabel: countText(days, "day", "days")}
 	p.Agent = AgentInfo{ID: a.ID, DryRun: a.DryRun}
 	for _, other := range agents {
 		p.Agents = append(p.Agents, AgentLink{ID: other.ID, URL: listURL(other.ID, days, view), Current: other.ID == a.ID})
@@ -185,7 +180,7 @@ func buildPage(snap store.DashboardSnapshot, agents []Agent, a Agent, days int, 
 	currentStart := daysList[0]
 	priorStart := currentStart.AddDate(0, 0, -days)
 
-	posted, replies, posts := publications(snap.Publications, a.Username, content)
+	posted, replies, posts := publications(snap.Publications, a.Username)
 
 	wakes, err := wakesFrom(snap.Wakes)
 	if err != nil {
@@ -219,10 +214,8 @@ func buildPage(snap store.DashboardSnapshot, agents []Agent, a Agent, days int, 
 	spentToday := ledger[todayKey]
 	if spentToday == 0 {
 		v := phases[todayKey]
-		spentToday = v[0] + v[1] + v[2]
+		spentToday = v[0] + v[1]
 	}
-
-	p.Learned = learnedFrom(snap, content)
 
 	metrics, err := metricsFrom(snap.Metrics, posts, snap.Publications, a.Username, priorStart, now)
 	if err != nil {
@@ -238,9 +231,7 @@ func buildPage(snap store.DashboardSnapshot, agents []Agent, a Agent, days int, 
 		p.Growth.EmptyText = "No data yet."
 	}
 
-	buildStandings(&p.Learned, snap)
 	p.Followers = buildFollowers(metrics, snap.Publications, daysList, currentStart, now, a)
-	p.Outcomes = buildOutcomes(snap.Publications)
 	p.Blocked = buildBlocked(tools)
 	buildCost(&p.Return, snap, ledger, phases, daysList, currentStart, p.Followers, p.Growth.Views)
 
@@ -250,11 +241,8 @@ func buildPage(snap store.DashboardSnapshot, agents []Agent, a Agent, days int, 
 
 // publications counts the real actions that sit under the agent's own username
 // and lists the latest own posts and replies. Newest first in, newest first out.
-func publications(all []store.DashboardPublication, username string, content bool) (posted, replies int, posts []rawAction) {
+func publications(all []store.DashboardPublication, username string) (posted, replies int, posts []rawAction) {
 	for _, pub := range all {
-		if !content {
-			pub.Why = nil
-		}
 		if ownURL(pub.URL, username) == "" {
 			continue
 		}
@@ -282,7 +270,7 @@ func wakesFrom(in []store.DashboardWake) ([]rawWake, error) {
 		if w.ID <= 0 || w.Steps < 0 || !stdx.FiniteNonNegative(w.CostUSD) {
 			return nil, errors.New("invalid run metadata")
 		}
-		raw := rawWake{ID: w.ID, StartedAt: w.StartedAt, EndedAt: w.EndedAt, Ended: w.Ended, Kind: oneOf(w.Kind, "agent", "metrics", "dream", "study"), Steps: w.Steps, Cost: w.CostUSD, EndReason: "in_progress"}
+		raw := rawWake{ID: w.ID, StartedAt: w.StartedAt, EndedAt: w.EndedAt, Ended: w.Ended, Kind: oneOf(w.Kind, "agent", "metrics", "dream"), Steps: w.Steps, Cost: w.CostUSD, EndReason: "in_progress"}
 		if w.Ended {
 			raw.EndReason = endReason(w.EndReason)
 		}
@@ -539,9 +527,9 @@ func trendsFrom(in []store.DashboardTrend) (items []trendItem, checks, total, so
 	return items, len(seenChecks), total, len(sources)
 }
 
-func spendFrom(snap store.DashboardSnapshot) (map[string]float64, map[string][3]float64, error) {
+func spendFrom(snap store.DashboardSnapshot) (map[string]float64, map[string][2]float64, error) {
 	ledger := map[string]float64{}
-	phases := map[string][3]float64{}
+	phases := map[string][2]float64{}
 	for _, d := range snap.Ledger {
 		if !stdx.FiniteNonNegative(d.CostUSD) {
 			return nil, nil, errors.New("invalid spend")
@@ -556,100 +544,14 @@ func spendFrom(snap store.DashboardSnapshot) (map[string]float64, map[string][3]
 		switch row.Phase {
 		case "agent", "critic": // critic spend is part of the wake
 			v[0] += row.CostUSD
-		case "study":
-			v[1] += row.CostUSD
 		case "dream":
-			v[2] += row.CostUSD
+			v[1] += row.CostUSD
 		default:
 			return nil, nil, errors.New("reading phase spend: unknown stored phase")
 		}
 		phases[row.Day] = v
 	}
 	return ledger, phases, nil
-}
-
-func learnedFrom(snap store.DashboardSnapshot, content bool) LearnedPanel {
-	pb := snap.Playbook
-	l := LearnedPanel{Content: content, Testing: pb.Testing, Established: pb.Established, Rejected: pb.Rejected, Samples: pb.Samples, Notes: snap.NoteCount}
-	for _, in := range snap.Hypotheses {
-		h := HypothesisRow{ID: in.ID, Status: in.Status, N: int64(in.N), Text: truncate(in.Text, ideaChars)}
-		if !in.DecidedAt.IsZero() {
-			h.ChangedAt = in.DecidedAt.Format("2 Jan 2006")
-		}
-		if content {
-			h.Outcomes = in.Outcomes
-			if d := in.Decision; d != nil {
-				head := "Changed to " + ideaStatus(d.Status)
-				if !d.At.IsZero() {
-					head += " on " + d.At.Format("2 Jan")
-				}
-				parts := []string{head}
-				if strings.TrimSpace(d.Reason) != "" {
-					parts = append(parts, d.Reason)
-				}
-				h.Evidence = strings.Join(parts, ": ")
-			}
-		}
-		l.Hypotheses = append(l.Hypotheses, h)
-	}
-	if len(l.Hypotheses) > visibleIdeas {
-		l.OlderHypotheses = l.Hypotheses[visibleIdeas:]
-		l.Hypotheses = l.Hypotheses[:visibleIdeas]
-	}
-	if content {
-		l.MemoryIndex = truncate(strings.Join(snap.MemoryIndex, "\n"), 2000)
-		var lines []string
-		for _, j := range snap.MemoryJournal {
-			lines = append(lines, fmt.Sprintf("#%d %s %s: %s", j.ID, j.Change, j.Phase, cmp.Or(j.NewText, j.OldText)))
-		}
-		l.MemoryJournal = truncate(strings.Join(lines, "\n"), 2000)
-		for i, s := range snap.Strategy {
-			if i == store.DashboardStrategyShown {
-				break
-			}
-			prev := ""
-			if i+1 < len(snap.Strategy) {
-				prev = snap.Strategy[i+1].Text
-			}
-			row := StrategyRow{Version: s.Version, Citations: strings.Join(s.Citations, ", "), Diff: lineDiff(prev, s.Text)}
-			if !s.CreatedAt.IsZero() {
-				row.When = s.CreatedAt.Format("2 Jan 15:04")
-				row.At = s.CreatedAt
-			}
-			l.Strategy = append(l.Strategy, row)
-		}
-		for _, n := range snap.Notes {
-			row := NoteRow{Text: n.Text}
-			if !n.CreatedAt.IsZero() {
-				row.When = n.CreatedAt.Format("2 Jan 15:04")
-				row.At = n.CreatedAt
-			}
-			l.NotesRows = append(l.NotesRows, row)
-		}
-		if len(l.NotesRows) > visibleNotes {
-			l.OlderNotes = l.NotesRows[visibleNotes:]
-			l.NotesRows = l.NotesRows[:visibleNotes]
-		}
-	}
-	if content {
-		if entries, err := knowledge.All(); err == nil {
-			for _, e := range entries {
-				if e.PenaltyRisk != "" {
-					l.Penalties = append(l.Penalties, PenaltyRow{Risk: penaltyLabel(e.PenaltyRisk), Claim: e.Claim, Source: e.SourceURL})
-				}
-			}
-		}
-		for _, c := range snap.Candidates {
-			row := CandidateRow{Text: c.Technique, Source: c.SourceURL}
-			if !c.CreatedAt.IsZero() {
-				row.When = c.CreatedAt.Format("2 Jan")
-				row.At = c.CreatedAt
-			}
-			l.Candidates = append(l.Candidates, row)
-		}
-	}
-	l.HasRows = len(l.Candidates) > 0 || l.Testing+l.Established+l.Rejected > 0 || l.Notes > 0 || l.Samples > 0 || len(snap.MemoryIndex) > 0 || len(snap.Strategy) > 0
-	return l
 }
 
 type metricSet struct {
@@ -701,7 +603,7 @@ func metricsFrom(in []store.DashboardMetric, posts []rawAction, pubs []store.Das
 	return ms, nil
 }
 
-func buildBurn(ledger map[string]float64, phases map[string][3]float64, a Agent, days []time.Time, now time.Time, loc *time.Location) BurnPanel {
+func buildBurn(ledger map[string]float64, phases map[string][2]float64, a Agent, days []time.Time, now time.Time, loc *time.Location) BurnPanel {
 	p := BurnPanel{RangeLabel: "last " + countText(len(days), "day", "days"), BudgetText: formatBudget(a.DailyBudgetUSD)}
 	rows := make([]daySpend, 0, len(days))
 	spendDays := 0
@@ -709,19 +611,19 @@ func buildBurn(ledger map[string]float64, phases map[string][3]float64, a Agent,
 		key := day.Format("2006-01-02")
 		total, ok := ledger[key]
 		v := phases[key]
-		if !ok && v[0]+v[1]+v[2] == 0 {
+		if !ok && v[0]+v[1] == 0 {
 			continue
 		}
 		if !ok {
-			total = v[0] + v[1] + v[2]
+			total = v[0] + v[1]
 		}
-		if v[0]+v[1]+v[2] == 0 && total > 0 {
+		if v[0]+v[1] == 0 && total > 0 {
 			v[0] = total
 		}
-		if total > 0 || v[0]+v[1]+v[2] > 0 {
+		if total > 0 || v[0]+v[1] > 0 {
 			spendDays++
 		}
-		rows = append(rows, daySpend{Start: day, Wake: v[0], Study: v[1], Dream: v[2], Total: total})
+		rows = append(rows, daySpend{Start: day, Wake: v[0], Dream: v[1], Total: total})
 	}
 	if len(rows) == 0 {
 		return p
@@ -730,11 +632,11 @@ func buildBurn(ledger map[string]float64, phases map[string][3]float64, a Agent,
 	today := a.Limits.Day(now)
 	todayTotal := ledger[today]
 	todayPhase := phases[today]
-	if todayPhase[0]+todayPhase[1]+todayPhase[2] == 0 && todayTotal > 0 {
+	if todayPhase[0]+todayPhase[1] == 0 && todayTotal > 0 {
 		todayPhase[0] = todayTotal
 	}
 	if todayTotal == 0 {
-		todayTotal = todayPhase[0] + todayPhase[1] + todayPhase[2]
+		todayTotal = todayPhase[0] + todayPhase[1]
 	}
 	p.PercentText = fmt.Sprintf("%.1f%% of the %s limit", todayTotal/a.DailyBudgetUSD*100, formatBudget(a.DailyBudgetUSD))
 	p.BarPct = math.Min(100, todayTotal/a.DailyBudgetUSD*100)
@@ -746,9 +648,6 @@ func buildBurn(ledger map[string]float64, phases map[string][3]float64, a Agent,
 		parts = append(parts, "Runs "+formatUSD(v))
 	}
 	if v := todayPhase[1]; v > 0 {
-		parts = append(parts, "Research "+formatUSD(v))
-	}
-	if v := todayPhase[2]; v > 0 {
 		parts = append(parts, "Planning "+formatUSD(v))
 	}
 	if len(parts) > 0 {
@@ -762,30 +661,30 @@ func buildBurn(ledger map[string]float64, phases map[string][3]float64, a Agent,
 			v := phases[key]
 			total, ok := ledger[key]
 			if !ok || total == 0 {
-				total = v[0] + v[1] + v[2]
+				total = v[0] + v[1]
 			}
-			if v[0]+v[1]+v[2] == 0 && total > 0 {
+			if v[0]+v[1] == 0 && total > 0 {
 				v[0] = total
 			}
-			chartRows[i] = daySpend{Start: day, Wake: v[0], Study: v[1], Dream: v[2], Total: total}
+			chartRows[i] = daySpend{Start: day, Wake: v[0], Dream: v[1], Total: total}
 		}
 		values := make([][]float64, len(chartRows))
 		for i, r := range chartRows {
-			values[i] = []float64{r.Wake, r.Study, r.Dream}
+			values[i] = []float64{r.Wake, r.Dream}
 		}
 		rects, axisMax := barGeometry(values, a.DailyBudgetUSD)
 		ch := &Chart{
 			ID: "spend-days", Title: "Spending per day", Height: "bars",
 			YMax: formatBudget(axisMax), YMid: formatBudget(axisMax / 2), YZero: "$0",
 			Rects: rects, HasData: true,
-			Head: []string{"Day", "Runs", "Research", "Planning", "Total"},
+			Head: []string{"Day", "Runs", "Planning", "Total"},
 		}
 		if a.DailyBudgetUSD <= axisMax {
 			ch.BudgetY = chartH - (a.DailyBudgetUSD/axisMax)*chartH
 			ch.Budget = "Dashed line: " + formatBudget(a.DailyBudgetUSD) + " limit a day."
 		}
 		for _, r := range chartRows {
-			ch.Rows = append(ch.Rows, []string{formatDay(r.Start, loc), formatUSD(r.Wake), formatUSD(r.Study), formatUSD(r.Dream), formatUSD(r.Total)})
+			ch.Rows = append(ch.Rows, []string{formatDay(r.Start, loc), formatUSD(r.Wake), formatUSD(r.Dream), formatUSD(r.Total)})
 		}
 		starts := make([]time.Time, len(chartRows))
 		for i, r := range chartRows {
@@ -946,8 +845,7 @@ func buildPosts(ms metricSet, now time.Time, loc *time.Location) []PostRow {
 	}
 	posts := make([]ranked, 0, len(ms.posts))
 	for _, p := range ms.posts {
-		row := PostRow{ID: p.ID, URL: p.URL, Kind: kindWord(p.Kind), Link: cmp.Or(truncate(strings.Join(strings.Fields(p.pub.Text), " "), postChars), "Open on Threads"), Why: p.pub.Why}
-		row.Label = outcomeWord(p.pub)
+		row := PostRow{ID: p.ID, URL: p.URL, Kind: kindWord(p.Kind), Link: cmp.Or(truncate(strings.Join(strings.Fields(p.pub.Text), " "), postChars), "Open on Threads")}
 		if p.pub.Deleted {
 			row.Label = "Deleted"
 		}
@@ -1056,46 +954,4 @@ func noteTone(note string) string {
 		return "down"
 	}
 	return ""
-}
-
-// lineDiff is a longest-common-subsequence line diff of old against new.
-func lineDiff(old, cur string) []DiffLine {
-	a, b := splitLines(old), splitLines(cur)
-	lcs := make([][]int, len(a)+1)
-	for i := range lcs {
-		lcs[i] = make([]int, len(b)+1)
-	}
-	for i := len(a) - 1; i >= 0; i-- {
-		for j := len(b) - 1; j >= 0; j-- {
-			if a[i] == b[j] {
-				lcs[i][j] = lcs[i+1][j+1] + 1
-			} else {
-				lcs[i][j] = max(lcs[i+1][j], lcs[i][j+1])
-			}
-		}
-	}
-	var out []DiffLine
-	i, j := 0, 0
-	for i < len(a) || j < len(b) {
-		switch {
-		case i < len(a) && j < len(b) && a[i] == b[j]:
-			out = append(out, DiffLine{" ", a[i]})
-			i++
-			j++
-		case j < len(b) && (i == len(a) || lcs[i][j+1] >= lcs[i+1][j]):
-			out = append(out, DiffLine{"+", b[j]})
-			j++
-		default:
-			out = append(out, DiffLine{"-", a[i]})
-			i++
-		}
-	}
-	return out
-}
-
-func splitLines(s string) []string {
-	if strings.TrimSpace(s) == "" {
-		return nil
-	}
-	return strings.Split(strings.TrimRight(s, "\n"), "\n")
 }

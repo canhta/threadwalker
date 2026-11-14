@@ -280,13 +280,13 @@ func (s *Store) OwnerControl(ctx context.Context, id, command, key, text string,
 }
 
 type OwnerSummary struct {
-	Status                                                                           string
-	NextWake                                                                         time.Time
-	Posts, Replies, Views, Likes, Responses, Reposts, PlaybookChanges, MetricSamples int
-	CostUSD                                                                          float64
-	// Phase costs split today's ledger: waking/studying count toward the daily
-	// cap, dreaming has its own cap.
-	WakeCostUSD, StudyCostUSD, DreamCostUSD float64
+	Status                                                          string
+	NextWake                                                        time.Time
+	Posts, Replies, Views, Likes, Responses, Reposts, MetricSamples int
+	CostUSD                                                         float64
+	// Phase costs split today's ledger: waking counts toward the daily cap,
+	// dreaming has its own cap.
+	WakeCostUSD, DreamCostUSD float64
 	// FailedWakes counts the day's wakes that ended for any reason but
 	// completing, FailReasons their most common end reasons (at most three).
 	// Blocked holds the day's most common guard refusals (tool_calls.blocked_by),
@@ -411,7 +411,6 @@ func (s *Store) OwnerSummary(ctx context.Context, id string, dryRun bool, from, 
 	if out.WakeCostUSD < 0 {
 		out.WakeCostUSD = 0
 	}
-	out.StudyCostUSD = phases["study"].CostUSD
 	out.DreamCostUSD = phases["dream"].CostUSD
 	counts, err := s.CountActions(ctx, ActionScope{AgentID: id, DryRun: dryRun}, from, to)
 	out.Posts, out.Replies = counts.Posts, counts.Replies
@@ -421,10 +420,6 @@ func (s *Store) OwnerSummary(ctx context.Context, id string, dryRun bool, from, 
 	err = s.db.QueryRowContext(ctx, `SELECT COUNT(*),COALESCE(SUM(m.views),0),COALESCE(SUM(m.likes),0),COALESCE(SUM(m.replies),0),COALESCE(SUM(m.reposts),0) FROM metrics m JOIN actions a ON a.id=m.action_id AND a.agent_id=m.agent_id WHERE m.agent_id=? AND a.dry_run=? AND julianday(m.measured_at)>=julianday(?) AND julianday(m.measured_at)<julianday(?) AND m.measured_at=(SELECT MAX(m2.measured_at) FROM metrics m2 WHERE m2.agent_id=m.agent_id AND m2.action_id=m.action_id AND julianday(m2.measured_at)<julianday(?))`, id, dryRun, formatStoreTimestamp(from), formatStoreTimestamp(to), formatStoreTimestamp(to)).Scan(&out.MetricSamples, &out.Views, &out.Likes, &out.Responses, &out.Reposts)
 	if err != nil {
 		return out, fmt.Errorf("counting owner summary metrics: %w", err)
-	}
-	err = s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM playbook WHERE agent_id=? AND ((julianday(created_at)>=julianday(?) AND julianday(created_at)<julianday(?)) OR (julianday(decided_at)>=julianday(?) AND julianday(decided_at)<julianday(?)))`, id, formatStoreTimestamp(from), formatStoreTimestamp(to), formatStoreTimestamp(from), formatStoreTimestamp(to)).Scan(&out.PlaybookChanges)
-	if err != nil {
-		return out, fmt.Errorf("counting owner playbook changes: %w", err)
 	}
 	err = s.db.QueryRowContext(ctx, `SELECT a.id,COALESCE(a.thread_url,''),m.views,m.likes+m.replies+m.reposts+COALESCE(m.quotes,0) FROM metrics m JOIN actions a ON a.id=m.action_id AND a.agent_id=m.agent_id WHERE m.agent_id=? AND a.dry_run=? AND a.kind='post' AND julianday(m.measured_at)>=julianday(?) AND julianday(m.measured_at)<julianday(?) AND m.measured_at=(SELECT MAX(m2.measured_at) FROM metrics m2 WHERE m2.agent_id=m.agent_id AND m2.action_id=m.action_id AND julianday(m2.measured_at)<julianday(?)) ORDER BY m.views DESC,a.id DESC LIMIT 1`, id, dryRun, formatStoreTimestamp(from), formatStoreTimestamp(to), formatStoreTimestamp(to)).Scan(&out.Top.ActionID, &out.Top.URL, &out.Top.Views, &out.Top.Engagements)
 	if err != nil && err != sql.ErrNoRows {

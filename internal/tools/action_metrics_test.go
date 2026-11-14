@@ -9,6 +9,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/canhta/threadz/internal/guard"
+	"github.com/canhta/threadz/internal/llm"
 	"github.com/canhta/threadz/internal/threads"
 	"github.com/canhta/threadz/internal/tools"
 )
@@ -47,35 +49,15 @@ func decodeActionMetrics(t *testing.T, out string) tools.ActionMetrics {
 	return got
 }
 
-func TestReadOwnMetricsDefinitionKeepsAggregateAndAddsOptionalActionID(t *testing.T) {
+func TestReadOwnMetricsIsAHarnessReadTheModelCannotCall(t *testing.T) {
 	h := newBrowserHarness(t, true)
-	var definition json.RawMessage
 	for _, tool := range h.dispatch.Definitions() {
 		if tool.Function.Name == "read_own_metrics" {
-			definition = tool.Function.Parameters
+			t.Fatal("read_own_metrics is offered to the model")
 		}
 	}
-	if definition == nil {
-		t.Fatal("read_own_metrics definition missing")
-	}
-	var schema struct {
-		Properties map[string]struct {
-			Type    string `json:"type"`
-			Minimum *int   `json:"minimum"`
-		} `json:"properties"`
-		Required []string `json:"required"`
-	}
-	if err := json.Unmarshal(definition, &schema); err != nil {
-		t.Fatal(err)
-	}
-	action, ok := schema.Properties["action_id"]
-	if !ok || action.Type != "integer" || action.Minimum == nil || *action.Minimum != 1 {
-		t.Fatalf("action_id schema = %+v", action)
-	}
-	for _, required := range schema.Required {
-		if required == "action_id" {
-			t.Fatal("action_id must stay optional so the aggregate call remains compatible")
-		}
+	if _, err := h.dispatch.Dispatch(context.Background(), llm.ToolCall{ID: "model-call", Type: "function", Function: llm.CallFunction{Name: "read_own_metrics", Arguments: `{}`}}); !errors.Is(err, guard.ErrBlocked) {
+		t.Fatalf("a model call to a harness read: %v", err)
 	}
 
 	h.backend.Own = threads.Metrics{Views: 31, Likes: 4, Replies: 2, Reposts: 1}

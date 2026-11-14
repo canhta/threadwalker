@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/canhta/threadz/internal/config"
-	"github.com/canhta/threadz/internal/llm"
 	"github.com/canhta/threadz/internal/metrics"
 	"github.com/canhta/threadz/internal/store"
 	"github.com/canhta/threadz/internal/threads"
@@ -38,7 +37,7 @@ func TestProcessorCloseFailureKeepsCompletedMetricScope(t *testing.T) {
 	}
 	source := processorSource()
 	source.Errors[threads.OpClose] = errors.New("synthetic close failure")
-	p, err := metrics.New(metrics.Options{Embedder: testEmbedder(t, st), Store: st, Template: tmpl, Now: func() time.Time { return now }, FetchTrends: metricTrends, FetchStudy: metricStudy, ThreadsFactory: func(context.Context, config.Template) (threads.Backend, error) { return source, nil }})
+	p, err := metrics.New(metrics.Options{Store: st, Template: tmpl, Now: func() time.Time { return now }, FetchTrends: metricTrends, ThreadsFactory: func(context.Context, config.Template) (threads.Backend, error) { return source, nil }})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -70,7 +69,7 @@ func TestProcessorThreeWindowsAndCatchupUseActualObservation(t *testing.T) {
 	}
 	source := processorSource()
 	makeProcessor := func() *metrics.Processor {
-		p, e := metrics.New(metrics.Options{Embedder: testEmbedder(t, st), Store: st, Template: tmpl, Now: func() time.Time { return now }, FetchTrends: metricTrends, FetchStudy: metricStudy, ThreadsFactory: func(context.Context, config.Template) (threads.Backend, error) { return source, nil }})
+		p, e := metrics.New(metrics.Options{Store: st, Template: tmpl, Now: func() time.Time { return now }, FetchTrends: metricTrends, ThreadsFactory: func(context.Context, config.Template) (threads.Backend, error) { return source, nil }})
 		if e != nil {
 			t.Fatal(e)
 		}
@@ -102,13 +101,4 @@ func TestProcessorThreeWindowsAndCatchupUseActualObservation(t *testing.T) {
 	if e != nil || !parsed.Equal(start.Add(25*time.Hour)) {
 		t.Fatalf("fabricated target time %s %v", at, e)
 	}
-}
-
-func testEmbedder(t *testing.T, st *store.Store) *llm.Embedder {
-	t.Helper()
-	e, err := llm.NewOfflineEmbedder(config.LimitsConfig{MaxUSDPerDay: 1}, st, llm.Options{})
-	if err != nil {
-		t.Fatal(err)
-	}
-	return e
 }

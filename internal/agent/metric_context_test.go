@@ -21,7 +21,7 @@ func TestContextContainsOnlyBoundedOwnConfirmedMetrics(t *testing.T) {
 	tmpl := agent.OfflineTemplate()
 	tmpl.Limits.MaxUSDPerDream = 1
 	fixture := agent.NewOfflineFixture(func() time.Time { return now })
-	r, err := agent.New(agent.Options{Store: st, Template: tmpl, Now: func() time.Time { return now }, FetchTrends: fixture.Trends, FetchStudy: fixture.Study})
+	r, err := agent.New(agent.Options{Store: st, Template: tmpl, Now: func() time.Time { return now }, FetchTrends: fixture.Trends})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -41,14 +41,6 @@ func TestContextContainsOnlyBoundedOwnConfirmedMetrics(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	for _, o := range []struct {
-		agent  string
-		action int
-	}{{tmpl.ID, 1}, {"other", 2}} {
-		if _, err = st.DB().Exec(`INSERT INTO action_outcomes(agent_id,action_id,measured_at,model_version,views,conversation_rate,applause_rate,reach_lift,resonance_lift,label) VALUES(?,?,?,1,42,0.05,0.07,1.2345,-0.5678,'viral')`, o.agent, o.action, now.Format(time.RFC3339Nano)); err != nil {
-			t.Fatal(err)
-		}
-	}
 	for _, phase := range []string{"agent", "dream"} {
 		messages, err := r.Context(ctx, phase)
 		if err != nil {
@@ -60,21 +52,12 @@ func TestContextContainsOnlyBoundedOwnConfirmedMetrics(t *testing.T) {
 				Views      int64     `json:"views"`
 				MeasuredAt time.Time `json:"measured_at"`
 			} `json:"metrics"`
-			Outcomes []struct {
-				ActionID      int64   `json:"action_id"`
-				Label         string  `json:"label"`
-				ReachLift     float64 `json:"reach_lift"`
-				ResonanceLift float64 `json:"resonance_lift"`
-			} `json:"outcomes"`
 		}
 		if err = json.Unmarshal([]byte(messages[1].Content), &data); err != nil {
 			t.Fatal(err)
 		}
 		if len(data.Metrics) != 1 || data.Metrics[0].ActionID != 1 || data.Metrics[0].Views != 42 || !data.Metrics[0].MeasuredAt.Equal(now) {
 			t.Fatalf("%s metrics=%+v", phase, data.Metrics)
-		}
-		if len(data.Outcomes) != 1 || data.Outcomes[0].ActionID != 1 || data.Outcomes[0].Label != "viral" || data.Outcomes[0].ReachLift != 1.23 || data.Outcomes[0].ResonanceLift != -0.57 {
-			t.Fatalf("%s outcomes=%+v: own action only, lifts rounded to two decimals", phase, data.Outcomes)
 		}
 	}
 }
@@ -103,7 +86,7 @@ func TestSchedulerPollsMetricsBeforeAgentChosen24HourWake(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Missing source is deferred, and must still be scheduled independently.
-	r, err := agent.New(agent.Options{Store: st, Template: tmpl, Now: clock, HTTPClient: fixture.Client(), FetchTrends: fixture.Trends, FetchStudy: fixture.Study})
+	r, err := agent.New(agent.Options{Store: st, Template: tmpl, Now: clock, HTTPClient: fixture.Client(), FetchTrends: fixture.Trends})
 	if err != nil {
 		t.Fatal(err)
 	}

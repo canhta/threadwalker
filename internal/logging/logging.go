@@ -1,6 +1,6 @@
 // Package logging owns the operational event contract. Audit rows remain the
 // action record. Callers supply only identifiers, counts and fixed reason codes;
-// never pass errors, payloads, headers, URLs, notes or user content to this API.
+// never pass errors, payloads, headers, URLs or user content to this API.
 package logging
 
 import (
@@ -14,7 +14,6 @@ import (
 // Stable events emitted by the components implemented today. LLM tool events
 // describe only the client dispatcher boundary, not a guard or audit outcome.
 const (
-	PlaybookDecided           = "playbook.decided"
 	MetricsScheduled          = "metrics.scheduled"
 	MetricsMeasured           = "metrics.measured"
 	MetricsTargetCompleted    = "metrics.target.completed"
@@ -37,25 +36,13 @@ const (
 	SchedulerScheduled        = "scheduler.scheduled"
 	RetentionPruned           = "retention.pruned"
 	ContextBuilt              = "context.built"
-	PostMortemJudged          = "postmortem.judged"
 	ToolStarted               = "tool.started"
 	ToolFinished              = "tool.finished"
 	GuardChecked              = "guard.checked"
 	ToolBlocked               = "tool.blocked"
 	AuditRecorded             = "audit.recorded"
-	NoteWritten               = "note.written"
-	StrategyWritten           = "strategy.written"
-	MemoryAdded               = "memory.added"
-	MemorySuperseded          = "memory.superseded"
-	LessonRejected            = "lesson.rejected"
-	NoteSearched              = "note.searched"
-	NoteRead                  = "note.read"
-	EmbeddingSynced           = "embedding.synced"
-	EmbeddingBackfilled       = "embedding.backfilled"
-	EmbeddingFailed           = "embedding.failed"
 	TrendsFetched             = "trends.fetched"
 	TrendsRecorded            = "trends.recorded"
-	TrendsSampled             = "trends.sampled"
 	WebSearchFinished         = "web_search.finished"
 	InboxPolled               = "inbox.polled"
 	CheckStarted              = "check.started"
@@ -115,7 +102,7 @@ type Record struct {
 	WindowHours, Jobs, Samples                                    int
 	TargetAt, MeasuredAt                                          time.Time
 	LatenessMS                                                    int64
-	HypothesisID, Revision, N                                     int64
+	N                                                             int64
 
 	// Evidence is the path of a saved page snapshot, under the operator's data directory.
 	Evidence string
@@ -140,8 +127,8 @@ func Emit(ctx context.Context, logger *slog.Logger, level slog.Level, r Record) 
 	if r.ActionID > 0 || r.Event == MetricsScheduled || r.Event == MetricsFinished {
 		attrs = append(attrs, slog.Int64("action_id", r.ActionID), slog.Int("window_hours", r.WindowHours), slog.Int("jobs", r.Jobs), slog.Int("samples", r.Samples), slog.Int64("lateness_ms", r.LatenessMS))
 	}
-	if r.HypothesisID > 0 {
-		attrs = append(attrs, slog.Int64("hypothesis_id", r.HypothesisID), slog.Int64("revision", r.Revision), slog.Int64("n", r.N))
+	if r.N > 0 {
+		attrs = append(attrs, slog.Int64("n", r.N))
 	}
 	for _, field := range []struct {
 		key string

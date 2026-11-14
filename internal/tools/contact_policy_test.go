@@ -67,11 +67,9 @@ func newContactHarness(t *testing.T, tmpl config.Template, logger *slog.Logger) 
 		t.Fatal(err)
 	}
 	h := &contactHarness{t: t, st: st, clock: &contactClock{at: time.Date(2026, 11, 11, 10, 0, 0, 0, time.UTC)}}
-	h.opts = tools.Options{Embedder: testEmbedder(t, st), Scope: guard.Scope{Store: st, Template: tmpl, WakeID: 1, Now: h.clock.Now, Logger: logger}, FetchTrends: func(context.Context) ([]trends.Trend, error) {
+	h.opts = tools.Options{Scope: guard.Scope{Store: st, Template: tmpl, WakeID: 1, Now: h.clock.Now, Logger: logger}, FetchTrends: func(context.Context) ([]trends.Trend, error) {
 		h.trendCalls++
 		return []trends.Trend{{Source: "synthetic", Title: "synthetic-trend", URL: "https://example.test/trend"}}, nil
-	}, FetchStudy: func(context.Context) (trends.StudyFeed, error) {
-		return trends.StudyFeed{Items: []trends.Trend{{Source: "synthetic", Title: "synthetic-study", URL: "https://example.test/study"}}}, nil
 	}}
 	d, err := tools.NewDispatcher(h.opts)
 	if err != nil {
@@ -206,17 +204,14 @@ func TestPausedOrKilledRefusesEveryRegisteredTool(t *testing.T) {
 					t.Fatalf("%s %s blocked_by=%q result=%q", status, name, blocked, result)
 				}
 			}
-			var audits, actions, contacts, notes int
-			var memoryRows int
+			var audits, actions, contacts int
 			var nextWake string
 			h.st.DB().QueryRow(`SELECT COUNT(*) FROM tool_calls`).Scan(&audits)
 			h.st.DB().QueryRow(`SELECT COUNT(*) FROM actions`).Scan(&actions)
 			h.st.DB().QueryRow(`SELECT COUNT(*) FROM contacts`).Scan(&contacts)
-			h.st.DB().QueryRow(`SELECT COUNT(*) FROM notes`).Scan(&notes)
-			h.st.DB().QueryRow(`SELECT COUNT(*) FROM memory_index`).Scan(&memoryRows)
 			h.st.DB().QueryRow(`SELECT COALESCE(next_wake_at,'') FROM agents WHERE id='guard-agent'`).Scan(&nextWake)
-			if audits != len(definitions) || actions != 0 || contacts != 0 || notes != 0 || memoryRows != 0 || nextWake != "" {
-				t.Fatalf("%s effects audits=%d tools=%d actions=%d contacts=%d notes=%d memory=%d next=%q", status, audits, len(definitions), actions, contacts, notes, memoryRows, nextWake)
+			if audits != len(definitions) || actions != 0 || contacts != 0 || nextWake != "" {
+				t.Fatalf("%s effects audits=%d tools=%d actions=%d contacts=%d next=%q", status, audits, len(definitions), actions, contacts, nextWake)
 			}
 			if h.trendCalls != 0 {
 				t.Fatalf("%s ran fetch_trends %d times", status, h.trendCalls)

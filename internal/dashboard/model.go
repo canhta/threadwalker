@@ -5,8 +5,7 @@ import "time"
 // Page is the canonical public view model for the single dashboard route.
 // It carries operator metadata, bounded rows, numeric aggregates and fixed
 // reason codes only. No post text, notes, prompts, tool payloads, credentials
-// or foreign usernames are projected here except in opt-in content mode, which
-// adds the agent's own bounded text.
+// or foreign usernames are projected here.
 type Page struct {
 	Agent      AgentInfo
 	Agents     []AgentLink
@@ -25,12 +24,9 @@ type Page struct {
 	Trending  TrendingPanel
 	Burn      BurnPanel
 	Growth    *GrowthPanel
-	Learned   LearnedPanel
 	Return    ReturnPanel
 	Followers FollowersPanel
-	Outcomes  OutcomesPanel
 	Blocked   BlockedPanel
-	Content   bool
 }
 
 type AgentInfo struct {
@@ -184,10 +180,8 @@ type PostRow struct {
 	Rate      string
 	Mark      string
 	HasSample bool
-	// Label is viral, flop or normal; empty until the outcome model scored the post.
+	// Label is Deleted for a post gone from Threads; empty otherwise.
 	Label string
-	// Why is set only in content mode.
-	Why []string
 }
 
 // FollowersPanel is the account's follower count over time and what each post
@@ -204,87 +198,10 @@ type FollowersPanel struct {
 	hasGain bool
 }
 
-// OutcomesPanel counts the posts the outcome model called viral or flop.
-type OutcomesPanel struct {
-	HasData     bool
-	Scored      int
-	Viral, Flop int
-}
-
 // BlockedPanel counts the posts and replies the guard refused, by reason.
 type BlockedPanel struct {
 	Total int
 	Rows  []CodeCount
-}
-
-type LearnedPanel struct {
-	HasRows         bool
-	Testing         int
-	Established     int
-	Rejected        int
-	Samples         int64
-	Notes           int
-	Posteriors      []PosteriorRow
-	Content         bool
-	Hypotheses      []HypothesisRow
-	OlderHypotheses []HypothesisRow
-	NotesRows       []NoteRow
-	OlderNotes      []NoteRow
-	Trends          []TrendRow
-	MemoryIndex     string
-	MemoryJournal   string
-	Strategy        []StrategyRow
-	// Penalties are the curated knowledge entries that collide with a Meta
-	// demotion; Candidates are techniques the agent found while studying.
-	Penalties  []PenaltyRow
-	Candidates []CandidateRow
-}
-
-// StrategyRow is one strategy revision with its line diff against the one before.
-type StrategyRow struct {
-	Version   int64
-	When      string
-	At        time.Time
-	Citations string
-	Diff      []DiffLine
-}
-
-// DiffLine is one line of a revision diff; Mark is "+", "-" or " ".
-type DiffLine struct {
-	Mark string
-	Text string
-}
-
-type PenaltyRow struct {
-	Risk   string
-	Claim  string
-	Source string
-}
-
-type CandidateRow struct {
-	Text   string
-	Source string
-	When   string
-	At     time.Time
-}
-
-// Tried reads "2 times".
-func (h HypothesisRow) Tried() string { return countText(int(h.N), "time", "times") }
-
-type HypothesisRow struct {
-	ID        int64
-	Status    string
-	Text      string
-	N         int64
-	ChangedAt string
-	Evidence  string
-	Outcomes  int64
-}
-
-type NoteRow struct {
-	Text string
-	When string
-	At   time.Time
 }
 
 type TrendRow struct {
@@ -331,17 +248,4 @@ type ChartRect struct {
 type ChartLabel struct {
 	Text  string
 	Class string
-}
-
-// PosteriorRow is a testing idea with how it stands so far.
-type PosteriorRow struct {
-	Text string
-	N    int64
-	// Verdict is ahead, behind or unclear.
-	Verdict string
-}
-
-// Standing reads "Tried 3 times, ahead so far".
-func (r PosteriorRow) Standing() string {
-	return "Tried " + countText(int(r.N), "time", "times") + ", " + r.Verdict + " so far"
 }

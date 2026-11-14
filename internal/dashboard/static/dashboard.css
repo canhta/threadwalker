@@ -591,10 +591,6 @@ rect.wake {
   fill: var(--lime);
 }
 
-rect.study {
-  fill: #a7acb1;
-}
-
 rect.dream {
   fill: #5b6168;
 }
@@ -644,10 +640,6 @@ rect.dream {
 
 .dot.wake {
   background: var(--lime);
-}
-
-.dot.study {
-  background: #a7acb1;
 }
 
 .dot.dream {
@@ -922,31 +914,6 @@ rect.dream {
   font-weight: 700;
 }
 
-.items {
-  display: grid;
-  gap: var(--s3);
-  margin-bottom: var(--s3);
-}
-
-.items li {
-  padding-top: var(--s3);
-  border-top: 1px solid var(--hair);
-}
-
-.items li:first-child {
-  border-top: 0;
-  padding-top: 0;
-}
-
-.items p {
-  overflow-wrap: anywhere;
-}
-
-.note {
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-}
-
 .plain {
   display: grid;
   gap: var(--s1);
@@ -982,12 +949,6 @@ rect.dream {
   margin-bottom: var(--s3);
 }
 
-.fb h3 + .items,
-.fb h3 + .note {
-  margin-top: var(--s2);
-}
-
-.fb .items + h3,
 .fb .more + h3 {
   margin-top: var(--s4);
 }
@@ -1225,70 +1186,6 @@ footer a:hover {
   white-space: nowrap;
   border: 0;
 }
-
-/* Unlock form */
-.unlock-page {
-  display: grid;
-  place-items: center;
-  min-height: 100vh;
-  padding: var(--s4);
-}
-
-.unlock {
-  width: min(100%, 420px);
-  padding: var(--s5);
-  background: var(--surface);
-  border-radius: var(--s4);
-}
-
-.unlock h1 {
-  margin: 0 0 var(--s2);
-  font-size: var(--t-lg);
-}
-
-.unlock p {
-  margin: 0 0 var(--s2);
-  color: var(--on-dark);
-}
-
-.unlock form {
-  display: grid;
-  gap: var(--s2);
-  margin-top: var(--s4);
-}
-
-.unlock label {
-  color: var(--on-dark);
-  font-size: var(--t-sm);
-}
-
-.unlock input {
-  min-height: 44px;
-  padding: var(--s2) var(--s3);
-  border: 1px solid var(--hair);
-  border-radius: var(--s2);
-  background: var(--night);
-  color: var(--tint);
-  caret-color: var(--lime);
-  font: inherit;
-}
-
-.unlock button {
-  min-height: 44px;
-  padding: var(--s2) var(--s4);
-  border: 0;
-  border-radius: var(--s2);
-  background: var(--lime);
-  color: var(--night);
-  font: inherit;
-  font-weight: 700;
-  cursor: pointer;
-}
-
-.unlock-error {
-  color: var(--bad);
-}
-
 
 @media (min-width: 640px) {
   .ghost {

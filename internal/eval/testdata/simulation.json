@@ -1,7 +1,0 @@
-[
-  {"name": "null-101", "seed": 101, "runs": 2000, "hypotheses": 5, "max_actions": 300, "lift": 0, "noise_scale": 0.6, "min_effect": 0.2},
-  {"name": "null-211", "seed": 211, "runs": 2000, "hypotheses": 5, "max_actions": 300, "lift": 0, "noise_scale": 0.6, "min_effect": 0.2},
-  {"name": "null-307", "seed": 307, "runs": 2000, "hypotheses": 5, "max_actions": 300, "lift": 0, "noise_scale": 0.6, "min_effect": 0.2},
-  {"name": "lift-0.3", "seed": 101, "runs": 2000, "hypotheses": 5, "max_actions": 300, "lift": 0.3, "noise_scale": 0.6, "min_effect": 0.2},
-  {"name": "lift-0.5", "seed": 101, "runs": 2000, "hypotheses": 5, "max_actions": 300, "lift": 0.5, "noise_scale": 0.6, "min_effect": 0.2}
-]

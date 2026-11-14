@@ -112,7 +112,7 @@ func TestEveryEnumHasAPlainLabel(t *testing.T) {
 			t.Errorf("tool %q has no plain label", name)
 		}
 	}
-	for _, kind := range []string{"agent", "metrics", "dream", "study"} {
+	for _, kind := range []string{"agent", "metrics", "dream"} {
 		if label := kindLabel(kind); label == "" || label == "Run" && kind != "agent" {
 			t.Errorf("kind %q has no plain label", kind)
 		}
@@ -145,9 +145,6 @@ func TestEveryEnumHasAPlainLabel(t *testing.T) {
 	}
 	if endReasonLabel("browser_error") != "Browser error" || endReasonLabel("provider_error") != "Model error" {
 		t.Fatal("end reason wording")
-	}
-	if ideaStatus("established") != "Adopted" || ideaStatus("rejected") != "Dropped" {
-		t.Fatal("idea status wording")
 	}
 }
 

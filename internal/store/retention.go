@@ -24,19 +24,18 @@ const (
 	// replyWindow is the guard's per-contact reply-count window.
 	replyWindow = 7 * day
 
-	// threadsObservationRetention is the trend brief's baseline window plus a day.
-	// Wake transcripts and tool call details hold the same outside text, so they share it.
-	threadsObservationRetention = 8 * day
+	// outsideTextRetention bounds the tables that hold other people's text:
+	// wake transcripts and tool call details.
+	outsideTextRetention = 8 * day
 )
 
 // retention lists every pruned table. actions, metrics, ledger, ledger_phases,
-// notes and the playbook tables are the experiment's record and are not here;
+// and lessons are the experiment's record and are not here;
 // contacts has its own rule in Prune.
 var retention = []retentionPolicy{
 	{table: "trend_stories", ageCol: "observed_at", maxAge: 7 * day, maxRows: 500},
-	{table: "threads_observations", ageCol: "observed_at", maxAge: threadsObservationRetention},
-	{table: "wake_transcripts", ageCol: "at", maxAge: threadsObservationRetention},
-	{table: "tool_call_details", ageCol: "at", maxAge: threadsObservationRetention},
+	{table: "wake_transcripts", ageCol: "at", maxAge: outsideTextRetention},
+	{table: "tool_call_details", ageCol: "at", maxAge: outsideTextRetention},
 	{table: "tool_calls", ageCol: "at", maxAge: 90 * day},
 	{table: "wakes", ageCol: "ended_at", maxAge: 90 * day},
 	{table: "owner_msgs", ageCol: "at", maxAge: 90 * day},

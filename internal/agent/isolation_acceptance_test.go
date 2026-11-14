@@ -48,13 +48,11 @@ func isolationTwoTemplates(t *testing.T) (config.Template, config.Template) {
 	one := agent.OfflineTemplate()
 	one.ID = isolationAgentOne
 	one.Threads = config.ThreadsConfig{Backend: "stub", Username: isolationUserOne, ProfileDir: filepath.Join(root, "one")}
-	one.SeedPlaybook = []string{"one-only-playbook-sentinel"}
 	one.Limits.MaxUSDPerDay = 0.50
 	one.Limits.RepliesPerUser7d = 1
 	two := agent.OfflineTemplate()
 	two.ID = isolationAgentTwo
 	two.Threads = config.ThreadsConfig{Backend: "stub", Username: isolationUserTwo, ProfileDir: filepath.Join(root, "two")}
-	two.SeedPlaybook = []string{"two-only-playbook-sentinel"}
 	two.Limits.MaxUSDPerDay = 1.00
 	return one, two
 }
@@ -72,11 +70,11 @@ func newIsolationAgentFixture(t *testing.T, logger *slog.Logger) *isolationAgent
 	fix1 := agent.NewOfflineFixture(func() time.Time { return now })
 	fix2 := agent.NewOfflineFixture(func() time.Time { return now })
 	own := []string{isolationUserOne, isolationUserTwo}
-	r1, err := agent.New(agent.Options{Store: st, Template: one, OwnUsernames: own, Logger: logger, Now: func() time.Time { return now }, HTTPClient: fix1.Client(), FetchTrends: fix1.Trends, FetchStudy: fix1.Study})
+	r1, err := agent.New(agent.Options{Store: st, Template: one, OwnUsernames: own, Logger: logger, Now: func() time.Time { return now }, HTTPClient: fix1.Client(), FetchTrends: fix1.Trends})
 	if err != nil {
 		t.Fatal(err)
 	}
-	r2, err := agent.New(agent.Options{Store: st, Template: two, OwnUsernames: own, Logger: logger, Now: func() time.Time { return now }, HTTPClient: fix2.Client(), FetchTrends: fix2.Trends, FetchStudy: fix2.Study})
+	r2, err := agent.New(agent.Options{Store: st, Template: two, OwnUsernames: own, Logger: logger, Now: func() time.Time { return now }, HTTPClient: fix2.Client(), FetchTrends: fix2.Trends})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -89,9 +87,8 @@ func newIsolationAgentFixture(t *testing.T, logger *slog.Logger) *isolationAgent
 }
 
 type isolationContextState struct {
-	MemoryIndex  []store.MemoryEntry   `json:"memory_index"`
-	Playbook     []store.PlaybookEntry `json:"playbook"`
-	RemainingUSD float64               `json:"remaining_usd"`
+	OwnActions   []store.OwnAction `json:"own_actions"`
+	RemainingUSD float64           `json:"remaining_usd"`
 }
 
 func isolationContextStateOf(t *testing.T, rt *agent.Runtime) (isolationContextState, string) {
@@ -110,75 +107,24 @@ func isolationContextStateOf(t *testing.T, rt *agent.Runtime) (isolationContextS
 	return state, messages[0].Content + "\n" + messages[1].Content
 }
 
-func TestIsolationAcceptanceNotesAndPlaybookAreInvisibleAcrossAgents(t *testing.T) {
+func TestIsolationAcceptanceOwnActionsAreInvisibleAcrossAgents(t *testing.T) {
 	env := newIsolationAgentFixture(t, nil)
 	ctx := context.Background()
-	if err := env.store.AddMemoryEntry(ctx, isolationAgentOne, "syntheticnote oneonlysentinel", env.now, store.MemoryActor{}); err != nil {
-		t.Fatal(err)
-	}
-	if err := env.store.AddMemoryEntry(ctx, isolationAgentTwo, "syntheticnote twoonlysentinel", env.now, store.MemoryActor{}); err != nil {
-		t.Fatal(err)
-	}
-
 	for id, text := range map[string]string{isolationAgentOne: "syntheticnote oneonlysentinel", isolationAgentTwo: "syntheticnote twoonlysentinel"} {
-		if _, err := env.store.WriteTopic(ctx, id, "sentinel", "", text, env.now); err != nil {
+		if _, err := env.store.SeedAction(ctx, store.SeededAction{AgentID: id, Kind: "post", Text: text, DryRun: true, PostedAt: env.now.Add(-time.Hour)}); err != nil {
 			t.Fatal(err)
 		}
 	}
 	stateOne, allOne := isolationContextStateOf(t, env.one)
 	stateTwo, allTwo := isolationContextStateOf(t, env.two)
-	if len(stateOne.MemoryIndex) != 1 || stateOne.MemoryIndex[0].Text != "syntheticnote oneonlysentinel" || len(stateTwo.MemoryIndex) != 1 || stateTwo.MemoryIndex[0].Text != "syntheticnote twoonlysentinel" {
-		t.Fatalf("memory indexes crossed scopes: %v %v", stateOne.MemoryIndex, stateTwo.MemoryIndex)
+	if len(stateOne.OwnActions) != 1 || stateOne.OwnActions[0].Text != "syntheticnote oneonlysentinel" || len(stateTwo.OwnActions) != 1 || stateTwo.OwnActions[0].Text != "syntheticnote twoonlysentinel" {
+		t.Fatalf("own actions crossed scopes: %v %v", stateOne.OwnActions, stateTwo.OwnActions)
 	}
-	if len(stateOne.Playbook) != 1 || stateOne.Playbook[0].Text != "one-only-playbook-sentinel" {
-		t.Fatalf("agent-one playbook = %+v", stateOne.Playbook)
-	}
-	if len(stateTwo.Playbook) != 1 || stateTwo.Playbook[0].Text != "two-only-playbook-sentinel" {
-		t.Fatalf("agent-two playbook = %+v", stateTwo.Playbook)
-	}
-	if strings.Contains(allOne, "twoonlysentinel") || strings.Contains(allOne, "two-only-playbook-sentinel") {
+	if strings.Contains(allOne, "twoonlysentinel") {
 		t.Fatal("agent-one context exposed agent-two state")
 	}
-	if strings.Contains(allTwo, "oneonlysentinel") || strings.Contains(allTwo, "one-only-playbook-sentinel") {
+	if strings.Contains(allTwo, "oneonlysentinel") {
 		t.Fatal("agent-two context exposed agent-one state")
-	}
-
-	// Exercise the note_search tool through a real scripted wake so the
-	// isolation assertion covers the agent's action surface, not only storage.
-	observed := make([][]llm.Message, 2)
-	env.fix1.Calls = []llm.ToolCall{agent.SyntheticCall("note_search", `{"query":"syntheticnote"}`)}
-	env.fix2.Calls = []llm.ToolCall{agent.SyntheticCall("note_search", `{"query":"syntheticnote"}`)}
-	env.fix1.Observe = func(messages []llm.Message) { observed[0] = append([]llm.Message(nil), messages...) }
-	env.fix2.Observe = func(messages []llm.Message) { observed[1] = append([]llm.Message(nil), messages...) }
-	for i, rt := range []*agent.Runtime{env.one, env.two} {
-		agentID := []string{isolationAgentOne, isolationAgentTwo}[i]
-		if err := env.store.SetNextWake(ctx, agentID, env.now); err != nil {
-			t.Fatal(err)
-		}
-		if _, err := rt.Wake(ctx); err != nil {
-			t.Fatalf("note isolation wake %d: %v", i, err)
-		}
-	}
-	for i, wantOwn := range []string{"oneonlysentinel", "twoonlysentinel"} {
-		wantOther := "twoonlysentinel"
-		if i == 1 {
-			wantOther = "oneonlysentinel"
-		}
-		foundOwn := false
-		for _, message := range observed[i] {
-			if message.Role != "tool" {
-				continue
-			}
-			if strings.Contains(message.Content, wantOwn) {
-				foundOwn = true
-			}
-			if strings.Contains(message.Content, wantOther) {
-				t.Fatalf("agent %d note_search returned another agent's note: %s", i, message.Content)
-			}
-		}
-		if !foundOwn {
-			t.Fatalf("agent %d note_search did not return its own note", i)
-		}
 	}
 }
 
@@ -223,7 +169,7 @@ func TestIsolationAcceptanceLedgerAndBudgetAreIndependent(t *testing.T) {
 	// Exhaust only agent-one's budget in a fresh process state and verify the
 	// other agent still completes a real wake.
 	env.tmpl1.Limits.MaxUSDPerDay = 0.05
-	exhausted, err := agent.New(agent.Options{Store: env.store, Template: env.tmpl1, OwnUsernames: []string{isolationUserOne, isolationUserTwo}, Now: func() time.Time { return env.now }, HTTPClient: env.fix1.Client(), FetchTrends: env.fix1.Trends, FetchStudy: env.fix1.Study})
+	exhausted, err := agent.New(agent.Options{Store: env.store, Template: env.tmpl1, OwnUsernames: []string{isolationUserOne, isolationUserTwo}, Now: func() time.Time { return env.now }, HTTPClient: env.fix1.Client(), FetchTrends: env.fix1.Trends})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -365,13 +311,13 @@ func TestIsolationAcceptanceSchedulerSerializesOneWakeAtATime(t *testing.T) {
 	fixtureOne := agent.NewOfflineFixture(func() time.Time { return now })
 	fixtureOne.Calls = []llm.ToolCall{}
 	blocked.base = fixtureOne
-	r1, err := agent.New(agent.Options{Store: st, Template: one, OwnUsernames: []string{isolationUserOne, isolationUserTwo}, Now: func() time.Time { return now }, HTTPClient: &http.Client{Transport: blocked}, FetchTrends: fixtureOne.Trends, FetchStudy: fixtureOne.Study})
+	r1, err := agent.New(agent.Options{Store: st, Template: one, OwnUsernames: []string{isolationUserOne, isolationUserTwo}, Now: func() time.Time { return now }, HTTPClient: &http.Client{Transport: blocked}, FetchTrends: fixtureOne.Trends})
 	if err != nil {
 		t.Fatal(err)
 	}
 	fixtureTwo := agent.NewOfflineFixture(func() time.Time { return now })
 	fixtureTwo.Calls = []llm.ToolCall{}
-	r2, err := agent.New(agent.Options{Store: st, Template: two, OwnUsernames: []string{isolationUserOne, isolationUserTwo}, Now: func() time.Time { return now }, HTTPClient: fixtureTwo.Client(), FetchTrends: fixtureTwo.Trends, FetchStudy: fixtureTwo.Study})
+	r2, err := agent.New(agent.Options{Store: st, Template: two, OwnUsernames: []string{isolationUserOne, isolationUserTwo}, Now: func() time.Time { return now }, HTTPClient: fixtureTwo.Client(), FetchTrends: fixtureTwo.Trends})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -519,11 +465,10 @@ func TestIsolationAcceptanceWakeLogsCorrelateAgentsWithoutPayloads(t *testing.T)
 	}
 	env := newIsolationAgentFixture(t, logger)
 	ctx := context.Background()
-	if err := env.store.AddMemoryEntry(ctx, isolationAgentOne, "oneonlysentinel", env.now, store.MemoryActor{}); err != nil {
-		t.Fatal(err)
-	}
-	if err := env.store.AddMemoryEntry(ctx, isolationAgentTwo, "twoonlysentinel", env.now, store.MemoryActor{}); err != nil {
-		t.Fatal(err)
+	for id, text := range map[string]string{isolationAgentOne: "oneonlysentinel", isolationAgentTwo: "twoonlysentinel"} {
+		if _, err := env.store.SeedAction(ctx, store.SeededAction{AgentID: id, Kind: "post", Text: text, DryRun: true, PostedAt: env.now.Add(-time.Hour)}); err != nil {
+			t.Fatal(err)
+		}
 	}
 	env.fix1.Calls = []llm.ToolCall{}
 	env.fix2.Calls = []llm.ToolCall{}
@@ -546,7 +491,7 @@ func TestIsolationAcceptanceWakeLogsCorrelateAgentsWithoutPayloads(t *testing.T)
 				seen[id] = true
 			}
 		}
-		for _, forbidden := range []string{"oneonlysentinel", "twoonlysentinel", "offline-dummy-key", "Synthetic note for the next wake."} {
+		for _, forbidden := range []string{"oneonlysentinel", "twoonlysentinel", "offline-dummy-key"} {
 			if strings.Contains(line, forbidden) {
 				t.Fatalf("operational log leaked payload %q: %s", forbidden, line)
 			}

@@ -18,16 +18,10 @@ func fixtureServer(t *testing.T, failPaths map[string]bool) *httptest.Server {
 			return
 		}
 		path := r.URL.Path
-		if len(path) > len("/reddit-listing") && path[:len("/reddit-listing")] == "/reddit-listing" {
-			path = "/reddit-listing"
-		}
 		name := map[string]string{
 			"/google-news-vn":     "google_news_vn.xml",
 			"/global-tech":        "global_tech.xml",
-			"/youtube":            "youtube.xml",
 			"/github":             "github_trending.html",
-			"/reddit-token":       "reddit_token.json",
-			"/reddit-listing":     "reddit_listing.json",
 			"/hn/topstories.json": "hn_topstories.json",
 			"/hn/item/101.json":   "hn_item_101.json",
 			"/hn/item/102.json":   "hn_item_102.json",
@@ -36,7 +30,7 @@ func fixtureServer(t *testing.T, failPaths map[string]bool) *httptest.Server {
 			http.NotFound(w, r)
 			return
 		}
-		body, err := os.ReadFile(filepath.Join("testdata", "study", name))
+		body, err := os.ReadFile(filepath.Join("testdata", "sources", name))
 		if err != nil {
 			t.Error(err)
 			http.Error(w, "fixture", http.StatusInternalServerError)
@@ -48,30 +42,24 @@ func fixtureServer(t *testing.T, failPaths map[string]bool) *httptest.Server {
 	return server
 }
 
-func TestFetchStudySourcesCoversEveryConfiguredSourceKind(t *testing.T) {
+func TestFetchSourcesCoversEveryConfiguredSourceKind(t *testing.T) {
 	server := fixtureServer(t, nil)
-	opts := StudyOptions{
-		HTTPClient:         server.Client(),
-		Timeout:            5 * time.Second,
-		MaxItemsPerSource:  5,
-		Sources:            []string{"google_news_vn", "the_verge", "hacker_news", "github_trending", "youtube", "reddit_localllama", "google_news_topics", "vnexpress"},
-		Queries:            []string{"AI"},
-		YouTubeChannels:    []string{"UCsynthetic"},
-		RedditClientID:     "id",
-		RedditClientSecret: "secret",
+	opts := SourceOptions{
+		HTTPClient:        server.Client(),
+		Timeout:           5 * time.Second,
+		MaxItemsPerSource: 5,
+		Sources:           []string{"google_news_vn", "the_verge", "hacker_news", "github_trending", "google_news_topics", "vnexpress"},
+		Queries:           []string{"AI"},
 		URLs: map[string]string{
 			"google_news_vn":     server.URL + "/google-news-vn",
 			"the_verge":          server.URL + "/global-tech",
 			"hacker_news":        server.URL + "/hn",
 			"github_trending":    server.URL + "/github",
-			"youtube":            server.URL + "/youtube",
-			"reddit_token":       server.URL + "/reddit-token",
-			"reddit_api":         server.URL + "/reddit-listing",
 			"google_news_topics": server.URL + "/global-tech",
 			"vnexpress":          server.URL + "/google-news-vn",
 		},
 	}
-	feed, err := FetchStudySources(context.Background(), opts)
+	feed, err := FetchSources(context.Background(), opts)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -79,7 +67,7 @@ func TestFetchStudySourcesCoversEveryConfiguredSourceKind(t *testing.T) {
 	for _, item := range feed.Items {
 		sources[item.Source]++
 	}
-	for _, want := range []string{"google_news_vn", "the_verge", "hacker_news", "github_trending", "youtube", "reddit_localllama", "google_news_topics", "vnexpress"} {
+	for _, want := range []string{"google_news_vn", "the_verge", "hacker_news", "github_trending", "google_news_topics", "vnexpress"} {
 		if sources[want] == 0 {
 			t.Fatalf("source %s missing from %v (failed=%v skipped=%v)", want, sources, feed.Failed, feed.Skipped)
 		}
@@ -98,9 +86,9 @@ func TestFetchStudySourcesCoversEveryConfiguredSourceKind(t *testing.T) {
 	}
 }
 
-func TestFetchStudySourcesIsFailSoftPerSource(t *testing.T) {
+func TestFetchSourcesIsFailSoftPerSource(t *testing.T) {
 	server := fixtureServer(t, map[string]bool{"/global-tech": true})
-	feed, err := FetchStudySources(context.Background(), StudyOptions{
+	feed, err := FetchSources(context.Background(), SourceOptions{
 		HTTPClient:        server.Client(),
 		Timeout:           5 * time.Second,
 		MaxItemsPerSource: 5,
@@ -114,23 +102,12 @@ func TestFetchStudySourcesIsFailSoftPerSource(t *testing.T) {
 		t.Fatalf("items=%d failed=%v err=%v", len(feed.Items), feed.Failed, err)
 	}
 	// Every source failing is still an error, not a silent empty success.
-	_, err = FetchStudySources(context.Background(), StudyOptions{
+	_, err = FetchSources(context.Background(), SourceOptions{
 		HTTPClient: server.Client(), Timeout: time.Second,
 		Sources: []string{"the_verge"},
 		URLs:    map[string]string{"the_verge": server.URL + "/global-tech"},
 	})
 	if err == nil {
 		t.Fatal("all-source failure accepted")
-	}
-}
-
-func TestFetchStudySourcesSkipsRedditWithoutCredentials(t *testing.T) {
-	feed, err := FetchStudySources(context.Background(), StudyOptions{
-		Timeout: time.Second,
-		Sources: []string{"reddit_openai"},
-		URLs:    map[string]string{"reddit_token": "http://127.0.0.1:1/unused"},
-	})
-	if err != nil || len(feed.Skipped) != 1 || feed.Skipped[0] != "reddit_openai" {
-		t.Fatalf("feed=%+v err=%v", feed, err)
 	}
 }

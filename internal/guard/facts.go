@@ -25,7 +25,7 @@ const factMetricSamples = 20
 // wake context shows it and the guard checks post and reply text against it.
 func FactSheet(ctx context.Context, st *store.Store, t config.Template, now time.Time) ([]Fact, error) {
 	dayStart, dayEnd, day := t.Limits.DayBounds(now)
-	spent, err := st.LLMUsageForDayPhases(ctx, t.ID, day, "agent", "study")
+	spent, err := st.LLMUsageForDayPhases(ctx, t.ID, day, "agent")
 	if err != nil {
 		return nil, fmt.Errorf("building fact sheet: %w", err)
 	}

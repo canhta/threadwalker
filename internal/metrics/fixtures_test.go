@@ -7,5 +7,3 @@ import (
 )
 
 func metricTrends(context.Context) ([]trends.Trend, error) { return []trends.Trend{}, nil }
-
-func metricStudy(context.Context) (trends.StudyFeed, error) { return trends.StudyFeed{}, nil }

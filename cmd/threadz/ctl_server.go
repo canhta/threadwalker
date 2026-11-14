@@ -105,17 +105,6 @@ func (a *adminService) Handle(ctx context.Context, req admin.Request) (any, erro
 			}
 			return maintenanceOutcome{Step: admin.TrendsRefresh, Agent: t.ID, Count: n}, nil
 		})
-	case admin.MemoryRestore:
-		if err := a.store.RestoreMemory(ctx, t.ID, req.ID, a.deps.now()); err != nil {
-			return nil, err
-		}
-		return maintenanceOutcome{Step: admin.MemoryRestore, Agent: t.ID, Count: 1}, nil
-	case admin.StrategyRevert:
-		version, err := a.store.RevertStrategy(ctx, t.ID, req.ID, a.deps.now())
-		if err != nil {
-			return nil, err
-		}
-		return maintenanceOutcome{Step: admin.StrategyRevert, Agent: t.ID, Count: int(version)}, nil
 	case admin.OAuthLink:
 		if a.oauth == nil {
 			return nil, errors.New("the api server is not running; start the service with -api-listen")
@@ -187,7 +176,7 @@ func (a *adminService) status(ctx context.Context, only string) ([]agentStatus, 
 		if err != nil {
 			return nil, err
 		}
-		s.SpentTodayUSD = phases["agent"].CostUSD + phases["study"].CostUSD + phases["critic"].CostUSD
+		s.SpentTodayUSD = phases["agent"].CostUSD + phases["critic"].CostUSD
 		s.DreamSpentUSD = phases["dream"].CostUSD
 		if wakes, err := a.store.Wakes(ctx, t.ID, time.Time{}.AddDate(1, 0, 0), 1); err != nil {
 			return nil, err

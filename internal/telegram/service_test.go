@@ -221,7 +221,7 @@ func TestNoticesAndDigestOncePerEventWithContent(t *testing.T) {
 		return svc
 	}
 	svc := makeService()
-	if _, err = st.DB().Exec(`INSERT INTO actions(id,agent_id,kind,text,posted_at,dry_run) VALUES(1,'one','post','synthetic','2026-01-01T12:00:00Z',0);INSERT INTO ledger_phases(agent_id,day,phase,tokens_in,tokens_out,cost_usd) VALUES('one','2026-01-01','agent',10,20,1);INSERT INTO metrics(agent_id,action_id,measured_at,views,likes,replies,reposts) VALUES('one',1,'2026-01-01T13:00:00Z',5,1,1,1),('one',1,'2026-01-01T17:00:00Z',10,2,3,4);INSERT INTO playbook(agent_id,text,status,created_at) VALUES('one','synthetic','testing','2026-01-01T13:00:00Z')`); err != nil {
+	if _, err = st.DB().Exec(`INSERT INTO actions(id,agent_id,kind,text,posted_at,dry_run) VALUES(1,'one','post','synthetic','2026-01-01T12:00:00Z',0);INSERT INTO ledger_phases(agent_id,day,phase,tokens_in,tokens_out,cost_usd) VALUES('one','2026-01-01','agent',10,20,1);INSERT INTO metrics(agent_id,action_id,measured_at,views,likes,replies,reposts) VALUES('one',1,'2026-01-01T13:00:00Z',5,1,1,1),('one',1,'2026-01-01T17:00:00Z',10,2,3,4)`); err != nil {
 		t.Fatal(err)
 	}
 	for _, kind := range []string{"logged_out", "captcha", "killed"} {
@@ -247,7 +247,7 @@ func TestNoticesAndDigestOncePerEventWithContent(t *testing.T) {
 	for _, text := range bot.texts {
 		if strings.HasPrefix(text, "Daily report, 2 Jan 2026\n") {
 			found = true
-			for _, part := range []string{"Posts: 1\n", "Replies: 0\n", "Spend today (resets at 00:00 local): $1.00 of $1.00 (100%)", "Metrics (1 measured): 10 views, 2 likes, 3 replies, 4 reposts", "Playbook changes: 1"} {
+			for _, part := range []string{"Posts: 1\n", "Replies: 0\n", "Spend today (resets at 00:00 local): $1.00 of $1.00 (100%)", "Metrics (1 measured): 10 views, 2 likes, 3 replies, 4 reposts"} {
 				if !strings.Contains(text, part) {
 					t.Fatalf("digest missing %s: %s", part, text)
 				}
@@ -803,7 +803,7 @@ func TestServiceRegistersMenuAtStartAndSurvivesFailure(t *testing.T) {
 			for _, command := range bot.commands {
 				names = append(names, command.Command)
 			}
-			if strings.Join(names, ",") != "status,report,pause,resume,kill,dnc,restore,cookie,update,help,start" {
+			if strings.Join(names, ",") != "status,report,pause,resume,kill,dnc,cookie,update,help,start" {
 				t.Fatalf("menu = %v, want the handled commands", names)
 			}
 			dnc := ""

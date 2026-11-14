@@ -19,7 +19,6 @@ import (
 // drive the real run() entry point with injected getenv and captured writers,
 // an isolated temporary SQLite database and no network, VPS or real credentials.
 const (
-	runtimeCLINoteText      = "Synthetic note for the next wake."
 	runtimeCLIActionText    = "Synthetic local dry-run action."
 	runtimeCLITrendText     = "Synthetic offline trend"
 	runtimeCLIDummyKey      = "offline-dummy-key"
@@ -157,7 +156,7 @@ func runtimeCLIAssertNoRuntimeRowsIfDBExists(t *testing.T, dbPath string) {
 		t.Fatalf("stat database %s: %v", dbPath, err)
 	}
 	st := runtimeCLIOpen(t, dbPath)
-	for _, table := range []string{"wakes", "actions", "tool_calls", "notes"} {
+	for _, table := range []string{"wakes", "actions", "tool_calls"} {
 		if got := runtimeCLICount(t, st, "SELECT COUNT(*) FROM "+table); got != 0 {
 			t.Errorf("%s rows = %d, want 0 before startup is accepted", table, got)
 		}
@@ -197,8 +196,8 @@ func TestRuntimeCLIOnceOfflineWakePersistsCompletedAudit(t *testing.T) {
 	if err != nil {
 		t.Fatalf("wake started_at %q is not RFC3339: %v", startedRaw, err)
 	}
-	if steps < 5 {
-		t.Errorf("wake steps = %d, want the five scripted tool calls to be counted", steps)
+	if steps < 4 {
+		t.Errorf("wake steps = %d, want the four guarded tool calls to be counted", steps)
 	}
 
 	rows, err := st.DB().Query(`SELECT tool, args_json, result_json FROM tool_calls ORDER BY id`)
@@ -228,7 +227,7 @@ func TestRuntimeCLIOnceOfflineWakePersistsCompletedAudit(t *testing.T) {
 	if auditRows < 4 {
 		t.Errorf("tool call audit rows = %d, want at least 4", auditRows)
 	}
-	for _, want := range []string{"read_feed", "fetch_trends", "note_write", "post"} {
+	for _, want := range []string{"read_feed", "fetch_trends", "post"} {
 		if !seenTools[want] {
 			t.Errorf("tool call audit rows do not include %q; got %v", want, seenTools)
 		}
@@ -258,9 +257,6 @@ func TestRuntimeCLIOnceOfflineWakePersistsCompletedAudit(t *testing.T) {
 	var nextWakeRaw string
 	if err := st.DB().QueryRow(`SELECT next_wake_at FROM agents WHERE id=?`, agentID).Scan(&nextWakeRaw); err != nil {
 		t.Fatalf("reading agent next_wake_at: %v", err)
-	}
-	if topics, err := st.TopicList(context.Background(), agentID, true); err != nil || len(topics) != 1 || topics[0].Description != runtimeCLINoteText {
-		t.Errorf("topics = %v, %v; want the note written during the wake %q", topics, err, runtimeCLINoteText)
 	}
 	nextWake, err := time.Parse(time.RFC3339Nano, nextWakeRaw)
 	if err != nil {
@@ -338,9 +334,9 @@ func TestRuntimeCLIOfflineInlineLLMUsesArbitraryNamesWithoutEnv(t *testing.T) {
 	}
 }
 
-// TestRuntimeCLIOfflineLogsOmitTemplateAndNoteValues proves payloads from the
-// template and the agent's own note stay out of captured operational logs.
-func TestRuntimeCLIOfflineLogsOmitTemplateAndNoteValues(t *testing.T) {
+// TestRuntimeCLIOfflineLogsOmitTemplateAndActionValues proves payloads from the
+// template and the agent's own action stay out of captured operational logs.
+func TestRuntimeCLIOfflineLogsOmitTemplateAndActionValues(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
@@ -364,11 +360,6 @@ func TestRuntimeCLIOfflineLogsOmitTemplateAndNoteValues(t *testing.T) {
 		t.Errorf("offline explicit-template run resolved real environment variables %v", env.keys)
 	}
 
-	st := runtimeCLIOpen(t, dbPath)
-	if got := runtimeCLICount(t, st, `SELECT COUNT(*) FROM notes WHERE description=?`, runtimeCLINoteText); got != 1 {
-		t.Fatalf("topic notes matching the scripted note = %d, want 1", got)
-	}
-
 	records := runtimeCLIDecodeLogs(t, stdout)
 	if len(runtimeCLIEvents(records, "wake.started")) != 1 {
 		t.Fatalf("expected one wake.started log record, got %d", len(runtimeCLIEvents(records, "wake.started")))
@@ -377,7 +368,6 @@ func TestRuntimeCLIOfflineLogsOmitTemplateAndNoteValues(t *testing.T) {
 	combined := stdout + "\n" + stderr
 	for _, payload := range []string{
 		templateCanary,
-		runtimeCLINoteText,
 		runtimeCLIActionText,
 		runtimeCLITrendText,
 		runtimeCLIDummyKey,
@@ -408,7 +398,7 @@ func (w *runtimeCLICancelWriter) Write(p []byte) (int, error) {
 }
 
 // TestRuntimeCLICancelledContextStopsWithoutSideEffects proves cancellation
-// ends the bounded run without publishing actions, tool calls or notes.
+// ends the bounded run without publishing actions, tool calls or tool calls.
 func TestRuntimeCLICancelledContextStopsWithoutSideEffects(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -432,7 +422,7 @@ func TestRuntimeCLICancelledContextStopsWithoutSideEffects(t *testing.T) {
 	if got := runtimeCLICount(t, st, `SELECT COUNT(*) FROM wakes WHERE ended_at IS NULL`); got != 0 {
 		t.Errorf("open wakes after cancellation = %d, want 0", got)
 	}
-	for _, table := range []string{"actions", "tool_calls", "notes"} {
+	for _, table := range []string{"actions", "tool_calls"} {
 		if got := runtimeCLICount(t, st, "SELECT COUNT(*) FROM "+table); got != 0 {
 			t.Errorf("%s rows after cancellation = %d, want 0", table, got)
 		}

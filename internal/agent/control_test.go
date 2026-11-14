@@ -86,7 +86,7 @@ func TestWakeNowDryRunDoesNotWrite(t *testing.T) {
 	fixture := agent.NewOfflineFixture(func() time.Time { return now })
 	fixture.Calls = []llm.ToolCall{agent.SyntheticCall("post", `{"text":"Synthetic live text"}`)}
 	backend := failingBrowser(nil)
-	r, err := agent.New(agent.Options{Store: st, Template: tmpl, Now: func() time.Time { return now }, HTTPClient: fixture.Client(), FetchTrends: fixture.Trends, FetchStudy: fixture.Study,
+	r, err := agent.New(agent.Options{Store: st, Template: tmpl, Now: func() time.Time { return now }, HTTPClient: fixture.Client(), FetchTrends: fixture.Trends,
 		ThreadsFactory: func(context.Context, config.Template) (threads.Backend, error) { return backend, nil }})
 	if err != nil {
 		t.Fatal(err)
@@ -158,7 +158,7 @@ func TestContextEqualsWhatTheWakeSends(t *testing.T) {
 					sent = append([]llm.Message(nil), m...)
 				}
 			}
-			r, err := agent.New(agent.Options{Store: st, Template: tmpl, Now: func() time.Time { return now }, HTTPClient: fixture.Client(), FetchTrends: fixture.Trends, FetchStudy: fixture.Study})
+			r, err := agent.New(agent.Options{Store: st, Template: tmpl, Now: func() time.Time { return now }, HTTPClient: fixture.Client(), FetchTrends: fixture.Trends})
 			if err != nil {
 				t.Fatal(err)
 			}

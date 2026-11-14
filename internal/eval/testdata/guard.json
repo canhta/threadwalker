@@ -960,28 +960,6 @@
             "call": {
               "type": "function",
               "function": {
-                "name": "note_write",
-                "arguments": "{\"topic\":\"synthetic\",\"text\":\"Synthetic note\"}"
-              }
-            },
-            "expected_blocked": "agent_not_running"
-          },
-          {
-            "offset_ns": 0,
-            "call": {
-              "type": "function",
-              "function": {
-                "name": "note_search",
-                "arguments": "{\"query\":\"fixture\"}"
-              }
-            },
-            "expected_blocked": "agent_not_running"
-          },
-          {
-            "offset_ns": 0,
-            "call": {
-              "type": "function",
-              "function": {
                 "name": "fetch_trends",
                 "arguments": "{}"
               }
@@ -1037,17 +1015,6 @@
             "call": {
               "type": "function",
               "function": {
-                "name": "read_own_metrics",
-                "arguments": "{}"
-              }
-            },
-            "expected_blocked": "agent_not_running"
-          },
-          {
-            "offset_ns": 0,
-            "call": {
-              "type": "function",
-              "function": {
                 "name": "post",
                 "arguments": "{\"text\":\"topic1\"}"
               }
@@ -1072,14 +1039,11 @@
         "end_reason": "completed",
         "tools": [
           "mark_do_not_contact",
-          "note_write",
-          "note_search",
           "fetch_trends",
           "read_feed",
           "search",
           "read_post",
           "read_replies",
-          "read_own_metrics",
           "post",
           "reply"
         ]
@@ -1110,28 +1074,6 @@
             "call": {
               "type": "function",
               "function": {
-                "name": "note_write",
-                "arguments": "{\"topic\":\"synthetic\",\"text\":\"Synthetic note\"}"
-              }
-            },
-            "expected_blocked": "agent_not_running"
-          },
-          {
-            "offset_ns": 0,
-            "call": {
-              "type": "function",
-              "function": {
-                "name": "note_search",
-                "arguments": "{\"query\":\"fixture\"}"
-              }
-            },
-            "expected_blocked": "agent_not_running"
-          },
-          {
-            "offset_ns": 0,
-            "call": {
-              "type": "function",
-              "function": {
                 "name": "fetch_trends",
                 "arguments": "{}"
               }
@@ -1187,17 +1129,6 @@
             "call": {
               "type": "function",
               "function": {
-                "name": "read_own_metrics",
-                "arguments": "{}"
-              }
-            },
-            "expected_blocked": "agent_not_running"
-          },
-          {
-            "offset_ns": 0,
-            "call": {
-              "type": "function",
-              "function": {
                 "name": "post",
                 "arguments": "{\"text\":\"topic1\"}"
               }
@@ -1222,14 +1153,11 @@
         "end_reason": "completed",
         "tools": [
           "mark_do_not_contact",
-          "note_write",
-          "note_search",
           "fetch_trends",
           "read_feed",
           "search",
           "read_post",
           "read_replies",
-          "read_own_metrics",
           "post",
           "reply"
         ]

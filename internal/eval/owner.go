@@ -106,7 +106,7 @@ func runOwnerCase(ctx context.Context, c Case, p Profile, repeat int, opts Optio
 	}
 	fixture := agent.NewOfflineFixture(clock)
 	fixture.Calls = []llm.ToolCall{}
-	runtime, err := agent.New(agent.Options{Store: st, Template: tmpl, Now: clock, HTTPClient: fixture.Client(), FetchTrends: fixture.Trends, FetchStudy: fixture.Study, Logger: logger, Owner: svc})
+	runtime, err := agent.New(agent.Options{Store: st, Template: tmpl, Now: clock, HTTPClient: fixture.Client(), FetchTrends: fixture.Trends, Logger: logger, Owner: svc})
 	if err != nil {
 		return r
 	}
@@ -197,7 +197,7 @@ func runOwnerCase(ctx context.Context, c Case, p Profile, repeat int, opts Optio
 		}
 	case "notices":
 		day := now.Format("2006-01-02")
-		if err = st.RecordUnattributedLLMUsage(ctx, tmpl.ID, day, store.LLMUsage{TokensIn: 10, TokensOut: 20, CostUSD: 1}); err != nil {
+		if _, err = st.DB().ExecContext(ctx, `INSERT INTO ledger_phases(agent_id,day,phase,tokens_in,tokens_out,cost_usd) VALUES(?,?,'agent',10,20,1)`, tmpl.ID, day); err != nil {
 			return r
 		}
 		if _, err = st.SeedAction(ctx, store.SeededAction{AgentID: tmpl.ID, Kind: "post", Text: "Synthetic eval action", DryRun: tmpl.DryRun, PostedAt: now.Add(-time.Minute)}); err != nil {

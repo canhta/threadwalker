@@ -17,7 +17,6 @@ type phaseLedger struct {
 	daily llm.Usage
 	dream llm.Usage
 	agent llm.Usage
-	study llm.Usage
 	reads int
 }
 
@@ -35,8 +34,6 @@ func (l *phaseLedger) LLMUsageForDayPhases(_ context.Context, _, _ string, phase
 			out = addUsage(out, l.dream)
 		case "agent":
 			out = addUsage(out, l.agent)
-		case "study":
-			out = addUsage(out, l.study)
 		}
 	}
 	return out, nil
@@ -78,14 +75,6 @@ func TestDreamSpendIsBoundedByItsOwnCapAndExcludedFromDailyCap(t *testing.T) {
 	client = phaseClient(t, &requests, ledger, llm.Options{Phase: "agent"})
 	if _, err := client.Run(context.Background(), "agent", 1, nil, nil, nil); err != nil || requests != 1 {
 		t.Fatalf("agent wake: err=%v requests=%d", err, requests)
-	}
-	// Study counts toward the same daily cap.
-	ledger.agent = llm.Usage{CostUSD: 0.8}
-	ledger.study = llm.Usage{CostUSD: 0.2}
-	requests = 0
-	client = phaseClient(t, &requests, ledger, llm.Options{Phase: "study"})
-	if _, err := client.Run(context.Background(), "agent", 1, nil, nil, nil); !errors.Is(err, llm.ErrBudget) || requests != 0 {
-		t.Fatalf("study daily cap: err=%v requests=%d", err, requests)
 	}
 }
 

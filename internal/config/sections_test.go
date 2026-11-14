@@ -138,12 +138,11 @@ func TestSectionTelegram(t *testing.T) {
 	})
 }
 
-func TestSectionStudyScheduleTrendsGuard(t *testing.T) {
+func TestSectionWebSearchScheduleTrendsGuard(t *testing.T) {
 	runSection(t, []sectionCase{
-		{name: "study defaults", check: func(t *testing.T, tmpl config.Template) {
-			s := tmpl.Study
-			if s.MaxThreadsReads != 4 || s.ReadPauseMS != 1500 || s.MaxStudiesPerDay != 8 || s.SpikeMultiplier != 2 || s.WebSearchBaseURL != "https://api.openai.com/v1" {
-				t.Fatalf("study = %+v", s)
+		{name: "web search defaults", check: func(t *testing.T, tmpl config.Template) {
+			if s := tmpl.WebSearch; s.Enabled || s.BaseURL != "https://api.openai.com/v1" || s.MaxResults != 5 || s.MaxOutput != 512 {
+				t.Fatalf("web search = %+v", s)
 			}
 			if tmpl.Schedule.Timezone != "Asia/Ho_Chi_Minh" {
 				t.Fatalf("timezone = %q", tmpl.Schedule.Timezone)
@@ -152,22 +151,19 @@ func TestSectionStudyScheduleTrendsGuard(t *testing.T) {
 				t.Fatalf("limits timezone = %q", tmpl.Limits.Timezone)
 			}
 		}},
-		{name: "unknown source", new: "study:\n  sources:\n    - nowhere", wantErr: "unknown source nowhere"},
-		{name: "sources deduplicated", new: "study:\n  sources:\n    - hacker_news\n    - hacker_news", check: func(t *testing.T, tmpl config.Template) {
-			if len(tmpl.Study.Sources) != 1 {
-				t.Fatalf("sources = %v", tmpl.Study.Sources)
+		{name: "unknown source", new: "trends:\n  sources:\n    - nowhere", wantErr: "unknown source nowhere"},
+		{name: "sources deduplicated", new: "trends:\n  sources:\n    - hacker_news\n    - hacker_news", check: func(t *testing.T, tmpl config.Template) {
+			if len(tmpl.Trends.Sources) != 1 {
+				t.Fatalf("sources = %v", tmpl.Trends.Sources)
 			}
 		}},
-		{name: "bad youtube channel", new: "study:\n  youtube_channels:\n    - bad id", wantErr: "YouTube channel ID"},
-		{name: "reads too many", new: "study:\n  threads_sample:\n    max_reads: 21", wantErr: "at most 20"},
-		{name: "pause out of range", new: "study:\n  threads_sample:\n    pause_ms: 60001", wantErr: "0..60000"},
-		{name: "spike multiplier out of range", new: "study:\n  spike_multiplier: 21", wantErr: "1..20"},
-		{name: "web search bad url", new: "study:\n  web_search:\n    enabled: false\n    base_url: ftp://x", wantErr: "HTTP(S) endpoint"},
-		{name: "web search enabled not bool", new: "study:\n  web_search:\n    enabled: perhaps", wantErr: "study.web_search.enabled"},
-		{name: "web search max results", new: "study:\n  web_search:\n    max_results: 11", wantErr: "at most 10"},
-		{name: "web search model defaults to llm", new: "study:\n  web_search:\n    enabled: true", check: func(t *testing.T, tmpl config.Template) {
-			if tmpl.Study.WebSearchModel != "deepseek-chat" {
-				t.Fatalf("model = %q", tmpl.Study.WebSearchModel)
+		{name: "removed source", new: "trends:\n  sources:\n    - reddit_openai", wantErr: "unknown source reddit_openai"},
+		{name: "web search bad url", new: "web_search:\n    enabled: false\n    base_url: ftp://x", wantErr: "HTTP(S) endpoint"},
+		{name: "web search enabled not bool", new: "web_search:\n    enabled: perhaps", wantErr: "web_search.enabled"},
+		{name: "web search max results", new: "web_search:\n    max_results: 11", wantErr: "at most 10"},
+		{name: "web search model defaults to llm", new: "web_search:\n    enabled: true", check: func(t *testing.T, tmpl config.Template) {
+			if tmpl.WebSearch.Model != "deepseek-chat" {
+				t.Fatalf("model = %q", tmpl.WebSearch.Model)
 			}
 		}},
 		{name: "kpi block absent is off", check: func(t *testing.T, tmpl config.Template) {
@@ -184,11 +180,6 @@ func TestSectionStudyScheduleTrendsGuard(t *testing.T) {
 		{name: "kpi on-target wait below the minimum", new: "kpi:\n  engagements_per_day: 40\n  followers_per_week: 5\n  max_hours_without_publish: 8\n  on_target_minutes_between_wakes: 1", wantErr: "at least limits.min_minutes_between_wakes"},
 		{name: "bad schedule zone", new: "schedule:\n  timezone: Mars/Base", wantErr: "schedule.timezone"},
 		{name: "bad dream time", new: "schedule:\n  dream_at: \"25:00\"", wantErr: "HH:MM"},
-		{name: "study slots deduplicated", new: "schedule:\n  study_slots:\n    - \"09:00\"\n    - \"09:00\"\n    - \"13:30\"", check: func(t *testing.T, tmpl config.Template) {
-			if got := strings.Join(tmpl.Schedule.StudySlots, ","); got != "09:00,13:30" {
-				t.Fatalf("slots = %s", got)
-			}
-		}},
 		{name: "blank keyword", new: "trends:\n  include_keywords:\n    - \" \"", wantErr: "keywords must be nonempty"},
 		{name: "blank stop phrase", new: "guard:\n  stop_phrases:\n    - \" \"", wantErr: "phrases must be nonempty"},
 	})

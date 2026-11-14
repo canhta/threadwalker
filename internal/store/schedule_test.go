@@ -23,8 +23,8 @@ func TestSetNextWake_PersistsUTCAndPreservesAgentFields(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			st := openNotesTestStore(t)
-			insertNotesTestAgent(t, st, "agent-a")
+			st := openTestStore(t)
+			insertTestAgent(t, st, "agent-a")
 			if _, err := st.DB().ExecContext(ctx, `
 				UPDATE agents SET next_wake_at = ? WHERE id = ?
 			`, "2026-11-11T00:00:00Z", "agent-a"); err != nil {
@@ -61,7 +61,7 @@ func TestSetNextWake_PersistsUTCAndPreservesAgentFields(t *testing.T) {
 
 func TestSetNextWake_MissingAgentErrors(t *testing.T) {
 	ctx := context.Background()
-	st := openNotesTestStore(t)
+	st := openTestStore(t)
 
 	err := st.SetNextWake(ctx, "missing-agent", time.Date(2026, 11, 12, 0, 0, 0, 0, time.UTC))
 	if !errors.Is(err, sql.ErrNoRows) {
@@ -74,8 +74,8 @@ func TestSetNextWake_MissingAgentErrors(t *testing.T) {
 
 func TestSetNextWake_RejectsCancelledContextAndClosedDB(t *testing.T) {
 	ctx := context.Background()
-	st := openNotesTestStore(t)
-	insertNotesTestAgent(t, st, "agent-a")
+	st := openTestStore(t)
+	insertTestAgent(t, st, "agent-a")
 
 	cancelled, cancel := context.WithCancel(ctx)
 	cancel()

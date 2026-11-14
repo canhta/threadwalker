@@ -2,15 +2,12 @@ package tools
 
 import (
 	"cmp"
-	"context"
 	"errors"
 	"regexp"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/canhta/threadz/internal/guard"
-	"github.com/canhta/threadz/internal/logging"
 
 	"github.com/canhta/threadz/internal/store"
 	"github.com/canhta/threadz/internal/threads"
@@ -22,7 +19,6 @@ var (
 	errLessonNumber     = errors.New("lesson number is not a counter on the cited action")
 	errLessonURL        = errors.New("lesson url is not one of your action urls")
 	errLessonSecret     = errors.New("lesson looks like a secret")
-	errLessonCap        = errors.New("dream lesson cap reached")
 )
 
 // lessonReasons is the one table from a rejection to its logged reason code.
@@ -35,7 +31,6 @@ var lessonReasons = []struct {
 	{errLessonNumber, "lesson_number_mismatch"},
 	{errLessonURL, "lesson_foreign_url"},
 	{errLessonSecret, "lesson_secret"},
-	{errLessonCap, "lesson_cap"},
 }
 
 // failureReason is the audit reason code of a failed tool: the lesson gate's
@@ -51,16 +46,8 @@ func failureReason(err error) string {
 		return "completed"
 	case errors.As(err, &blocked):
 		return blocked.Reason
-	case errors.Is(err, store.ErrStrategyInput):
-		return "strategy_input"
-	case errors.Is(err, store.ErrPlaybookInput):
-		return "playbook_input"
-	case errors.Is(err, errUnknownKnowledge):
-		return "unknown_knowledge"
 	case errors.Is(err, errStaleRef):
 		return "stale_ref"
-	case errors.Is(err, errDatedTopic):
-		return "dated_topic"
 	case errors.Is(err, errBudgetSpent):
 		return "budget"
 	}
@@ -71,18 +58,14 @@ func failureReason(err error) string {
 }
 
 var (
-	errUnknownKnowledge = errors.New("unknown knowledge_id")
-	errStaleRef         = errors.New("text names a per-wake ref")
-	errDatedTopic       = errors.New("note topic starts with a date")
-	errBudgetSpent      = errors.New("daily budget spent")
+	errStaleRef    = errors.New("text names a per-wake ref")
+	errBudgetSpent = errors.New("daily budget spent")
 )
 
 // modelFixable are the codes the model can act on; each has a guard hint.
 var modelFixable = map[string]bool{
 	"lesson_missing_citation": true, "lesson_foreign_citation": true, "lesson_number_mismatch": true,
-	"lesson_foreign_url": true, "lesson_secret": true, "lesson_cap": true,
-	"strategy_input": true, "playbook_input": true, "unknown_knowledge": true, "budget": true,
-	"stale_ref": true, "dated_topic": true,
+	"lesson_foreign_url": true, "lesson_secret": true, "budget": true, "stale_ref": true,
 }
 
 // modelFacing gives a model-fixable failure the blocked hint the model reads.
@@ -112,16 +95,19 @@ var (
 	// wakeRefPattern is a short ref such as r58. Refs restart at r1 every wake, so
 	// stored text that names one points at a different post in the next wake.
 	wakeRefPattern = regexp.MustCompile(`\br\d+\b`)
-	datedTopic     = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}`)
 	secretPattern  = regexp.MustCompile(`sk-[A-Za-z0-9_-]{16,}|(?i:bearer\s+[A-Za-z0-9._~+/=-]{16,})|[A-Za-z0-9_-]{40,}|-----BEGIN`)
 )
 
 // checkLesson accepts text only when every URL is one of the agent's own
 // action URLs and every number equals a counter measured on the cited action.
-// Dates, action and note ids and short refs are names, not counters.
+// Dates and action and note ids are names, not counters. Text that names a
+// short ref is refused: refs restart every wake.
 func checkLesson(text string, ev store.ActionEvidence) error {
 	if secretPattern.MatchString(text) {
 		return errLessonSecret
+	}
+	if wakeRefPattern.MatchString(text) {
+		return errStaleRef
 	}
 	for _, u := range urlPattern.FindAllString(text, -1) {
 		if !ev.URLs[strings.TrimRight(u, ".,;:!?")] {
@@ -135,48 +121,4 @@ func checkLesson(text string, ev store.ActionEvidence) error {
 		}
 	}
 	return nil
-}
-
-// checkNoWakeRef refuses durable text that names a per-wake ref.
-func checkNoWakeRef(texts ...string) error {
-	for _, t := range texts {
-		if wakeRefPattern.MatchString(t) {
-			return errStaleRef
-		}
-	}
-	return nil
-}
-
-func (d *Dispatcher) memoryActor() store.MemoryActor {
-	return store.MemoryActor{WakeID: d.opts.WakeID, Phase: d.opts.Phase}
-}
-
-// checkDreamLesson gates memory_add during a dream; other phases are unchecked.
-// A rejection is logged with its reason code and never reaches the memory index.
-func (d *Dispatcher) checkDreamLesson(ctx context.Context, a arguments) error {
-	if d.opts.Phase != guard.PhaseDream {
-		return nil
-	}
-	err := d.lessonVerdict(ctx, a)
-	if err != nil {
-		d.event(ctx, logging.LessonRejected, "rejected", lessonReason(err), "memory_add", time.Time{})
-	}
-	return err
-}
-
-func (d *Dispatcher) lessonVerdict(ctx context.Context, a arguments) error {
-	if d.lessons >= guard.MaxDreamLessons {
-		return errLessonCap
-	}
-	if a.Int("action_id") == 0 {
-		return errLessonNoCitation
-	}
-	ev, err := d.opts.Store.ActionEvidence(ctx, d.opts.Template.ID, a.Int("action_id"))
-	if err != nil {
-		return err
-	}
-	if !ev.Owned {
-		return errLessonForeign
-	}
-	return checkLesson(a.Text("text"), ev)
 }

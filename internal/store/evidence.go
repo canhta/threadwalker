@@ -139,14 +139,6 @@ func (s *Store) StopRequestContacts(ctx context.Context, agentID string) (n int,
 	return
 }
 
-// PlaybookOutcomeCount counts recorded outcome markers.
-func (s *Store) PlaybookOutcomeCount(ctx context.Context, agentID string) (n int, err error) {
-	if err = s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM playbook_outcomes WHERE agent_id=?`, agentID).Scan(&n); err != nil {
-		err = fmt.Errorf("counting playbook outcomes: %w", err)
-	}
-	return
-}
-
 // MetricTally counts stored metric samples, completed measurement jobs and
 // samples that belong to another agent or to one of the excluded actions.
 type MetricTally struct{ Samples, CompletedJobs, Foreign int }
@@ -189,13 +181,11 @@ func (s *Store) SeedAction(ctx context.Context, a SeededAction) (int64, error) {
 	return res.LastInsertId()
 }
 
-// SeededPost is a synthetic post with a finished 24h measurement and a stored
-// ordinary outcome whose reach and resonance lift are both Lift.
+// SeededPost is a synthetic post with a finished 24h measurement.
 type SeededPost struct {
 	Text, URL          string
 	PostedAt, Measured time.Time
 	Likes              int
-	Lift               float64
 }
 
 // SeedMeasuredPosts inserts posts with a metric sample and completed 1h, 6h
@@ -217,9 +207,6 @@ func (s *Store) SeedMeasuredPosts(ctx context.Context, agentID string, posts []S
 		}
 		measured := p.Measured.Format(time.RFC3339Nano)
 		if _, err = tx.ExecContext(ctx, `INSERT INTO metrics(agent_id,action_id,measured_at,views,likes) VALUES(?,?,?,100,?)`, agentID, id, measured, p.Likes); err != nil {
-			return fmt.Errorf("seeding measured posts: %w", err)
-		}
-		if _, err = tx.ExecContext(ctx, `INSERT INTO action_outcomes(agent_id,action_id,measured_at,model_version,views,conversation_rate,applause_rate,reach_lift,resonance_lift,label) VALUES(?,?,?,0,100,0,?,?,?,'ordinary')`, agentID, id, measured, float64(p.Likes)/100, p.Lift, p.Lift); err != nil {
 			return fmt.Errorf("seeding measured posts: %w", err)
 		}
 		for _, h := range []int{1, 6, 24} {

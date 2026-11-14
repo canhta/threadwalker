@@ -15,7 +15,6 @@ import (
 	"github.com/canhta/threadz/internal/guard"
 	"github.com/canhta/threadz/internal/llm"
 	"github.com/canhta/threadz/internal/logging"
-	"github.com/canhta/threadz/internal/playbook"
 	"github.com/canhta/threadz/internal/store"
 	"github.com/canhta/threadz/internal/threads"
 	"github.com/canhta/threadz/internal/tools"
@@ -37,9 +36,7 @@ type Options struct {
 	Owner          tools.Owner
 	Redactor       *config.Redactor
 	FetchTrends    func(context.Context) ([]trends.Trend, error)
-	FetchStudy     func(context.Context) (trends.StudyFeed, error)
 	SearchWeb      trends.WebSearcher
-	Embedder       *llm.Embedder
 	LeaseDuration  time.Duration
 	RetryDelay     time.Duration
 	BatchSize      int
@@ -109,9 +106,6 @@ func (p *Processor) NextDue(ctx context.Context) (time.Time, bool, error) {
 func (p *Processor) RunDue(ctx context.Context) (result Result, runErr error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	if err := p.settle(ctx); err != nil {
-		return result, err
-	}
 	due, ok, err := p.NextDue(ctx)
 	if err != nil {
 		return result, err
@@ -210,7 +204,7 @@ func (p *Processor) RunDue(ctx context.Context) (result Result, runErr error) {
 		// completed scope or stop the scheduler.
 		_ = backend.Close(closeCtx)
 	}()
-	dispatcher, err := tools.NewDispatcher(tools.Options{Scope: guard.Scope{Store: p.opts.Store, Template: p.opts.Template, WakeID: wakeID, Now: p.opts.Now, Logger: p.opts.Logger, AllowLive: true}, Threads: backend, Embedder: p.opts.Embedder, Owner: p.opts.Owner, Redactor: p.opts.Redactor, FetchTrends: p.opts.FetchTrends, FetchStudy: p.opts.FetchStudy, SearchWeb: p.opts.SearchWeb})
+	dispatcher, err := tools.NewDispatcher(tools.Options{Scope: guard.Scope{Store: p.opts.Store, Template: p.opts.Template, WakeID: wakeID, Now: p.opts.Now, Logger: p.opts.Logger, AllowLive: true}, Threads: backend, Owner: p.opts.Owner, Redactor: p.opts.Redactor, FetchTrends: p.opts.FetchTrends, SearchWeb: p.opts.SearchWeb})
 	if err != nil {
 		return result, metricError("configuring metric tools", err)
 	}
@@ -224,7 +218,7 @@ func (p *Processor) RunDue(ctx context.Context) (result Result, runErr error) {
 		}
 		first := group[0]
 		call := llm.ToolCall{ID: fmt.Sprintf("metric-%d-%d", wakeID, first.ActionID), Type: "function", Function: llm.CallFunction{Name: "read_own_metrics", Arguments: fmt.Sprintf(`{"action_id":%d}`, first.ActionID)}}
-		output, readErr := dispatcher.Dispatch(ctx, call)
+		output, readErr := dispatcher.DispatchHarness(ctx, call)
 		if readErr != nil {
 			if errors.Is(readErr, context.Canceled) || errors.Is(readErr, context.DeadlineExceeded) || errors.Is(readErr, guard.ErrAudit) {
 				return result, metricError("reading guarded metric", readErr)
@@ -297,22 +291,7 @@ func (p *Processor) RunDue(ctx context.Context) (result Result, runErr error) {
 			}
 		}
 	}
-	if err := p.settle(ctx); err != nil {
-		return result, err
-	}
 	return result, nil
-}
-
-// settle stores the outcomes of newly measured actions, then counts them in the playbook gate.
-func (p *Processor) settle(ctx context.Context) error {
-	tz, err := time.LoadLocation(p.opts.Template.Schedule.Timezone)
-	if err != nil {
-		return metricError("loading outcome timezone", err)
-	}
-	if err = ComputeOutcomes(ctx, p.opts.Store, p.opts.Template.ID, tz, p.opts.Now()); err != nil {
-		return metricError("computing outcomes", err)
-	}
-	return playbook.Process(ctx, p.opts.Store, p.opts.Template.ID, p.opts.Template.MinEffect, p.opts.Now(), p.opts.Logger)
 }
 
 func (p *Processor) available(ctx context.Context) (bool, error) {

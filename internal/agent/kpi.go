@@ -171,7 +171,7 @@ func (r *Runtime) nextWake(ctx context.Context, now time.Time) (time.Time, error
 func (r *Runtime) capReset(ctx context.Context, now time.Time) (time.Time, error) {
 	t := r.opts.Template
 	dayStart, dayEnd, day := t.Limits.DayBounds(now)
-	spent, err := r.opts.Store.LLMUsageForDayPhases(ctx, t.ID, day, "agent", "study")
+	spent, err := r.opts.Store.LLMUsageForDayPhases(ctx, t.ID, day, "agent")
 	if err != nil {
 		return time.Time{}, err
 	}

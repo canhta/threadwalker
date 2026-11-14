@@ -11,6 +11,17 @@ import (
 	"github.com/canhta/threadz/internal/threads"
 )
 
+// PostingContext is what an action built on an item stores about it. A nil
+// field was not observed; nothing is invented for it.
+type PostingContext struct {
+	// TargetScoreJSON is a reply target's numeric score parts.
+	TargetScoreJSON string
+	// TopicHeat is the heat of the topic the action is anchored to.
+	TopicHeat *float64
+	// ParentReplies and ParentAgeMinutes describe the replied-to post.
+	ParentReplies, ParentAgeMinutes *int64
+}
+
 // ItemFacts is what one item read this wake says in numbers: Line is the compact
 // text the ideas prompt shows, Score orders items (best first), and the
 // embedded context is what an action built on the item stores. Outside, empty
@@ -135,7 +146,7 @@ func TopicFacts(h Heat, now time.Time) ItemFacts {
 	}
 }
 
-// StoryHeats reads the history of earlier agent-phase fetches for each story:
+// StoryHeats reads the history of earlier fetches for each story:
 // its first sighting and its rank in the latest earlier fetch that listed it.
 // A story not listed before is first seen now. Call it before recording the
 // current fetch.
@@ -146,9 +157,6 @@ func StoryHeats(stories []Story, history []store.TrendStory, now time.Time) []He
 	}
 	byTitle := map[string]*seen{}
 	for _, h := range history {
-		if h.Phase != "agent" {
-			continue
-		}
 		key := normalizeTrendText(h.Title)
 		s := byTitle[key]
 		if s == nil {
@@ -169,6 +177,9 @@ func StoryHeats(stories []Story, history []store.TrendStory, now time.Time) []He
 	}
 	return out
 }
+
+// BaselineWindow is the history of earlier fetches StoryHeats reads.
+const BaselineWindow = 7 * 24 * time.Hour
 
 func minTime(a, b time.Time) time.Time {
 	if b.Before(a) {

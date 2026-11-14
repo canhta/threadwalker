@@ -22,22 +22,20 @@ import (
 // Commands the live process serves. Everything else the operator CLI reads
 // from the database or checks locally.
 const (
-	Status         = "status"
-	Wake           = "wake"
-	Pause          = "pause"
-	Resume         = "resume"
-	Kill           = "kill"
-	MetricsRun     = "metrics_run"
-	Prune          = "prune"
-	TrendsRefresh  = "trends_refresh"
-	Context        = "context"
-	MemoryRestore  = "memory_restore"
-	StrategyRevert = "strategy_revert"
-	OAuthLink      = "oauth_link"
-	Cookies        = "cookies"
+	Status        = "status"
+	Wake          = "wake"
+	Pause         = "pause"
+	Resume        = "resume"
+	Kill          = "kill"
+	MetricsRun    = "metrics_run"
+	Prune         = "prune"
+	TrendsRefresh = "trends_refresh"
+	Context       = "context"
+	OAuthLink     = "oauth_link"
+	Cookies       = "cookies"
 )
 
-var commands = map[string]bool{Status: true, Wake: true, Pause: true, Resume: true, Kill: true, MetricsRun: true, Prune: true, TrendsRefresh: true, Context: true, MemoryRestore: true, StrategyRevert: true, OAuthLink: true, Cookies: true}
+var commands = map[string]bool{Status: true, Wake: true, Pause: true, Resume: true, Kill: true, MetricsRun: true, Prune: true, TrendsRefresh: true, Context: true, OAuthLink: true, Cookies: true}
 
 // ErrBusy means another operator job is waiting or running.
 var ErrBusy = errors.New("another operator job is waiting or running")
@@ -52,9 +50,6 @@ type Request struct {
 	Agent   string `json:"agent,omitempty"`
 	Phase   string `json:"phase,omitempty"`
 	DryRun  bool   `json:"dry_run,omitempty"`
-	// ID is the memory journal row to restore, or the strategy revision to
-	// revert to (0 is the one before the newest).
-	ID int64 `json:"id,omitempty"`
 	// Cookies is the owner's cookie export for the Cookies command. It is never
 	// logged: the audit record carries only the command, agent and outcome.
 	Cookies string `json:"cookies,omitempty"`

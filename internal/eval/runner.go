@@ -168,9 +168,6 @@ var runners = map[string]runner{
 	"metrics": func(ctx context.Context, c Case, p Profile, repeat int, opts Options, _ *reservation) CaseResult {
 		return runMetricsCase(ctx, c, p, repeat, opts)
 	},
-	"playbook": func(ctx context.Context, c Case, p Profile, repeat int, opts Options, _ *reservation) CaseResult {
-		return runPlaybookCase(ctx, c, p, repeat, opts, nil)
-	},
 	"dashboard": func(ctx context.Context, c Case, p Profile, repeat int, opts Options, _ *reservation) CaseResult {
 		return runDashboardCase(ctx, c, p, repeat, opts)
 	},
@@ -458,16 +455,15 @@ func effectiveLimits(opts Options, l Limits) (int, int, float64) {
 }
 func inputsFingerprint(cases []Case, opts Options) string {
 	type input struct {
-		ID              string
-		Steps, Output   int
-		USD             float64
-		BrowserFixture  string `json:",omitempty"`
-		PlaybookFixture string `json:",omitempty"`
+		ID             string
+		Steps, Output  int
+		USD            float64
+		BrowserFixture string `json:",omitempty"`
 	}
 	selected := make([]input, 0, len(cases))
 	for _, c := range cases {
 		steps, output, usd := effectiveLimits(opts, c.Limits)
-		selected = append(selected, input{c.ID, steps, output, usd, browserFixtureDigest([]Case{c}), playbookFixtureDigest([]Case{c})})
+		selected = append(selected, input{c.ID, steps, output, usd, browserFixtureDigest([]Case{c})})
 	}
 	sort.Slice(selected, func(i, j int) bool { return selected[i].ID < selected[j].ID })
 	b, _ := json.Marshal(struct {

@@ -62,7 +62,7 @@ func TestWakeBrowserFactoryClosesEveryExitAndPreservesPartialAccounting(t *testi
 				fixture.Calls = []llm.ToolCall{agent.SyntheticCall("post", `{"text":"Synthetic first action"}`), agent.SyntheticCall("post", `{"text":"Synthetic must never run"}`)}
 			}
 			factories := 0
-			r, err := agent.New(agent.Options{Store: st, Template: tmpl, Now: func() time.Time { return now }, HTTPClient: fixture.Client(), FetchTrends: fixture.Trends, FetchStudy: fixture.Study, ThreadsFactory: func(context.Context, config.Template) (threads.Backend, error) {
+			r, err := agent.New(agent.Options{Store: st, Template: tmpl, Now: func() time.Time { return now }, HTTPClient: fixture.Client(), FetchTrends: fixture.Trends, ThreadsFactory: func(context.Context, config.Template) (threads.Backend, error) {
 				factories++
 				if mode == "factory_error" {
 					return nil, errors.New("private launch detail")
@@ -135,7 +135,7 @@ func TestCompletedWakeWithFailedBrowserCloseStaysCompleted(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	r, err := agent.New(agent.Options{Store: st, Template: tmpl, Now: func() time.Time { return now }, Logger: logger, HTTPClient: fixture.Client(), FetchTrends: fixture.Trends, FetchStudy: fixture.Study, ThreadsFactory: func(context.Context, config.Template) (threads.Backend, error) {
+	r, err := agent.New(agent.Options{Store: st, Template: tmpl, Now: func() time.Time { return now }, Logger: logger, HTTPClient: fixture.Client(), FetchTrends: fixture.Trends, ThreadsFactory: func(context.Context, config.Template) (threads.Backend, error) {
 		return backend, nil
 	}})
 	if err != nil {

@@ -28,7 +28,7 @@ func TestPhaseContextsShareOwnActionsAndDifferInJob(t *testing.T) {
 	if _, err = st.DB().Exec(`INSERT INTO actions(agent_id,kind,text,dry_run,posted_at) VALUES(?,?,?,1,?)`, r.opts.Template.ID, "post", "own line", now.Add(-time.Hour).Format(time.RFC3339Nano)); err != nil {
 		t.Fatal(err)
 	}
-	for phase, job := range map[string]string{guard.PhaseAgent: "A normal wake", guard.PhaseDream: "A dream", guard.PhaseStudy: "A study session"} {
+	for phase, job := range map[string]string{guard.PhaseAgent: "A normal wake", guard.PhaseDream: "A dream"} {
 		messages, err := r.wakeContext(ctx, phase, 0)
 		if err != nil {
 			t.Fatalf("%s: %v", phase, err)
@@ -42,17 +42,19 @@ func TestPhaseContextsShareOwnActionsAndDifferInJob(t *testing.T) {
 	}
 }
 
-func TestSystemPromptNeverForcesANoteAndOffersMemoryAddOnlyToTheDream(t *testing.T) {
+func TestSystemPromptNeverForcesAWriteOrNamesARemovedTool(t *testing.T) {
 	tmpl := OfflineTemplate()
-	for _, phase := range []string{guard.PhaseAgent, guard.PhaseDream, guard.PhaseStudy} {
+	for _, phase := range []string{guard.PhaseAgent, guard.PhaseDream} {
 		prompt := systemPrompt(tmpl, phase)
 		for _, forced := range []string{"End the wake", "one-line lessons", "saying why", "Save what you learned"} {
 			if strings.Contains(prompt, forced) {
 				t.Errorf("%s prompt forces a write: %q", phase, forced)
 			}
 		}
-		if got := strings.Contains(prompt, "memory_add"); got != (phase == guard.PhaseDream) {
-			t.Errorf("%s prompt names memory_add = %v", phase, got)
+		for _, removed := range []string{"memory_add", "note_write", "playbook", "strategy_write", "knowledge_read", "read_own_metrics", "explore"} {
+			if strings.Contains(prompt, removed) {
+				t.Errorf("%s prompt names the removed %q", phase, removed)
+			}
 		}
 	}
 }

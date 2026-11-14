@@ -19,14 +19,11 @@ func TestStopCheckShowsOpenTargetsToABehindAgentWhileBudgetIsLeft(t *testing.T) 
 	if ask := check(nil, nil); !strings.Contains(ask, "2 posts you read") || !strings.Contains(ask, "r3, r8") {
 		t.Fatalf("ask %q", ask)
 	}
-	if ask := check(nil, nil); strings.Contains(ask, "note_write") {
-		t.Fatalf("stop check pushes a note: %q", ask)
-	}
 	open = nil
-	if ask := check(map[string]bool{"ideas": true}, map[string]int{"note_write": 1}); ask != "" {
+	if ask := check(map[string]bool{"ideas": true}, map[string]int{"search": 1}); ask != "" {
 		t.Fatalf("nothing left to answer still asked: %q", ask)
 	}
-	if ask := behindSB.stopCheck(nil, func() []string { return []string{"r1"} }, 0.01)(map[string]bool{"ideas": true}, map[string]int{"note_write": 1}); ask != "" {
+	if ask := behindSB.stopCheck(nil, func() []string { return []string{"r1"} }, 0.01)(map[string]bool{"ideas": true}, map[string]int{"search": 1}); ask != "" {
 		t.Fatalf("spent budget still asked: %q", ask)
 	}
 }

@@ -8,141 +8,20 @@ import (
 	"time"
 
 	"github.com/canhta/threadz/internal/guard"
-	"github.com/canhta/threadz/internal/knowledge"
-	"github.com/canhta/threadz/internal/llm"
 	"github.com/canhta/threadz/internal/logging"
-	"github.com/canhta/threadz/internal/store"
 	"github.com/canhta/threadz/internal/threads"
 	"github.com/canhta/threadz/internal/trends"
 )
 
 func (d *Dispatcher) executors() map[string]executor {
 	tools := map[string]executor{
-		"playbook_read": func(ctx context.Context, a arguments) (any, error) {
-			return d.opts.Store.PlaybookEntries(ctx, d.opts.Template.ID, int(a.Int("limit")))
-		},
-		"playbook_propose": func(ctx context.Context, a arguments) (any, error) {
-			if id := a.Text("knowledge_id"); id != "" {
-				if _, ok, err := knowledge.Get(id); err != nil || !ok {
-					return nil, fmt.Errorf("proposing playbook entry: %w", errUnknownKnowledge)
-				}
-			}
-			entry, err := d.opts.Store.ProposePlaybook(ctx, d.opts.Template.ID, a.Int("hypothesis_id"), a.Text("text"), d.opts.Now(), a.Text("knowledge_id"))
-			if errors.Is(err, store.ErrPlaybookInput) {
-				return nil, fmt.Errorf("proposing playbook entry: %w", store.ErrPlaybookInput)
-			}
-			if err != nil {
-				return nil, errors.New("proposing playbook entry: refused")
-			}
-			return entry, nil
-		},
-		"knowledge_read": func(ctx context.Context, a arguments) (any, error) {
-			entries, err := knowledge.Filter(a.Text("scope"), a.Text("evidence"))
-			if err != nil {
-				return nil, fmt.Errorf("reading knowledge: %w", err)
-			}
-			return entries, nil
-		},
-		"knowledge_candidate": func(ctx context.Context, a arguments) (any, error) {
-			id, err := d.opts.Store.AddKnowledgeCandidate(ctx, d.opts.Template.ID, a.Text("technique"), a.Text("url"), d.opts.Now())
-			if err != nil {
-				return nil, fmt.Errorf("submitting knowledge candidate: %w", err)
-			}
-			return map[string]int64{"candidate_id": id}, nil
-		},
-		"strategy_write": func(ctx context.Context, a arguments) (any, error) {
-			err := checkNoWakeRef(a.Text("text"))
-			if err != nil {
-				d.event(ctx, logging.StrategyWritten, outcome(err), failureReason(err), "strategy_write", time.Time{})
-				return nil, fmt.Errorf("writing strategy: %w", err)
-			}
-			version, err := d.opts.Store.WriteStrategy(ctx, d.opts.Template.ID, a.Text("text"), a.TextList("citations"), d.opts.Now())
-			d.event(ctx, logging.StrategyWritten, outcome(err), failureReason(err), "strategy_write", time.Time{})
-			if err != nil {
-				return nil, fmt.Errorf("writing strategy: %w", err)
-			}
-			return map[string]int64{"version": version}, nil
-		},
 		"mark_do_not_contact": func(ctx context.Context, a arguments) (any, error) {
 			if err := d.opts.Store.MarkDoNotContact(ctx, d.opts.Template.ID, a.Text("username"), "agent_request"); err != nil {
 				return nil, errors.New("marking do not contact: failed")
 			}
 			return map[string]bool{"do_not_contact": true}, nil
 		},
-		"memory_add": func(ctx context.Context, a arguments) (any, error) {
-			err := checkNoWakeRef(a.Text("text"))
-			if err == nil {
-				err = d.checkDreamLesson(ctx, a)
-			}
-			if err != nil {
-				if errors.Is(err, errStaleRef) {
-					d.event(ctx, logging.MemoryAdded, outcome(err), failureReason(err), "memory_add", time.Time{})
-				}
-				return nil, fmt.Errorf("adding memory entry: %w", err)
-			}
-			err = d.opts.Store.AddMemoryEntry(ctx, d.opts.Template.ID, a.Text("text"), d.opts.Now(), d.memoryActor())
-			d.event(ctx, logging.MemoryAdded, outcome(err), failureReason(err), "memory_add", time.Time{})
-			if err != nil {
-				return nil, fmt.Errorf("adding memory entry: %w", err)
-			}
-			if d.opts.Phase == guard.PhaseDream {
-				d.lessons++
-			}
-			return map[string]bool{"added": true}, nil
-		},
-		"memory_supersede": func(ctx context.Context, a arguments) (any, error) {
-			err := d.opts.Store.SupersedeMemory(ctx, d.opts.Template.ID, a.Int("old_id"), a.Int("new_id"), d.opts.Now(), d.memoryActor())
-			d.event(ctx, logging.MemorySuperseded, outcome(err), failureReason(err), "memory_supersede", time.Time{})
-			if err != nil {
-				return nil, fmt.Errorf("superseding memory entry: %w", err)
-			}
-			return map[string]bool{"superseded": true}, nil
-		},
-		"note_write": func(ctx context.Context, a arguments) (any, error) {
-			err := checkNoWakeRef(a.Text("topic"), a.Text("description"), a.Text("text"))
-			if err == nil && datedTopic.MatchString(a.Text("topic")) {
-				err = errDatedTopic
-			}
-			var id int64
-			if err == nil {
-				id, err = d.opts.Store.WriteTopic(ctx, d.opts.Template.ID, a.Text("topic"), a.Text("description"), a.Text("text"), d.opts.Now())
-			}
-			if err == nil {
-				d.syncEmbeddings(ctx)
-			}
-			d.event(ctx, logging.NoteWritten, outcome(err), failureReason(err), "note_write", time.Time{})
-			if err != nil {
-				return nil, fmt.Errorf("writing topic note: %w", err)
-			}
-			return map[string]any{"id": id}, nil
-		},
-		"note_search": func(ctx context.Context, a arguments) (any, error) {
-			hits, err := d.opts.Store.SearchMemory(ctx, d.opts.Template.ID, d.opts.Template.DryRun, a.Text("query"), d.embedQuery(ctx, a.Text("query")), a.Time("since"), a.Time("until"), int(a.Int("limit")))
-			d.event(ctx, logging.NoteSearched, outcome(err), failureReason(err), "note_search", time.Time{})
-			if err != nil {
-				return nil, fmt.Errorf("searching agent notes: %w", err)
-			}
-			return hits, nil
-		},
-		"note_read": func(ctx context.Context, a arguments) (any, error) {
-			memory, err := d.opts.Store.ReadMemory(ctx, d.opts.Template.ID, a.Text("ref"))
-			d.event(ctx, logging.NoteRead, outcome(err), failureReason(err), "note_read", time.Time{})
-			if err != nil {
-				return nil, errors.New("reading agent note: not found")
-			}
-			return memory, nil
-		},
 		"fetch_trends": func(ctx context.Context, a arguments) (any, error) {
-			if d.opts.Phase == guard.PhaseStudy {
-				feed, err := d.opts.FetchStudy(ctx)
-				d.event(ctx, logging.TrendsFetched, outcome(err), failureReason(err), "fetch_trends", time.Time{})
-				if err != nil {
-					return nil, errors.New("fetching study sources: fetch failed")
-				}
-				stories := trends.RankStories(feed.Items, d.trendProfile)
-				d.recordStories(ctx, "study", stories)
-				return map[string]any{"stories": trends.TopStories(stories, 10), "failed_sources": feed.Failed, "skipped_sources": feed.Skipped}, nil
-			}
 			fetched, err := d.opts.FetchTrends(ctx)
 			d.event(ctx, logging.TrendsFetched, outcome(err), failureReason(err), "fetch_trends", time.Time{})
 			if err != nil {
@@ -164,13 +43,13 @@ func (d *Dispatcher) executors() map[string]executor {
 			for i, heat := range trends.StoryHeats(stories, history, now) {
 				d.guard.NoteFacts(stories[i].URL, trends.TopicFacts(heat, now))
 			}
-			d.recordStories(ctx, "agent", stories)
+			d.recordStories(ctx, stories)
 			return ranked, nil
 		},
 	}
 	for _, name := range []string{"read_feed", "read_topic", "search", "profile", "profile_posts", "read_post", "read_replies", "read_own_metrics"} {
 		tools[name] = func(ctx context.Context, a arguments) (any, error) {
-			if name == "read_own_metrics" && a.Int("action_id") > 0 {
+			if name == "read_own_metrics" {
 				return d.browserRead(ctx, name, a)
 			}
 			if name == "read_topic" {
@@ -179,7 +58,7 @@ func (d *Dispatcher) executors() map[string]executor {
 				}
 			}
 			data, err := d.browserRead(ctx, name, a)
-			if err == nil && name != "read_own_metrics" && name != "profile" {
+			if err == nil && name != "profile" {
 				d.noteRead(data)
 			}
 			if err == nil && (name == "search" || name == "read_feed" || name == "read_topic") {
@@ -203,12 +82,10 @@ func (d *Dispatcher) executors() map[string]executor {
 	}
 	for _, name := range []string{"post", "reply"} {
 		tools[name] = func(ctx context.Context, a arguments) (any, error) {
-			result, err := d.action(ctx, name, a)
-			d.syncEmbeddings(ctx)
-			return result, err
+			return d.action(ctx, name, a)
 		}
 	}
-	if d.opts.Template.Study.WebSearch {
+	if d.opts.Template.WebSearch.Enabled {
 		tools["web_search"] = func(ctx context.Context, a arguments) (any, error) {
 			if d.opts.Phase == guard.PhaseAgent {
 				d.webSearches++ // Dispatch already holds d.mu
@@ -256,8 +133,8 @@ func (d *Dispatcher) executors() map[string]executor {
 }
 
 // recordStories is best-effort: a storage failure never fails the read.
-func (d *Dispatcher) recordStories(ctx context.Context, phase string, stories []trends.Story) {
-	err := trends.Record(ctx, d.opts.Store, d.opts.Template.ID, phase, stories, d.opts.Now())
+func (d *Dispatcher) recordStories(ctx context.Context, stories []trends.Story) {
+	err := trends.Record(ctx, d.opts.Store, d.opts.Template.ID, stories, d.opts.Now())
 	d.event(ctx, logging.TrendsRecorded, outcome(err), failureReason(err), "fetch_trends", time.Time{})
 }
 
@@ -274,12 +151,12 @@ func searchCountry(language string) string {
 }
 
 // webSearch checks the shared daily cap before the call and records the actual
-// reported usage to the study phase ledger, so a search is bounded like any
-// other study spend.
+// reported usage to the wake's ledger, so a search is bounded like any other
+// spend.
 func (d *Dispatcher) webSearch(ctx context.Context, query string) (trends.WebSearchResult, error) {
 	now := d.opts.Now()
 	day := d.opts.Template.Limits.Day(now)
-	spent, err := d.opts.Store.LLMUsageForDayPhases(ctx, d.opts.Template.ID, day, "agent", "study")
+	spent, err := d.opts.Store.LLMUsageForDayPhases(ctx, d.opts.Template.ID, day, "agent")
 	if err != nil {
 		return trends.WebSearchResult{}, err
 	}
@@ -287,12 +164,12 @@ func (d *Dispatcher) webSearch(ctx context.Context, query string) (trends.WebSea
 		return trends.WebSearchResult{}, fmt.Errorf("web search: %w", errBudgetSpent)
 	}
 	result, err := d.opts.SearchWeb(ctx, trends.WebSearchRequest{
-		BaseURL:    d.opts.Template.Study.WebSearchBaseURL,
-		Model:      d.opts.Template.Study.WebSearchModel,
+		BaseURL:    d.opts.Template.WebSearch.BaseURL,
+		Model:      d.opts.Template.WebSearch.Model,
 		APIKey:     d.opts.Template.LLM.APIKey.Expose(),
 		Query:      query,
-		MaxOutput:  d.opts.Template.Study.WebSearchMaxOutput,
-		MaxResults: d.opts.Template.Study.WebSearchMaxResults,
+		MaxOutput:  d.opts.Template.WebSearch.MaxOutput,
+		MaxResults: d.opts.Template.WebSearch.MaxResults,
 		Country:    searchCountry(d.opts.Template.Persona.Language),
 	})
 	if err != nil {
@@ -321,7 +198,7 @@ func (d *Dispatcher) noteRead(data any) {
 }
 
 func (d *Dispatcher) action(ctx context.Context, kind string, a arguments) (any, error) {
-	// The guard already validated hypotheses and atomically committed the intent
+	// The guard already validated the action and atomically committed the intent
 	// and contact counter. A builtin must never insert a second action.
 	if a.ReservedActionID <= 0 {
 		return nil, errors.New("recording action: missing guarded reservation")
@@ -337,21 +214,4 @@ func outcome(err error) string {
 		return "error"
 	}
 	return "success"
-}
-
-// embedQuery returns the query's vector, or nil (logging the reason when a
-// request failed), which makes SearchMemory rank by BM25 alone for this call.
-func (d *Dispatcher) embedQuery(ctx context.Context, query string) []float32 {
-	vectors, err := d.opts.Embedder.Embed(ctx, d.opts.Template.ID, d.opts.WakeID, []string{query})
-	if err != nil {
-		d.event(ctx, logging.EmbeddingFailed, "error", llm.EmbeddingFailureReason(err), "note_search", time.Time{})
-		return nil
-	}
-	return vectors[0]
-}
-
-// syncEmbeddings embeds the rows a write just added. A failure is logged and
-// leaves them pending for the next sync; the write itself already succeeded.
-func (d *Dispatcher) syncEmbeddings(ctx context.Context) {
-	_, _ = d.opts.Embedder.Sync(ctx, d.opts.Template.ID, d.opts.WakeID)
 }

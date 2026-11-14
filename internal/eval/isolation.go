@@ -69,11 +69,13 @@ func runIsolationCaptured(ctx context.Context, c Case, p Profile, repeat int, op
 			tmpl.ID = []string{"synthetic-isolation-a", "synthetic-isolation-b"}[i]
 			tmpl.Threads.Username = users[i]
 			tmpl.Threads.ProfileDir = filepath.Join(dir, tmpl.ID)
-			tmpl.SeedPlaybook = []string{private[i]}
 			tmpl.LLM.Protocol = p.Config.Protocol
 			fixture := agent.NewOfflineFixture(clock)
-			fixture.Calls = []llm.ToolCall{agent.SyntheticCall("note_write", string(isolationJSON(map[string]string{"topic": "isolation", "description": private[i], "text": private[i]})))}
-			runtime, err := agent.New(agent.Options{Store: st, Template: *tmpl, Now: clock, Logger: logger, HTTPClient: fixture.Client(), FetchTrends: fixture.Trends, FetchStudy: fixture.Study})
+			fixture.Calls = []llm.ToolCall{agent.SyntheticCall("fetch_trends", `{}`)}
+			if _, err = st.SeedAction(ctx, store.SeededAction{AgentID: tmpl.ID, Kind: "post", Text: private[i], DryRun: tmpl.DryRun, PostedAt: now.Add(-time.Hour)}); err != nil {
+				return r
+			}
+			runtime, err := agent.New(agent.Options{Store: st, Template: *tmpl, Now: clock, Logger: logger, HTTPClient: fixture.Client(), FetchTrends: fixture.Trends})
 			if err != nil {
 				return r
 			}
@@ -89,7 +91,7 @@ func runIsolationCaptured(ctx context.Context, c Case, p Profile, repeat int, op
 				return r
 			}
 			wakes = append(wakes, id)
-			d, err := tools.NewDispatcher(tools.Options{Scope: guard.Scope{Store: st, Template: *tmpl, OwnUsernames: users, WakeID: id, Now: clock, Logger: logger}, Threads: threads.NewMemory(), FetchTrends: fixture.Trends, FetchStudy: fixture.Study, Embedder: offlineEmbedder(st, *tmpl, clock, logger)})
+			d, err := tools.NewDispatcher(tools.Options{Scope: guard.Scope{Store: st, Template: *tmpl, OwnUsernames: users, WakeID: id, Now: clock, Logger: logger}, Threads: threads.NewMemory(), FetchTrends: fixture.Trends})
 			if err != nil {
 				return r
 			}
@@ -107,20 +109,6 @@ func runIsolationCaptured(ctx context.Context, c Case, p Profile, repeat int, op
 	}
 	switch c.Scenario {
 	case "data":
-		for i := range templates {
-			if _, err = call(i, "note_write", map[string]string{"topic": "isolation", "text": private[i]}); err != nil {
-				return r
-			}
-			output, err := call(i, "note_search", map[string]string{"query": "PRIVATE"})
-			output = strings.NewReplacer("[", "", "]", "").Replace(output)
-			if err != nil || !strings.Contains(output, private[i]) || strings.Contains(output, private[1-i]) {
-				return fail("notes_cross_agent")
-			}
-			output, err = call(i, "playbook_read", map[string]any{})
-			if err != nil || !strings.Contains(output, private[i]) || strings.Contains(output, private[1-i]) {
-				return fail("playbook_cross_agent")
-			}
-		}
 		if _, err = guards[0].ObserveStopRequest(ctx, "fixture_stranger", "stop", true); err != nil {
 			return r
 		}
@@ -188,14 +176,6 @@ func runIsolationCaptured(ctx context.Context, c Case, p Profile, repeat int, op
 		if err = scheduler.Run(ctx, true); err != nil {
 			return r
 		}
-		indexA, err := st.TopicList(ctx, templates[0].ID, templates[0].DryRun)
-		if err != nil {
-			return r
-		}
-		indexB, err := st.TopicList(ctx, templates[1].ID, templates[1].DryRun)
-		if err != nil {
-			return r
-		}
 		ua, err := st.LLMUsageForDay(ctx, templates[0].ID, now.Format("2006-01-02"))
 		if err != nil {
 			return r
@@ -204,7 +184,7 @@ func runIsolationCaptured(ctx context.Context, c Case, p Profile, repeat int, op
 		if err != nil {
 			return r
 		}
-		if len(indexA) != 0 || len(indexB) != 1 || indexB[0].Description != private[1] || ua.CostUSD != 1 || ub.CostUSD <= 0 {
+		if ua.CostUSD != 1 || ub.CostUSD <= 0 {
 			return fail("state_budget_cross_agent")
 		}
 	case "own_accounts":

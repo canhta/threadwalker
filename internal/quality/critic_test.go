@@ -131,14 +131,14 @@ func TestPromptsCarryTheOffLimitsSubjectsAndTheirRule(t *testing.T) {
 	}
 }
 
-func TestPromptsCarryTheTemplatesAudienceAndLearnedPosts(t *testing.T) {
+func TestPromptsCarryTheTemplatesAudience(t *testing.T) {
 	r, err := DefaultRubric()
 	if err != nil {
 		t.Fatal(err)
 	}
 	p := config.PersonaConfig{Name: "N", Audience: "night-shift nurses", CriticRules: []string{"mentions pizza"}}
 	c := CriticMessages(r, p, CriticInput{Kind: Post, Texts: []string{"x"}})
-	w := WriterMessages(r, p, WriterInput{Kind: Post, Learned: []string{"my best"}})
+	w := WriterMessages(r, p, WriterInput{Kind: Post})
 	i := IdeasMessages(p, nil, []string{"outlook went down again"})
 	if !strings.Contains(i[1].Content, `"outlook went down again"`) {
 		t.Error("ideas must see the account's recent posts so it does not repeat them")
@@ -148,8 +148,8 @@ func TestPromptsCarryTheTemplatesAudienceAndLearnedPosts(t *testing.T) {
 			t.Errorf("no audience in %q", s)
 		}
 	}
-	if !strings.Contains(c[1].Content, "(1) mentions pizza") || !strings.Contains(w[1].Content, `"my best"`) {
-		t.Error("rule or learned post missing")
+	if !strings.Contains(c[1].Content, "(1) mentions pizza") {
+		t.Error("critic rule missing")
 	}
 	for _, s := range []string{r.CriticInstructions, r.WriterInstructions, ideasInstructions} {
 		if strings.Contains(s, "GenZ") || strings.Contains(s, "Vietnamese") {

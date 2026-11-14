@@ -129,7 +129,7 @@ func runBrowserCase(ctx context.Context, c Case, p Profile, repeat int, opts Opt
 	reply := agent.SyntheticCall("reply", `{"text":"Synthetic outgoing reply","target_username":"synthetic_author","target_id":"fixture-1","target_url":"https://www.threads.com/@synthetic_author/post/1"}`)
 	switch c.Scenario {
 	case "six_operations":
-		fixture.Calls = []llm.ToolCall{agent.SyntheticCall("read_feed", `{}`), agent.SyntheticCall("search", `{"query":"synthetic"}`), agent.SyntheticCall("read_post", `{"id":"fixture-1"}`), agent.SyntheticCall("read_own_metrics", `{}`), post, reply}
+		fixture.Calls = []llm.ToolCall{agent.SyntheticCall("read_feed", `{}`), agent.SyntheticCall("search", `{"query":"synthetic"}`), agent.SyntheticCall("read_post", `{"id":"fixture-1"}`), agent.SyntheticCall("read_replies", `{}`), post, reply}
 	case "dry_run":
 		fixture.Calls = []llm.ToolCall{agent.SyntheticCall("read_feed", `{}`), post, reply}
 	case "uncertain_submit":
@@ -172,7 +172,7 @@ func runBrowserCase(ctx context.Context, c Case, p Profile, repeat int, opts Opt
 		}
 	}
 	logger := run.Logger
-	runtime, err := agent.New(agent.Options{Store: st, Template: tmpl, Now: clock, HTTPClient: fixture.Client(), FetchTrends: fixture.Trends, FetchStudy: fixture.Study, Logger: logger, ThreadsFactory: func(context.Context, config.Template) (threads.Backend, error) { return backend, nil }})
+	runtime, err := agent.New(agent.Options{Store: st, Template: tmpl, Now: clock, HTTPClient: fixture.Client(), FetchTrends: fixture.Trends, Logger: logger, ThreadsFactory: func(context.Context, config.Template) (threads.Backend, error) { return backend, nil }})
 	if err != nil || runtime.Start(ctx) != nil {
 		return r
 	}
@@ -243,7 +243,7 @@ func runBrowserCase(ctx context.Context, c Case, p Profile, repeat int, opts Opt
 			return r
 		}
 		st = run.Store
-		restarted, e := agent.New(agent.Options{Store: st, Template: tmpl, Now: func() time.Time { return now }, HTTPClient: fixture.Client(), FetchTrends: fixture.Trends, FetchStudy: fixture.Study, ThreadsFactory: func(context.Context, config.Template) (threads.Backend, error) { return backend, nil }})
+		restarted, e := agent.New(agent.Options{Store: st, Template: tmpl, Now: func() time.Time { return now }, HTTPClient: fixture.Client(), FetchTrends: fixture.Trends, ThreadsFactory: func(context.Context, config.Template) (threads.Backend, error) { return backend, nil }})
 		if e != nil || restarted.Start(ctx) != nil {
 			return fail("unknown_restart_failed")
 		}

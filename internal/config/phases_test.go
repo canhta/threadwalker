@@ -34,17 +34,11 @@ func TestTemplatePhaseDefaults(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if tmpl.Schedule.Timezone != "Asia/Ho_Chi_Minh" || tmpl.Schedule.DreamAt != "" || len(tmpl.Schedule.StudySlots) != 0 {
+	if tmpl.Schedule.Timezone != "Asia/Ho_Chi_Minh" || tmpl.Schedule.DreamAt != "" {
 		t.Fatalf("schedule defaults: %+v", tmpl.Schedule)
 	}
 	if tmpl.Limits.MaxUSDPerDream != 0.30 || tmpl.Limits.MaxStepsPerDream != 20 {
 		t.Fatalf("dream limits: %+v", tmpl.Limits)
-	}
-	if tmpl.Study.MaxThreadsReads != 4 || tmpl.Study.MaxStudiesPerDay != 8 || tmpl.Study.MinMinutesBetweenStudies != 120 || tmpl.Study.SpikeMultiplier != 2 || tmpl.Study.SpikeMinScore != 6 {
-		t.Fatalf("study defaults: %+v", tmpl.Study)
-	}
-	if len(tmpl.Study.YouTubeChannels) == 0 || len(config.DefaultStudySources) == 0 {
-		t.Fatal("missing study source defaults")
 	}
 	include, avoid := tmpl.TrendKeywords()
 	if len(include) == 0 || len(avoid) == 0 {
@@ -66,62 +60,46 @@ func TestTemplatePhaseFieldsParseAndValidate(t *testing.T) {
 schedule:
   timezone: Asia/Ho_Chi_Minh
   dream_at: "23:30"
-  study_slots:
-    - "08:00"
-    - "13:15"
-    - "08:00"
 trends:
+  sources:
+    - hacker_news
+    - vnexpress
+    - github_trending
   include_keywords:
     - "AI"
     - "LLM"
     - "token"
   avoid_keywords:
     - "crypto"
-study:
-  sources:
-    - hacker_news
-    - vnexpress
-    - github_trending
-  threads_sample:
-    max_reads: 3
-    pause_ms: 0
-    keywords:
-      - "AI thay dev"
-  web_search:
-    enabled: true
-    base_url: https://search.fixture.invalid/v1
-    max_results: 4
-    max_output_tokens: 256
+web_search:
+  enabled: true
+  base_url: https://search.fixture.invalid/v1
+  max_results: 4
+  max_output_tokens: 256
 `)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if tmpl.Schedule.DreamAt != "23:30" || len(tmpl.Schedule.StudySlots) != 2 {
+	if tmpl.Schedule.DreamAt != "23:30" {
 		t.Fatalf("schedule: %+v", tmpl.Schedule)
 	}
 	if tmpl.Limits.MaxStepsPerDream != 12 {
 		t.Fatalf("dream steps: %d", tmpl.Limits.MaxStepsPerDream)
 	}
-	if tmpl.Study.MaxThreadsReads != 3 || tmpl.Study.ReadPauseMS != 0 || len(tmpl.Study.ThreadsKeywords) != 1 {
-		t.Fatalf("threads sample: %+v", tmpl.Study)
+	if w := tmpl.WebSearch; !w.Enabled || w.Model != tmpl.LLM.Model || w.MaxResults != 4 || w.MaxOutput != 256 {
+		t.Fatalf("web search: %+v", w)
 	}
-	if !tmpl.Study.WebSearch || tmpl.Study.WebSearchModel != tmpl.LLM.Model || tmpl.Study.WebSearchMaxResults != 4 || tmpl.Study.WebSearchMaxOutput != 256 {
-		t.Fatalf("web search: %+v", tmpl.Study)
-	}
-	if len(tmpl.Study.Sources) != 3 || !tmpl.StudySourceEnabled("vnexpress") || tmpl.StudySourceEnabled("reddit_openai") {
-		t.Fatalf("sources: %v", tmpl.Study.Sources)
+	if len(tmpl.Trends.Sources) != 3 {
+		t.Fatalf("sources: %v", tmpl.Trends.Sources)
 	}
 	if include := tmpl.Trends.IncludeKeywords; len(include) != 3 || include[0] != "AI" {
 		t.Fatalf("include keywords: %v", include)
 	}
 	for _, bad := range []string{`schedule:
-  dream_at: "25:00"`, `schedule:
-  study_slots:
-    - "8am"`, `study:
+  dream_at: "25:00"`, `trends:
   sources:
-    - not_a_source`, `study:
-  threads_sample:
-    max_reads: 50`} {
+    - not_a_source`, `web_search:
+  max_results: 50`} {
 		if _, err := loadTemplate(t, bad); err == nil {
 			t.Fatalf("invalid %q accepted", bad)
 		}

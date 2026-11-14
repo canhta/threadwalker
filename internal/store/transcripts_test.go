@@ -60,7 +60,7 @@ func TestTranscriptIsBoundedByEntriesAndBytes(t *testing.T) {
 	}
 }
 
-func TestTranscriptPrunedWithTheThreadsObservations(t *testing.T) {
+func TestTranscriptPrunedAfterEightDays(t *testing.T) {
 	s, _ := retentionStore(t)
 	ctx := context.Background()
 	if err := s.AppendTranscript(ctx, "a", 1, store.TranscriptContext, "old", retentionNow.Add(-9*24*time.Hour)); err != nil {
@@ -72,8 +72,7 @@ func TestTranscriptPrunedWithTheThreadsObservations(t *testing.T) {
 	if got := prune(t, s)["wake_transcripts"]; got != 1 {
 		t.Fatalf("pruned=%d", got)
 	}
-	observations, _ := store.RetentionAge("threads_observations")
-	if age, ok := store.RetentionAge("wake_transcripts"); !ok || age != observations {
+	if age, ok := store.RetentionAge("wake_transcripts"); !ok || age != 8*24*time.Hour {
 		t.Fatalf("age=%v ok=%v", age, ok)
 	}
 }

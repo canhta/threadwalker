@@ -129,9 +129,6 @@ func canonicalReport(r Report) (Report, error) {
 				return Report{}, invalid
 			}
 		}
-		if c.Simulation != nil && !validSimulationMetadata(*c.Simulation) {
-			return Report{}, invalid
-		}
 		if len(c.Agents) > 100 {
 			return Report{}, invalid
 		}

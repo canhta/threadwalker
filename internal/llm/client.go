@@ -87,11 +87,11 @@ type Options struct {
 	Transcript func(ctx context.Context, kind, body string)
 	ProviderID string
 	ProfileID  string
-	// Phase selects phase-scoped accounting: agent (default), study or dream.
+	// Phase selects phase-scoped accounting: agent (default), critic or dream.
 	// Dream spend is measured against CapUSD, not limits.MaxUSDPerDay.
 	Phase string
 	// CapUSD overrides the spend cap for this phase. Zero uses
-	// limits.MaxUSDPerDay (agent/study) or requires a positive value for dream.
+	// limits.MaxUSDPerDay (agent, critic) or requires a positive value for dream.
 	CapUSD float64
 	// MaxSteps overrides limits.MaxStepsPerWake when positive.
 	MaxSteps int
@@ -531,7 +531,7 @@ func (c *Client) attempt(ctx context.Context, body []byte) (completion, int, tim
 }
 
 // PhaseLedger is implemented by stores that split spend by wake phase. Agent
-// and study spend share limits.max_usd_per_day; dream spend uses its own cap.
+// spend counts toward limits.max_usd_per_day; dream spend uses its own cap.
 type PhaseLedger interface {
 	LLMUsageForDayPhases(context.Context, string, string, ...string) (Usage, error)
 }
@@ -548,7 +548,7 @@ func spentForPhase(ctx context.Context, l Ledger, phase, agentID, day string) (U
 		}
 		return l.LLMUsageForDay(ctx, agentID, day)
 	}
-	phases := []string{"agent", "study"}
+	phases := []string{"agent"}
 	if phase == "dream" {
 		phases = []string{"dream"}
 	}
@@ -562,7 +562,7 @@ func resolvePhase(opts Options, limits config.LimitsConfig) (string, float64, er
 	if phase == "" {
 		phase = "agent"
 	}
-	if phase != "agent" && phase != "study" && phase != "dream" && phase != "critic" {
+	if phase != "agent" && phase != "dream" && phase != "critic" {
 		return "", 0, errors.New("configuring LLM client: unknown phase")
 	}
 	capUSD := opts.CapUSD

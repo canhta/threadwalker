@@ -11,7 +11,7 @@ func TestAttachRefusesToolMissingFromGuardTable(t *testing.T) {
 	if err := d.attach(map[string]executor{"not_in_table": run}); err == nil || len(d.registry) != 0 {
 		t.Fatalf("err=%v registry=%v", err, d.registry)
 	}
-	if err := d.attach(map[string]executor{"note_read": run}); err != nil || d.registry["note_read"] == nil {
+	if err := d.attach(map[string]executor{"fetch_trends": run}); err != nil || d.registry["fetch_trends"] == nil {
 		t.Fatalf("listed tool refused: %v", err)
 	}
 }

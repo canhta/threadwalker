@@ -13,7 +13,7 @@ import (
 func validEnv() func(string) string {
 	env := map[string]string{
 		"LLM_API_KEY":            "secret-llm-key-value",
-		"OPENAI_API_KEY":         "secret-embedding-key-value",
+		"OPENAI_API_KEY":         "secret-openai-key-value",
 		"TELEGRAM_BOT_TOKEN":     "secret-tg-token-value",
 		"TELEGRAM_OWNER_CHAT_ID": "secret-owner-chat-id",
 	}
@@ -50,8 +50,8 @@ func TestLoadFile_ValidExampleTemplate(t *testing.T) {
 	if !strings.Contains(tmpl.Persona.Voice, "Giọng GenZ Threads VN") {
 		t.Errorf("Persona.Voice = %q", tmpl.Persona.Voice)
 	}
-	if len(tmpl.Persona.ResearchFocus) != 4 {
-		t.Errorf("len(Persona.ResearchFocus) = %d, want 4", len(tmpl.Persona.ResearchFocus))
+	if len(tmpl.Persona.ResearchFocus) != 3 {
+		t.Errorf("len(Persona.ResearchFocus) = %d, want 3", len(tmpl.Persona.ResearchFocus))
 	}
 	if len(tmpl.Persona.StyleRules) != 5 {
 		t.Errorf("len(Persona.StyleRules) = %d, want 5", len(tmpl.Persona.StyleRules))
@@ -73,9 +73,6 @@ func TestLoadFile_ValidExampleTemplate(t *testing.T) {
 	}
 	if len(tmpl.Persona.StyleAvoid) != 16 || tmpl.Persona.StyleAvoid[0] != "Tuy nhiên," {
 		t.Errorf("Persona.StyleAvoid = %v", tmpl.Persona.StyleAvoid)
-	}
-	if len(tmpl.SeedPlaybook) != 3 {
-		t.Errorf("len(SeedPlaybook) = %d, want 3", len(tmpl.SeedPlaybook))
 	}
 	if tmpl.LLM.BaseURL != "https://api.deepseek.com" {
 		t.Errorf("LLM.BaseURL = %q", tmpl.LLM.BaseURL)
@@ -173,7 +170,6 @@ func TestLoadFile_MissingRequiredFields(t *testing.T) {
 		{field: "persona.good_replies", removeKey: "  good_replies:"},
 		{field: "persona.bad_examples", removeKey: "  bad_examples:"},
 		{field: "persona.style_avoid", removeKey: "  style_avoid:"},
-		{field: "seed_playbook", removeKey: "seed_playbook:"},
 		{field: "llm.base_url", removeKey: "  base_url:"},
 		{field: "llm.model", removeKey: "  model:"},
 		{field: "llm.api_key_env", removeKey: "  api_key_env:"},
@@ -326,7 +322,6 @@ func TestLoadFile_UnsetSecretVariables(t *testing.T) {
 		envVar string
 	}{
 		{field: "llm.api_key_env", envVar: "LLM_API_KEY"},
-		{field: "embedding.api_key_env", envVar: "OPENAI_API_KEY"},
 		{field: "telegram.bot_token_env", envVar: "TELEGRAM_BOT_TOKEN"},
 		{field: "telegram.owner_chat_id_env", envVar: "TELEGRAM_OWNER_CHAT_ID"},
 	}

@@ -70,7 +70,7 @@ func TestFakeBotPauseResumeWakeAndRedactedTrace(t *testing.T) {
 	}
 	fixture := agent.NewOfflineFixture(clock)
 	fixture.Calls = []llm.ToolCall{agent.SyntheticCall("ask_owner", `{"text":"Synthetic private question?"}`), agent.SyntheticCall("notify_owner", `{"text":"Synthetic private notification."}`)}
-	runtime, err := agent.New(agent.Options{Store: st, Template: tmpl, Now: clock, HTTPClient: fixture.Client(), FetchTrends: fixture.Trends, FetchStudy: fixture.Study, Owner: svc, Logger: logger})
+	runtime, err := agent.New(agent.Options{Store: st, Template: tmpl, Now: clock, HTTPClient: fixture.Client(), FetchTrends: fixture.Trends, Owner: svc, Logger: logger})
 	if err != nil {
 		t.Fatal(err)
 	}
