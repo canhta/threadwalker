@@ -194,3 +194,17 @@ func TestWriterPromptCarriesTheAccountsOwnExamplesAsData(t *testing.T) {
 		t.Error("an account without examples gets an empty examples section")
 	}
 }
+
+func TestWriterMessagesListLessonsToApply(t *testing.T) {
+	r, err := DefaultRubric()
+	if err != nil {
+		t.Fatal(err)
+	}
+	with := WriterMessages(r, config.PersonaConfig{Name: "N"}, WriterInput{Kind: Reply, Lessons: []string{"open with one detail"}})[1].Content
+	if !strings.Contains(with, "Lessons to apply") || !strings.Contains(with, "- open with one detail\n") {
+		t.Fatalf("prompt: %s", with)
+	}
+	if strings.Contains(WriterMessages(r, config.PersonaConfig{Name: "N"}, WriterInput{Kind: Reply})[1].Content, "Lessons to apply") {
+		t.Fatal("empty lessons were listed")
+	}
+}

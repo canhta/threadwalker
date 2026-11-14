@@ -112,6 +112,7 @@ type WriterInput struct {
 	Problems []string  // the editor's problems with Draft; empty on the first try
 	Recent   []string  // the account's last own posts, newest first
 	Examples []Example // the account's best and worst recent actions of this kind
+	Lessons  []string  // texts of the active lessons the agent says it applies
 }
 
 // Example is one of the account's own recent actions and how it did.
@@ -154,6 +155,12 @@ func WriterMessages(r Rubric, p config.PersonaConfig, in WriterInput) []llm.Mess
 				fmt.Fprintf(&b, "; target was %d min old", *e.ParentAgeMin)
 			}
 			fmt.Fprintf(&b, ": %q\n", e.Text)
+		}
+	}
+	if len(in.Lessons) > 0 {
+		b.WriteString("Lessons to apply (notes from this account's own results; follow them where they fit the angle):\n")
+		for _, l := range in.Lessons {
+			fmt.Fprintf(&b, "- %s\n", l)
 		}
 	}
 	if len(p.StyleAvoid) > 0 {

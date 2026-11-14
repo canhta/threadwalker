@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"log/slog"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -348,6 +349,25 @@ func (g *Guard) Execute(ctx context.Context, a Attempt, effect func() (string, e
 // (or a guard check) turned down, inside one tool call.
 const MaxRevisions = 2
 
+// lessonTexts are the texts of the active lessons of this kind that the action
+// names. An id that does not fit is skipped here and refused at reservation.
+func (g *Guard) lessonTexts(ctx context.Context, kind string, ids []int64) ([]string, error) {
+	if len(ids) == 0 {
+		return nil, nil
+	}
+	all, err := g.opts.Store.Lessons(ctx, g.opts.Template.ID, false)
+	if err != nil {
+		return nil, err
+	}
+	var out []string
+	for _, l := range all {
+		if slices.Contains(ids, l.ID) && (l.Kind == "any" || l.Kind == kind) {
+			out = append(out, l.Text)
+		}
+	}
+	return out, nil
+}
+
 // review has the writer draft the text from the agent's brief (when a writer
 // is configured) and the critic gate it; a turned-down draft goes back to the
 // writer with the problems, up to MaxRevisions times. A draft still failing
@@ -371,6 +391,10 @@ func (g *Guard) review(ctx context.Context, a Attempt, intent *actionIntent) (re
 		return "critic_limit", strconv.Itoa(rejected), ""
 	}
 	recent, err := g.opts.Store.RecentOwnTexts(ctx, store.ActionScope{AgentID: g.opts.Template.ID, DryRun: g.opts.Template.DryRun}, 20)
+	if err != nil {
+		return "critic_unavailable", "", ""
+	}
+	lessons, err := g.lessonTexts(ctx, a.Tool, intent.LessonIDs)
 	if err != nil {
 		return "critic_unavailable", "", ""
 	}
@@ -401,7 +425,7 @@ func (g *Guard) review(ctx context.Context, a Attempt, intent *actionIntent) (re
 		source = "writer"
 		intent.tries = append(intent.tries, draftTrace("agent", intent.texts(), nil))
 	}
-	tries, ok, err := quality.Revise(ctx, g.opts.Writer, g.opts.Critic, check, quality.WriterInput{Kind: a.Tool, Angle: intent.Angle, Fact: intent.Fact, Parent: parent, Draft: intent.texts(), Recent: recent}, MaxRevisions)
+	tries, ok, err := quality.Revise(ctx, g.opts.Writer, g.opts.Critic, check, quality.WriterInput{Kind: a.Tool, Angle: intent.Angle, Fact: intent.Fact, Parent: parent, Draft: intent.texts(), Recent: recent, Lessons: lessons}, MaxRevisions)
 	for _, t := range tries {
 		v := t.Verdict
 		intent.tries = append(intent.tries, draftTrace(source, t.Texts, &v))

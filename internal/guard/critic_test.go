@@ -265,3 +265,25 @@ func TestTraceKeepsTheBriefAndEveryDraftBounded(t *testing.T) {
 		t.Fatalf("tries %+v", d.Tries)
 	}
 }
+
+func TestWriterGetsTheCitedLessonsOnly(t *testing.T) {
+	st, scope := setup(t)
+	for i, l := range []struct{ kind, text string }{{"reply", "answer with one detail"}, {"post", "post only lesson"}, {"any", "unused lesson"}} {
+		if _, err := st.DB().Exec(`INSERT INTO lessons(id,agent_id,kind,polarity,text,evidence_json,created_at,confirmed_at) VALUES(?,?,?,?,?,'[]','2026-11-01T00:00:00Z','2026-11-01T00:00:00Z')`, i+1, "agent", l.kind, "do", l.text); err != nil {
+			t.Fatal(err)
+		}
+	}
+	var seen []string
+	scope.Writer = func(_ context.Context, in quality.WriterInput) ([]string, error) {
+		seen = in.Lessons
+		return in.Draft, nil
+	}
+	scope.Critic = func(context.Context, quality.CriticInput) (quality.CriticVerdict, error) { return verdict(true), nil }
+	args := strings.Replace(criticReplyArgs, `"text"`, `"lesson_ids":[1],"text"`, 1)
+	if _, err := criticReply(criticGuard(t, scope), args); err != nil {
+		t.Fatal(err)
+	}
+	if len(seen) != 1 || seen[0] != "answer with one detail" {
+		t.Fatalf("writer lessons %v", seen)
+	}
+}
