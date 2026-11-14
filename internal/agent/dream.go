@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
+	"slices"
 	"time"
 
 	"github.com/canhta/threadz/internal/llm"
@@ -26,7 +27,7 @@ const (
 // dreamPrompt is the dream's whole system prompt. It is code, not template.
 const dreamPrompt = `You keep the lesson list of one Threads account. Once a day you read how its recent posts and replies did and decide what the list should say.
 
-A lesson is one sentence of at most 240 characters about how this account should write: one specific thing to do or to avoid, such as a kind of opening, a length, a way of answering or a kind of target. Lessons are shown to the account before each post and reply.
+A lesson is one sentence of at most 240 characters about how this account should write: one specific thing to do or to avoid, such as a kind of opening, a way of answering or a kind of target. Lessons are shown to the account before each post and reply.
 
 How to read the data:
 - An episode is one published action with its numbers at its newest window (window_h is 1, 6 or 24).
@@ -68,24 +69,28 @@ type dreamData struct {
 }
 
 // newEpisodes are the episodes that reached a 6h or 24h window since the last
-// completed dream ended, or ever if there has been none.
-func (r *Runtime) newEpisodes(ctx context.Context) ([]store.Episode, error) {
+// completed dream ended, or ever if there has been none. counted is how many
+// of them are distinct, ranked actions that first reached 6h after that end: a
+// 24h re-measure of an action an earlier dream saw adds nothing to it.
+func (r *Runtime) newEpisodes(ctx context.Context) (out []store.Episode, counted int, err error) {
 	id := r.opts.Template.ID
 	since, _, err := r.opts.Store.LastCompletedDreamEnd(ctx, id)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	all, err := r.opts.Store.Episodes(ctx, id, store.EpisodeQuery{})
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
-	var out []store.Episode
 	for _, e := range all {
 		if e.Window >= 6 && e.MeasuredAt.After(since) {
 			out = append(out, e)
+			if e.Band != store.BandUnranked && e.LongAt.After(since) {
+				counted++
+			}
 		}
 	}
-	return out, nil
+	return out, counted, nil
 }
 
 // prepareDream runs what comes before a dream's model turn: it retires the
@@ -96,11 +101,11 @@ func (r *Runtime) prepareDream(ctx context.Context, wakeID int64) (run bool, err
 	if _, err = r.opts.Store.ExpireLessons(ctx, id, now); err != nil {
 		return false, err
 	}
-	eps, err := r.newEpisodes(ctx)
+	_, counted, err := r.newEpisodes(ctx)
 	if err != nil {
 		return false, err
 	}
-	if len(eps) >= dreamMinEpisodes {
+	if counted >= dreamMinEpisodes {
 		return true, nil
 	}
 	r.event(ctx, store.WakeDream, logging.WakeStopped, "skipped", dreamSkipReason, wakeID, 0)
@@ -132,7 +137,7 @@ func (r *Runtime) dreamContext(ctx context.Context, wakeID int64) ([]llm.Message
 		}
 		data.Lessons = append(data.Lessons, d)
 	}
-	fresh, err := r.newEpisodes(ctx)
+	fresh, _, err := r.newEpisodes(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -143,6 +148,7 @@ func (r *Runtime) dreamContext(ctx context.Context, wakeID int64) ([]llm.Message
 	if err != nil {
 		return nil, err
 	}
+	week = slices.DeleteFunc(week, func(e store.Episode) bool { return e.Window < 6 })
 	data.Last7Days = topBottomBoth(week, dreamTop, redactor, true)
 	body, err := json.Marshal(data)
 	if err != nil {

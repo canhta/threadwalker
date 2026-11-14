@@ -29,11 +29,13 @@ const (
 // Episode is one live, confirmed, non-failed own action and what was measured
 // at its newest completed metric window.
 type Episode struct {
-	ActionID                        int64
-	Kind                            string
-	Text, Hook, Angle, Fact         string
-	TargetUsername, ThreadURL       string
-	PostedAt, MeasuredAt            time.Time
+	ActionID                  int64
+	Kind                      string
+	Text, Hook, Angle, Fact   string
+	TargetUsername, ThreadURL string
+	PostedAt, MeasuredAt      time.Time
+	// LongAt is when the action first had a sample at the 6h window or later.
+	LongAt                          time.Time
 	ParentReplies, ParentAgeMinutes *int64
 	// Window is the completed metric_jobs target in hours: 1, 6 or 24.
 	Window                int
@@ -76,6 +78,7 @@ func (s *Store) Episodes(ctx context.Context, agentID string, q EpisodeQuery) ([
 	}
 	defer rows.Close()
 	newest := map[int64]*Episode{}
+	longAt := map[int64]time.Time{}
 	var order []int64
 	type poolKey struct {
 		kind   string
@@ -95,6 +98,9 @@ func (s *Store) Episodes(ctx context.Context, agentID string, q EpisodeQuery) ([
 			return nil, fmt.Errorf("reading episode %d: %w", e.ActionID, err)
 		}
 		e.Score = e.Likes + 2*e.Replies
+		if at, ok := longAt[e.ActionID]; e.Window >= 6 && (!ok || e.MeasuredAt.Before(at)) {
+			longAt[e.ActionID] = e.MeasuredAt
+		}
 		k := poolKey{e.Kind, e.Window}
 		pools[k] = append(pools[k], sample{e.ActionID, e.Views, e.Score})
 		if prev, ok := newest[e.ActionID]; !ok {
@@ -110,6 +116,7 @@ func (s *Store) Episodes(ctx context.Context, agentID string, q EpisodeQuery) ([
 	var out []Episode
 	for i := len(order) - 1; i >= 0; i-- {
 		e := newest[order[i]]
+		e.LongAt = longAt[e.ActionID]
 		if (!q.Since.IsZero() && e.PostedAt.Before(q.Since)) || (q.Kind != "" && e.Kind != q.Kind) {
 			continue
 		}

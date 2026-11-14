@@ -85,7 +85,7 @@ func TestDreamRunsOnceAcrossRestartAndDoesNotMoveNextWake(t *testing.T) {
 	if _, err = st.DB().Exec(`INSERT INTO wakes(agent_id,started_at,ended_at,end_reason,kind,phase_key) VALUES(?,?,'2025-12-31T16:40:00Z','completed','dream','2025-12-31')`, tmpl.ID, "2025-12-31T16:30:00Z"); err != nil {
 		t.Fatal(err)
 	}
-	for i := int64(0); i < 5; i++ {
+	for i := int64(0); i < 8; i++ {
 		seedEpisode(t, st, tmpl.ID, "post", "episode", now.Add(-time.Duration(12+i)*time.Hour), 6, 10, i, 0)
 	}
 	makeRuntime := func() *agent.Runtime {

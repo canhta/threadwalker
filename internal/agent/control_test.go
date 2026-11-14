@@ -166,7 +166,7 @@ func TestContextEqualsWhatTheWakeSends(t *testing.T) {
 				t.Fatal(err)
 			}
 			if phase == "dream" {
-				for i := int64(0); i < 5; i++ {
+				for i := int64(0); i < 8; i++ {
 					seedEpisode(t, st, tmpl.ID, "post", "episode", now.Add(-time.Duration(12+i)*time.Hour), 6, 10, i, 0)
 				}
 			}

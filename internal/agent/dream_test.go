@@ -19,7 +19,7 @@ import (
 func TestDreamLaunchesNoThreadsBackend(t *testing.T) {
 	ctx := context.Background()
 	g := newDreamRig(t)
-	g.episodes(t, 6)
+	g.episodes(t, 9)
 	tmpl := agent.OfflineTemplate()
 	tmpl.Limits.MaxUSDPerDream, tmpl.Limits.MaxStepsPerDream = 1, 8
 	launched := 0
@@ -175,5 +175,34 @@ func TestDreamRunsOnTheNewEpisodesAndOnlyCountsEpisodesAfterTheWatermark(t *test
 	g.now = g.now.Add(24 * time.Hour)
 	if wake, err = g.r.RunPhase(ctx, store.WakeDream, "2026-01-05"); err != nil || wake.EndReason != "completed" {
 		t.Fatalf("third dream: %+v err=%v", wake, err)
+	}
+}
+
+func TestDreamGateCountsDistinctRankedActionsOnce(t *testing.T) {
+	ctx := context.Background()
+	g := newDreamRig(t)
+	// Seven episodes are below the rank pool, so they are unranked and count for nothing.
+	g.episodes(t, 7)
+	if wake, err := g.r.RunPhase(ctx, store.WakeDream, "2026-01-03"); err != nil || wake.EndReason != "too_few_episodes" {
+		t.Fatalf("unranked episodes opened the gate: %+v %v", wake, err)
+	}
+	ids := g.episodes(t, 9)
+	g.now = g.now.Add(24 * time.Hour)
+	if wake, err := g.r.RunPhase(ctx, store.WakeDream, "2026-01-04"); err != nil || wake.EndReason != "completed" {
+		t.Fatalf("dream: %+v %v", wake, err)
+	}
+	// Five already-counted actions get a 24h re-measure after the dream ended.
+	g.now = g.now.Add(24 * time.Hour)
+	at := g.now.Add(-time.Hour).Format(time.RFC3339Nano)
+	for _, id := range ids[:5] {
+		if _, err := g.st.DB().Exec(`INSERT INTO metrics(agent_id,action_id,measured_at,views,likes,replies) VALUES(?,?,?,100,3,0)`, g.tmpl, id, at); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := g.st.DB().Exec(`INSERT INTO metric_jobs(agent_id,action_id,window_hours,due_at,not_before,completed_at) VALUES(?,?,24,?,?,?)`, g.tmpl, id, at, at, at); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if wake, err := g.r.RunPhase(ctx, store.WakeDream, "2026-01-05"); err != nil || wake.EndReason != "too_few_episodes" {
+		t.Fatalf("a 24h re-measure counted twice: %+v %v", wake, err)
 	}
 }
