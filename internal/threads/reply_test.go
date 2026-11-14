@@ -81,19 +81,15 @@ func TestBrowserReplyRefusalsNeverSubmit(t *testing.T) {
 	}
 }
 
-func liveWith(t *testing.T, f *fakeDriver, withBrowser bool) (*Live, *fakeThreads) {
+func liveWith(t *testing.T, f *fakeDriver) (*Live, *fakeThreads) {
 	t.Helper()
 	fake, api, _ := newFake(t)
-	l := &Live{API: api}
-	if withBrowser {
-		l.browser = testBrowser(f)
-	}
-	return l, fake
+	return &Live{API: api, browser: testBrowser(f)}, fake
 }
 
 func TestLiveReplyRoutesByTarget(t *testing.T) {
 	f := &fakeDriver{read: Page{Kind: "post", Form: replyForm}, ack: Page{ThreadURL: "https://fixture.test/@me/post/R1"}}
-	l, fake := liveWith(t, f, true)
+	l, fake := liveWith(t, f)
 	fake.route("POST", "/1000000000000001/threads", "container.json")
 	fake.route("GET", "/3000000000000001", "status_finished.json")
 	fake.route("POST", "/1000000000000001/threads_publish", "publish.json")
@@ -107,10 +103,12 @@ func TestLiveReplyRoutesByTarget(t *testing.T) {
 	}
 }
 
-func TestLiveReplyWithoutFeedReadIsRefused(t *testing.T) {
-	l, _ := liveWith(t, nil, false)
-	if _, err := l.Reply(context.Background(), "https://www.threads.com/@a/post/P1", "x"); !errors.Is(err, ErrWriteRefused) {
-		t.Fatalf("no browser: %v", err)
+func TestLiveReplyOpensTheBrowserSession(t *testing.T) {
+	boom := errors.New("launch failed")
+	opened := 0
+	l := &Live{openBrowser: func(context.Context) (*Browser, error) { opened++; return nil, boom }}
+	if _, err := l.Reply(context.Background(), "https://www.threads.com/@a/post/P1", "x"); !errors.Is(err, boom) || opened != 1 {
+		t.Fatalf("reply without a read opened %d sessions: %v", opened, err)
 	}
 }
 
@@ -121,7 +119,7 @@ func TestLiveReplyResolvesMediaIDFromOwnReplies(t *testing.T) {
 	} {
 		t.Run(name, func(t *testing.T) {
 			f := &fakeDriver{read: Page{Kind: "post", Form: replyForm}, ack: Page{ThreadURL: "https://fixture.test/@me/post/R1"}}
-			l, fake := liveWith(t, f, true)
+			l, fake := liveWith(t, f)
 			fake.route("GET", "/me/replies", "replies.json")
 			got, err := l.Reply(context.Background(), "https://www.threads.com/@a/post/P1", tc.text)
 			if err != nil || got.ID != tc.id || got.URL != "https://fixture.test/@me/post/R1" {
@@ -131,7 +129,7 @@ func TestLiveReplyResolvesMediaIDFromOwnReplies(t *testing.T) {
 	}
 	// A failed lookup never undoes a confirmed reply.
 	f := &fakeDriver{read: Page{Kind: "post", Form: replyForm}, ack: Page{ThreadURL: "https://fixture.test/@me/post/R1"}}
-	l, _ := liveWith(t, f, true)
+	l, _ := liveWith(t, f)
 	if got, err := l.Reply(context.Background(), "https://www.threads.com/@a/post/P1", "x"); err != nil || got.ID != "" || got.URL == "" {
 		t.Fatalf("%+v %v", got, err)
 	}

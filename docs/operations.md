@@ -159,20 +159,17 @@ Sections run in this order; missing values show `—`.
 
 `threadz update` (root) installs a GitHub release only after the tarball's sha256 and detached ed25519 signature verify against `update.ReleasePublicKey`. It refuses a downgrade, a major-version jump and release notes with a `Manual step:` line, and restores `.prev` when the restarted unit is not active and `ctl doctor` does not pass within 2 minutes. `THREADZ_UPDATE_AUTO` (default false) and `THREADZ_UPDATE_WINDOW` (local hours `H-H`) gate only the timer; Telegram `/update` and `ctl update` write `/run/threadz/update-request` for a root path unit. Steps, flags and install: [setup.md](setup.md#updates).
 
-## Manual deploy of v0.3.0
+## Manual deploy of v0.2.2
 
-v0.3.0 changes the schema (v12 to v13) and the tool surface, so its release notes carry a `Manual step:` line and `threadz update` refuses it. Install by hand, in this order:
+v0.2.2 changes the schema (v12 to v13) and the tool surface, so its release notes carry a `Manual step:` line and `threadz update` refuses it. Install by hand, in this order:
 
 1. Stop both services: `systemctl stop threadz threadz-dashboard`. The dashboard runs the same binary on the same database.
 2. Back up the database and the yaml: `cp /opt/threadz/data/threadz.db /opt/threadz/data/threadz.db.v12` and `cp /opt/threadz/agents/viral.agent.yaml /opt/threadz/agents/viral.agent.yaml.v12`.
 3. Migrate the database (one transaction, refuses any schema other than v12; it only adds the `seen_posts` table): `sqlite3 -bail /opt/threadz/data/threadz.db < deploy/migrate-13.sql`
 4. Patch the live template (writes a `.bak`, prints each change, warns about any line that still names a removed tool or argument, never touches `dry_run`; a second run changes nothing): `python3 deploy/patch-template-v13.py /opt/threadz/agents/viral.agent.yaml`
-5. Install the v0.3.0 binary over `/opt/threadz/threadz`.
-6. Check with the service env: `set -a; . /etc/threadz/threadz.env; set +a; /opt/threadz/threadz check --agents /opt/threadz/agents --db /opt/threadz/data/threadz.db`
-7. Start the services: `systemctl start threadz`, then `systemctl start threadz-dashboard`, then `threadz ctl doctor`.
+5. Persona patch step: reserved, none yet.
+6. Install the v0.2.2 binary over `/opt/threadz/threadz`.
+7. Check with the service env: `set -a; . /etc/threadz/threadz.env; set +a; /opt/threadz/threadz check --agents /opt/threadz/agents --db /opt/threadz/data/threadz.db`
+8. Start the services: `systemctl start threadz`, then `systemctl start threadz-dashboard`, then `threadz ctl doctor`.
 
-To roll back, stop both services and restore the two backups and the previous binary. `OPENAI_API_KEY` is no longer required for embeddings; keep it only when the LLM or `web_search` uses it.
-
-## Manual step for v0.2.1
-
-A step is now one model request, so the live `limits.max_steps_per_wake: 45` allows 45 requests, far more than a wake needs. Set `max_steps_per_wake: 20` in `/opt/threadz/agents/viral.agent.yaml` by hand and restart `threadz`. The repo template stays at 15. The wake also stops at 40 tool calls (`tool_call_cap`), whatever the step limit.
+To roll back, stop both services and undo the migration: `sqlite3 -bail /opt/threadz/data/threadz.db 'DROP TABLE seen_posts; PRAGMA user_version=12;'`. Then restore `viral.agent.yaml.v12` over the patched yaml, install the previous binary and start the services as in step 8.

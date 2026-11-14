@@ -40,7 +40,7 @@ Every own-account Threads operation uses the official Threads API, except two: t
 
 | Stored post | Path | Guard proof required |
 |---|---|---|
-| Has a `media_id` (an API read: `find_posts` `search` or `profile`, `read_post`, `read_replies`, the inbox) | API | The ref is a stored post of this agent, read in the last 7 days (`unknown_target`) |
+| Has a `media_id` (an API read: `find_posts` `search` or `profile`, `read_post`, `read_replies`, the inbox) | API | The ref is a `p` ref this wake issued, through a read, the inbox or the open reply candidates (`unknown_target`) |
 | Has none (a browser read: `find_posts` `feed` or `topic`) | Browser | Same; counts against `limits.browser_replies_per_day` |
 
 A post first read by the browser and later by the API gets its `media_id` filled and takes the API path from then on. The API has no permalink-to-id resolver, which is why the id is stored at read time. Other reply limits ([guards.md](guards.md)) apply to both paths.

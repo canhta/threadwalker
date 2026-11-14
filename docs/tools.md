@@ -41,7 +41,7 @@ Phases: `A` agent, `D` dream. Effect classes: `read`, `own-state`, `threads-writ
 
 ## Refs: p and t
 
-Every post a read returns is stored per agent under a durable id, shown as `p<N>`: the same permalink keeps its id across wakes, for 7 days after it was last read (table `seen_posts`, [data.md](data.md)). Trends, `web_search` sources and Trending-now topics, which are not posts, get a `t<N>` ref that restarts every wake. Tool results carry the ref in the `ref` field beside the URL; the model passes the ref, never a copied URL. The inbox and the open reply candidates list `p` refs too. A ref the guard cannot resolve is refused: `unknown_target` for `reply.target`, `no_trend_anchor` for `post.trend`, `find_args` for `find_posts.topic`.
+Every post a read returns is stored per agent under a durable id, shown as `p<N>`: the same permalink keeps its id across wakes, for 7 days after it was last read (table `seen_posts`, [data.md](data.md)). Trends, `web_search` sources and Trending-now topics, which are not posts, get a `t<N>` ref that restarts every wake. Tool results carry the ref in the `ref` field beside the URL; the model passes the ref, never a copied URL. The inbox and the open reply candidates list `p` refs too. A `p` ref works only in the wake that issued it, through a read, the inbox or the open reply candidates; a ref from an earlier wake is refused until the post is read again. A ref the guard cannot resolve is refused: `unknown_target` for `reply.target`, `no_trend_anchor` for `post.trend`, `find_args` for `find_posts.topic`.
 
 The data message lists up to 8 open reply candidates (`guard.OpenCandidates`): posts read in the last 6 hours, not replied to in the last day, not the account's own or a do-not-contact author, and inside the template's `targets` window and scoring at least 0.5 with their age advanced to now. It is the one source of "posts worth a reply"; the stop check names the same list.
 
@@ -49,7 +49,7 @@ The data message lists up to 8 open reply candidates (`guard.OpenCandidates`): p
 |---|---|
 | `parts` | 1 to 4 later parts of a series (2 to 5 parts in all), each published as a reply to the previous one |
 | `hook` | One of `number`, `contrarian`, `curiosity_gap`, `personal_stake`, `trend_detail` (an enum in the schema); with `guard.trend_anchor` a post also needs `trend` and `rationale` (`post_brief`) |
-| `trend` | A `t` or `p` ref of a trend, source or post read this wake or, for a `p` ref, in the last 7 days; the action stores the item's URL or title, never the ref |
+| `trend` | A `t` or `p` ref of a trend, source or post this wake issued; the action stores the item's URL or title, never the ref |
 | `rationale` | One line, at most 300 characters, no newline: the trend, the hook, why a Vietnamese dev would reply |
 | `answers_note` | Id of an open owner note |
 | `angle`, `fact` | The brief for the writer: the one thing to say, and the verified detail it rests on ([content.md](content.md)) |

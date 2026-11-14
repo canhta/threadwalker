@@ -135,30 +135,17 @@ func (g *Guard) register(row store.SeenPost) string {
 	return ref
 }
 
-// post resolves a p ref to its stored post: from this wake's reads, else from
-// the store, which keeps posts for 7 days. ok is false for anything that is not
-// the ref of one of this agent's stored posts.
-func (g *Guard) post(ctx context.Context, raw string) (store.SeenPost, bool, error) {
+// post resolves a p ref this wake issued, through its reads, the inbox or the
+// open reply candidates; ok is false for any other ref, however valid its id.
+func (g *Guard) post(raw string) (store.SeenPost, bool) {
 	m := postRefForm.FindStringSubmatch(strings.TrimSpace(raw))
 	if m == nil {
-		return store.SeenPost{}, false, nil
+		return store.SeenPost{}, false
 	}
 	g.mu.Lock()
+	defer g.mu.Unlock()
 	row, ok := g.posts["p"+m[1]]
-	g.mu.Unlock()
-	if ok {
-		return row, true, nil
-	}
-	id, err := strconv.ParseInt(m[1], 10, 64)
-	if err != nil {
-		return store.SeenPost{}, false, nil
-	}
-	row, ok, err = g.opts.Store.SeenPostByID(ctx, g.opts.Template.ID, id)
-	if err != nil || !ok {
-		return store.SeenPost{}, false, err
-	}
-	g.register(row)
-	return row, true, nil
+	return row, ok
 }
 
 // IsOwn reports whether username is one of the operator-declared own accounts.
@@ -334,9 +321,6 @@ func (g *Guard) content(ctx context.Context, a Attempt, draft bool) (*actionInte
 		if intent.Hook == "" || strings.TrimSpace(intent.Rationale) == "" || strings.ContainsAny(intent.Rationale, "\r\n") || utf8.RuneCountInString(intent.Rationale) > MaxRationaleRunes {
 			return nil, "post_brief", nil
 		}
-		if _, _, err := g.post(ctx, intent.Trend); err != nil {
-			return nil, "", err
-		}
 		ref, ok := g.Trend(intent.Trend)
 		intent.refTrace = g.traceRef("trend", intent.Trend, ref)
 		if !ok {
@@ -365,10 +349,7 @@ func (g *Guard) content(ctx context.Context, a Attempt, draft bool) (*actionInte
 		}
 	}
 	if a.Tool == "reply" {
-		row, ok, err := g.post(ctx, intent.Target)
-		if err != nil {
-			return nil, "", err
-		}
+		row, ok := g.post(intent.Target)
 		intent.refTrace = g.traceRef("target", intent.Target, row.URL)
 		if !ok {
 			return &intent, "unknown_target", nil

@@ -20,7 +20,7 @@ import (
 // immutable persona as a system prompt and this agent's own state as data. It
 // calls no model and no tool.
 func (r *Runtime) Context(ctx context.Context, phase string) ([]llm.Message, error) {
-	return r.wakeContext(ctx, phase, 0, "")
+	return r.wakeContext(ctx, phase, 0, "", noIssue)
 }
 
 type counters struct {
@@ -66,11 +66,17 @@ type wakeData struct {
 	Said         []string             `json:"said"`
 }
 
+// issuer makes the open reply candidates of the data message refs of the wake.
+type issuer func(context.Context, []guard.Candidate) error
+
+// noIssue is the issuer of a context built with no wake to issue refs for.
+func noIssue(context.Context, []guard.Candidate) error { return nil }
+
 // wakeContext is the only place a wake's messages are assembled. It reads this
 // agent's own rows only; every editable text is redacted before delivery. An
 // agent wake's message is the data JSON, then the scoreboard, the inbox section
 // and the open owner notes: the parts that change every wake.
-func (r *Runtime) wakeContext(ctx context.Context, phase string, wakeID int64, inbox string) ([]llm.Message, error) {
+func (r *Runtime) wakeContext(ctx context.Context, phase string, wakeID int64, inbox string, issue issuer) ([]llm.Message, error) {
 	t := r.opts.Template
 	now := r.opts.Now()
 	if _, err := r.opts.Store.AgentState(ctx, t.ID); err != nil {
@@ -163,6 +169,9 @@ func (r *Runtime) wakeContext(ctx context.Context, phase string, wakeID int64, i
 	if !slices.Contains(hidden, "reply") {
 		candidates, err := guard.OpenCandidates(ctx, r.opts.Store, t, r.opts.OwnUsernames, now)
 		if err != nil {
+			return nil, err
+		}
+		if err = issue(ctx, candidates); err != nil {
 			return nil, err
 		}
 		section, err := candidatesSection(candidates, redactor)

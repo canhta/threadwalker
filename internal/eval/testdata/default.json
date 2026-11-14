@@ -1205,9 +1205,9 @@
       }
     },
     {
-      "id": "replay_trend_ref",
+      "id": "replay_trend_anchor",
       "kind": "replay",
-      "description": "A post anchors to a trend ref the wake never issued and is refused with the ref in the stored detail; the short ref the trend read issued resolves to the trend.",
+      "description": "A post anchors to a trend ref the wake never issued and is refused with the ref in the stored detail; the ref the trend read issued resolves to the trend.",
       "replay": {
         "steps": [
           {

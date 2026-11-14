@@ -218,9 +218,9 @@ func (a *API) ReadOwnPosts(ctx context.Context) (Page, error) {
 // Standard access serves only a few official Meta accounts, and the API
 // refuses the rest; a refusal returns a limited_access page, not an error.
 func (a *API) ProfilePosts(ctx context.Context, username string) (Page, error) {
-	page, err := a.list(ctx, "profile_posts", "/profile_posts", url.Values{"username": {username}, "fields": {postFields}, "limit": {"10"}})
+	page, err := a.list(ctx, "profile", "/profile_posts", url.Values{"username": {username}, "fields": {postFields}, "limit": {"10"}})
 	if err != nil && errors.Is(err, ErrAPI) && (strings.Contains(err.Error(), "status 400") || strings.Contains(err.Error(), "status 403")) {
-		return Page{Kind: "profile_posts", LimitedAccess: "The API refused this profile: profile_posts needs Meta App Review for threads_profile_discovery, and only public profiles with at least 100 followers are served."}, nil
+		return Page{Kind: "profile", LimitedAccess: "The API refused this profile: find_posts source profile needs Meta App Review for threads_profile_discovery, and only public profiles with at least 100 followers are served."}, nil
 	}
 	return page, err
 }

@@ -143,7 +143,7 @@ func callScope(tool, arguments string) string {
 	if a.Source == "" {
 		return tool
 	}
-	return tool + ":" + a.Source
+	return guard.FindScope(a.Source)
 }
 
 // countCall counts one call of a capped tool in a normal wake and refuses
@@ -249,10 +249,29 @@ func (d *Dispatcher) Definitions() []llm.Tool {
 	definitions := []llm.Tool{}
 	for _, spec := range guard.Specs() {
 		if _, ok := d.registry[spec.Name]; ok && !spec.Harness && spec.AllowedIn(d.opts.Phase) && !slices.Contains(d.opts.Hidden, spec.Name) {
+			if spec.Name == "find_posts" {
+				var open bool
+				if spec, open = d.withOpenSources(spec); !open {
+					continue
+				}
+			}
 			definitions = append(definitions, definition(spec))
 		}
 	}
 	return definitions
+}
+
+// withOpenSources drops the hidden sources from find_posts' source enum; ok is
+// false when none is left and the tool is not offered at all.
+func (d *Dispatcher) withOpenSources(spec guard.ToolSpec) (guard.ToolSpec, bool) {
+	spec.Args = slices.Clone(spec.Args)
+	for i, a := range spec.Args {
+		if a.Name == "source" {
+			spec.Args[i].Enum = slices.DeleteFunc(slices.Clone(a.Enum), func(source string) bool { return slices.Contains(d.opts.Hidden, guard.FindScope(source)) })
+			return spec, len(spec.Args[i].Enum) > 0
+		}
+	}
+	return spec, true
 }
 
 // Guard is the guard this dispatcher built from its scope, for harness-side reads and stop-request ingestion.

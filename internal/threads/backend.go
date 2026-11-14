@@ -76,8 +76,8 @@ func NewBackend(tmpl config.Template, now func() time.Time, tokens *Tokens) (Fac
 	return func(context.Context, config.Template) (Backend, error) { return NewMemory(), nil }, false
 }
 
-// Live serves a wake: the API for every own-account operation and, only on the
-// first ReadFeed, one browser session for the feed and for replies to feed posts.
+// Live serves a wake: the API for every own-account operation and, opened on
+// first use, one browser session for the feed, topics and replies to feed posts.
 type Live struct {
 	*API
 	openBrowser func(context.Context) (*Browser, error)
@@ -134,19 +134,17 @@ func (l *Live) ReadTopic(ctx context.Context, topicURL, query string) (Page, err
 	return b.ReadTopic(ctx, topicURL, query)
 }
 
-// Reply answers a numeric post id through the API and a permalink from this
-// wake's feed read through the browser. The reply's media id is read back from
+// Reply answers a numeric post id through the API and a permalink through the
+// browser, which it opens when the wake has not yet. The reply's media id is read back from
 // the account's own replies; when no reply matches, the id is empty and the
 // reply is still confirmed.
 func (l *Live) Reply(ctx context.Context, target, text string) (Published, error) {
 	if digitsOnly(target) {
 		return l.API.Reply(ctx, target, text)
 	}
-	l.mu.Lock()
-	b := l.browser
-	l.mu.Unlock()
-	if b == nil {
-		return Published{}, operationError("reply", ErrWriteRefused)
+	b, err := l.session(ctx)
+	if err != nil {
+		return Published{}, err
 	}
 	threadURL, err := b.Reply(ctx, target, text)
 	if err != nil {
@@ -164,7 +162,7 @@ func (l *Live) Reply(ctx context.Context, target, text string) (Published, error
 	return Published{URL: threadURL, ID: id}, nil
 }
 
-// Close closes the browser only if a feed read opened one.
+// Close closes the browser only if the wake opened one.
 func (l *Live) Close(ctx context.Context) error {
 	l.mu.Lock()
 	b := l.browser

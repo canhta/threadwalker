@@ -121,7 +121,8 @@ func runReplayCase(ctx context.Context, c Case, p Profile, repeat int, opts Opti
 					Source string `json:"source"`
 				}
 				_ = json.Unmarshal([]byte(call.Function.Arguments), &a)
-				op = tools.FindRead(a.Source)
+				src, _ := guard.FindSourceOf(a.Source)
+				op = src.Read
 			}
 			if err = serveRecorded(mem, &fetched, op, step.Output); err != nil {
 				return run.fail("replay_output_invalid")

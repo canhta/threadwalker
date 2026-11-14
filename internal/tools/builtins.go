@@ -57,7 +57,7 @@ func (d *Dispatcher) executors() map[string]executor {
 	tools["find_posts"] = d.findPosts
 	for _, name := range []string{"profile", "read_post", "read_replies", "read_own_metrics"} {
 		tools[name] = func(ctx context.Context, a arguments) (any, error) {
-			data, err := d.browserRead(ctx, name, a)
+			data, err := d.browserRead(ctx, name, name, a)
 			if err == nil && name != "profile" && name != "read_own_metrics" {
 				d.noteRead(ctx, data)
 			}
@@ -168,32 +168,16 @@ func (d *Dispatcher) webSearch(ctx context.Context, query string) (trends.WebSea
 	return result, nil
 }
 
-// findSources maps each find_posts source to the backend read it runs and the
-// arguments it takes besides source.
-var findSources = map[string]struct {
-	read string
-	args []string
-}{
-	"feed":    {threads.OpReadFeed, nil},
-	"topic":   {threads.OpReadTopic, []string{"topic", "query"}},
-	"search":  {threads.OpSearch, []string{"query", "recent"}},
-	"profile": {threads.OpProfilePosts, []string{"username"}},
-}
-
-// FindRead is the backend operation a find_posts source runs (threads.OpReadFeed,
-// OpReadTopic, OpSearch or OpProfilePosts); empty for an unknown source.
-func FindRead(source string) string { return findSources[source].read }
-
 // findPosts is the one finder: it checks the arguments the source takes, the
 // source's per-wake cap and whether the source is closed, runs the read, and
 // gives every post and trend in the page its ref.
 func (d *Dispatcher) findPosts(ctx context.Context, a arguments) (any, error) {
 	source := a.Text("source")
-	src := findSources[source]
-	scope := "find_posts:" + source
+	src, _ := guard.FindSourceOf(source)
+	scope := guard.FindScope(source)
 	given := map[string]bool{"topic": a.Text("topic") != "", "query": a.Text("query") != "", "username": a.Text("username") != "", "recent": a.Bool("recent")}
 	for arg, set := range given {
-		if set && !slices.Contains(src.args, arg) {
+		if set && !slices.Contains(src.Args, arg) {
 			return nil, &guard.BlockedError{Reason: "find_args"}
 		}
 	}
@@ -215,7 +199,7 @@ func (d *Dispatcher) findPosts(ctx context.Context, a arguments) (any, error) {
 	if err := d.countCall(scope); err != nil {
 		return nil, err
 	}
-	data, err := d.browserRead(ctx, src.read, a)
+	data, err := d.browserRead(ctx, scope, src.Read, a)
 	if err != nil {
 		return nil, err
 	}

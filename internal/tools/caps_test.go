@@ -2,10 +2,13 @@ package tools_test
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
 	"testing"
 
+	"github.com/canhta/threadz/internal/guard"
 	"github.com/canhta/threadz/internal/store"
 	"github.com/canhta/threadz/internal/tools"
 )
@@ -76,6 +79,48 @@ func TestHiddenToolIsRefusedWithoutStalling(t *testing.T) {
 		if reason, _ := blockedResult(t, err); reason != "tool_hidden" {
 			t.Fatalf("call %d: %s", i, reason)
 		}
+	}
+}
+
+// A hidden find_posts source leaves the schema's source values, and with every
+// source hidden the tool itself is not offered.
+func TestDefinitionsDropHiddenFindSources(t *testing.T) {
+	sources := func(hidden ...string) []string {
+		_, opts, _ := setup(t)
+		opts.Hidden = hidden
+		d, err := tools.NewDispatcher(opts)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, def := range d.Definitions() {
+			if def.Function.Name == "find_posts" {
+				var schema struct {
+					Properties struct {
+						Source struct {
+							Enum []string `json:"enum"`
+						} `json:"source"`
+					} `json:"properties"`
+				}
+				if err := json.Unmarshal(def.Function.Parameters, &schema); err != nil {
+					t.Fatal(err)
+				}
+				return schema.Properties.Source.Enum
+			}
+		}
+		return nil
+	}
+	if got := sources(); !slices.Equal(got, []string{"feed", "topic", "search", "profile"}) {
+		t.Fatalf("sources %v", got)
+	}
+	if got := sources("find_posts:search", "find_posts:topic"); !slices.Equal(got, []string{"feed", "profile"}) {
+		t.Fatalf("sources %v", got)
+	}
+	all := []string{}
+	for _, s := range guard.FindSources {
+		all = append(all, guard.FindScope(s.Name))
+	}
+	if got := sources(all...); got != nil {
+		t.Fatalf("find_posts offered with every source hidden: %v", got)
 	}
 }
 

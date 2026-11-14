@@ -411,6 +411,7 @@ func (g *Guard) review(ctx context.Context, a Attempt, intent *actionIntent) (re
 	}
 	ending := "" // the overused closing token of the last draft checked
 	check := func(texts []string) []string {
+		ending = ""
 		if why, d := g.recheck(ctx, a, texts); why != "" {
 			return []string{Hint(why, d)}
 		}
@@ -421,7 +422,6 @@ func (g *Guard) review(ctx context.Context, a Attempt, intent *actionIntent) (re
 			ending = t
 			return []string{Hint("repeat_ending", t)}
 		}
-		ending = ""
 		return nil
 	}
 	redact := config.NewRedactor(g.opts.Template).String
@@ -450,9 +450,6 @@ func (g *Guard) review(ctx context.Context, a Attempt, intent *actionIntent) (re
 	}
 	last := tries[len(tries)-1]
 	encoded, _ := json.Marshal(last.Verdict)
-	if !ok && ending != "" {
-		return "repeat_ending", ending, ""
-	}
 	if ok {
 		intent.Text, intent.Parts = last.Texts[0], last.Texts[1:]
 		return "", "", string(encoded)
@@ -460,6 +457,9 @@ func (g *Guard) review(ctx context.Context, a Attempt, intent *actionIntent) (re
 	g.mu.Lock()
 	g.rejections++
 	g.mu.Unlock()
+	if ending != "" {
+		return "repeat_ending", ending, ""
+	}
 	clean := make([]string, 0, len(last.Verdict.Problems))
 	for _, p := range last.Verdict.Problems {
 		p = strings.Join(strings.Fields(p), " ")

@@ -74,7 +74,7 @@ func NewMemory() *Memory {
 		Pages: map[string]Page{
 			OpReadFeed:     {Kind: "feed", Posts: []Post{withoutID(post("thread", "Synthetic fixture: a small Go tool reduced a repetitive task. Bài mẫu đây."))}},
 			OpSearch:       {Kind: "search", Posts: []Post{post("search", "Synthetic fixture: measuring the useful part of an experiment. Bài mẫu đây.")}},
-			OpProfilePosts: {Kind: "profile_posts", Posts: []Post{post("profile", "Synthetic fixture: a recent post of a public profile. Bài mẫu đây.")}},
+			OpProfilePosts: {Kind: "profile", Posts: []Post{post("profile", "Synthetic fixture: a recent post of a public profile. Bài mẫu đây.")}},
 			OpReadReplies:  {Kind: "replies", Posts: []Post{post("reply", "Synthetic fixture: a reply to an own post. Bài mẫu đây.")}},
 			OpReadPost:     {Kind: "post", Posts: []Post{post("thread", "Synthetic fixture: a tiny tool can make a concrete difference. Bài mẫu đây.")}},
 		},

@@ -2,7 +2,10 @@ package guard
 
 import (
 	"encoding/json"
+	"strconv"
 	"strings"
+
+	"github.com/canhta/threadz/internal/store"
 )
 
 // BlockedError is the guard's refusal of one tool call. Detail is the one
@@ -98,8 +101,8 @@ var hints = map[string]string{
 	"stale_ref":                   "the text names a p or t ref, which is an id and not content; name the post or story in words instead",
 	"budget":                      "today's budget is spent; stop calling paid tools this wake",
 	"limit_per_wake":              "%s is used up for this wake; do not call it again, work with what you already read",
-	"too_many_parts":              "a series has at most 4 later parts; send fewer parts",
-	"unknown_target":              "target must be a p ref (such as p12) of a post you read in the last 7 days; pick one from the candidates or call find_posts",
+	"too_many_parts":              "a series has at most " + strconv.Itoa(store.MaxSeriesParts-1) + " later parts; send fewer parts",
+	"unknown_target":              "target must be a p ref (such as p12) that this wake showed you; pick one from the open reply candidates or the inbox, or read posts with find_posts first and use a ref it returns",
 	"note_not_open":               "answers_note names an owner note that is not open; use the id of an open note from the data message or leave it out",
 	"post_brief":                  "a post needs hook, trend and a one-line rationale; add them and send it again",
 	"repeat_topic":                "you already posted on this story in the last 24 hours; anchor a different story or reply to someone instead",

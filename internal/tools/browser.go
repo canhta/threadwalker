@@ -30,9 +30,9 @@ func (e *browserStop) Error() string           { return "browser stopped: " + e.
 func (e *browserStop) Unwrap() error           { return e.cause }
 func (e *browserStop) TerminalToolError() bool { return true }
 
-func (d *Dispatcher) browserRead(ctx context.Context, operation string, a arguments) (data any, err error) {
+func (d *Dispatcher) browserRead(ctx context.Context, tool, operation string, a arguments) (data any, err error) {
 	started := d.opts.Now()
-	defer func() { err = d.browserResult(ctx, operation, started, err) }()
+	defer func() { err = d.browserResult(ctx, tool, operation, started, err) }()
 	var page threads.Page
 	switch operation {
 	case threads.OpReadFeed:
@@ -136,7 +136,7 @@ func (d *Dispatcher) actionMetrics(ctx context.Context, actionID int64) (any, er
 
 func (d *Dispatcher) browserAction(ctx context.Context, operation string, a arguments) (data any, err error) {
 	started := d.opts.Now()
-	defer func() { err = d.browserResult(ctx, operation, started, err) }()
+	defer func() { err = d.browserResult(ctx, operation, operation, started, err) }()
 	var published threads.Published
 	if operation == "post" {
 		published, err = d.opts.Threads.Post(ctx, a.Text("text"), a.Text("topic_tag"))
@@ -212,7 +212,9 @@ func (d *Dispatcher) publishParts(ctx context.Context, a arguments, firstID stri
 	return nil
 }
 
-func (d *Dispatcher) browserResult(ctx context.Context, operation string, started time.Time, err error) error {
+// browserResult logs the finished operation under the tool that ran it, find_posts
+// with its source for a find.
+func (d *Dispatcher) browserResult(ctx context.Context, tool, operation string, started time.Time, err error) error {
 	reason, outcome := "completed", "success"
 	if err != nil {
 		outcome = "error"
@@ -220,7 +222,7 @@ func (d *Dispatcher) browserResult(ctx context.Context, operation string, starte
 			reason = "operation_failed"
 		}
 	}
-	logging.Emit(context.WithoutCancel(ctx), d.opts.Logger, slog.LevelInfo, logging.Record{Event: logging.BrowserOperationFinished, AgentID: d.opts.Template.ID, Phase: d.opts.Phase, WakeID: d.opts.WakeID, Operation: operation, Tool: operation, Outcome: outcome, Reason: reason, DurationMS: d.opts.Now().Sub(started).Milliseconds()})
+	logging.Emit(context.WithoutCancel(ctx), d.opts.Logger, slog.LevelInfo, logging.Record{Event: logging.BrowserOperationFinished, AgentID: d.opts.Template.ID, Phase: d.opts.Phase, WakeID: d.opts.WakeID, Operation: operation, Tool: tool, Outcome: outcome, Reason: reason, DurationMS: d.opts.Now().Sub(started).Milliseconds()})
 	if reason == threads.ReasonLoggedOut || reason == threads.ReasonCaptcha {
 		finalCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
 		defer cancel()

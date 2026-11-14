@@ -83,3 +83,22 @@ func OpenCandidates(ctx context.Context, st *store.Store, t config.Template, own
 	slices.SortStableFunc(out, func(a, b Candidate) int { return cmp.Compare(b.Score, a.Score) })
 	return out[:min(len(out), MaxCandidates)], nil
 }
+
+// IssueCandidates makes the refs of the candidates the data message lists
+// refs of this wake, so a reply may target them.
+func (g *Guard) IssueCandidates(ctx context.Context, candidates []Candidate) error {
+	for _, c := range candidates {
+		id, err := strconv.ParseInt(strings.TrimPrefix(c.Ref, "p"), 10, 64)
+		if err != nil {
+			return err
+		}
+		row, ok, err := g.opts.Store.SeenPostByID(ctx, g.opts.Template.ID, id)
+		if err != nil {
+			return err
+		}
+		if ok {
+			g.register(row)
+		}
+	}
+	return nil
+}

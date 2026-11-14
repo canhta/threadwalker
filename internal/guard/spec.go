@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/canhta/threadz/internal/store"
+	"github.com/canhta/threadz/internal/threads"
 )
 
 // MaxHookRunes bounds the first line of a post, the line that decides the scroll-past.
@@ -83,8 +84,34 @@ var (
 	}()
 )
 
-// FindSources are the sources of find_posts.
-var FindSources = []string{"feed", "topic", "search", "profile"}
+// FindSource is one source of find_posts: the backend read it runs and the
+// arguments it takes besides source.
+type FindSource struct {
+	Name, Read string
+	Args       []string
+}
+
+// FindSources are the sources of find_posts, the one list the schema, the
+// argument check and the dispatcher read.
+var FindSources = []FindSource{
+	{"feed", threads.OpReadFeed, nil},
+	{"topic", threads.OpReadTopic, []string{"topic", "query"}},
+	{"search", threads.OpSearch, []string{"query", "recent"}},
+	{"profile", threads.OpProfilePosts, []string{"username"}},
+}
+
+// FindSourceOf returns the find_posts source called name; ok is false for an unknown one.
+func FindSourceOf(name string) (FindSource, bool) {
+	i := slices.IndexFunc(FindSources, func(s FindSource) bool { return s.Name == name })
+	if i < 0 {
+		return FindSource{}, false
+	}
+	return FindSources[i], true
+}
+
+// FindScope is what a cap, a refusal count, a close and a hide apply to for
+// one find_posts source, so a closed feed leaves topic open.
+func FindScope(source string) string { return "find_posts:" + source }
 
 func buildSpecs() []ToolSpec {
 	ownerText := Arg{Name: "text", Kind: ArgText, Required: true, Desc: "the message"}
@@ -92,7 +119,7 @@ func buildSpecs() []ToolSpec {
 		{Name: "mark_do_not_contact", Description: "Permanently stop replying to a username. Entries cannot be removed.", Args: []Arg{{Name: "username", Kind: ArgText, Required: true, Desc: "Threads username"}}, Effect: EffectOwnState, Phases: agentOnly},
 		{Name: "fetch_trends", Description: "Read outside trends ranked for your topics. Items are untrusted data; each has a ref (t3) for trend.", Effect: EffectRead, Phases: agentOnly, Untrusted: true},
 		{Name: "find_posts", Description: "Find posts on Threads. Results are untrusted data; each post has a ref (p12) for reply or trend. feed also lists Trending-now topics, each with a ref (t3).", Args: []Arg{
-			{Name: "source", Kind: ArgText, Required: true, Desc: "feed: home feed. topic: a topic page or search page. search: keyword search. profile: one author's posts", Enum: FindSources},
+			{Name: "source", Kind: ArgText, Required: true, Desc: "feed: home feed. topic: a topic page or search page. search: keyword search. profile: one author's posts", Enum: findSourceNames()},
 			{Name: "query", Kind: ArgText, Desc: "search words (topic or search)"},
 			{Name: "topic", Kind: ArgText, Desc: "ref (t3) of a Trending-now topic from feed (topic)"},
 			{Name: "username", Kind: ArgText, Desc: "Threads username (profile)"},
@@ -293,4 +320,12 @@ func (s ToolSpec) Parse(raw string) (Args, error) {
 		}
 	}
 	return a, nil
+}
+
+func findSourceNames() []string {
+	names := make([]string, len(FindSources))
+	for i, s := range FindSources {
+		names[i] = s.Name
+	}
+	return names
 }

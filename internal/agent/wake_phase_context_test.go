@@ -25,18 +25,18 @@ func TestPhaseContextsDifferInPromptAndData(t *testing.T) {
 	if err = r.Start(ctx); err != nil {
 		t.Fatal(err)
 	}
-	agentMsgs, err := r.wakeContext(ctx, guard.PhaseAgent, 0, "")
+	agentMsgs, err := r.wakeContext(ctx, guard.PhaseAgent, 0, "", noIssue)
 	if err != nil || !strings.Contains(agentMsgs[0].Content, "A normal wake") || !strings.Contains(agentMsgs[1].Content, `"counters"`) {
 		t.Fatalf("agent context: %v", err)
 	}
-	dreamMsgs, err := r.wakeContext(ctx, guard.PhaseDream, 0, "")
+	dreamMsgs, err := r.wakeContext(ctx, guard.PhaseDream, 0, "", noIssue)
 	if err != nil || dreamMsgs[0].Content != dreamPrompt || !strings.Contains(dreamMsgs[1].Content, `"new_episodes"`) || strings.Contains(dreamMsgs[1].Content, `"counters"`) {
 		t.Fatalf("dream context: %v", err)
 	}
 	if strings.Contains(dreamMsgs[0].Content, OfflineTemplate().Persona.Name) {
 		t.Fatal("the dream prompt carries the persona")
 	}
-	if _, err = r.wakeContext(ctx, "other", 0, ""); err == nil {
+	if _, err = r.wakeContext(ctx, "other", 0, "", noIssue); err == nil {
 		t.Fatal("unknown phase accepted")
 	}
 }
@@ -90,14 +90,14 @@ func TestOpenOwnerNoteIsTheFirstTaskOfAWake(t *testing.T) {
 	if err = st.OwnerNote(ctx, []string{r.opts.Template.ID}, "k", "post about the AP story", now.Add(-time.Hour)); err != nil {
 		t.Fatal(err)
 	}
-	messages, err := r.wakeContext(ctx, guard.PhaseAgent, 0, "# Inbox: someone replied\n\n")
+	messages, err := r.wakeContext(ctx, guard.PhaseAgent, 0, "# Inbox: someone replied\n\n", noIssue)
 	if err != nil || !strings.Contains(messages[1].Content, "# First task: owner notes") || !strings.Contains(messages[1].Content, "post about the AP story") {
 		t.Fatalf("user message lacks the note: %v", err)
 	}
 	if inbox, note := strings.Index(messages[1].Content, "# Inbox"), strings.Index(messages[1].Content, "# First task"); inbox < 0 || inbox > note || strings.Index(messages[1].Content, `"counters"`) > inbox {
 		t.Fatal("the data JSON comes first, then the inbox, then the owner notes")
 	}
-	if messages, err = r.wakeContext(ctx, guard.PhaseDream, 0, ""); err != nil || strings.Contains(messages[1].Content, "First task") {
+	if messages, err = r.wakeContext(ctx, guard.PhaseDream, 0, "", noIssue); err != nil || strings.Contains(messages[1].Content, "First task") {
 		t.Fatalf("a dream cannot post, so it carries no note task: %v", err)
 	}
 }

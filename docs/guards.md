@@ -47,11 +47,11 @@ flowchart TD
 | `post_brief` | With `guard.trend_anchor`, a post lacks `hook` or `rationale`, or the rationale is multi-line or over 300 characters | template flag | content |
 | `too_many_parts` | A series with 5 or more later parts | code | content |
 | `find_args` | `find_posts` arguments do not fit the `source`, or `topic` is not the `t` ref of a Threads topic that `feed` returned this wake | code | executor |
-| `no_trend_anchor` | With `guard.trend_anchor`, `trend` was not the `t` ref of a trend or source noted this wake, or the `p` ref of a post stored in the last 7 days | template flag | content |
+| `no_trend_anchor` | With `guard.trend_anchor`, `trend` was not the `t` ref of a trend or source noted this wake, or the `p` ref of a post this wake issued | template flag | content |
 | `own_account` | Interaction with a configured own username, own profile or post URL, or a confirmed own publication URL, even when the supplied author disagrees; mentions and Threads links to own accounts | template (`threads.username`) | content, reserve |
 | `shared_promotion_link` | A post promotes a link already reserved by another agent; checks all prior intents including dry-run, failed and uncertain | code | reserve |
 | `reply_target_host` | The stored post has no usable author in a `threads.com` or `threads.net` post URL (optional `www.`, http normalized to https) | code | content |
-| `unknown_target` | `reply.target` is not the `p` ref of a post this agent has stored in the last 7 days; the hint says to pick one from the candidates or call `find_posts` | code | content |
+| `unknown_target` | `reply.target` is not a `p` ref this wake issued, through a read, the inbox or the open reply candidates; the hint says to pick one from the candidates or the inbox, or read with `find_posts` first | code | content |
 | `target_outside_window` | The stored figures of the target, aged to now, are outside the `targets.*` window ([wake.md](wake.md)); the hint names each broken knob with the post's figure and the limit. An answer to a reply listed in the wake's inbox is exempt; a target that never showed figures is not checked | template (`targets.*`) | content |
 | `reply_url` | A reply contains a URL | code | content |
 | `reply_mention` | A reply mentions a username other than the author it answers | code | content |

@@ -407,7 +407,7 @@ func TestAPIProfilePosts(t *testing.T) {
 	ctx := context.Background()
 	f.route("GET", "/profile_posts", "keyword_search.json")
 	page, err := api.ProfilePosts(ctx, "synthetic_author")
-	if err != nil || page.Kind != "profile_posts" || len(page.Posts) != 1 || page.Posts[0].ID == "" || page.LimitedAccess != "" {
+	if err != nil || page.Kind != "profile" || len(page.Posts) != 1 || page.Posts[0].ID == "" || page.LimitedAccess != "" {
 		t.Fatalf("page=%+v err=%v", page, err)
 	}
 	if q := f.queries["GET /profile_posts"]; q["username"] != "synthetic_author" {

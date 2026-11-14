@@ -6,12 +6,12 @@ import (
 )
 
 func TestStopCheckNeverNudgesTowardAHiddenTool(t *testing.T) {
-	open := func() []string { return []string{"r1", "r2"} }
+	open := func() []string { return []string{"p1", "p2"} }
 	called := map[string]bool{"ideas": true}
 	if ask := behindSB.stopCheck([]string{"reply"}, open, 5)(called, nil); ask != "" {
 		t.Fatalf("hidden reply still asked for: %q", ask)
 	}
-	if ask := behindSB.stopCheck([]string{"ideas"}, open, 5)(nil, nil); strings.Contains(ask, "call ideas") || !strings.Contains(ask, "r1, r2") {
+	if ask := behindSB.stopCheck([]string{"ideas"}, open, 5)(nil, nil); strings.Contains(ask, "call ideas") || !strings.Contains(ask, "p1, p2") {
 		t.Fatalf("ask %q", ask)
 	}
 }

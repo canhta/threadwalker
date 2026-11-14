@@ -264,8 +264,8 @@ func (r *Runtime) startWake(ctx context.Context, now time.Time) (WakeResult, err
 	wake := WakeResult{ID: id, EndReason: "runtime_error"}
 	r.event(ctx, guard.PhaseAgent, logging.WakeStarted, "started", "due", id, 0)
 	r.event(ctx, guard.PhaseAgent, logging.SchedulerScheduled, "success", "fallback", id, 0)
-	return r.execute(ctx, wake, guard.PhaseAgent, 0, 0, func(inbox string) ([]llm.Message, error) {
-		return r.wakeContext(ctx, guard.PhaseAgent, id, inbox)
+	return r.execute(ctx, wake, guard.PhaseAgent, 0, 0, func(inbox string, issue issuer) ([]llm.Message, error) {
+		return r.wakeContext(ctx, guard.PhaseAgent, id, inbox, issue)
 	})
 }
 
@@ -338,8 +338,8 @@ func (r *Runtime) RunPhase(ctx context.Context, kind, phaseKey string) (WakeResu
 			return wake, nil
 		}
 	}
-	return r.execute(ctx, wake, phase, capUSD, maxSteps, func(inbox string) ([]llm.Message, error) {
-		return r.wakeContext(ctx, kind, id, inbox)
+	return r.execute(ctx, wake, phase, capUSD, maxSteps, func(inbox string, issue issuer) ([]llm.Message, error) {
+		return r.wakeContext(ctx, kind, id, inbox, issue)
 	})
 }
 
@@ -352,7 +352,7 @@ func (r *Runtime) phaseCap(phase string) (capUSD float64, maxSteps int) {
 	return 0, 0
 }
 
-func (r *Runtime) execute(ctx context.Context, wake WakeResult, phase string, capUSD float64, maxSteps int, build func(inbox string) ([]llm.Message, error)) (result WakeResult, wakeErr error) {
+func (r *Runtime) execute(ctx context.Context, wake WakeResult, phase string, capUSD float64, maxSteps int, build func(inbox string, issue issuer) ([]llm.Message, error)) (result WakeResult, wakeErr error) {
 	result = wake
 	defer func() {
 		finalCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)
@@ -453,7 +453,7 @@ func (r *Runtime) execute(ctx context.Context, wake WakeResult, phase string, ca
 		// be answered: a model call could only read.
 		result.EndReason = "nothing_to_do"
 	} else {
-		messages, err := build(section)
+		messages, err := build(section, dispatcher.Guard().IssueCandidates)
 		if err != nil {
 			return result, err
 		}

@@ -23,7 +23,7 @@ func TestStopCheckShowsOpenTargetsToABehindAgentWhileBudgetIsLeft(t *testing.T) 
 	if ask := check(map[string]bool{"ideas": true}, map[string]int{"search": 1}); ask != "" {
 		t.Fatalf("nothing left to answer still asked: %q", ask)
 	}
-	if ask := behindSB.stopCheck(nil, func() []string { return []string{"r1"} }, 0.01)(map[string]bool{"ideas": true}, map[string]int{"search": 1}); ask != "" {
+	if ask := behindSB.stopCheck(nil, func() []string { return []string{"p1"} }, 0.01)(map[string]bool{"ideas": true}, map[string]int{"search": 1}); ask != "" {
 		t.Fatalf("spent budget still asked: %q", ask)
 	}
 }
@@ -35,7 +35,7 @@ func TestStopCheckNeverAsksAnAgentOnTarget(t *testing.T) {
 	if onTarget.Behind() {
 		t.Fatal("fixture is behind")
 	}
-	if ask := onTarget.stopCheck(nil, func() []string { return []string{"r1", "r2"} }, 5)(nil, nil); ask != "" {
+	if ask := onTarget.stopCheck(nil, func() []string { return []string{"p1", "p2"} }, 5)(nil, nil); ask != "" {
 		t.Fatalf("on-target agent asked: %q", ask)
 	}
 }

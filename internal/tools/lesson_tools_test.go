@@ -132,7 +132,7 @@ func TestLessonAddGates(t *testing.T) {
 		{"mid action", "Mở bằng số.", "post", "do", []int{3, 1}, "lesson_band"},
 		{"avoid on tops", "Mở bằng số.", "post", "avoid", []int{3, 5}, "lesson_band"},
 		{"wrong kind", "Mở bằng số.", "reply", "do", []int{3, 5}, "lesson_kind_mismatch"},
-		{"short ref", "Bài p12 mở bằng số.", "post", "do", []int{3, 5}, "stale_ref"},
+		{"p ref", "Bài p12 mở bằng số.", "post", "do", []int{3, 5}, "stale_ref"},
 		{"number not measured", "Bài có 77 lượt thích.", "post", "do", []int{3, 5}, "lesson_number_mismatch"},
 		{"foreign link", "Xem https://example.com/x", "post", "do", []int{3, 5}, "lesson_foreign_url"},
 		{"iso date", "Bài ngày 2026-11-10 mở bằng số.", "post", "do", []int{3, 5}, "lesson_has_ref"},

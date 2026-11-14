@@ -220,7 +220,7 @@ live wakes, each with data shaped like the real outputs:
 
 | Case | Failure it keeps from returning |
 |---|---|
-| `replay_trend_ref` | A post anchored to a `trend` ref the wake never issued is refused with the ref in the stored detail; the `t` ref the trend read issued resolves to the trend |
+| `replay_trend_anchor` | A post anchored to a `trend` ref the wake never issued is refused with the ref in the stored detail; the `t` ref the trend read issued resolves to the trend |
 | `replay_rough_draft_with_writer` | A rough draft over 500 characters is refused as `text_length` before the writer runs; the final text must be checked, and a writer text that is too long is rejected by the editor naming the length |
 | `replay_reply_composer_missing` | A browser reply whose page shows no composer ends as `write_refused` at stage `composer_missing`, the intent is marked failed and the snapshot is saved |
 
