@@ -402,7 +402,7 @@ func TestDispatcherKeepsConfiguredSecretsOutOfEffectsAndAudit(t *testing.T) {
 }
 func TestLocalValidationBeforeEffects(t *testing.T) {
 	_, _, d := setup(t)
-	for _, tc := range []struct{ name, args string }{{"post", `{"text":1}`}, {"post", `{"text":"x","parts":null}`}, {"post", `{"text":"x","parts":[""]}`}, {"find_posts", `{"source":"search","query":"x","recent":"1"}`}, {"find_posts", `{"source":"search","query":"x","recent":null}`}, {"reply", `{"text":"x","answers_note":0}`}, {"reply", `{"text":"x","answers_note":"1"}`}} {
+	for _, tc := range []struct{ name, args string }{{"post", `{"text":1}`}, {"post", `{"text":"x","parts":[""]}`}, {"find_posts", `{"source":"search","query":"x","recent":"1"}`}, {"reply", `{"text":"x","answers_note":0}`}, {"reply", `{"text":"x","answers_note":"1"}`}} {
 		if _, err := d.Dispatch(context.Background(), call(tc.name, tc.args)); err == nil {
 			t.Fatal("accepted invalid typed input")
 		}

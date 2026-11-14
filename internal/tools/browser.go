@@ -46,9 +46,17 @@ func (d *Dispatcher) browserRead(ctx context.Context, tool, operation string, a 
 	case threads.OpProfilePosts:
 		page, err = d.opts.Threads.ProfilePosts(ctx, a.Text("username"))
 	case threads.OpReadPost:
-		page, err = d.opts.Threads.ReadPost(ctx, a.Text("id"))
+		id, rerr := d.apiPostID(a.Text("id"))
+		if rerr != nil {
+			return nil, rerr
+		}
+		page, err = d.opts.Threads.ReadPost(ctx, id)
 	case threads.OpReadReplies:
-		page, err = d.opts.Threads.ReadReplies(ctx, a.Text("id"))
+		id, rerr := d.apiPostID(a.Text("id"))
+		if rerr != nil {
+			return nil, rerr
+		}
+		page, err = d.opts.Threads.ReadReplies(ctx, id)
 	case threads.OpReadOwnMetrics:
 		if a.Int("action_id") > 0 {
 			return d.actionMetrics(ctx, a.Int("action_id"))
@@ -67,6 +75,22 @@ func (d *Dispatcher) browserRead(ctx context.Context, tool, operation string, a 
 		return nil, err
 	}
 	return page, nil
+}
+
+// apiPostID turns a p ref into the post's API id; a numeric id or an empty one
+// (mentions) passes through. A post only a browser read showed has no API id.
+func (d *Dispatcher) apiPostID(id string) (string, error) {
+	if !strings.HasPrefix(strings.ToLower(strings.TrimSpace(id)), "p") {
+		return id, nil
+	}
+	row, ok := d.guard.IssuedPost(id)
+	if !ok {
+		return "", &guard.BlockedError{Reason: "unknown_target", Detail: id}
+	}
+	if row.MediaID == "" {
+		return "", &guard.BlockedError{Reason: "post_not_readable", Detail: id}
+	}
+	return row.MediaID, nil
 }
 
 func (d *Dispatcher) observeStops(ctx context.Context, operation string, page threads.Page) error {

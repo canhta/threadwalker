@@ -345,6 +345,7 @@ func (d *Dispatcher) Dispatch(ctx context.Context, call llm.ToolCall) (string, e
 	block := llm.RejectedReason(ctx)
 	var args arguments
 	var parseErr error
+	var blockDetail string
 	switch {
 	case call.ID == "":
 		block = "invalid_tool_call_id"
@@ -358,6 +359,10 @@ func (d *Dispatcher) Dispatch(ctx context.Context, call llm.ToolCall) (string, e
 		args.Args = parsed
 		if parseErr != nil {
 			block = "invalid_tool_arguments"
+			var bad *guard.ArgError
+			if errors.As(parseErr, &bad) {
+				blockDetail = bad.Name
+			}
 		}
 	}
 	if block == "" && d.containsSecret(call.Function.Arguments, args.Args) {
@@ -399,7 +404,7 @@ func (d *Dispatcher) Dispatch(ctx context.Context, call llm.ToolCall) (string, e
 	var reservedID int64
 	var final []string
 	var target guard.ResolvedTarget
-	output, err := d.guard.Execute(ctx, guard.Attempt{Tool: safeTool, Arguments: call.Function.Arguments, Logged: d.redactedArgs(call.Function.Arguments, block == "sensitive_arguments"), BlockedBy: block, ReservedActionID: &reservedID, Final: &final, Target: &target}, func() (string, error) {
+	output, err := d.guard.Execute(ctx, guard.Attempt{Tool: safeTool, Arguments: call.Function.Arguments, Logged: d.redactedArgs(call.Function.Arguments, block == "sensitive_arguments"), BlockedBy: block, BlockedDetail: blockDetail, ReservedActionID: &reservedID, Final: &final, Target: &target}, func() (string, error) {
 		args.ReservedActionID = reservedID
 		args.Target = target
 		if len(final) > 0 {

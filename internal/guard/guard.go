@@ -89,7 +89,9 @@ type Guard struct {
 // redacted, per-field-capped copy, empty when the arguments hold a secret.
 type Attempt struct {
 	Tool, Arguments, BlockedBy string
-	Logged                     string
+	// BlockedDetail names what the dispatcher refused, such as the argument that did not match.
+	BlockedDetail string
+	Logged        string
 	// ReservedActionID receives the committed intent ID before effect executes.
 	// The dispatcher uses it to report the action without inserting a second row.
 	ReservedActionID *int64
@@ -323,7 +325,7 @@ func (g *Guard) Execute(ctx context.Context, a Attempt, effect func() (string, e
 		if reason == "posts_per_day" || reason == "replies_per_day" {
 			return "", &actionLimitError{rule: reason}
 		}
-		detail := ""
+		detail := a.BlockedDetail
 		if intent != nil {
 			detail = intent.detail
 		}

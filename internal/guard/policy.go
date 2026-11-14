@@ -154,6 +154,11 @@ func (g *Guard) Issued(ref string) bool {
 	return ok
 }
 
+// IssuedPost returns the stored post behind a p ref this wake issued.
+func (g *Guard) IssuedPost(ref string) (store.SeenPost, bool) {
+	return g.post(ref)
+}
+
 // IsOwn reports whether username is one of the operator-declared own accounts.
 func (g *Guard) IsOwn(username string) bool {
 	user, err := store.NormalizeUsername(username)

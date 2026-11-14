@@ -102,7 +102,7 @@
         "additionalProperties": false,
         "properties": {
           "id": {
-            "description": "numeric post id (the id field of a post)",
+            "description": "the post's ref (p12) or numeric id",
             "type": "string"
           }
         },
@@ -122,7 +122,7 @@
         "additionalProperties": false,
         "properties": {
           "id": {
-            "description": "numeric id of your post; omit for mentions",
+            "description": "your post's ref (p12) or numeric id; omit for mentions",
             "type": "string"
           }
         },

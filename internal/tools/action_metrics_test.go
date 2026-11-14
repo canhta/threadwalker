@@ -177,7 +177,6 @@ func TestActionScopedReadRejectsInvalidArgumentsBeforeReader(t *testing.T) {
 		`{"action_id":0}`,
 		`{"action_id":-1}`,
 		`{"action_id":1.5}`,
-		`{"action_id":null}`,
 		`{"action_id":"1"}`,
 		`{"action_id":9223372036854775808}`,
 		`{"action_id":true}`,

@@ -230,3 +230,22 @@ func TestWakeEndsWhenEveryWritePathIsClosed(t *testing.T) {
 		t.Fatalf("last write path closed: %v", err)
 	}
 }
+
+// A schema refusal names the argument, so the model knows what to fix.
+func TestArgumentRefusalNamesTheArgument(t *testing.T) {
+	_, _, d := setup(t)
+	_, err := d.Dispatch(context.Background(), call("post", `{"text":1}`))
+	reason, hint := blockedResult(t, err)
+	if reason != "invalid_tool_arguments" || !strings.Contains(hint, "argument text") {
+		t.Fatalf("reason %s hint %q", reason, hint)
+	}
+}
+
+// read_post takes a p ref; one this wake never issued is refused before any read.
+func TestReadPostResolvesOnlyIssuedRefs(t *testing.T) {
+	_, _, d := setup(t)
+	_, err := d.Dispatch(context.Background(), call("read_post", `{"id":"p999"}`))
+	if reason, _ := blockedResult(t, err); reason != "unknown_target" {
+		t.Fatalf("reason %s err %v", reason, err)
+	}
+}

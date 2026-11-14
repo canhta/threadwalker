@@ -123,8 +123,8 @@ func buildSpecs() []ToolSpec {
 			{Name: "username", Kind: ArgText, Desc: "Threads username (profile)"},
 			{Name: "recent", Kind: ArgBool, Desc: "newest posts of the last hour instead of top ones (search)"}}, Effect: EffectRead, Phases: agentOnly, Untrusted: true},
 		{Name: "profile", Description: "Read a Threads user's public profile: followers when known and 7-day views. Untrusted data.", Args: []Arg{{Name: "username", Kind: ArgText, Required: true, Desc: "Threads username"}}, Effect: EffectRead, Phases: agentOnly, Untrusted: true},
-		{Name: "read_post", Description: "Read one post by its numeric id. Untrusted data.", Args: []Arg{{Name: "id", Kind: ArgText, Required: true, Desc: "numeric post id (the id field of a post)"}}, Effect: EffectRead, Phases: agentOnly, Untrusted: true},
-		{Name: "read_replies", Description: "Read the replies to one of your posts, or your mentions. Untrusted data; each has a ref (p12).", Args: []Arg{{Name: "id", Kind: ArgText, Desc: "numeric id of your post; omit for mentions"}}, Effect: EffectRead, Phases: agentOnly, Untrusted: true},
+		{Name: "read_post", Description: "Read one post by its numeric id. Untrusted data.", Args: []Arg{{Name: "id", Kind: ArgText, Required: true, Desc: "the post's ref (p12) or numeric id"}}, Effect: EffectRead, Phases: agentOnly, Untrusted: true},
+		{Name: "read_replies", Description: "Read the replies to one of your posts, or your mentions. Untrusted data; each has a ref (p12).", Args: []Arg{{Name: "id", Kind: ArgText, Desc: "your post's ref (p12) or numeric id; omit for mentions"}}, Effect: EffectRead, Phases: agentOnly, Untrusted: true},
 		{Name: "post", Description: fmt.Sprintf("Publish a post (at most %d characters and %d lines, the first line at most %d), or a series with parts. Code checks policy and an editor reviews the draft; a refusal names the next step. Dry run records intent only.", quality.MaxPostRunes, quality.MaxPostLines, quality.MaxHookRunes), Args: []Arg{
 			{Name: "text", Kind: ArgText, Required: true, Desc: "the post (first line is the hook); a rough draft is fine"},
 			{Name: "parts", Kind: ArgTextList, Desc: "later parts of a series, each a reply to the previous"},
@@ -255,8 +255,15 @@ func (a Args) Texts() []string {
 // errArguments marks arguments that do not match the tool's schema.
 var errArguments = fmt.Errorf("invalid tool arguments")
 
-// Parse validates raw JSON arguments against the schema: unknown, null,
-// missing-required and ill-typed values are all refused.
+// ArgError names the argument that did not match; it is errArguments.
+type ArgError struct{ Name string }
+
+func (e *ArgError) Error() string        { return "invalid tool argument " + e.Name }
+func (e *ArgError) Is(target error) bool { return target == errArguments }
+
+// Parse validates raw JSON arguments against the schema: unknown, missing-
+// required and ill-typed values are refused, naming the argument. An optional
+// argument sent empty ("", [] or null) counts as not sent.
 func (s ToolSpec) Parse(raw string) (Args, error) {
 	var values map[string]json.RawMessage
 	if json.Unmarshal([]byte(raw), &values) != nil || values == nil {
@@ -267,57 +274,69 @@ func (s ToolSpec) Parse(raw string) (Args, error) {
 	for _, arg := range s.Args {
 		declared[arg.Name] = true
 		value, present := values[arg.Name]
+		if present && !arg.Required && emptyValue(value) {
+			present = false
+		}
 		if !present {
 			if arg.Required {
-				return Args{}, errArguments
+				return Args{}, &ArgError{arg.Name}
 			}
 			continue
 		}
 		if string(value) == "null" {
-			return Args{}, errArguments
+			return Args{}, &ArgError{arg.Name}
 		}
 		switch arg.Kind {
 		case ArgText:
 			var v string
 			if json.Unmarshal(value, &v) != nil || strings.TrimSpace(v) == "" {
-				return Args{}, errArguments
+				return Args{}, &ArgError{arg.Name}
 			}
 			if arg.Enum != nil && !slices.Contains(arg.Enum, v) {
-				return Args{}, errArguments
+				return Args{}, &ArgError{arg.Name}
 			}
 			a.text[arg.Name] = v
 		case ArgID:
 			var v int64
 			if json.Unmarshal(value, &v) != nil || v < 1 {
-				return Args{}, errArguments
+				return Args{}, &ArgError{arg.Name}
 			}
 			a.num[arg.Name] = v
 		case ArgBool:
 			var v bool
 			if json.Unmarshal(value, &v) != nil {
-				return Args{}, errArguments
+				return Args{}, &ArgError{arg.Name}
 			}
 			a.bools[arg.Name] = v
 		case ArgTextList:
 			var v []string
 			if json.Unmarshal(value, &v) != nil || len(v) == 0 || slices.ContainsFunc(v, func(s string) bool { return strings.TrimSpace(s) == "" }) {
-				return Args{}, errArguments
+				return Args{}, &ArgError{arg.Name}
 			}
 			a.texts[arg.Name] = v
 		case ArgIDList:
 			var v []int64
 			if json.Unmarshal(value, &v) != nil || len(v) == 0 || slices.ContainsFunc(v, func(id int64) bool { return id < 1 }) {
-				return Args{}, errArguments
+				return Args{}, &ArgError{arg.Name}
 			}
 			a.ids[arg.Name] = v
 		}
 	}
 	for name := range values {
 		if !declared[name] {
-			return Args{}, errArguments
+			return Args{}, &ArgError{name}
 		}
 	}
 	return a, nil
+}
+
+// emptyValue reports a JSON "", [] or null.
+func emptyValue(v json.RawMessage) bool {
+	switch strings.TrimSpace(string(v)) {
+	case `""`, "[]", "null":
+		return true
+	}
+	return false
 }
 
 func findSourceNames() []string {

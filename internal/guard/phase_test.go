@@ -181,13 +181,13 @@ func TestSpecParse(t *testing.T) {
 		{reply, `{"text":" ","target":"p1"}`, false},
 		{reply, `{"text":null,"target":"p1"}`, false},
 		{reply, `{"text":"x","target":"p1","answers_note":0}`, false},
-		{reply, `{"text":"x","target":"p1","answers_note":null}`, false},
+		{reply, `{"text":"x","target":"p1","answers_note":null}`, true},
 		{reply, `{"text":"x","target":"p1","extra":1}`, false},
 		{reply, `[]`, false},
 		{reply, `null`, false},
 		{reply, `{`, false},
 		{reply, `{"text":"x","target":"p1","lesson_ids":[1,2]}`, true},
-		{reply, `{"text":"x","target":"p1","lesson_ids":[]}`, false},
+		{reply, `{"text":"x","target":"p1","lesson_ids":[]}`, true},
 		{reply, `{"text":"x","target":"p1","lesson_ids":[0]}`, false},
 		{reply, `{"text":"x","target":"p1","lesson_ids":["1"]}`, false},
 		{find, `{"source":"search","query":"q"}`, true},
@@ -199,6 +199,9 @@ func TestSpecParse(t *testing.T) {
 		{find, `{"query":"q"}`, false},
 		{post, `{"text":"x","hook":"number","trend":"t1"}`, true},
 		{post, `{"text":"x","hook":"shout"}`, false},
+		// An optional argument sent empty counts as not sent.
+		{post, `{"text":"x","lesson_ids":[],"topic_tag":"","parts":null}`, true},
+		{reply, `{"target":""}`, false},
 	} {
 		if _, err := tc.spec.Parse(tc.raw); (err == nil) != tc.ok {
 			t.Fatalf("%s %s: err=%v", tc.spec.Name, tc.raw, err)
