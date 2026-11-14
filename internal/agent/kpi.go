@@ -180,16 +180,21 @@ func (r *Runtime) pacedWake(s scoreboard, now time.Time) time.Time {
 	if quiet, ok := r.schedule.NextQuietFrom(now); ok && quiet.Before(horizon) {
 		horizon = quiet
 	}
-	return s.LastWake.Add(pacedInterval(horizon.Sub(now), s.SpendToday-s.DreamToday, int64(s.WakesToday), t.Limits.MaxUSDPerDay-s.SpendToday))
+	return s.LastWake.Add(pacedInterval(horizon.Sub(s.LastWake), s.SpendToday-s.DreamToday, int64(s.WakesToday), t.Limits.MaxUSDPerDay-s.SpendToday))
 }
 
-// settleWake returns the rule every scheduled wake time follows, early ones
-// included: not before a capped day resets (see capReset), not before the
-// budget lets the next wake start (see pacedInterval), and not inside the quiet
-// window, where a wake spends tokens for posts nobody reads. A capped day
-// cannot be worked: a wake would burn tokens on reads and ideas and publish
-// nothing. Spend is read only when a time is settled. The scheduler's own check
-// (deferQuiet) catches a wake time that was stored before it was due.
+// settleWake returns the rule for the next wake time that a finished wake, an
+// early inbox wake and a webhook wake set: not before a capped day resets (see
+// capReset), not before the budget lets the next wake start (see
+// pacedInterval), and not inside the quiet window, where a wake spends tokens
+// for posts nobody reads. A capped day cannot be worked: a wake would burn
+// tokens on reads and ideas and publish nothing. Spend is read only when a
+// time is settled.
+//
+// It does not cover the fixed fallback that BeginWake stores for a wake that
+// then fails, nor the one RecoverWakes stores after a restart: both skip the cap
+// and the pacing. Only the scheduler's own check (deferQuiet) catches them, and
+// only for the quiet window.
 func (r *Runtime) settleWake(ctx context.Context, now time.Time) func(time.Time) (time.Time, error) {
 	return func(at time.Time) (time.Time, error) {
 		reset, err := r.capReset(ctx, now)

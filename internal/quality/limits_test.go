@@ -26,6 +26,9 @@ func TestWriterInstructionsStateTheLengthLimits(t *testing.T) {
 	if want := fmt.Sprintf("at most %d characters and %d lines", MaxPostRunes, MaxPostLines); !strings.Contains(post, want) {
 		t.Errorf("post instructions lack %q", want)
 	}
+	if want := fmt.Sprintf("first line to at most %d characters", MaxHookRunes); !strings.Contains(post, want) {
+		t.Errorf("post instructions lack %q", want)
+	}
 	if reply := WriterMessages(r, p, WriterInput{Kind: Reply, ReplyMaxRunes: 80})[0].Content; !strings.Contains(reply, "at most 80 characters;") || strings.Contains(reply, "lines") {
 		t.Errorf("reply instructions: %q", reply)
 	}

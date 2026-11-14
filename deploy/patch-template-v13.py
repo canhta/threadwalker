@@ -10,10 +10,14 @@ and target_username, and post's trend in place of trend_ref. It also cuts the
 persona: each rule now lives in one section, and the agent prompt no longer
 carries style_rules, style_avoid, bad_examples or critic_rules.
 
-This script does two things to AGENT.yaml:
- 1. Rewrites the persona sentences that name a removed tool or argument.
- 2. Replaces the whole persona: block with the template's, but only when the
-    live block (after step 1) is exactly the v0.2.1 repo persona, checked by
+It also refuses the keys older templates carry: the second writer model and the
+study, playbook, learning and owner-message settings (REMOVED_KEYS).
+
+This script does three things to AGENT.yaml:
+ 1. Removes those keys.
+ 2. Rewrites the persona sentences that name a removed tool or argument.
+ 3. Replaces the whole persona: block with the template's, but only when the
+    live block (after step 2) is exactly the v0.2.1 repo persona, checked by
     sha256. A block the owner edited is left alone with a warning: merge it by
     hand.
 It writes AGENT.yaml.bak first, prints every change and touches nothing else
@@ -35,6 +39,10 @@ REWRITES = [
     ("chọn trong bài read_feed hoặc read_topic vừa trả về; không gửi target_id, target_url là ref của bài (như r3), kèm angle",
      "chọn trong danh sách bài ứng viên hoặc bài find_posts vừa trả về; target là ref của bài (như p12), kèm angle"),
 ]
+# Dotted paths of the keys older templates carry and v0.3.0 refuses as unknown: the second
+# writer model, and the study, playbook and learning settings and the owner copy of v0.1 and v0.2.
+REMOVED_KEYS = ["writer.post_llm", "study", "seed_playbook", "learning", "limits.explore_percent",
+                "schedule.study_slots", "telegram.digest_hour", "telegram.messages"]
 REMOVED = re.compile(r"\b(read_feed|read_topic|profile_posts|target_url|target_id|target_username|trend_ref)\b|\bsearch\b(?=[ ,.)])")
 
 # sha256 of the persona: block of templates/viral.agent.yaml at v0.2.1 (after the REWRITES above), the only
@@ -72,22 +80,52 @@ def replace_persona(text, template_text, log):
     return "".join(lines[:span[0]]) + new + "".join(lines[span[1]:])
 
 
-def remove_post_llm(text, log):
-    """Drop writer.post_llm: v0.3.0 has one writer model and refuses unknown keys."""
-    lines = text.splitlines(keepends=True)
-    start = next((i for i, l in enumerate(lines) if l.startswith("  post_llm:")), None)
-    if start is None:
-        return text
-    end = start + 1
-    while end < len(lines) and (not lines[end].strip() or lines[end].startswith("    ")):
-        end += 1
-    log.append("removed writer.post_llm (%d lines); the writer uses writer.llm" % (end - start))
-    return "".join(lines[:start] + lines[end:])
+def key_span(lines, path):
+    """Line range of the key at a dotted path (key line to its last nested line), with the comment
+    lines right above it; None when absent. Indentation decides what is nested."""
+    lo, hi = 0, len(lines)
+    for key in path.split("."):
+        found = indent = None
+        for i in range(lo, hi):
+            body = lines[i].lstrip()
+            if not body.strip() or body.startswith("#"):
+                continue
+            n = len(lines[i]) - len(body)
+            indent = n if indent is None else indent
+            if n == indent and body.startswith(key + ":"):
+                found = i
+                break
+        if found is None:
+            return None
+        last = found
+        for i in range(found + 1, hi):
+            body = lines[i].lstrip()
+            n = len(lines[i]) - len(body)
+            if body.strip() and n <= indent and not (n == indent and body.startswith("- ")):
+                break
+            if body.strip():
+                last = i
+        lo, hi = found + 1, last + 1
+    start = found
+    while start > 0 and lines[start - 1].lstrip().startswith("#") and len(lines[start - 1]) - len(lines[start - 1].lstrip()) == indent:
+        start -= 1
+    return start, last + 1
+
+
+def remove_keys(text, log):
+    """Drop every key v0.3.0 refuses as unknown (REMOVED_KEYS)."""
+    for path in REMOVED_KEYS:
+        lines = text.splitlines(keepends=True)
+        span = key_span(lines, path)
+        if span:
+            log.append("removed %s (%d lines)" % (path, span[1] - span[0]))
+            text = "".join(lines[:span[0]] + lines[span[1]:])
+    return text
 
 
 def patch(text, template_text):
     log = []
-    text = remove_post_llm(text, log)
+    text = remove_keys(text, log)
     for old, new in REWRITES:
         if old in text:
             text = text.replace(old, new)

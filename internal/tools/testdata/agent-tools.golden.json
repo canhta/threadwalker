@@ -134,7 +134,7 @@
     "type": "function",
     "function": {
       "name": "post",
-      "description": "Publish a post (at most 300 characters and 3 lines), or a series with parts. Code checks policy and an editor reviews the draft; a refusal names the next step. Dry run records intent only.",
+      "description": "Publish a post (at most 300 characters and 3 lines, the first line at most 80), or a series with parts. Code checks policy and an editor reviews the draft; a refusal names the next step. Dry run records intent only.",
       "parameters": {
         "additionalProperties": false,
         "properties": {

@@ -19,6 +19,7 @@ func TestBrowserConfigurationExplicitAndFailClosed(t *testing.T) {
 	}{
 		{"default", "", true},
 		{"api", "  backend: api\n  base_url: https://www.threads.com\n  executable_path: /synthetic/chrome\n  agent_browser_path: /synthetic/agent-browser\n", true},
+		{"stub_keeps_api_settings", "  backend: stub\n  access_token_env: T\n  user_id_env: U\n  base_url: https://www.threads.com\n  executable_path: /x\n  agent_browser_path: relative\n", true},
 		{"api_missing_cli", "  backend: api\n  base_url: https://www.threads.com\n  executable_path: /synthetic/chrome\n", false},
 		{"api_relative_cli", "  backend: api\n  base_url: https://www.threads.com\n  executable_path: /synthetic/chrome\n  agent_browser_path: agent-browser\n", false},
 		{"api_missing_chrome", "  backend: api\n  base_url: https://www.threads.com\n  agent_browser_path: /synthetic/agent-browser\n", false},

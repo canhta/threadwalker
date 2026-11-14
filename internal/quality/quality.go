@@ -27,12 +27,14 @@ const (
 	Reply = "reply"
 )
 
-// The length of a post: code owns both limits. The guard refuses a post over
+// The length of a post: code owns these limits. The guard refuses a post over
 // them and the scorer checks them, so the two cannot disagree. A reply's limit
-// is the template's guard.reply_max_runes.
+// is the template's guard.reply_max_runes. MaxHookRunes bounds the first line of
+// a post, the line that decides the scroll-past.
 const (
 	MaxPostRunes = 300
 	MaxPostLines = 3
+	MaxHookRunes = 80
 )
 
 // Check ids. Judge checks are StyleRulePrefix plus the 1-based rule number.

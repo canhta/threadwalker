@@ -229,7 +229,7 @@ func TestSchedulerDefersAnAgentWakeDueInQuietHours(t *testing.T) {
 }
 
 // An early wake follows the budget pacing too: $0.20 over one wake, $0.80 left
-// for the 12 hours to midnight, is 3 hours after the last wake started.
+// for the 13 hours from the last wake to midnight, is 3h15m after it started.
 func TestPollInboxWakeEarlyWaitsForThePacedWake(t *testing.T) {
 	g := newInboxRig(t, 10)
 	g.farm = g.now.Add(10 * time.Hour)
@@ -243,7 +243,7 @@ func TestPollInboxWakeEarlyWaitsForThePacedWake(t *testing.T) {
 		}
 	}
 	g.reply("a1", "alice")
-	if next, want := g.poll(t), time.Date(2026, 1, 1, 14, 0, 0, 0, time.UTC); next.Sub(want) < -time.Minute || next.Sub(want) > time.Minute {
+	if next, want := g.poll(t), time.Date(2026, 1, 1, 14, 15, 0, 0, time.UTC); next.Sub(want) < -time.Minute || next.Sub(want) > time.Minute {
 		t.Fatalf("wake at %v, want about %v", next, want)
 	}
 }

@@ -204,7 +204,7 @@ func lengthRule(in WriterInput) string {
 	if lines == 0 {
 		return fmt.Sprintf("Keep each %s text to at most %d characters; a longer text is sent back.", in.Kind, runes)
 	}
-	return fmt.Sprintf("Keep each %s text to at most %d characters and %d lines (blank lines do not count); a longer text is sent back.", in.Kind, runes, lines)
+	return fmt.Sprintf("Keep each %s text to at most %d characters and %d lines (blank lines do not count) and its first line to at most %d characters; a longer text is sent back.", in.Kind, runes, lines, MaxHookRunes)
 }
 
 // ParseWriter decodes the writer's reply: one to max non-empty texts.

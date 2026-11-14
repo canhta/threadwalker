@@ -328,8 +328,8 @@ func (g *Guard) content(ctx context.Context, a Attempt, draft bool) (*actionInte
 	}
 	if a.Tool == "post" && g.opts.Template.Guard.TrendAnchor {
 		first, _, _ := strings.Cut(strings.TrimSpace(intent.Text), "\n")
-		if n := utf8.RuneCountInString(first); n > MaxHookRunes && !draft {
-			intent.detail = strconv.Itoa(n) + " of " + strconv.Itoa(MaxHookRunes) + " characters in the first line"
+		if n := utf8.RuneCountInString(first); n > quality.MaxHookRunes && !draft {
+			intent.detail = strconv.Itoa(n) + " of " + strconv.Itoa(quality.MaxHookRunes) + " characters in the first line"
 			return &intent, "text_length", nil
 		}
 		if intent.Hook == "" || strings.TrimSpace(intent.Rationale) == "" || strings.ContainsAny(intent.Rationale, "\r\n") || utf8.RuneCountInString(intent.Rationale) > MaxRationaleRunes {

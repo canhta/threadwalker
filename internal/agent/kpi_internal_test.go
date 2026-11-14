@@ -86,3 +86,17 @@ func TestBehindCountsFollowersAgainstTheWeeklyTarget(t *testing.T) {
 		t.Error("a template without a kpi block is never behind")
 	}
 }
+
+// An early inbox poll must not pull the paced wake forward: the floor is the
+// last wake plus an interval measured from that wake, wherever the poll falls.
+func TestPacedWakeDoesNotDriftWithTheTimeOfThePoll(t *testing.T) {
+	tmpl := config.Template{Limits: config.LimitsConfig{MaxUSDPerDay: 1, Timezone: "UTC"}}
+	r := &Runtime{opts: Options{Template: tmpl}}
+	// $0.10 a wake over 4 wakes, $0.60 of the $1 left.
+	s := scoreboard{LastWake: testNow, SpendToday: 0.4, WakesToday: 4}
+	atWake := r.pacedWake(s, testNow)
+	atPoll := r.pacedWake(s, testNow.Add(4*time.Hour+20*time.Minute))
+	if !atWake.After(testNow) || !atPoll.Equal(atWake) {
+		t.Fatalf("floor %v at the wake, %v at a poll 4h20m later", atWake, atPoll)
+	}
+}

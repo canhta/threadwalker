@@ -450,6 +450,11 @@ func (d *decoder) threads(t *Template) {
 	}
 	switch th.Backend {
 	case "stub":
+		// The api settings stay known when the backend is stub, so switching a
+		// template to stub is one edit. Only the api backend reads and checks them.
+		for _, field := range []string{"access_token_env", "user_id_env", "base_url", "executable_path", "agent_browser_path"} {
+			d.value("threads." + field)
+		}
 	case "api":
 		th.AccessTokenEnv, th.UserIDEnv = "THREADS_ACCESS_TOKEN", "THREADS_USER_ID"
 		if d.has("threads.access_token_env") {

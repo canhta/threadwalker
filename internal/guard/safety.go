@@ -4,6 +4,7 @@ import (
 	"regexp"
 	"strings"
 	"unicode"
+	"unicode/utf8"
 
 	"golang.org/x/text/unicode/norm"
 
@@ -25,41 +26,61 @@ const (
 	edgeEnd   = `(?:[^\p{L}\p{N}]|$)`
 )
 
-// safetyRules match case-folded text in this order. Identity rules target a
-// person (a second-person or "đồ"/"con" address), never a topic. A rule with
-// plain set matches the text without diacritics (see unaccent), so its pattern
-// is spelled without them and also catches "tha tim cho minh".
-var safetyRules = []struct {
+// Pieces of the engagement-ask patterns. A heart is the word or an emoji.
+const (
+	heart       = `(?:tim|tym|[❤♥\x{1F493}-\x{1F49F}\x{1F5A4}\x{1F90D}\x{1F90E}\x{1F9E1}\x{1F970}\x{FE0F}]+)`
+	me          = `(?:mình|mk|mik|t|tui|tôi)`
+	clauseStart = `(?:^|[.,!?;:\n])\s*`
+	clauseEnd   = `\s*(?:[.,!?;:\n]|$)`
+)
+
+// safetyRule is one hard content rule. A bait rule is also compiled without
+// diacritics (plain), for text typed without any.
+type safetyRule struct {
 	reason  string
-	plain   bool
 	pattern *regexp.Regexp
-}{
-	{reasonIdentity, false, regexp.MustCompile(`(?i)` + edgeStart + `(?:` +
+	plain   *regexp.Regexp
+}
+
+func baitRule(src string) safetyRule {
+	return safetyRule{reasonBait, regexp.MustCompile(src), regexp.MustCompile(unaccent(src))}
+}
+
+// safetyRules match case-folded text in this order. Identity rules target a
+// person (a second-person or "đồ"/"con" address), never a topic.
+var safetyRules = []safetyRule{
+	{reasonIdentity, regexp.MustCompile(`(?i)` + edgeStart + `(?:` +
 		`(?:you(?:'re| are)?|your|ur)\s+(?:so\s+|too\s+)?(?:fat|ugly|old|gay|retarded)` +
 		`|(?:mày|bạn|ông|bà|anh|chị|con|thằng|đồ)\s+(?:quá\s+|rất\s+)?(?:béo|mập|xấu|già|lùn|đen|bê đê|đồng tính|nhà quê|bắc kỳ|nam kỳ|trung kỳ)` +
 		`|(?:ngoại tình|ly hôn|chồng|vợ|người yêu)\s+(?:của\s+)?(?:mày|bạn|ông|bà|anh|chị|nó|hắn)` +
-		`)` + edgeEnd)},
-	{reasonPolitical, false, regexp.MustCompile(`(?i)` + edgeStart + `(?:vote\s+(?:for|against)|(?:nên|hãy|đừng)\s+(?:bầu|bỏ phiếu)|bầu\s+cho|ủng hộ\s+(?:đảng|ứng viên|ông|bà))` + edgeEnd)},
+		`)` + edgeEnd), nil},
+	{reasonPolitical, regexp.MustCompile(`(?i)` + edgeStart + `(?:vote\s+(?:for|against)|(?:nên|hãy|đừng)\s+(?:bầu|bỏ phiếu)|bầu\s+cho|ủng hộ\s+(?:đảng|ứng viên|ông|bà))` + edgeEnd), nil},
 	// Engagement asks are first-person or imperative and aimed at the reader:
-	// "follow mình", "nhớ follow", "thả tim cho mình", "share giúp mình". The
-	// same words in an ordinary sentence ("anh ấy theo dõi em", "chia sẻ cho
-	// fan", "đau tim nha mn") are not asks.
-	{reasonBait, true, regexp.MustCompile(`(?i)` + edgeStart + `(?:` +
-		// Comment, tag, like and share.
-		`comment\s+(?:ngay|\S{1,12}\s+(?:de|if|below|neu))|cmt\s+(?:ngay|\S+\s+de)|tag\s+(?:a\s+|mot\s+)?(?:friend|ban|nguoi)|like\s+(?:va|&|and)\s+share|reply\s+\S{1,6}\s+(?:de|if|to get)` +
-		// A heart: "thả tim cho mình", "để lại 1 tim", "xin 1 tym", "cho mình 1 tim".
-		`|tha\s+(?:tim|tym)\s+(?:cho\s+(?:minh|mk|mik|t|tui|toi)|di|nhe|nha|giup)|de\s+lai\s+(?:mot\s+|1\s+)?(?:tim|tym|like|cmt|comment)|xin\s+(?:mot\s+|1\s+)?(?:tim|tym)|(?:cho|tang)\s+(?:minh|mk|mik|t|tui|toi)\s+(?:mot\s+|1\s+)?(?:tim|tym)` +
-		// Follow: "nhớ follow", "follow mình/mk/t", "follow để xem phần 2", "theo dõi mình để xem tiếp".
-		`|(?:nho|hay|dung\s+quen|bam|nhan)\s+(?:follow|theo\s+doi)|follow\s+(?:me|minh|mk|mik|t|tui|toi|de|nha|nhe|di|ngay|giup|mn|moi\s+nguoi)|theo\s+doi\s+(?:minh|mk|mik|tui|toi)\s+(?:de|nha|nhe|di|ngay|giup)` +
-		// Share and repost: "share/chia sẻ/repost giúp mình", "share ngay cho bạn bè", "nhớ share".
-		`|(?:share|chia\s+se|repost)\s+(?:giup|dum|ho)\s+(?:minh|mk|mik|t|tui|toi|em)|share\s+(?:ngay\s+cho|di|nhe|nha|cho\s+(?:ban|bn|mn|moi\s+nguoi))|(?:nho|hay)\s+(?:share|chia\s+se|repost)` +
-		`)` + edgeEnd)},
-	// A heart opening a clause is a command: "tim đi mn", "❤️ đi mn".
-	{reasonBait, true, regexp.MustCompile(`(?i)(?:^|[.,!?;:\n])\s*(?:tim|tym|[❤♥\x{1F493}-\x{1F49F}\x{1F5A4}\x{1F90D}\x{1F90E}\x{1F9E1}])\s+(?:di|nhe|nha|cho\s+(?:minh|mk|mik|t|tui|toi))` + edgeEnd)},
+	// "follow mình", "nhớ follow nha", "thả tim cho mình", "share giúp mình". The
+	// same words in an ordinary sentence ("anh ấy theo dõi em", "mình hay share
+	// clip", "tui nhớ follow acc này", "Tim đi lạc một nhịp") are not asks.
+	// They are written with diacritics: "hay" is not "hãy" and "tìm" is not "tim".
+	baitRule(`(?i)` + edgeStart + `(?:` +
+		// Comment, tag, like, save and share.
+		`(?:comment|cmt)\s+(?:ngay|\S{1,12}\s+(?:để|if|below|nếu))|tag\s+(?:a\s+|một\s+)?(?:friend|bạn|người|đứa)|like\s+(?:và|&|and)\s+share|like\s+(?:nếu|if)|reply\s+\S{1,6}\s+(?:để|if|to get)|lưu(?:\s+lại)?\s+(?:và|&)\s+(?:share|chia\s+sẻ|repost)` +
+		// A heart: "thả tim cho mình", "thả ❤️ nếu đúng", "thì thả tim", "để lại 1 tim", "xin 1 tym", "cho mình 1 tim".
+		`|thả\s+` + heart + `\s+(?:cho\s+` + me + `|đi|nhé|nha|giúp|nếu)|(?:thì|hãy|nhớ)\s+thả\s+` + heart + clauseEnd +
+		`|để\s+lại\s+(?:một\s+|1\s+)?(?:tim|tym|like|cmt|comment)|xin\s+(?:một\s+|1\s+)?(?:tim|tym)|(?:cho|tặng)\s+` + me + `\s+(?:một\s+|1\s+)?(?:tim|tym)` +
+		// A reminder: "nhớ follow nha", "hãy share ngay", "bấm theo dõi"; "follow mình".
+		`|(?:nhớ|hãy|đừng\s+quên|bấm|nhấn)\s+(?:follow|theo\s+dõi|share|chia\s+sẻ|repost)(?:\s+(?:me|` + me + `|nha|nhé|nhen|đi|mn|mng|mọi\s+người|ngay|giúp|dùm|hộ)|` + clauseEnd + `)` +
+		`|follow\s+(?:me|` + me + `)` +
+		`)` + edgeEnd),
+	// A command opening a clause: "tim đi mn", "❤️❤️ đi mn", "follow page để xem phần 2",
+	// "theo dõi mình nhé", "share giúp mình". After a subject ("mình follow để học") it is not an ask.
+	baitRule(`(?i)` + clauseStart + `(?:` +
+		heart + `\s+(?:đi|nhé|nha|cho\s+` + me + `)(?:\s+(?:mn|mng|mọi\s+người|đi|nha|nhé|nhen))*` + clauseEnd +
+		`|(?:follow|theo\s+dõi)(?:\s+(?:page|kênh|acc|me|` + me + `))?\s+(?:để|nha|nhé|nhen|đi|ngay|giúp|mn|mọi\s+người)` +
+		`|(?:share|chia\s+sẻ|repost)(?:\s+(?:giúp|dùm|hộ)\s+(?:` + me + `|em)|\s+ngay\s+cho|\s+(?:đi|nhé|nha))` +
+		`)` + edgeEnd),
 }
 
-// unaccent drops Vietnamese tone and vowel marks and maps đ to d, so a text
-// typed without diacritics matches the same rule.
+// unaccent drops Vietnamese tone and vowel marks and maps đ to d. It derives the
+// plain bait patterns and tells a text without diacritics from one with them.
 func unaccent(text string) string {
 	var b strings.Builder
 	for _, r := range norm.NFD.String(text) {
@@ -83,14 +104,17 @@ func contentBlock(blocked []string, text string) (reason, detail string) {
 			return reasonBlockedPhrase, phrase
 		}
 	}
-	plain := unaccent(folded)
+	diacritics := unaccent(folded) != folded
 	for _, r := range safetyRules {
-		text := folded
-		if r.plain {
-			text = plain
+		re := r.pattern
+		if !diacritics && r.plain != nil {
+			re = r.plain
 		}
-		if m := r.pattern.FindString(text); m != "" {
-			return r.reason, strings.TrimSpace(m)
+		if loc := re.FindStringIndex(folded); loc != nil {
+			// FoldCase maps rune to rune, so the match is cut from the original text by rune offsets.
+			from := utf8.RuneCountInString(folded[:loc[0]])
+			n := utf8.RuneCountInString(folded[loc[0]:loc[1]])
+			return r.reason, strings.TrimSpace(string([]rune(text)[from : from+n]))
 		}
 	}
 	return "", ""

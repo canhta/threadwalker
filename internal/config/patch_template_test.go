@@ -183,3 +183,81 @@ func TestPatchTemplateV13(t *testing.T) {
 		t.Error("an edited persona must keep warning on every run")
 	}
 }
+
+// older holds the keys older templates carry and v0.3.0 refuses: a comment above one, a nested
+// block, a list and an inline value each, under the sections of the repo template.
+var older = map[string]string{
+	"limits":   "  explore_percent: 30 # share of the last actions\n",
+	"schedule": "  # the minimum cadence\n  study_slots:\n    - \"09:00\"\n    - \"15:00\"\n",
+	"telegram": "  digest_hour: 18 # UTC\n  # Owner-facing copy.\n  messages:\n    digest: \"hôm nay {{.Posts}}\"\n    help: \"lệnh\"\n",
+}
+
+const olderTopLevel = "study:\n  sources:\n    - google_news_vn\nseed_playbook:\n  - \"Reply bám một chi tiết.\"\nlearning:\n  min_effect: 0.2\n"
+
+// Every key v0.3.0 refuses that a historical template carried is removed, and nothing else changes.
+func TestPatchTemplateV13RemovesTheKeysOlderTemplatesCarry(t *testing.T) {
+	py, err := exec.LookPath("python3")
+	if err != nil {
+		t.Skip("python3 not installed")
+	}
+	raw, err := os.ReadFile(viralTemplatePath())
+	if err != nil {
+		t.Fatal(err)
+	}
+	body := string(raw)
+	for section, keys := range older {
+		header := regexp.MustCompile(`(?m)^` + section + `:.*\n`)
+		if !header.MatchString(body) {
+			t.Fatalf("the template has no %s: section", section)
+		}
+		body = header.ReplaceAllStringFunc(body, func(h string) string { return h + keys })
+	}
+	body = strings.Replace(body, "\ndry_run:", "\n"+olderTopLevel+"dry_run:", 1)
+	live := filepath.Join(t.TempDir(), "old.agent.yaml")
+	if err = os.WriteFile(live, []byte(body), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = loadOne(live, viralEnv()); err == nil {
+		t.Fatal("the decoder accepts the older keys; the test proves nothing")
+	}
+	out, err := patchCommand(py, scriptPath, live, viralTemplatePath()).CombinedOutput()
+	if err != nil || len(regexp.MustCompile(`(?m)^removed `).FindAllString(string(out), -1)) != 7 {
+		t.Fatalf("patch: %v\n%s", err, out)
+	}
+	if patched, _ := os.ReadFile(live); string(patched) != string(raw) {
+		t.Errorf("patched template differs from the repo template:\n%s", patched)
+	}
+	if out, _ = patchCommand(py, scriptPath, live, viralTemplatePath()).CombinedOutput(); strings.Contains(string(out), "backup:") {
+		t.Errorf("second run changed the file: %q", out)
+	}
+}
+
+// The v0.2.0 release template is patched into one the strict decoder loads, dry_run untouched.
+func TestPatchTemplateV13OnTheV020Template(t *testing.T) {
+	py, err := exec.LookPath("python3")
+	if err != nil {
+		t.Skip("python3 not installed")
+	}
+	vcs, err := exec.LookPath("git")
+	if err != nil {
+		t.Skip("git not installed")
+	}
+	shipped, err := exec.Command(vcs, "show", "v0.2.0:templates/viral.agent.yaml").Output()
+	if err != nil {
+		t.Skip("tag v0.2.0 is not available")
+	}
+	live := filepath.Join(t.TempDir(), "v0.2.0.agent.yaml")
+	if err = os.WriteFile(live, shipped, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if out, err := patchCommand(py, scriptPath, live, viralTemplatePath()).CombinedOutput(); err != nil {
+		t.Fatalf("patch: %v\n%s", err, out)
+	}
+	patched, err := loadOne(live, viralEnv())
+	if err != nil {
+		t.Fatalf("patched v0.2.0 template does not load: %v", err)
+	}
+	if want := strings.Contains(string(shipped), "\ndry_run: true"); patched.DryRun != want {
+		t.Errorf("dry_run is %v, the v0.2.0 template has %v", patched.DryRun, want)
+	}
+}
