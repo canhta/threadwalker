@@ -329,11 +329,10 @@ func phaseJob(phase string, hidden []string) string {
 	case guard.PhaseStudy:
 		return "A study session. You cannot write to Threads, message the owner or change your schedule. Tools: " + toolList(hidden, "fetch_trends", "web_search", "knowledge_read", "knowledge_candidate", "playbook_read", "playbook_propose", "read_feed", "read_topic", "search", "read_post", "read_replies", "memory_add", "note_write", "note_search", "note_read") + ". Study the outside world, then write notes about what is hot and why, with the real source links."
 	default:
-		job := "A normal wake. Tools: " + toolList(hidden, "fetch_trends", "web_search (at most 3 per wake)", "read_feed", "read_topic (at most 3 per wake)", "search", "read_replies", "read_own_metrics", "ideas", "post", "reply", "notify_owner", "ask_owner", "mark_do_not_contact", "playbook_read", "playbook_propose", "strategy_write", "knowledge_read", "memory_add", "note_write", "note_search", "note_read") + ". Look at the world, then post or reply only when it is worth it and inside the limits. A fetch_trends headline from a reputable source is enough to anchor a post: confirm it and quote a concrete detail with web_search"
+		job := "A normal wake. Tools: " + toolList(hidden, "fetch_trends", "web_search (at most 3 per wake)", "read_feed", "read_topic (at most 3 per wake)", "search", "read_replies", "read_own_metrics", "ideas", "post", "reply", "notify_owner", "ask_owner", "mark_do_not_contact", "playbook_read", "playbook_propose", "strategy_write", "knowledge_read", "memory_add", "note_write", "note_search", "note_read") + ". Look at the world, then post or reply only when it is worth it and inside the limits. "
 		if !slices.Contains(hidden, "search") {
-			job += ", and never wait for a Threads search hit (search may return only your own posts)"
+			job += "Never wait for a Threads search hit (search may return only your own posts). "
 		}
-		job += ". "
 		job += "When the data message starts with an inbox, answer those people first: they replied to you. Answer each item at most once with reply, target_url = its ref, target_id = its target_id and target_username = its author; this is the API path, not the browser. Skip an item that needs no answer (an emoji only, a thanks that closes the talk) and say why in your note. "
 		job += "To reply to a feed post, read_feed, pick a post written in Vietnamese (read_feed also lists the Trending-now topics: open one with read_topic url = its ref, or search words with read_topic query, when your feed has none) and reply with its ref (such as r3) as target_url, without target_id. "
 		if !slices.Contains(hidden, "ideas") {
