@@ -92,6 +92,7 @@ func (l *memoryLedger) RecordLLMUsage(ctx context.Context, agent string, wake in
 	l.days = append(l.days, day)
 	l.usage.TokensIn += u.TokensIn
 	l.usage.TokensOut += u.TokensOut
+	l.usage.TokensCached += u.TokensCached
 	l.usage.CostUSD += u.CostUSD
 	return nil
 }
@@ -281,6 +282,10 @@ func TestInvalidConfiguration(t *testing.T) {
 		func(c *config.LLMConfig, l *config.LimitsConfig, o *llm.Options) { c.APIKey = config.NewSecret("") },
 		func(c *config.LLMConfig, l *config.LimitsConfig, o *llm.Options) { c.PricePerMTokInUSD = -1 },
 		func(c *config.LLMConfig, l *config.LimitsConfig, o *llm.Options) { c.PricePerMTokOutUSD = math.NaN() },
+		func(c *config.LLMConfig, l *config.LimitsConfig, o *llm.Options) {
+			neg := -1.0
+			c.PricePerMTokCachedInUSD = &neg
+		},
 		func(c *config.LLMConfig, l *config.LimitsConfig, o *llm.Options) { l.MaxStepsPerWake = 0 },
 		func(c *config.LLMConfig, l *config.LimitsConfig, o *llm.Options) { l.MaxUSDPerDay = math.Inf(1) },
 		func(c *config.LLMConfig, l *config.LimitsConfig, o *llm.Options) { o.RequestTimeout = -1 },

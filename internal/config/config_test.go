@@ -411,6 +411,22 @@ func TestLoadFile_BlockScalarPreservesHashAndErrorsOnInvalidSyntax(t *testing.T)
 		}
 	}
 
+	// Optional cached_input_per_mtok: parsed when set, rejected when negative.
+	for _, tc := range []struct {
+		val  string
+		fail bool
+	}{{"0.25", false}, {"-1", true}} {
+		y := strings.Replace(baseYAML, "  price_per_mtok_in_usd: 0", "  cached_input_per_mtok: "+tc.val+"\n  price_per_mtok_in_usd: 0", 1)
+		f := filepath.Join(t.TempDir(), "cached.yaml")
+		if err := os.WriteFile(f, []byte(y), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		tm, err := loadOne(f, validEnv())
+		if tc.fail != (err != nil) || (err == nil && (tm.LLM.PricePerMTokCachedInUSD == nil || *tm.LLM.PricePerMTokCachedInUSD != 0.25)) {
+			t.Fatalf("cached_input_per_mtok %s: err=%v", tc.val, err)
+		}
+	}
+
 	// YAML syntax errors: unexpected list item, missing colon, unexpected indentation
 	syntaxCases := []struct {
 		name string

@@ -73,5 +73,5 @@ func (c *Client) recordToolResult(ctx context.Context, request int, tool string,
 }
 
 func (c *Client) recordUsage(ctx context.Context, request, attempt int, u Usage) {
-	c.record(ctx, store.TranscriptUsage, map[string]any{"request": request, "attempt": attempt, "tokens_in": u.TokensIn, "tokens_out": u.TokensOut, "cost_usd": u.CostUSD})
+	c.record(ctx, store.TranscriptUsage, map[string]any{"request": request, "attempt": attempt, "tokens_in": u.TokensIn, "tokens_cached": u.TokensCached, "tokens_out": u.TokensOut, "cost_usd": u.CostUSD})
 }

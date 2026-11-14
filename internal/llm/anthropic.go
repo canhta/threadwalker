@@ -55,7 +55,7 @@ type anthropicTool struct {
 	InputSchema json.RawMessage `json:"input_schema"`
 }
 
-func (anthropicAdapter) encode(model string, messages []Message, tools []Tool, limit int, reasoning string) ([]byte, error) {
+func (anthropicAdapter) encode(model string, messages []Message, tools []Tool, limit int, reasoning, _ string) ([]byte, error) {
 	if limit == 0 {
 		limit = 1024
 		if reasoning != "" {
@@ -161,6 +161,7 @@ func (anthropicAdapter) decode(raw []byte) (completion, error) {
 			}
 			input = &n
 		}
+		response.cached = wire.Usage.CacheRead
 		response.Usage = &struct {
 			PromptTokens     *int64 `json:"prompt_tokens"`
 			CompletionTokens *int64 `json:"completion_tokens"`

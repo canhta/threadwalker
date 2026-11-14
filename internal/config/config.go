@@ -246,6 +246,8 @@ type LLMConfig struct {
 	APIKey             Secret
 	PricePerMTokInUSD  float64
 	PricePerMTokOutUSD float64
+	// PricePerMTokCachedInUSD prices cached input tokens; nil means the input rate.
+	PricePerMTokCachedInUSD *float64
 	// ReasoningEffort is an optional provider-specific hint, sent when nonempty: openai
 	// reasoning_effort, or anthropic adaptive thinking with output_config.effort. Values are operator inputs, not an allowlist.
 	ReasoningEffort string

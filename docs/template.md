@@ -60,6 +60,7 @@ All required unless noted. A phrase in both `guard.blocked_phrases` and `persona
 | `model` | string | required | template | Model ID |
 | `api_key_env` | string | required | ops | Environment variable holding the key; resolved into a redacting `Secret` |
 | `price_per_mtok_in_usd`, `price_per_mtok_out_usd` | number >= 0 | required | code | Flat rates for the local ledger |
+| `cached_input_per_mtok` | number >= 0 | the input rate | code | Rate for cached input tokens (OpenAI `prompt_tokens_details.cached_tokens`, Anthropic `cache_read_input_tokens`); the rest of the input is billed at the input rate |
 | `reasoning_effort` | string | unset (omitted) | template | `openai`: sent as `reasoning_effort`. `anthropic`: `thinking: {type: adaptive}` with `output_config.effort` set to it |
 
 | Block | Effect |

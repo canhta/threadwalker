@@ -12,7 +12,7 @@ import (
 type protocolAdapter interface {
 	endpoint(string) string
 	authorize(*http.Request, string)
-	encode(string, []Message, []Tool, int, string) ([]byte, error)
+	encode(model string, messages []Message, tools []Tool, limit int, reasoning, cacheKey string) ([]byte, error)
 	decode([]byte) (completion, error)
 	// attempted lists the tool calls a provider response tried to make, for the audit of a refused response.
 	attempted([]byte) []ToolCall
@@ -37,27 +37,38 @@ func (openAIAdapter) endpoint(base string) string {
 func (openAIAdapter) authorize(req *http.Request, key string) {
 	req.Header.Set("Authorization", "Bearer "+key)
 }
-func (openAIAdapter) encode(model string, messages []Message, tools []Tool, limit int, reasoning string) ([]byte, error) {
+func (openAIAdapter) encode(model string, messages []Message, tools []Tool, limit int, reasoning, cacheKey string) ([]byte, error) {
 	return json.Marshal(struct {
 		Model               string    `json:"model"`
 		Messages            []Message `json:"messages"`
 		Tools               []Tool    `json:"tools,omitempty"`
 		MaxCompletionTokens int       `json:"max_completion_tokens,omitempty"`
 		ReasoningEffort     string    `json:"reasoning_effort,omitempty"`
-	}{model, messages, tools, limit, reasoning})
+		PromptCacheKey      string    `json:"prompt_cache_key,omitempty"`
+	}{model, messages, tools, limit, reasoning, cacheKey})
 }
 func (openAIAdapter) decode(raw []byte) (completion, error) {
 	var wire struct {
 		Usage *struct {
 			PromptTokens     *int64 `json:"prompt_tokens"`
 			CompletionTokens *int64 `json:"completion_tokens"`
+			Details          struct {
+				Cached int64 `json:"cached_tokens"`
+			} `json:"prompt_tokens_details"`
 		} `json:"usage"`
 		Choices json.RawMessage `json:"choices"`
 	}
 	if err := json.Unmarshal(raw, &wire); err != nil {
 		return completion{}, err
 	}
-	response := completion{Usage: wire.Usage, raw: raw}
+	response := completion{raw: raw}
+	if wire.Usage != nil {
+		response.Usage = &struct {
+			PromptTokens     *int64 `json:"prompt_tokens"`
+			CompletionTokens *int64 `json:"completion_tokens"`
+		}{wire.Usage.PromptTokens, wire.Usage.CompletionTokens}
+		response.cached = wire.Usage.Details.Cached
+	}
 	var choices []struct {
 		Message      Message `json:"message"`
 		FinishReason string  `json:"finish_reason"`

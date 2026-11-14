@@ -198,6 +198,10 @@ func (d *decoder) llmBlock(prefix string, l *LLMConfig) {
 	l.APIKeyEnv = d.str(prefix + ".api_key_env")
 	l.PricePerMTokInUSD = d.float(prefix+".price_per_mtok_in_usd", true)
 	l.PricePerMTokOutUSD = d.float(prefix+".price_per_mtok_out_usd", true)
+	if d.has(prefix + ".cached_input_per_mtok") {
+		c := d.float(prefix+".cached_input_per_mtok", true)
+		l.PricePerMTokCachedInUSD = &c
+	}
 	l.ReasoningEffort = strings.TrimSpace(d.doc.scalars[prefix+".reasoning_effort"])
 }
 

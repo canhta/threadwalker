@@ -13,6 +13,8 @@ type LLMUsage struct {
 	TokensIn  int64
 	TokensOut int64
 	CostUSD   float64
+	// TokensCached is the cached share of TokensIn. It is traced but not stored in the ledger tables.
+	TokensCached int64
 	// Phase overrides the wake kind as the ledger phase; only "critic" is honoured.
 	Phase string
 }

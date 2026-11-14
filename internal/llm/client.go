@@ -155,7 +155,7 @@ func New(cfg config.LLMConfig, limits config.LimitsConfig, ledger Ledger, opts O
 	if strings.TrimSpace(cfg.Model) == "" || cfg.APIKey.Expose() == "" {
 		return nil, errors.New("configuring LLM client: model and API key are required")
 	}
-	if !stdx.FiniteNonNegative(cfg.PricePerMTokInUSD) || !stdx.FiniteNonNegative(cfg.PricePerMTokOutUSD) || !stdx.FiniteNonNegative(limits.MaxUSDPerDay) || limits.MaxUSDPerDay == 0 || limits.MaxStepsPerWake <= 0 {
+	if !stdx.FiniteNonNegative(cfg.PricePerMTokInUSD) || !stdx.FiniteNonNegative(cfg.PricePerMTokOutUSD) || (cfg.PricePerMTokCachedInUSD != nil && !stdx.FiniteNonNegative(*cfg.PricePerMTokCachedInUSD)) || !stdx.FiniteNonNegative(limits.MaxUSDPerDay) || limits.MaxUSDPerDay == 0 || limits.MaxStepsPerWake <= 0 {
 		return nil, errors.New("configuring LLM client: invalid prices or limits")
 	}
 	phase, capUSD, err := resolvePhase(opts, limits)
@@ -208,6 +208,8 @@ type completion struct {
 		PromptTokens     *int64 `json:"prompt_tokens"`
 		CompletionTokens *int64 `json:"completion_tokens"`
 	}
+	// cached is the cached share of the prompt tokens, priced at the cached rate.
+	cached       int64
 	Message      Message
 	FinishReason string
 	// assistant is true when the response carried exactly one assistant message.
@@ -250,7 +252,7 @@ func (c *Client) Run(ctx context.Context, agentID string, wakeID int64, messages
 	called, succeeded := map[string]bool{}, map[string]int{}
 	for result.Steps < c.maxSteps {
 		requestIndex++
-		body, err := c.adapter.encode(c.config.Model, result.Messages, tools, c.outputLimit, c.reasoning)
+		body, err := c.adapter.encode(c.config.Model, result.Messages, tools, c.outputLimit, c.reasoning, c.cacheKey(agentID))
 		if err != nil {
 			return result, failure("encoding chat request", "invalid_request", err)
 		}
@@ -459,15 +461,19 @@ func (c *Client) requestAttempt(ctx context.Context, agentID string, wakeID int6
 		if response.Usage.PromptTokens == nil || response.Usage.CompletionTokens == nil {
 			return completion{}, status, 0, failure("accounting chat response", "incomplete_usage", nil)
 		}
-		usage = Usage{TokensIn: *response.Usage.PromptTokens, TokensOut: *response.Usage.CompletionTokens}
-		if usage.TokensIn < 0 || usage.TokensOut < 0 {
+		usage = Usage{TokensIn: *response.Usage.PromptTokens, TokensOut: *response.Usage.CompletionTokens, TokensCached: response.cached}
+		if usage.TokensIn < 0 || usage.TokensOut < 0 || usage.TokensCached < 0 || usage.TokensCached > usage.TokensIn {
 			usage = Usage{}
 			return completion{}, status, 0, failure("accounting chat response", "negative_usage", nil)
 		}
 		if c.phase == "critic" {
 			usage.Phase = "critic"
 		}
-		usage.CostUSD = float64(usage.TokensIn)/1e6*c.config.PricePerMTokInUSD + float64(usage.TokensOut)/1e6*c.config.PricePerMTokOutUSD
+		cachedRate := c.config.PricePerMTokInUSD
+		if c.config.PricePerMTokCachedInUSD != nil {
+			cachedRate = *c.config.PricePerMTokCachedInUSD
+		}
+		usage.CostUSD = float64(usage.TokensIn-usage.TokensCached)/1e6*c.config.PricePerMTokInUSD + float64(usage.TokensCached)/1e6*cachedRate + float64(usage.TokensOut)/1e6*c.config.PricePerMTokOutUSD
 		if !stdx.FiniteNonNegative(usage.CostUSD) {
 			usage = Usage{}
 			return completion{}, status, 0, failure("accounting chat response", "nonfinite_cost", nil)
@@ -594,4 +600,13 @@ func (c *Client) redactMessage(m Message) Message {
 		m.ToolCalls[i].Function.Arguments = redact(m.ToolCalls[i].Function.Arguments)
 	}
 	return m
+}
+
+// cacheKey is the OpenAI prompt_cache_key, "<agent>:<phase>". Only api.openai.com
+// is known to accept it; other OpenAI-compatible endpoints may reject unknown fields.
+func (c *Client) cacheKey(agentID string) string {
+	if u, err := url.Parse(c.config.BaseURL); err != nil || u.Hostname() != "api.openai.com" {
+		return ""
+	}
+	return agentID + ":" + c.phase
 }
