@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/canhta/threadz/internal/stdx"
 	"maps"
 	"strings"
 	"time"
@@ -186,6 +187,9 @@ func (d *Dispatcher) webSearch(ctx context.Context, query string) (trends.WebSea
 // findPosts is the one finder: it checks the arguments the source takes, the
 // source's per-wake cap and whether the source is closed, runs the read, and
 // gives every post and trend in the page its ref.
+// maxTopicQueryBytes bounds a trend title used as a Threads search.
+const maxTopicQueryBytes = 160
+
 func (d *Dispatcher) findPosts(ctx context.Context, a arguments) (any, error) {
 	source := a.Text("source")
 	src, _ := guard.FindSourceOf(source)
@@ -206,13 +210,18 @@ func (d *Dispatcher) findPosts(ctx context.Context, a arguments) (any, error) {
 	if given["topic"] {
 		// Only a Threads topic link opens; a news link would fail in the
 		// browser and still use up a read. With a query too, the query is read.
+		// A news trend has no topic page: its title is searched on Threads instead.
 		seen, ok := d.guard.Trend(a.Text("topic"))
+		title, _, _ := strings.Cut(d.guard.TrendText(a.Text("topic")), ". ")
 		switch {
 		case ok && threads.IsTopicURL(seen):
 			a.Args = a.Args.WithText("url", seen).WithText("query", "")
 		case given["query"]:
+		case ok && strings.TrimSpace(title) != "":
+			title, _ = stdx.TruncateUTF8(strings.TrimSpace(title), maxTopicQueryBytes)
+			a.Args = a.Args.WithText("query", title)
 		default:
-			return nil, &guard.BlockedError{Reason: "find_args", Detail: "a topic ref from the Trending-now list, or query"}
+			return nil, &guard.BlockedError{Reason: "find_args", Detail: "a t ref read this wake, or query"}
 		}
 	}
 	if err := d.countCall(scope); err != nil {

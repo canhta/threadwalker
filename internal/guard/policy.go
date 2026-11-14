@@ -188,6 +188,14 @@ func (g *Guard) NoteTrend(refs ...string) []string {
 	return short
 }
 
+// TrendText is the text noted with a t ref this wake (a trend's title, or a
+// web source's title and answer); empty when none was noted.
+func (g *Guard) TrendText(ref string) string {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	return g.trendText[g.refItem[strings.ToLower(strings.TrimSpace(ref))]]
+}
+
 // NoteTrendText is NoteTrend for an item whose text the critic may read.
 func (g *Guard) NoteTrendText(ref, text string) string {
 	short := g.NoteTrend(ref)

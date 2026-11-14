@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strconv"
 	"strings"
 	"time"
 
@@ -52,13 +53,13 @@ func (d *Dispatcher) browserRead(ctx context.Context, tool, operation string, a 
 		if row, ok := d.guard.IssuedPost(a.Text("id")); ok && row.MediaID == "" {
 			return threads.Page{Kind: "post", Posts: []threads.Post{{Ref: store.PostRef(row.ID), Username: row.Author, Text: row.Text, URL: row.URL, Likes: row.Likes, Replies: row.Replies, AgeMinutes: row.AgeMinutes}}}, nil
 		}
-		id, rerr := d.apiPostID(a.Text("id"))
+		id, rerr := d.apiPostID(ctx, a.Text("id"))
 		if rerr != nil {
 			return nil, rerr
 		}
 		page, err = d.opts.Threads.ReadPost(ctx, id)
 	case threads.OpReadReplies:
-		id, rerr := d.apiPostID(a.Text("id"))
+		id, rerr := d.apiPostID(ctx, a.Text("id"))
 		if rerr != nil {
 			return nil, rerr
 		}
@@ -86,10 +87,26 @@ func (d *Dispatcher) browserRead(ctx context.Context, tool, operation string, a 
 	return page, nil
 }
 
+// ownActionIDDigits: local action ids stay far shorter than Threads media ids (17+ digits).
+const ownActionIDDigits = 10
+
 // apiPostID turns a p ref into the post's API id; a numeric id or an empty one
 // (mentions) passes through. A post only a browser read showed has no API id.
-func (d *Dispatcher) apiPostID(id string) (string, error) {
-	if !strings.HasPrefix(strings.ToLower(strings.TrimSpace(id)), "p") {
+func (d *Dispatcher) apiPostID(ctx context.Context, id string) (string, error) {
+	id = strings.TrimSpace(id)
+	// The agent sees its own actions by their local id; a Threads media id is
+	// far longer, so a short number is taken as one of the agent's actions.
+	if n, err := strconv.ParseInt(id, 10, 64); err == nil && len(id) < ownActionIDDigits {
+		media, err := d.opts.Store.OwnMediaID(ctx, d.opts.Template.ID, n)
+		if err != nil {
+			return "", err
+		}
+		if media == "" {
+			return "", &guard.BlockedError{Reason: "unknown_target", Detail: id}
+		}
+		return media, nil
+	}
+	if !strings.HasPrefix(strings.ToLower(id), "p") {
 		return id, nil
 	}
 	row, ok := d.guard.IssuedPost(id)
@@ -248,6 +265,12 @@ func (d *Dispatcher) publishParts(ctx context.Context, a arguments, firstID stri
 // browserResult logs the finished operation under the tool that ran it, find_posts
 // with its source for a find.
 func (d *Dispatcher) browserResult(ctx context.Context, tool, operation string, started time.Time, err error) error {
+	// A refusal before any read (an unknown ref, a post with no API id) is not
+	// a browser failure.
+	var refused *guard.BlockedError
+	if errors.As(err, &refused) {
+		return err
+	}
 	reason, outcome := "completed", "success"
 	if err != nil {
 		outcome = "error"

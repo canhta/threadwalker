@@ -206,3 +206,17 @@ func (s *Store) RecentOwnTexts(ctx context.Context, scope ActionScope, limit int
 	}
 	return out, rows.Err()
 }
+
+// OwnMediaID returns the Threads media id of one of the agent's published
+// actions, or "" when the action is not the agent's or was never published.
+func (s *Store) OwnMediaID(ctx context.Context, agentID string, actionID int64) (string, error) {
+	var media string
+	err := s.db.QueryRowContext(ctx, `SELECT media_id FROM actions WHERE agent_id=? AND id=? AND failed=0`, agentID, actionID).Scan(&media)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", nil
+	}
+	if err != nil {
+		return "", fmt.Errorf("reading own media id: %w", err)
+	}
+	return media, nil
+}

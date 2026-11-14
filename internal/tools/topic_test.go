@@ -82,19 +82,31 @@ func TestFindPostsRefusesOnlyAMissingArgument(t *testing.T) {
 	}
 }
 
-// A news link is not a topic page: it is refused before the browser and does
-// not use up one of the wake's topic reads.
-func TestReadTopicRefusesANewsLinkWithoutSpendingARead(t *testing.T) {
+// A news trend has no topic page, so its title is searched on Threads instead
+// of opening the news link.
+func TestTopicOfANewsTrendSearchesItsTitle(t *testing.T) {
 	h := newBrowserHarness(t, true)
 	h.backend.Pages[threads.OpReadFeed] = threads.Page{Kind: "feed", Trends: []threads.Trend{{Title: "Synthetic news", Summary: "Synthetic summary", URL: "https://vnexpress.net/synthetic-story.html"}}}
 	h.backend.Pages[threads.OpReadTopic] = threads.Page{Kind: "topic"}
 	h.mustCall("find_posts", `{"source":"feed"}`)
 	h.next()
-	if _, err := h.call("find_posts", `{"source":"topic","topic":"t1"}`); err == nil || !strings.Contains(err.Error(), "find_args") {
-		t.Fatalf("a news link was accepted: %v", err)
+	h.mustCall("find_posts", `{"source":"topic","topic":"t1"}`)
+	if got := h.backend.Last(threads.OpReadTopic).Arg; got != "Synthetic news" {
+		t.Fatalf("searched %q, want the trend title", got)
 	}
-	for i := 0; i < tools.MaxTopicReadsPerWake; i++ {
-		h.next()
-		h.mustCall("find_posts", `{"source":"topic","query":"synthetic words"}`)
+}
+
+// The agent knows its own posts by their local action id; read_replies maps it
+// to the post's media id, and an id that is not the agent's is refused.
+func TestReadRepliesTakesAnOwnActionID(t *testing.T) {
+	h := newBrowserHarness(t, true)
+	insertPipelineAction(t, h, 54, "agent", false, "https://threads.example/own")
+	h.mustCall("read_replies", `{"id":"54"}`)
+	if got := h.backend.Last(threads.OpReadReplies).Arg; got != mediaOf("https://threads.example/own") {
+		t.Fatalf("read replies of %q, want the action's media id", got)
+	}
+	h.next()
+	if _, err := h.call("read_replies", `{"id":"999"}`); err == nil || !strings.Contains(err.Error(), "unknown_target") {
+		t.Fatalf("a foreign action id was read: %v", err)
 	}
 }
