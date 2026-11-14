@@ -77,9 +77,8 @@ func (d *Dispatcher) executors() map[string]executor {
 			result, err := d.webSearch(ctx, a.Text("query"))
 			if err == nil {
 				for i, s := range result.Sources {
-					if refs := d.guard.NoteTrend(s.URL); len(refs) > 0 {
-						result.Sources[i].Ref = refs[0]
-					}
+					// The anchor's text is what the agent read, so the critic can ground a detail in it.
+					result.Sources[i].Ref = d.guard.NoteTrendText(s.URL, s.Title+". "+result.Answer)
 				}
 			}
 			d.event(ctx, logging.WebSearchFinished, outcome(err), trends.WebSearchReason(err), "web_search", time.Time{})
