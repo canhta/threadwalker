@@ -297,16 +297,6 @@ type OwnerSummary struct {
 	// Followers is the newest account follower count measured in [from,to) and
 	// FollowersBefore the newest before from; nil when not measured.
 	Followers, FollowersBefore *int64
-	// Top is the post with the most views among the day's metric samples; zero
-	// ActionID when none.
-	Top TopPost
-}
-
-// TopPost identifies a post by its id, permalink and counts, never its text.
-type TopPost struct {
-	ActionID           int64
-	URL                string
-	Views, Engagements int
 }
 
 // Refusal is one reason code and how often it occurred.
@@ -420,10 +410,6 @@ func (s *Store) OwnerSummary(ctx context.Context, id string, dryRun bool, from, 
 	err = s.db.QueryRowContext(ctx, `SELECT COUNT(*),COALESCE(SUM(m.views),0),COALESCE(SUM(m.likes),0),COALESCE(SUM(m.replies),0),COALESCE(SUM(m.reposts),0) FROM metrics m JOIN actions a ON a.id=m.action_id AND a.agent_id=m.agent_id WHERE m.agent_id=? AND a.dry_run=? AND julianday(m.measured_at)>=julianday(?) AND julianday(m.measured_at)<julianday(?) AND m.measured_at=(SELECT MAX(m2.measured_at) FROM metrics m2 WHERE m2.agent_id=m.agent_id AND m2.action_id=m.action_id AND julianday(m2.measured_at)<julianday(?))`, id, dryRun, formatStoreTimestamp(from), formatStoreTimestamp(to), formatStoreTimestamp(to)).Scan(&out.MetricSamples, &out.Views, &out.Likes, &out.Responses, &out.Reposts)
 	if err != nil {
 		return out, fmt.Errorf("counting owner summary metrics: %w", err)
-	}
-	err = s.db.QueryRowContext(ctx, `SELECT a.id,COALESCE(a.thread_url,''),m.views,m.likes+m.replies+m.reposts+COALESCE(m.quotes,0) FROM metrics m JOIN actions a ON a.id=m.action_id AND a.agent_id=m.agent_id WHERE m.agent_id=? AND a.dry_run=? AND a.kind='post' AND julianday(m.measured_at)>=julianday(?) AND julianday(m.measured_at)<julianday(?) AND m.measured_at=(SELECT MAX(m2.measured_at) FROM metrics m2 WHERE m2.agent_id=m.agent_id AND m2.action_id=m.action_id AND julianday(m2.measured_at)<julianday(?)) ORDER BY m.views DESC,a.id DESC LIMIT 1`, id, dryRun, formatStoreTimestamp(from), formatStoreTimestamp(to), formatStoreTimestamp(to)).Scan(&out.Top.ActionID, &out.Top.URL, &out.Top.Views, &out.Top.Engagements)
-	if err != nil && err != sql.ErrNoRows {
-		return out, fmt.Errorf("reading top post: %w", err)
 	}
 	if out.Followers, err = s.followerCount(ctx, id, from, to); err != nil {
 		return out, err

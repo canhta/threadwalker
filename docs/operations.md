@@ -31,6 +31,8 @@ The service listens on a Unix socket (`--socket`, `THREADZ_ADMIN_SOCKET`, defaul
 | `wakes --agent [--since] [--limit]` | database, read-only | Wake list |
 | `wake-show <id> --agent` | database, read-only | One wake's stored transcript with its guard decisions |
 | `wake-diagnose <id> --agent` | database, read-only | One wake as a funnel; see [Diagnose a wake](#diagnose-a-wake) |
+| `lessons --agent` | database, read-only | Active and retired lessons with their use |
+| `lessons forget <id> --agent` | admin socket | Retire a lesson for good; the agent will not add it again |
 | `wake-export <id> --agent [--keep-text] [--briefs]` | database, read-only | The wake's reads, calls and guard verdicts as a `replay` eval suite on stdout ([evals.md](evals.md#replay-cases)); the text of other people's posts is blanked unless `--keep-text`; `--briefs` writes the writer and critic briefs for a live replay ([evals.md](evals.md#replaying-briefs-through-the-current-writer-and-critic-live)) |
 | `logs [--agent] [--wake] [--event] [--follow] [--source journal\|db]` | journald, or `db` for one wake's transcript | Structured log filtered by agent, wake or event; `--unit` selects another journald unit |
 | `draft --agent --input FILE` | host | Writer and critic on fixed items, nothing published ([content.md](content.md)) |
@@ -91,7 +93,7 @@ A call older than the details' retention shows its outcome and guard reason with
 | Item | Fact |
 |---|---|
 | Agent to owner | When it meets something outside its permissions, is logged out or hits a captcha (the notice says how to send cookies with `/cookie`), has no Threads token (carries the OAuth link, once a day), or is near its budget limit; once per local day when a running agent has published nothing for longer than `kpi.max_hours_without_publish` (hours, how the last run ended, top blocked reasons today); plus the daily report |
-| Owner commands | `/help`, `/start`, `/status`, `/report`, `/pause`, `/resume`, `/kill`, `/dnc <username>`, `/cookie <cookies>`, `/update`. With a shared bot, per-agent commands take the ID: `/pause <agent_id>`, `/dnc <agent_id> <username>`, `/status <agent_id>`, `/report <agent_id>`. Ambiguous or unknown agents fail safely. `/kill` is terminal; `/resume` cannot revive it |
+| Owner commands | `/help`, `/start`, `/status`, `/report`, `/lessons`, `/forget <id>`, `/pause`, `/resume`, `/kill`, `/dnc <username>`, `/cookie <cookies>`, `/update`. With a shared bot, per-agent commands take the ID: `/pause <agent_id>`, `/dnc <agent_id> <username>`, `/status <agent_id>`, `/report <agent_id>`, `/lessons <agent_id>`, `/forget <agent_id> <id>`. Ambiguous or unknown agents fail safely. `/kill` is terminal; `/resume` cannot revive it |
 | Replies | Replying to a delivered `ask_owner` question answers it. Free text that is neither a command nor a reply becomes an owner note for the next wake with one acknowledgement and no model call |
 | Access | One long poller per bot; conflicting owner chats for a bot are rejected. Only the configured owner chat can command or answer |
 | Persistence | Poll offsets, command receipts, question delivery IDs and reply correlation survive restarts |

@@ -13,7 +13,7 @@ type LLMUsage struct {
 	TokensIn  int64
 	TokensOut int64
 	CostUSD   float64
-	// TokensCached is the cached share of TokensIn. It is traced but not stored in the ledger tables.
+	// TokensCached is the cached share of TokensIn.
 	TokensCached int64
 	// Phase overrides the wake kind as the ledger phase; only "critic" is honoured.
 	Phase string
@@ -58,13 +58,14 @@ func (s *Store) RecordLLMUsage(ctx context.Context, agentID string, wakeID int64
 	}
 
 	_, err = tx.ExecContext(ctx, `
-		INSERT INTO ledger_phases (agent_id, day, phase, tokens_in, tokens_out, cost_usd)
-		VALUES (?, ?, ?, ?, ?, ?)
+		INSERT INTO ledger_phases (agent_id, day, phase, tokens_in, tokens_out, cost_usd, tokens_cached)
+		VALUES (?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT(agent_id, day, phase) DO UPDATE SET
 			tokens_in = ledger_phases.tokens_in + excluded.tokens_in,
 			tokens_out = ledger_phases.tokens_out + excluded.tokens_out,
-			cost_usd = ledger_phases.cost_usd + excluded.cost_usd
-	`, agentID, day, phase, usage.TokensIn, usage.TokensOut, usage.CostUSD)
+			cost_usd = ledger_phases.cost_usd + excluded.cost_usd,
+			tokens_cached = ledger_phases.tokens_cached + excluded.tokens_cached
+	`, agentID, day, phase, usage.TokensIn, usage.TokensOut, usage.CostUSD, usage.TokensCached)
 	if err != nil {
 		return fmt.Errorf("recording LLM usage for agent %q on %s: updating ledger: %w", agentID, day, err)
 	}
@@ -98,10 +99,10 @@ func (s *Store) RecordLLMUsage(ctx context.Context, agentID string, wakeID int64
 func (s *Store) LLMUsageForDay(ctx context.Context, agentID string, day string) (LLMUsage, error) {
 	var usage LLMUsage
 	err := s.db.QueryRowContext(ctx, `
-		SELECT COALESCE(SUM(tokens_in),0), COALESCE(SUM(tokens_out),0), COALESCE(SUM(cost_usd),0)
+		SELECT COALESCE(SUM(tokens_in),0), COALESCE(SUM(tokens_out),0), COALESCE(SUM(cost_usd),0), COALESCE(SUM(tokens_cached),0)
 		FROM ledger_phases
 		WHERE agent_id = ? AND day = ?
-	`, agentID, day).Scan(&usage.TokensIn, &usage.TokensOut, &usage.CostUSD)
+	`, agentID, day).Scan(&usage.TokensIn, &usage.TokensOut, &usage.CostUSD, &usage.TokensCached)
 	if err != nil {
 		return LLMUsage{}, fmt.Errorf("reading LLM usage for agent %q on %s: %w", agentID, day, err)
 	}
@@ -114,6 +115,9 @@ func (u LLMUsage) validate() error {
 	}
 	if u.TokensOut < 0 {
 		return fmt.Errorf("tokens out must not be negative: %d", u.TokensOut)
+	}
+	if u.TokensCached < 0 || u.TokensCached > u.TokensIn {
+		return fmt.Errorf("tokens cached must be within tokens in: %d of %d", u.TokensCached, u.TokensIn)
 	}
 	if u.CostUSD < 0 {
 		return fmt.Errorf("cost must not be negative: %v", u.CostUSD)

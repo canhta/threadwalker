@@ -119,7 +119,7 @@ func (s *Store) LLMUsageForDayPhases(ctx context.Context, agentID, day string, p
 		args = append(args, phase)
 	}
 	var usage LLMUsage
-	err := s.db.QueryRowContext(ctx, `SELECT COALESCE(SUM(tokens_in),0),COALESCE(SUM(tokens_out),0),COALESCE(SUM(cost_usd),0) FROM ledger_phases WHERE agent_id=? AND day=? AND phase IN (`+placeholders+`)`, args...).Scan(&usage.TokensIn, &usage.TokensOut, &usage.CostUSD)
+	err := s.db.QueryRowContext(ctx, `SELECT COALESCE(SUM(tokens_in),0),COALESCE(SUM(tokens_out),0),COALESCE(SUM(cost_usd),0),COALESCE(SUM(tokens_cached),0) FROM ledger_phases WHERE agent_id=? AND day=? AND phase IN (`+placeholders+`)`, args...).Scan(&usage.TokensIn, &usage.TokensOut, &usage.CostUSD, &usage.TokensCached)
 	if err != nil {
 		return LLMUsage{}, fmt.Errorf("reading phase usage: %w", err)
 	}
@@ -129,7 +129,7 @@ func (s *Store) LLMUsageForDayPhases(ctx context.Context, agentID, day string, p
 // LLMUsageByPhaseForDay returns each phase's totals; absent phases are zero.
 func (s *Store) LLMUsageByPhaseForDay(ctx context.Context, agentID, day string) (map[string]LLMUsage, error) {
 	out := map[string]LLMUsage{"agent": {}, "dream": {}, "critic": {}}
-	rows, err := s.db.QueryContext(ctx, `SELECT phase,tokens_in,tokens_out,cost_usd FROM ledger_phases WHERE agent_id=? AND day=?`, agentID, day)
+	rows, err := s.db.QueryContext(ctx, `SELECT phase,tokens_in,tokens_out,cost_usd,tokens_cached FROM ledger_phases WHERE agent_id=? AND day=?`, agentID, day)
 	if err != nil {
 		return nil, fmt.Errorf("reading phase usage: %w", err)
 	}
@@ -137,7 +137,7 @@ func (s *Store) LLMUsageByPhaseForDay(ctx context.Context, agentID, day string) 
 	for rows.Next() {
 		var phase string
 		var usage LLMUsage
-		if err = rows.Scan(&phase, &usage.TokensIn, &usage.TokensOut, &usage.CostUSD); err != nil {
+		if err = rows.Scan(&phase, &usage.TokensIn, &usage.TokensOut, &usage.CostUSD, &usage.TokensCached); err != nil {
 			return nil, fmt.Errorf("reading phase usage: %w", err)
 		}
 		if phase != "agent" && phase != "dream" && phase != "critic" {

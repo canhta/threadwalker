@@ -32,10 +32,17 @@ func TestReportText(t *testing.T) {
 		Status: "running", NextWake: day.Add(14*time.Hour + 45*time.Minute),
 		Posts: 2, Replies: 5, CostUSD: 0.42, WakeCostUSD: 0.4, DreamCostUSD: 0.02,
 		MetricSamples: 4, Views: 3400, Likes: 120, Responses: 30, Reposts: 8,
-		Top:       store.TopPost{ActionID: 7, URL: "https://www.threads.com/@a/post/x", Views: 1234, Engagements: 56},
 		Followers: &followers, FollowersBefore: &before,
 		FailedWakes: 1, FailReasons: []store.Refusal{{Reason: "step_limit", Count: 1}},
 		Blocked: []store.Refusal{{Reason: "blocked_phrase", Count: 3}, {Reason: "quota", Count: 1}},
+	}
+	at := day.Add(8 * time.Hour)
+	learned := learning{
+		best:      []store.Episode{{ActionID: 12, Kind: "reply", Window: 6, Rank: 0.92, Pool: 30, Views: 340, Likes: 12, Replies: 3, Text: "Ship the smallest thing that can fail."}},
+		worst:     []store.Episode{{ActionID: 9, Kind: "post", Window: 6, Rank: 0.08, Pool: 25, Views: 20, Likes: 0, Replies: 0, Text: "Good morning everyone"}},
+		added:     []store.Lesson{{ID: 6, Kind: "reply", Polarity: "do", Text: "Answer with one number.", CreatedAt: at}},
+		confirmed: []store.Lesson{{ID: 3, Kind: "post", Polarity: "avoid", Text: "Skip greetings."}},
+		retired:   []store.Lesson{{ID: 2, Text: "Use hashtags.", RetiredBy: store.RetiredByOwner, RetiredAt: at}},
 	}
 	want := `Daily report, 1 Jan 2026
 Period: last 24 hours, 31 Dec 21:15 to 1 Jan 21:15 UTC+07
@@ -44,25 +51,40 @@ State: Running, next run 21:45 (in 30 min)
 Posts: 2
 Replies: 5
 Metrics (4 measured): 3400 views, 120 likes, 30 replies, 8 reposts
-Top post: 1234 views, 56 engagements
-https://www.threads.com/@a/post/x
 Followers: 1034 (+12)
+
+Best episodes
+#12 reply at 6h, rank 0.92 of 30: 340 views, 12 likes, 3 replies. Ship the smallest thing that can fail.
+Weakest episodes
+#9 post at 6h, rank 0.08 of 25: 20 views, 0 likes, 0 replies. Good morning everyone
+Lessons: 1 added, 1 confirmed, 1 retired
+Added #6 reply, do: Answer with one number.
+Confirmed #3 post, avoid: Skip greetings.
+Retired #2 by owner: Use hashtags.
+
 Spend today (resets at 00:00 local): $0.42 of $0.50 (84%); wake $0.40, dream $0.02
 
 Failed runs: 1 (step_limit ×1)
 Blocked actions: blocked_phrase ×3, quota ×1`
-	if got := s.reportText("one", full); got != want {
+	if got := s.reportText("one", full, learned); got != want {
 		t.Fatalf("report:\n%s\nwant:\n%s", got, want)
 	}
 	// Missing measurements say so instead of showing zero.
-	empty := s.reportText("one", store.OwnerSummary{Status: "paused"})
-	for _, part := range []string{"State: Paused, next run none scheduled", "Metrics: none measured\n", "Followers: not measured\n", "Failed runs: 0", "Blocked actions: none"} {
+	empty := s.reportText("one", store.OwnerSummary{Status: "paused"}, learning{})
+	for _, part := range []string{"State: Paused, next run none scheduled", "Metrics: none measured\n", "Followers: not measured\n", "Failed runs: 0", "Blocked actions: none", "Episodes: none ranked in this period\n", "Lessons: 0 added, 0 confirmed, 0 retired\n"} {
 		if !strings.Contains(empty, part) {
 			t.Fatalf("empty report missing %q:\n%s", part, empty)
 		}
 	}
-	if strings.Contains(empty, "Top post") {
-		t.Fatalf("empty report shows absent facts:\n%s", empty)
+	for _, gone := range []string{"top post", "outcome", "label", "playbook", "strategy", "best episodes"} {
+		if strings.Contains(strings.ToLower(empty), gone) {
+			t.Fatalf("empty report mentions %q:\n%s", gone, empty)
+		}
+	}
+	for _, gone := range []string{"top post", "outcome", "label", "playbook", "strategy"} {
+		if strings.Contains(strings.ToLower(want), gone) {
+			t.Fatalf("report mentions %q:\n%s", gone, want)
+		}
 	}
 }
 
@@ -92,7 +114,7 @@ func TestCommandMenuAndHelpShareOneTable(t *testing.T) {
 			t.Fatalf("multi=%v help agent-id form wrong:\n%s", multi, help)
 		}
 	}
-	for _, want := range []string{"start", "help", "status", "report", "pause", "resume"} {
+	for _, want := range []string{"start", "help", "status", "report", "pause", "resume", "lessons", "forget"} {
 		found := false
 		for _, c := range ownerCommands(false) {
 			found = found || c.Command == want

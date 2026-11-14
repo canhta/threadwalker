@@ -52,7 +52,7 @@ func TestOwnerSummaryFailuresAndSilence(t *testing.T) {
 	}
 }
 
-func TestOwnerSummaryTopPostAndFollowers(t *testing.T) {
+func TestOwnerSummaryFollowersAndLiveSamples(t *testing.T) {
 	ctx := context.Background()
 	st, err := Open(ctx, filepath.Join(t.TempDir(), "top.db"))
 	if err != nil {
@@ -64,7 +64,7 @@ func TestOwnerSummaryTopPostAndFollowers(t *testing.T) {
 	}
 	day := time.Date(2026, 11, 2, 0, 0, 0, 0, time.UTC)
 	sum, err := st.OwnerSummary(ctx, "a", false, day, day.Add(24*time.Hour), day.Format(time.DateOnly))
-	if err != nil || sum.Top.ActionID != 0 || sum.Followers != nil || sum.FollowersBefore != nil {
+	if err != nil || sum.Followers != nil || sum.FollowersBefore != nil {
 		t.Fatalf("empty: %+v %v", sum, err)
 	}
 	ts := func(h int) string { return formatTime(day.Add(time.Duration(h) * time.Hour)) }
@@ -94,9 +94,6 @@ func TestOwnerSummaryTopPostAndFollowers(t *testing.T) {
 	sum, err = st.OwnerSummary(ctx, "a", false, day, day.Add(24*time.Hour), day.Format(time.DateOnly))
 	if err != nil {
 		t.Fatal(err)
-	}
-	if sum.Top != (TopPost{ActionID: 2, URL: "https://example.test/p/2", Views: 300, Engagements: 4}) {
-		t.Fatalf("top = %+v", sum.Top)
 	}
 	// Live samples only: 80 + 300 + the reply's 5000; the dry-run post's 9000 is left out.
 	if sum.Views != 5380 {

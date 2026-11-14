@@ -214,13 +214,13 @@ func (s *Service) handle(ctx context.Context, u Update) error {
 		}
 		s.event(ctx, "", "update", outcome, reason, 0)
 		return nil
-	case "pause", "resume", "kill", "dnc", "status", "report":
+	case "pause", "resume", "kill", "dnc", "status", "report", "lessons", "forget":
 	default:
 		s.event(ctx, "", "command", "ignored", "unknown_command", 0)
 		return nil
 	}
 	want := 0
-	if command == "dnc" {
+	if command == "dnc" || command == "forget" {
 		want = 1
 	}
 	args := fields[1:]
@@ -258,18 +258,25 @@ func (s *Service) handle(ctx context.Context, u Update) error {
 		}
 	}
 	text := receiptText(command, username)
-	if command == "status" || command == "report" {
-		summary, err := s.summary(ctx, id)
-		if err != nil {
+	var err error
+	switch command {
+	case "status", "report":
+		var summary store.OwnerSummary
+		if summary, err = s.summary(ctx, id); err != nil {
 			return err
 		}
 		if text = s.statusText(id, summary); command == "report" {
-			if text, err = s.report(ctx, id); err != nil {
-				return err
-			}
+			text, err = s.report(ctx, id)
 		}
+	case "lessons":
+		text, err = s.lessonsText(ctx, id)
+	case "forget":
+		text, err = s.forget(ctx, id, args[0])
 	}
-	if err := s.opts.Store.OwnerControl(ctx, id, command, key, text, s.opts.Now()); err != nil {
+	if err != nil {
+		return err
+	}
+	if err = s.opts.Store.OwnerControl(ctx, id, command, key, text, s.opts.Now()); err != nil {
 		s.event(ctx, id, command, "error", "control_failed", 0)
 		return err
 	}
@@ -453,7 +460,11 @@ func (s *Service) report(ctx context.Context, id string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return s.reportText(id, window), nil
+	learning, err := s.learning(ctx, id, now)
+	if err != nil {
+		return "", err
+	}
+	return s.reportText(id, window, learning), nil
 }
 
 // Tick observes persisted state, thresholds and the daily report hour. A

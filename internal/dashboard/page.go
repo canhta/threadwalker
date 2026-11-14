@@ -233,6 +233,7 @@ func buildPage(snap store.DashboardSnapshot, agents []Agent, a Agent, days int, 
 
 	p.Followers = buildFollowers(metrics, snap.Publications, daysList, currentStart, now, a)
 	p.Blocked = buildBlocked(tools)
+	p.Lessons = buildLessons(snap, a)
 	buildCost(&p.Return, snap, ledger, phases, daysList, currentStart, p.Followers, p.Growth.Views)
 
 	p.KPIs = buildKPIs(kpiInput{posts: posted - replies, replies: replies, days: days, spentToday: spentToday, budget: a.DailyBudgetUSD, growth: p.Growth, followers: p.Followers})
@@ -849,6 +850,10 @@ func buildPosts(ms metricSet, now time.Time, loc *time.Location) []PostRow {
 		if p.pub.Deleted {
 			row.Label = "Deleted"
 		}
+		if oneOfOK(p.pub.Band, store.BandTop, store.BandMid, store.BandBottom) {
+			row.Band = p.pub.Band
+			row.BandTitle = fmt.Sprintf("Rank %.2f of %d at %dh", p.pub.Rank, p.pub.Pool, p.pub.Window)
+		}
 		if !p.PostedAt.IsZero() {
 			row.Age = formatAge(p.PostedAt, now)
 			row.AgeTitle = formatFullDay(p.PostedAt, loc)
@@ -954,4 +959,38 @@ func noteTone(note string) string {
 		return "down"
 	}
 	return ""
+}
+
+// maxCited bounds the action links under one lesson.
+const maxCited = 5
+
+var lessonRetirers = map[string]string{store.RetiredByDream: "the daily review", store.RetiredByOwner: "the owner", store.RetiredByExpiry: "expiry"}
+
+// buildLessons lists the lessons with their use and the own actions they cite.
+// Only an action under the agent's own username is linked.
+func buildLessons(snap store.DashboardSnapshot, a Agent) LessonsPanel {
+	urls := map[int64]string{}
+	for _, pub := range snap.Publications {
+		if ownURL(pub.URL, a.Username) != "" {
+			urls[pub.ID] = pub.URL
+		}
+	}
+	var panel LessonsPanel
+	for _, l := range snap.Lessons {
+		row := LessonRow{ID: l.ID, Kind: l.Kind, Polarity: l.Polarity, Text: l.Text, Use: snap.LessonUses[l.ID].Summary()}
+		for _, id := range l.Evidence {
+			if u := urls[id]; u != "" && len(row.Cited) < maxCited {
+				row.Cited = append(row.Cited, LessonCite{Label: fmt.Sprintf("#%d", id), URL: u})
+			}
+		}
+		if l.Active() {
+			panel.Active = append(panel.Active, row)
+			continue
+		}
+		row.RetiredBy = lessonRetirers[oneOf(l.RetiredBy, store.RetiredByDream, store.RetiredByOwner, store.RetiredByExpiry)]
+		row.Reason = l.RetireReason
+		row.RetiredAt, row.RetiredOn = l.RetiredAt, formatDay(l.RetiredAt, a.Location)
+		panel.Retired = append(panel.Retired, row)
+	}
+	return panel
 }

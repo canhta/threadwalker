@@ -24,6 +24,8 @@ type agentStatus struct {
 	DailyCapUSD       float64        `json:"daily_cap_usd"`
 	DreamSpentUSD     float64        `json:"dream_spent_today_usd"`
 	DreamCapUSD       float64        `json:"dream_cap_usd"`
+	TokensInToday     int64          `json:"tokens_in_today"`
+	TokensCachedToday int64          `json:"tokens_cached_today"`
 	LastWake          *wakeSummary   `json:"last_wake,omitempty"`
 	PendingMetricJobs int            `json:"pending_metric_jobs"`
 	Health            []healthResult `json:"health"`

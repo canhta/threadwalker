@@ -177,6 +177,13 @@
         </li>{{end}}</ul></div></details>
       {{else}}<div class="fold flat"><span class="ft">Trends</span><span class="fs">None yet.</span></div>{{end}}
 
+      {{if or .Lessons.Active .Lessons.Retired}}<details class="fold"><summary><span class="ft">Lessons</span><span class="fs">{{len .Lessons.Active}} active{{if .Lessons.Retired}}, {{len .Lessons.Retired}} retired{{end}}</span></summary>
+        <div class="fb">
+        {{if .Lessons.Active}}<ul class="lessons">{{range .Lessons.Active}}{{template "lesson" .}}{{end}}</ul>{{else}}<p class="empty">No active lessons.</p>{{end}}
+        {{if .Lessons.Retired}}<details class="more"><summary>Retired ({{len .Lessons.Retired}})</summary><ul class="lessons">{{range .Lessons.Retired}}{{template "lesson" .}}{{end}}</ul></details>{{end}}
+        </div></details>
+      {{else}}<div class="fold flat"><span class="ft">Lessons</span><span class="fs">None yet.</span></div>{{end}}
+
     </div>
   </main>
 
@@ -199,8 +206,16 @@
 
 {{define "runrow"}}{{if .At.IsZero}}<span class="t">{{.When}}</span>{{else}}<time class="t" datetime="{{iso .At}}" data-fmt="clock" data-title="full"{{if not .EndAt.IsZero}} data-end="{{iso .EndAt}}"{{end}} title="{{.WhenTitle}}">{{.When}}</time>{{end}}<span class="k">{{.Kind}}</span><span class="s">{{.Steps}}</span><span class="c">{{.Cost}}</span><span class="e{{if .Bad}} er{{end}}" title="{{.EndCode}}">{{.EndReason}}</span>{{end}}
 
+{{define "lesson"}}<li>
+  <p class="pmeta"><span class="kind">{{.Kind}}</span><span class="tag">{{.Polarity}}</span></p>
+  <p class="ltext">{{.Text}}</p>
+  {{if .RetiredBy}}<p class="sub">Retired by {{.RetiredBy}} on {{tm "day" .RetiredAt .RetiredOn}}{{if .Reason}}: {{.Reason}}{{end}}</p>{{end}}
+  <p class="sub">{{.Use}}</p>
+  {{if .Cited}}<p class="cites"><span class="sub">Based on</span>{{range .Cited}}<a href="{{.URL}}" rel="noreferrer noopener">{{.Label}}</a>{{end}}</p>{{end}}
+</li>{{end}}
+
 {{define "post"}}<li class="post">
-  <p class="pmeta"><span class="kind">{{.Kind}}</span>{{if .Age}}<time datetime="{{iso .PostedAt}}" data-title="full" title="{{.AgeTitle}}">{{.Age}} ago</time>{{end}}{{if .Mark}}<span class="tag {{.Mark}}">{{.Mark}}</span>{{end}}{{if .Label}}<span class="tag">{{.Label}}</span>{{end}}</p>
+  <p class="pmeta"><span class="kind">{{.Kind}}</span>{{if .Age}}<time datetime="{{iso .PostedAt}}" data-title="full" title="{{.AgeTitle}}">{{.Age}} ago</time>{{end}}{{if .Mark}}<span class="tag {{.Mark}}">{{.Mark}}</span>{{end}}{{if .Band}}<span class="tag band-{{.Band}}" title="{{.BandTitle}}">{{.Band}}</span>{{end}}{{if .Label}}<span class="tag">{{.Label}}</span>{{end}}</p>
   <a class="ptext" href="{{.URL}}" rel="noreferrer noopener">{{.Link}}</a>
   {{if .HasSample}}<p class="pstats">{{template "stats" .}}</p>{{else}}<p class="sub">No stats yet</p>{{end}}
 </li>{{end}}

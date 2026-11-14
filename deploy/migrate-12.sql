@@ -73,9 +73,10 @@ CREATE TABLE ledger_phases_new (
     tokens_in INTEGER NOT NULL DEFAULT 0,
     tokens_out INTEGER NOT NULL DEFAULT 0,
     cost_usd REAL NOT NULL DEFAULT 0,
+    tokens_cached INTEGER NOT NULL DEFAULT 0,
     PRIMARY KEY(agent_id,day,phase)
 );
-INSERT INTO ledger_phases_new SELECT agent_id, day, phase, tokens_in, tokens_out, cost_usd FROM ledger_phases;
+INSERT INTO ledger_phases_new(agent_id, day, phase, tokens_in, tokens_out, cost_usd) SELECT agent_id, day, phase, tokens_in, tokens_out, cost_usd FROM ledger_phases;
 DROP TABLE ledger_phases;
 ALTER TABLE ledger_phases_new RENAME TO ledger_phases;
 

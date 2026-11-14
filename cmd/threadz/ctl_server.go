@@ -128,6 +128,8 @@ func (a *adminService) Handle(ctx context.Context, req admin.Request) (any, erro
 			return nil, errors.New(telegram.CookieResultText(status))
 		}
 		return cookiesOutcome{Agent: t.ID, Message: telegram.CookieResultText(status)}, nil
+	case admin.ForgetLesson:
+		return a.forgetLesson(ctx, t.ID, req.Lesson)
 	case admin.Context:
 		phase := req.Phase
 		if phase == "" {
@@ -178,6 +180,10 @@ func (a *adminService) status(ctx context.Context, only string) ([]agentStatus, 
 		}
 		s.SpentTodayUSD = phases["agent"].CostUSD + phases["critic"].CostUSD
 		s.DreamSpentUSD = phases["dream"].CostUSD
+		for _, u := range phases {
+			s.TokensInToday += u.TokensIn
+			s.TokensCachedToday += u.TokensCached
+		}
 		if wakes, err := a.store.Wakes(ctx, t.ID, time.Time{}.AddDate(1, 0, 0), 1); err != nil {
 			return nil, err
 		} else if len(wakes) == 1 {

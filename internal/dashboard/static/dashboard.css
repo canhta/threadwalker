@@ -718,6 +718,16 @@ rect.dream {
   color: var(--lime);
 }
 
+.tag.band-top {
+  box-shadow: inset 0 0 0 1px var(--lime);
+  color: var(--lime);
+}
+
+.tag.band-bottom {
+  box-shadow: inset 0 0 0 1px var(--bad);
+  color: var(--bad);
+}
+
 .ptext {
   display: -webkit-box;
   -webkit-box-orient: vertical;
@@ -947,6 +957,42 @@ rect.dream {
 
 .lead {
   margin-bottom: var(--s3);
+}
+
+/* Lessons: one block each, text first, then use and the actions behind it. */
+.lessons > li {
+  display: grid;
+  gap: var(--s1);
+  padding: var(--s3) 0;
+  border-top: 1px solid var(--hair);
+}
+
+.lessons > li:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.ltext {
+  font-size: var(--t-lg);
+  overflow-wrap: anywhere;
+}
+
+.cites {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0 var(--s3);
+}
+
+.cites a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  color: var(--on-dark);
+}
+
+.more > .lessons {
+  margin-top: var(--s2);
 }
 
 .fb .more + h3 {

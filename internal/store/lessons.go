@@ -339,6 +339,22 @@ func (s *Store) LessonUses(ctx context.Context, agentID string, lessons []Lesson
 	return out, nil
 }
 
+// Summary is the use line owners read: how often the lesson was applied and,
+// only where there are ranked actions to compare, the medians.
+func (u LessonUse) Summary() string {
+	if u.AppliedN == 0 {
+		return "Not applied yet"
+	}
+	line := fmt.Sprintf("Applied %d times", u.AppliedN)
+	if u.AppliedRanked > 0 {
+		line += fmt.Sprintf(", median rank %.2f (%d ranked)", u.AppliedMedian, u.AppliedRanked)
+	}
+	if u.OthersN > 0 {
+		line += fmt.Sprintf("; other actions %.2f (%d)", u.OthersMedian, u.OthersN)
+	}
+	return line
+}
+
 func median(xs []float64) float64 {
 	if len(xs) == 0 {
 		return 0

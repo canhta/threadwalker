@@ -45,7 +45,13 @@ type DashboardSnapshot struct {
 	Metrics      []DashboardMetric
 	// SpendTotal is every dollar the agent's ledger holds, whatever the range.
 	SpendTotal float64
+	// Lessons are the active lessons and the latest retired ones, with their use.
+	Lessons    []Lesson
+	LessonUses map[int64]LessonUse
 }
+
+// snapshotRetiredLessons bounds the retired lessons one snapshot lists.
+const snapshotRetiredLessons = 20
 
 // DashboardPublication is a real (not dry-run) action, newest first. URL is
 // empty when the stored link is longer than 512 bytes. Text is the post text, cut to a bounded
@@ -59,6 +65,11 @@ type DashboardPublication struct {
 	// Deleted is set when a metric read found the post gone from Threads.
 	Deleted bool
 	Text    string
+	// Band is the episode band at the newest window; empty when the action has
+	// no measurement. Rank, Pool and Window are zero when it is unranked.
+	Band         string
+	Rank         float64
+	Pool, Window int
 }
 
 type DashboardWake struct {
@@ -130,7 +141,47 @@ func (s *Store) DashboardSnapshot(ctx context.Context, q DashboardQuery) (Dashbo
 			return DashboardSnapshot{}, fmt.Errorf("reading dashboard snapshot: %w", err)
 		}
 	}
+	// The episode and lesson reads use their own connection, so the snapshot's
+	// transaction ends first.
+	if err = tx.Rollback(); err != nil {
+		return DashboardSnapshot{}, fmt.Errorf("reading dashboard snapshot: %w", err)
+	}
+	if err = s.episodesAndLessons(ctx, q.AgentID, &snap); err != nil {
+		return DashboardSnapshot{}, fmt.Errorf("reading dashboard snapshot: %w", err)
+	}
 	return snap, nil
+}
+
+// episodesAndLessons adds each publication's band and the agent's lessons.
+func (s *Store) episodesAndLessons(ctx context.Context, agentID string, snap *DashboardSnapshot) error {
+	eps, err := s.Episodes(ctx, agentID, EpisodeQuery{})
+	if err != nil {
+		return err
+	}
+	byID := make(map[int64]Episode, len(eps))
+	for _, e := range eps {
+		byID[e.ActionID] = e
+	}
+	for i, p := range snap.Publications {
+		if e, ok := byID[p.ID]; ok {
+			snap.Publications[i].Band, snap.Publications[i].Rank, snap.Publications[i].Pool, snap.Publications[i].Window = e.Band, e.Rank, e.Pool, e.Window
+		}
+	}
+	all, err := s.Lessons(ctx, agentID, true)
+	if err != nil {
+		return err
+	}
+	retired := 0
+	for _, l := range all {
+		if !l.Active() {
+			if retired++; retired > snapshotRetiredLessons {
+				continue
+			}
+		}
+		snap.Lessons = append(snap.Lessons, l)
+	}
+	snap.LessonUses, err = s.LessonUses(ctx, agentID, snap.Lessons)
+	return err
 }
 
 type snapshotReader struct {

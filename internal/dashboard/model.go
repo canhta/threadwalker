@@ -27,6 +27,7 @@ type Page struct {
 	Return    ReturnPanel
 	Followers FollowersPanel
 	Blocked   BlockedPanel
+	Lessons   LessonsPanel
 }
 
 type AgentInfo struct {
@@ -182,6 +183,38 @@ type PostRow struct {
 	HasSample bool
 	// Label is Deleted for a post gone from Threads; empty otherwise.
 	Label string
+	// Band is top, mid or bottom among the agent's recent actions of its kind;
+	// empty while the action is unranked. BandTitle says how it ranked.
+	Band      string
+	BandTitle string
+}
+
+// LessonsPanel is what the agent has learned: the active lessons and the
+// latest retired ones.
+type LessonsPanel struct {
+	Active  []LessonRow
+	Retired []LessonRow
+}
+
+type LessonRow struct {
+	ID       int64
+	Kind     string
+	Polarity string
+	Text     string
+	Use      string
+	// Cited are the agent's own actions the lesson rests on.
+	Cited []LessonCite
+	// RetiredBy names who retired it; RetiredAt is a UTC moment the browser
+	// reformats, RetiredOn the server text shown without it.
+	RetiredBy string
+	Reason    string
+	RetiredAt time.Time
+	RetiredOn string
+}
+
+type LessonCite struct {
+	Label string
+	URL   string
 }
 
 // FollowersPanel is the account's follower count over time and what each post

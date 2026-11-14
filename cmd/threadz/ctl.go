@@ -41,8 +41,10 @@ Commands talk to the running service over its admin socket:
   threads connect --agent ID                send the owner a one-time link to authorize Threads
   threads cookies --agent ID                import a cookie export (JSON or Cookie header) read from stdin into the Threads browser profile
   context --agent ID [--phase P]            the exact messages the next wake sends
+  lessons forget <id> --agent ID            retire a lesson for good; the agent will not add it again
 
 Commands that read the database or the host:
+  lessons --agent ID                        active and retired lessons with their use
   wakes --agent ID [--since 24h|RFC3339] [--limit N]
   wake-show <id>                            the stored transcript of one wake
   wake-diagnose <id>                        one wake as a funnel: reads, every post and reply with its guard verdict, editor drafts, browser stage
@@ -125,6 +127,8 @@ func runCtl(ctx context.Context, args []string, getenv func(string) string, stdo
 		return ctlMaintenance(ctx, getenv, admin.OAuthLink, true, rest[1:], stdout, stderr)
 	case "context":
 		return ctlContext(ctx, getenv, rest, stdout, stderr)
+	case "lessons":
+		return ctlLessons(ctx, getenv, rest, stdout, stderr)
 	case "wakes":
 		return ctlWakes(ctx, getenv, rest, stdout, stderr, deps)
 	case "logs":
@@ -202,6 +206,9 @@ func ctlStatus(ctx context.Context, getenv func(string) string, args []string, s
 				fmt.Fprintf(w, "  next: %s at %s\n", s.NextKind, s.NextWake.UTC().Format(time.RFC3339))
 			}
 			fmt.Fprintf(w, "  spend today: $%.4f of $%.2f; dream $%.4f of $%.2f\n", s.SpentTodayUSD, s.DailyCapUSD, s.DreamSpentUSD, s.DreamCapUSD)
+			if s.TokensInToday > 0 {
+				fmt.Fprintf(w, "  cached input today: %.0f%% of %d tokens\n", 100*float64(s.TokensCachedToday)/float64(s.TokensInToday), s.TokensInToday)
+			}
 			if s.LastWake != nil {
 				fmt.Fprintf(w, "  last wake: #%d %s, %s, %d steps\n", s.LastWake.ID, s.LastWake.Kind, orDash(s.LastWake.EndReason), s.LastWake.Steps)
 			}

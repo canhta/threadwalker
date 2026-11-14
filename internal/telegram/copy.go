@@ -24,6 +24,8 @@ type ownerCommand struct {
 var ownerCommandList = []ownerCommand{
 	{"status", "", "Current state, next run and today's counts", true},
 	{"report", "", "Today's report", true},
+	{"lessons", "", "List the lessons the agent has learned", true},
+	{"forget", "<id>", "Remove a lesson for good", true},
 	{"pause", "", "Pause the agent", true},
 	{"resume", "", "Resume a paused agent", true},
 	{"kill", "", "Stop the agent permanently", true},
@@ -268,8 +270,9 @@ func (s *Service) statusText(id string, summary store.OwnerSummary) string {
 // reportText is the daily report, also sent by /report. summary covers the 24
 // hours up to now, so consecutive daily reports leave no gap, except its spend,
 // which is the local spend day's because the cap applies to that day. A missing
-// metric is said to be missing, never shown as zero.
-func (s *Service) reportText(id string, summary store.OwnerSummary) string {
+// metric is said to be missing, never shown as zero. The episodes are the ones
+// measured in that period; the lessons are the ones changed in it.
+func (s *Service) reportText(id string, summary store.OwnerSummary, learned learning) string {
 	loc, now := s.location(id), s.opts.Now()
 	local := now.In(loc)
 	lines := []string{
@@ -285,12 +288,6 @@ func (s *Service) reportText(id string, summary store.OwnerSummary) string {
 	} else {
 		lines = append(lines, "Metrics: none measured")
 	}
-	if summary.Top.ActionID != 0 {
-		lines = append(lines, fmt.Sprintf("Top post: %d views, %d engagements", summary.Top.Views, summary.Top.Engagements))
-		if summary.Top.URL != "" {
-			lines = append(lines, summary.Top.URL)
-		}
-	}
 	switch {
 	case summary.Followers == nil:
 		lines = append(lines, "Followers: not measured")
@@ -299,7 +296,9 @@ func (s *Service) reportText(id string, summary store.OwnerSummary) string {
 	default:
 		lines = append(lines, fmt.Sprintf("Followers: %d (%+d)", *summary.Followers, *summary.Followers-*summary.FollowersBefore))
 	}
-	lines = append(lines, "Spend today (resets at 00:00 local): "+s.spendLine(id, summary), "")
+	lines = append(lines, "")
+	lines = append(lines, learned.lines()...)
+	lines = append(lines, "", "Spend today (resets at 00:00 local): "+s.spendLine(id, summary), "")
 	failed := fmt.Sprintf("Failed runs: %d", summary.FailedWakes)
 	if len(summary.FailReasons) > 0 {
 		failed += " (" + refusalList(summary.FailReasons) + ")"

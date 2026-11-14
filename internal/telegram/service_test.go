@@ -803,7 +803,7 @@ func TestServiceRegistersMenuAtStartAndSurvivesFailure(t *testing.T) {
 			for _, command := range bot.commands {
 				names = append(names, command.Command)
 			}
-			if strings.Join(names, ",") != "status,report,pause,resume,kill,dnc,cookie,update,help,start" {
+			if strings.Join(names, ",") != "status,report,lessons,forget,pause,resume,kill,dnc,cookie,update,help,start" {
 				t.Fatalf("menu = %v, want the handled commands", names)
 			}
 			dnc := ""
