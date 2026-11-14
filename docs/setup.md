@@ -76,7 +76,7 @@ Per-agent template fields:
 ```yaml
 limits:
   max_usd_per_day: 2.00
-  max_usd_per_dream: 0.30   # dream spend is outside max_usd_per_day
+  max_usd_per_dream: 0.30   # dream spend counts inside max_usd_per_day
   max_steps_per_dream: 8
 schedule:
   timezone: Asia/Ho_Chi_Minh

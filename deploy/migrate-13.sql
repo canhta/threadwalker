@@ -3,7 +3,9 @@
 -- -bail is required: it stops the script at the first error. The file refuses
 -- to run on any other schema version and is one transaction: it applies
 -- completely or not at all. It adds a table, drops actions.topic_heat (never
--- read) and renames actions.trend_ref to actions.trend; no other row changes.
+-- read), renames actions.trend_ref to actions.trend and rewrites the host of
+-- stored Threads URLs to threads.com; no other row changes. DROP COLUMN needs
+-- sqlite3 3.35 or later and UPDATE ... FROM 3.33 or later (check: sqlite3 --version).
 --
 -- The store test (TestMigrate13MatchesFreshSchema) builds v12 from
 -- internal/store/testdata/schema-v12.sql, applies this file and compares the
@@ -41,6 +43,27 @@ ALTER TABLE actions DROP COLUMN topic_heat;
 
 -- "ref" now means the p and t ids; the stored anchor is the trend itself.
 ALTER TABLE actions RENAME COLUMN trend_ref TO trend;
+
+-- One post has one address: CanonicalThread now maps threads.net and www. hosts
+-- to threads.com, and replies_per_conversation matches root_url in SQL. Every
+-- stored Threads URL column gets the same host. Only the host changes; the
+-- character after it must end the host, so graph.threads.net or threads.net.x
+-- never match.
+CREATE TEMP TABLE old_host(prefix TEXT PRIMARY KEY);
+INSERT INTO old_host VALUES
+    ('https://threads.net'), ('https://www.threads.net'), ('https://www.threads.com'),
+    ('http://threads.net'), ('http://www.threads.net'), ('http://threads.com'), ('http://www.threads.com');
+
+UPDATE actions SET target_url = 'https://threads.com' || substr(target_url, length(prefix) + 1)
+    FROM old_host WHERE substr(target_url, 1, length(prefix)) = prefix AND substr(target_url, length(prefix) + 1, 1) IN ('', '/', '?', '#');
+UPDATE actions SET thread_url = 'https://threads.com' || substr(thread_url, length(prefix) + 1)
+    FROM old_host WHERE substr(thread_url, 1, length(prefix)) = prefix AND substr(thread_url, length(prefix) + 1, 1) IN ('', '/', '?', '#');
+UPDATE actions SET root_url = 'https://threads.com' || substr(root_url, length(prefix) + 1)
+    FROM old_host WHERE substr(root_url, 1, length(prefix)) = prefix AND substr(root_url, length(prefix) + 1, 1) IN ('', '/', '?', '#');
+UPDATE action_parts SET thread_url = 'https://threads.com' || substr(thread_url, length(prefix) + 1)
+    FROM old_host WHERE substr(thread_url, 1, length(prefix)) = prefix AND substr(thread_url, length(prefix) + 1, 1) IN ('', '/', '?', '#');
+
+DROP TABLE old_host;
 
 -- Append further v13 changes above this line.
 

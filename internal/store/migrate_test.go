@@ -95,7 +95,11 @@ func TestMigrate13MatchesFreshSchema(t *testing.T) {
 	defer old.Close()
 	if _, err = old.ExecContext(ctx, `
 		INSERT INTO agents(id,status) VALUES('a','running');
-		INSERT INTO actions(agent_id,kind,text,posted_at) VALUES('a','post','hello','2026-11-01T00:00:00Z');`); err != nil {
+		INSERT INTO actions(id,agent_id,kind,text,posted_at) VALUES(1,'a','post','hello','2026-11-01T00:00:00Z');
+		INSERT INTO actions(id,agent_id,kind,text,posted_at,target_url,thread_url,root_url) VALUES(2,'a','reply','old host','2026-11-01T00:00:00Z',
+			'https://www.threads.net/@x/post/1','http://threads.net/@y/post/2','https://threads.net/@x/post/1');
+		INSERT INTO actions(id,agent_id,kind,text,posted_at,target_url) VALUES(3,'a','reply','other host','2026-11-01T00:00:00Z','https://graph.threads.net/v1.0/x');
+		INSERT INTO action_parts(agent_id,action_id,part,text,thread_url) VALUES('a',2,2,'part','https://threads.net/@y/post/3?x=1');`); err != nil {
 		t.Fatalf("seeding v12: %v", err)
 	}
 	if _, err = old.ExecContext(ctx, string(migration)); err != nil {
@@ -115,8 +119,22 @@ func TestMigrate13MatchesFreshSchema(t *testing.T) {
 	}
 	// Existing rows stay and the new table takes rows; a URL keeps one id per agent.
 	var actions int
-	if err = old.QueryRow(`SELECT COUNT(*) FROM actions`).Scan(&actions); err != nil || actions != 1 {
-		t.Errorf("actions after migration = %d, %v; want 1", actions, err)
+	if err = old.QueryRow(`SELECT COUNT(*) FROM actions`).Scan(&actions); err != nil || actions != 3 {
+		t.Errorf("actions after migration = %d, %v; want 3", actions, err)
+	}
+	// Stored Threads URLs take the canonical host, so SQL matches on root_url
+	// find them; other hosts and the paths stay.
+	for query, want := range map[string]string{
+		`SELECT target_url FROM actions WHERE id=2`:        "https://threads.com/@x/post/1",
+		`SELECT thread_url FROM actions WHERE id=2`:        "https://threads.com/@y/post/2",
+		`SELECT root_url FROM actions WHERE id=2`:          "https://threads.com/@x/post/1",
+		`SELECT target_url FROM actions WHERE id=3`:        "https://graph.threads.net/v1.0/x",
+		`SELECT thread_url FROM action_parts WHERE part=2`: "https://threads.com/@y/post/3?x=1",
+	} {
+		var got string
+		if err = old.QueryRow(query).Scan(&got); err != nil || got != want {
+			t.Errorf("%s = %q, %v; want %q", query, got, err, want)
+		}
 	}
 	insert := `INSERT INTO seen_posts(agent_id,url,author,text,read_at) VALUES('a','https://threads.com/@x/post/1','x','t','2026-11-01T00:00:00Z')`
 	if _, err = old.Exec(insert); err != nil {

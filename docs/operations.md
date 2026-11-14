@@ -165,10 +165,10 @@ v0.3.0 changes the schema (v12 to v13) and the tool surface, so its release note
 
 1. Stop both services: `systemctl stop threadz threadz-dashboard`. The dashboard runs the same binary on the same database.
 2. Back up the database and the yaml: `cp /opt/threadz/data/threadz.db /opt/threadz/data/threadz.db.v12` and `cp /opt/threadz/agents/viral.agent.yaml /opt/threadz/agents/viral.agent.yaml.v12`.
-3. Migrate the database (one transaction, refuses any schema other than v12; it only adds the `seen_posts` table): `sqlite3 -bail /opt/threadz/data/threadz.db < deploy/migrate-13.sql`
+3. Migrate the database (one transaction, refuses any schema other than v12; it adds the `seen_posts` table, renames `actions.trend_ref` to `trend`, drops `actions.topic_heat` and rewrites `threads.net` and `www.` hosts in stored Threads URLs to `threads.com`; it needs sqlite3 3.35 or later for DROP COLUMN, check with `sqlite3 --version`): `sqlite3 -bail /opt/threadz/data/threadz.db < deploy/migrate-13.sql`
 4. Patch the live template (rewrites the sentences that name a removed tool or argument, then replaces the whole `persona:` block with the repo template's, but only when the live block is exactly the v0.2.x repo persona (sha256); an edited persona is kept with a warning to merge by hand. Writes a `.bak`, prints each change, never touches `dry_run`; a second run changes nothing): `python3 deploy/patch-template-v13.py /opt/threadz/agents/viral.agent.yaml` (run it from the repo checkout: it reads `templates/viral.agent.yaml`)
 5. Install the v0.3.0 binary over `/opt/threadz/threadz`.
 6. Check with the service env: `set -a; . /etc/threadz/threadz.env; set +a; /opt/threadz/threadz check --agents /opt/threadz/agents --db /opt/threadz/data/threadz.db`
 7. Start the services: `systemctl start threadz`, then `systemctl start threadz-dashboard`, then `threadz ctl doctor`.
 
-To roll back, stop both services and undo the migration: `sqlite3 -bail /opt/threadz/data/threadz.db 'DROP TABLE seen_posts; PRAGMA user_version=12;'`. Then restore `viral.agent.yaml.v12` over the patched yaml, install the previous binary and start the services as in step 7.
+To roll back, stop both services and restore the database backup over the migrated one (the migration drops a column and rewrites URLs, so it has no inverse): `cp /opt/threadz/data/threadz.db.v12 /opt/threadz/data/threadz.db`. Then restore `viral.agent.yaml.v12` over the patched yaml, install the previous binary and start the services as in step 7.

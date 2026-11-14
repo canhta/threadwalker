@@ -46,7 +46,7 @@ A lesson is one sentence of at most 240 characters about how the account should 
 
 | Rule | Fact |
 |---|---|
-| Schedule | Once per local day at `schedule.dream_at`. Own caps `limits.max_usd_per_dream` and `limits.max_steps_per_dream` (default 8), outside the daily cap |
+| Schedule | Once per local day at `schedule.dream_at`. Own caps `limits.max_usd_per_dream` and `limits.max_steps_per_dream` (default 8); its spend also counts against `limits.max_usd_per_day` |
 | Gate | Runs only when at least 5 episodes reached a 6 h or 24 h window since the last completed dream. Otherwise the wake ends as `too_few_episodes` with no model call and still uses up its day |
 | Context | Active lessons with age and use stats, the new episodes since the last dream, and the best and worst 5 of each kind from the last 7 days. Code-owned role prompt, no persona |
 | Tools | `lesson_add`, `lesson_confirm`, `lesson_retire` only. No Threads backend or browser is opened |

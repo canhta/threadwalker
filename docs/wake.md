@@ -44,7 +44,7 @@ sequenceDiagram
 | Phase | Trigger | Tools | Writes | Spend |
 |---|---|---|---|---|
 | `agent` | `next_wake_at`; a fresh webhook reply or mention | All, see [tools.md](tools.md) | Threads, owner | `limits.max_usd_per_day` |
-| `dream` | `schedule.dream_at`, once per local day | Reads | None to Threads or owner | `limits.max_usd_per_dream` (default 0.30), `limits.max_steps_per_dream` (default 8 model requests), excluded from the daily cap |
+| `dream` | `schedule.dream_at`, once per local day | Reads | None to Threads or owner | `limits.max_usd_per_dream` (default 0.30), `limits.max_steps_per_dream` (default 8 model requests); the spend also counts against the daily cap |
 | `metrics` | Due metric targets | None (no model call) | Metric samples only | None |
 
 A dream wake uses `wakes.kind` and a durable `phase_key`; a partial unique index makes one dream per local day unrepeatable, restarts included. A dream missed while the process was down runs once on the next start. A dream does not move `next_wake_at`. Spend rows carry the phase, so the dashboard and the daily report show wake and dream spend separately. `critic` is a third ledger phase for the pre-publish review ([content.md](content.md)).
@@ -89,8 +89,10 @@ The data message carries a `Limits now (computed by code)` block: posts and repl
 | Same, on target | `kpi.on_target_minutes_between_wakes` |
 | Same, no `kpi:` block | One hour, or the minimum if longer |
 | Day capped: today's agent spend reached `max_usd_per_day` or both `posts_per_day` and `replies_per_day` used (in the template's mode, as the guard counts), all on the local day in `schedule.timezone` | The next local midnight, whatever the gap |
-| Fresh webhook reply or mention arrived since the latest wake started | Now, but never closer than `min_minutes_between_wakes` after that wake started |
-| The inbox poll found a reply not seen before (every `inbox.poll_minutes` between wakes; 0 disables) | Now, but never closer than `inbox.min_minutes_after_wake` after the latest wake started. The poll is API reads only, no model call; a reply is remembered once polled or listed in a wake, so it asks for at most one early wake (the memory is lost on restart). A failed poll backs off 15 minutes, doubling up to 4 hours, and never stops the process. A paused or killed agent is not polled. Spend caps and pacing are unchanged |
+| Fresh webhook reply or mention arrived since the latest wake started | Now, but never closer than `min_minutes_between_wakes` after that wake started, and not before pacing allows |
+| The inbox poll found a reply not seen before (every `inbox.poll_minutes` between wakes; 0 disables) | Now, but never closer than `inbox.min_minutes_after_wake` after the latest wake started. The poll is API reads only, no model call; a reply is remembered once polled or listed in a wake, so it asks for at most one early wake (the memory is lost on restart). A failed poll backs off 15 minutes, doubling up to 4 hours, and never stops the process. A paused or killed agent is not polled. Spend cap, pacing and quiet hours apply as to every wake, so a reply may wait for the next paced wake |
+| Budget pacing, which every wake time above follows | Not sooner than `time left * (spend today without the dream / agent wakes today) / budget left` after the latest agent wake started. Time left runs to the quiet window or the day reset, whichever is first, and the interval stays a minute short of it so the day's last affordable wake is kept. With no spend or no wake today there is no pacing |
+| Due inside the quiet window (`schedule.quiet_from` to `quiet_until`): a failed wake's fallback, a recovered wake, a missing or stale `next_wake_at` | The end of the window; the scheduler checks this just before it starts an agent wake |
 | Wake fails | The fallback below |
 
 The agent has no tool to schedule a wake.
