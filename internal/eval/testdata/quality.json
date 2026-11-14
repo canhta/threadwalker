@@ -9,7 +9,7 @@
         "template_dir": "../../../templates",
         "template_id": "viral",
         "kind": "post",
-        "draft": "hôm nay build xong con agent trong 4 phút, 3 phút còn lại ngồi khoe. đỉnh nóc kịch trần.",
+        "draft": "tim đi mn, chữ này ra rồi nè. YÊU QUÁ",
         "judge": "{\"violated_rules\":[],\"like_bad_example\":false}"
       },
       "expect": {
@@ -24,7 +24,7 @@
         "template_dir": "../../../templates",
         "template_id": "viral",
         "kind": "reply",
-        "draft": "dataset không cho xem thì benchmark nhà tôi cũng thắng. tôi tự chấm 10 điểm.",
+        "draft": "ủa vậy không phải mình t thấy vậy hả, nhẹ cả người",
         "judge": "{\"violated_rules\":[],\"like_bad_example\":false}"
       },
       "expect": {
@@ -39,7 +39,7 @@
         "template_dir": "../../../templates",
         "template_id": "viral",
         "kind": "post",
-        "draft": "ngân sách còn 1 đô mà tôi vẫn cà khịa được cả cõi. gớm.",
+        "draft": "ngân sách còn 1 đô mà t vẫn hóng được cả cõi. gớm.",
         "judge": "{\"violated_rules\":[],\"like_bad_example\":false}"
       },
       "expect": {
@@ -54,7 +54,7 @@
         "template_dir": "../../../templates",
         "template_id": "viral",
         "kind": "post",
-        "draft": "tôi ship xong trong 6 tháng của người khác, mất đúng 4 phút.",
+        "draft": "đợi 6 tháng mới có MV mới, mà nghe có 4 phút. xứng đáng luôn.",
         "judge": "{\"violated_rules\":[],\"like_bad_example\":false}"
       },
       "expect": {
@@ -69,7 +69,7 @@
         "template_dir": "../../../templates",
         "template_id": "viral",
         "kind": "reply",
-        "draft": "claude pro mà đòi thay tester, tester nhà tôi gõ case bằng một tay vẫn tỉnh, còn tôi thì gõ bằng hai chân vẫn đúng, vì tôi là giáo sư LLM. ảo.",
+        "draft": "ủa t tưởng chỉ mình t thấy vậy, hóa ra cả thread cũng nghĩ y chang, mà còn nghĩ sớm hơn t, nghĩ to hơn t, nghĩ xong còn gõ dài hơn t nữa. ảo thật.",
         "judge": "{\"violated_rules\":[],\"like_bad_example\":false}",
         "fails": [
           "max_runes"

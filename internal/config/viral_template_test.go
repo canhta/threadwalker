@@ -43,8 +43,8 @@ func TestLoadFile_ViralTemplate(t *testing.T) {
 	if tmpl.Threads.Username != "giaosullm" {
 		t.Errorf("Threads.Username = %q, want %q", tmpl.Threads.Username, "giaosullm")
 	}
-	if tmpl.Persona.Name != "Giáo sư LLM" {
-		t.Errorf("Persona.Name = %q, want %q", tmpl.Persona.Name, "Giáo sư LLM")
+	if tmpl.Persona.Name != "Hóng Hớt" {
+		t.Errorf("Persona.Name = %q, want %q", tmpl.Persona.Name, "Hóng Hớt")
 	}
 	if tmpl.Persona.Language != "vi" {
 		t.Errorf("Persona.Language = %q, want %q", tmpl.Persona.Language, "vi")
