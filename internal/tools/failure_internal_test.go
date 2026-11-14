@@ -64,7 +64,7 @@ func TestCheckLessonGate(t *testing.T) {
 		{"foreign url", "see https://threads.example/p/2", errLessonURL},
 		{"secret key", "key sk-abcdefghijklmnopqrstuvwx", errLessonSecret},
 		{"bearer token", "use Bearer abcdefghijklmnopqrstuvwx", errLessonSecret},
-		{"per-wake ref", "post r58 got the reaction", errStaleRef},
+		{"per-wake ref", "post p58 got the reaction", errStaleRef},
 	} {
 		if err := checkLesson(tc.text, ev); !errors.Is(err, tc.want) && (err != nil || tc.want != nil) {
 			t.Errorf("%s: err %v, want %v", tc.name, err, tc.want)

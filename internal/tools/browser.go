@@ -1,6 +1,7 @@
 package tools
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
@@ -34,15 +35,15 @@ func (d *Dispatcher) browserRead(ctx context.Context, operation string, a argume
 	defer func() { err = d.browserResult(ctx, operation, started, err) }()
 	var page threads.Page
 	switch operation {
-	case "read_feed":
+	case threads.OpReadFeed:
 		page, err = d.opts.Threads.ReadFeed(ctx)
-	case "read_topic":
+	case threads.OpReadTopic:
 		page, err = d.opts.Threads.ReadTopic(ctx, a.Text("url"), a.Text("query"))
-	case "search":
+	case threads.OpSearch:
 		page, err = d.opts.Threads.Search(ctx, a.Text("query"), a.Bool("recent"))
 	case "profile":
 		return d.opts.Threads.ProfileLookup(ctx, a.Text("username"))
-	case "profile_posts":
+	case threads.OpProfilePosts:
 		page, err = d.opts.Threads.ProfilePosts(ctx, a.Text("username"))
 	case "read_post":
 		page, err = d.opts.Threads.ReadPost(ctx, a.Text("id"))
@@ -66,29 +67,6 @@ func (d *Dispatcher) browserRead(ctx context.Context, operation string, a argume
 		return nil, err
 	}
 	return page, nil
-}
-
-// checkTopic refuses a read_topic call that names both or neither argument, a
-// url the wake has not read, or a fourth read in a normal wake. Its refusals
-// reach the model as blocked hints, unlike a browser failure's generic error.
-func (d *Dispatcher) checkTopic(a *arguments) error {
-	topicURL, query := a.Text("url"), a.Text("query")
-	if (topicURL == "") == (query == "") {
-		return &guard.BlockedError{Reason: "topic_args"}
-	}
-	if topicURL != "" {
-		seen, ok := d.guard.Trend(topicURL)
-		if !ok {
-			return &guard.BlockedError{Reason: "topic_args"}
-		}
-		// Only a Threads topic link opens; a news link would fail in the
-		// browser and still use up a read.
-		if !threads.IsTopicURL(seen) {
-			return &guard.BlockedError{Reason: "topic_args"}
-		}
-		a.Args = a.Args.WithText("url", seen)
-	}
-	return d.countCall("read_topic")
 }
 
 func (d *Dispatcher) observeStops(ctx context.Context, operation string, page threads.Page) error {
@@ -163,11 +141,9 @@ func (d *Dispatcher) browserAction(ctx context.Context, operation string, a argu
 	if operation == "post" {
 		published, err = d.opts.Threads.Post(ctx, a.Text("text"), a.Text("topic_tag"))
 	} else {
-		// An empty target_id is a feed post, replied to through the browser by permalink.
-		target := a.Text("target_id")
-		if target == "" {
-			target = a.Text("target_url")
-		}
+		// A post with an API id is replied to through the API; one only a browser
+		// read showed, through the browser by permalink.
+		target := cmp.Or(a.Target.MediaID, a.Target.URL)
 		published, err = d.opts.Threads.Reply(ctx, target, a.Text("text"))
 		// A failure that is not an unknown outcome happened before submit: the
 		// reply never reached Threads, so it must not use up a daily cap.
@@ -182,7 +158,7 @@ func (d *Dispatcher) browserAction(ctx context.Context, operation string, a argu
 	}
 	confirmed := published.URL
 	// A browser reply may have no media id: it then has no metric jobs.
-	if confirmed == "" || (published.ID == "" && a.Text("target_id") != "") {
+	if confirmed == "" || (published.ID == "" && a.Target.MediaID != "") {
 		return nil, threads.ErrUnknownOutcome
 	}
 	if d.redactor.Contains(confirmed) {

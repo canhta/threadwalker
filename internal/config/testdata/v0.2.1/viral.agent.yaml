@@ -68,7 +68,6 @@ persona:
     - "Gọi fetch_trends mỗi ngày, chọn đúng một chuyện mà người lướt Threads đang bàn và một chi tiết thật trong đó (tên, mức giá, con số, việc vừa xảy ra) để làm nền cho phản ứng của mình."
     - "Đọc read_feed, rồi read_topic của 2–3 trend đang hot nhất (heat cao, nhiều bài) để tìm bài đang lên mà reply: đã có từ 50 like, dưới vài giờ tuổi, còn ít reply. Feed chỉ có vài bài nên đừng dừng ở feed. Chỉ đăng bài riêng sau khi đã reply hết bài đủ điều kiện, hoặc đã đọc 3 topic mà không có bài nào."
     - "Đọc kỹ phần reply của bài hot: thread đang hô gì, ý nào đã có người nói, còn nhịp nào chưa ai nói, để câu của mình thêm được điều gì đó."
-    - "Sau mỗi ngày đối chiếu read_own_metrics: kiểu bài nào, khung giờ nào, reply dạo hay bài riêng kéo reply và view nhiều nhất, rồi chỉ khi học được điều mới về một chủ đề thì ghi vào note_write (một chủ đề, không ghi ngày, không ghi ref)."
   style_rules:
     - "Anti AI-slop: không câu chung chung, không cấu trúc LinkedIn, không 'mặt khác thì', không quote truyền động lực, không gạch đầu dòng, không hashtag."
     - "Cấm lên lớp: không 'chưa phải X, chỉ là Y', không 'ai chịu trách nhiệm khi...', không 'vấn đề là', không caveat 'nhưng cũng có lý', không rào đón pháp lý kiểu 'khởi tố chưa đồng nghĩa có tội', không kết bài bằng bài học."
@@ -166,16 +165,6 @@ persona:
     - "tag bạn"
     - "like và share"
     - "comment đi"
-seed_playbook:
-  - "Reply bám đúng một chi tiết cụ thể của bài đang nhiều người bàn (trên 50 reply) nhận được nhiều reply và view hơn là tự đăng một bài cùng ý."
-  - "Reply trong 60 phút đầu dưới bài của tài khoản có follower gấp 2–10 lần mình, kèm một chi tiết cụ thể của bài đó, kéo được nhiều lượt xem profile và follower hơn reply muộn hoặc dưới tài khoản lớn hơn nhiều."
-  - "Post phản ứng như người trong cuộc (hú, ủa, đứng về một phe) về chuyện đang hot nhận được nhiều reply và follower hơn post quan sát trung tính cùng chủ đề."
-  - "Hook kiểu number (dòng đầu là một con số tiền hoặc số lần nhỏ và thật) nhận nhiều reply hơn post mở bằng nhận định chung."
-  - "Hook kiểu contrarian (dòng đầu ngược với điều ai cũng nói về giá, app, drama) nhận nhiều reply hơn post đồng tình với điều đó."
-  - "Hook kiểu curiosity_gap (dòng đầu là câu hở, dòng sau trả lời thật) nhận nhiều view và reply hơn post nói thẳng kết luận ở dòng đầu."
-  - "Hook kiểu personal_stake (dòng đầu đứng về một phe hay đặt cược vào chuyện đang bàn, không kể đời mình) nhận nhiều reply hơn post bình luận từ ngoài."
-  - "Hook kiểu trend_detail (dòng đầu là tên bài, tên người, mức giá hay chi tiết cả mạng đang nhắc) nhận nhiều view hơn post nhắc chủ đề chung chung."
-  - "Post một dòng 40–80 ký tự nhận nhiều view và reply hơn post từ ba dòng trở lên cùng chủ đề; series 2–3 phần chỉ đáng giữ khi phần 1 tự đứng được."
 llm:
   protocol: openai
   base_url: https://api.openai.com/v1
@@ -228,11 +217,8 @@ limits:                           # starting values, no experimental basis
   max_steps_per_wake: 45
   max_usd_per_day: 1.00           # owner cap for the live viral account
   max_usd_per_dream: 0.30         # nightly dream has its own cap, outside the daily cap
-  max_steps_per_dream: 20
+  max_steps_per_dream: 8
   min_minutes_between_wakes: 20
-  explore_percent: 30            # share of the last 20 actions the agent may mark explore
-learning:
-  min_effect: 0.2                 # smallest mean lift (log scale, 0.2 is about +22%) a hypothesis needs to be established
 kpi:                              # pressure: the scoreboard in every wake shows these; code sets the wake cadence from the gap
   engagements_per_day: 10         # likes + replies + reposts + quotes on own actions in 24h
   followers_per_week: 5
@@ -243,10 +229,6 @@ schedule:                         # local-time phases
   dream_at: "00:30"               # once per local day, after the evening peak so its metrics exist
   quiet_from: "01:00"             # no agent wake in the night; the next one waits for quiet_until
   quiet_until: "07:00"
-  study_slots:                    # minimum "đi học" cadence; spikes can add sessions
-    - "09:00"
-    - "15:00"
-    - "20:30"
 trends:                           # deterministic fetch_trends ranking, no extra LLM call
   sources:                        # what a Vietnamese GenZ reader lives in
     - google_trends
@@ -272,31 +254,11 @@ targets:                          # the window of a good reply target; outside i
 inbox:
   poll_minutes: 10                # code looks for new replies to us between wakes and wakes the agent early (0 turns it off)
   min_minutes_after_wake: 5       # an early wake starts at least this long after the last one started
-study:
-  sources:                        # Vietnamese general news and trends; no AI-only feeds
-    - google_news_vn
-    - google_news_topics
-    - google_trends
-    - vnexpress
-    - vietnamnet
-    - tinhte
-    - genk
-  threads_sample:                 # bounded, paced read-only Threads sampling
-    max_reads: 4
-    pause_ms: 1500
-    keywords:
-      - "drama hôm nay"
-      - "mv mới"
-      - "đang trend"
-  min_minutes_between_sessions: 120
-  max_sessions_per_day: 8
-  spike_multiplier: 2.0
-  spike_min_score: 6
-  web_search:                     # optional bounded OpenAI Responses web search
-    enabled: true
-    model: gpt-6-luna
-    max_results: 5
-    max_output_tokens: 512
+web_search:                     # optional bounded OpenAI Responses web search
+  enabled: true
+  model: gpt-6-luna
+  max_results: 5
+  max_output_tokens: 512
 threads:
   username: giaosullm # operator-owned throwaway account; never inferred from the persona name.
   backend: stub # Live use is backend: api with THREADS_ACCESS_TOKEN, THREADS_USER_ID and THREADZ_SECRET_KEY set.
@@ -306,4 +268,4 @@ telegram:
   enabled: false # Local default; set true to require the owner integration credentials.
   bot_token_env: TELEGRAM_BOT_TOKEN
   owner_chat_id_env: TELEGRAM_OWNER_CHAT_ID
-dry_run: true
+dry_run: false

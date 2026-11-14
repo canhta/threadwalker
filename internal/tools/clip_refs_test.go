@@ -12,9 +12,9 @@ import (
 	"github.com/canhta/threadz/internal/tools"
 )
 
-// A post the clip dropped was never shown to the model, so it is never offered
-// as an open target.
-func TestOpenTargetsOfferOnlyRefsTheModelWasShown(t *testing.T) {
+// A clipped result drops posts from what the model reads, but every post read
+// is stored under its ref and the best of them are listed as open candidates.
+func TestClippedFeedStillStoresEveryPostAndListsCandidates(t *testing.T) {
 	st, opts, _ := setup(t)
 	opts.Template.Targets = config.DefaultTargets
 	opts.Template.Limits.BrowserRepliesPerDay = 10
@@ -31,20 +31,19 @@ func TestOpenTargetsOfferOnlyRefsTheModelWasShown(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	out, err := d.Dispatch(context.Background(), call("read_feed", "{}"))
+	out, err := d.Dispatch(context.Background(), call("find_posts", `{"source":"feed"}`))
 	if err != nil {
 		t.Fatal(err)
 	}
 	if !strings.Contains(out, "clipped_lists") {
 		t.Fatal("the feed was not clipped; the test needs a larger result")
 	}
-	open := d.OpenTargets(context.Background())
-	if len(open) == 0 {
-		t.Fatal("no open targets at all")
+	stored, err := st.SeenPostsSince(context.Background(), "agent", opts.Now().Add(-guard.CandidateWindow))
+	if err != nil || len(stored) != 60 {
+		t.Fatalf("stored %d posts, %v; want all 60", len(stored), err)
 	}
-	for _, r := range open {
-		if !strings.Contains(out, `"ref":"`+r+`"`) {
-			t.Fatalf("open target %s was never shown to the model", r)
-		}
+	open, err := guard.OpenCandidates(context.Background(), st, opts.Template, nil, opts.Now())
+	if err != nil || len(open) != guard.MaxCandidates {
+		t.Fatalf("%d open candidates, %v; want %d", len(open), err, guard.MaxCandidates)
 	}
 }

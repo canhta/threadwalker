@@ -76,8 +76,7 @@ func TestConfirmedReplyURLCannotBypassOriginalThreadQuota(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	d.Guard().NoteRead("tid", "https://threads.com/@fixture_author/post/original", "")
-	args := `{"text":"Synthetic reply","target_username":"fixture_author","target_id": "tid", "target_url":"https://threads.com/@fixture_author/post/original"}`
+	args := `{"text":"Synthetic reply","target":"` + readRef(t, d.Guard(), "https://threads.com/@fixture_author/post/original", "tid") + `"}`
 	if _, err = d.Dispatch(context.Background(), call("reply", args)); err != nil {
 		t.Fatal(err)
 	}

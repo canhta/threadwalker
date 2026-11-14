@@ -41,9 +41,15 @@ func TestConversationCapRefusesTheThirdReplyAndHidesTheInboxItem(t *testing.T) {
 		"oB": {Kind: "replies", Posts: []threads.Post{inboxPost("q1", "ww", now.Add(-18*time.Minute), "other conversation")}},
 	}
 	_, items := d.Inbox(ctx)
+	// The inbox shows no post ids; each item is found by its text.
+	text := map[string]string{"p1": "one", "p2": "two", "q1": "other conversation", "p3": "late"}
 	byID := map[string]tools.InboxItem{}
-	for _, it := range items {
-		byID[it.TargetID] = it
+	for id, want := range text {
+		for _, it := range items {
+			if it.Text == want {
+				byID[id] = it
+			}
+		}
 	}
 	if len(items) != 3 {
 		t.Fatalf("%+v", items)
@@ -51,7 +57,7 @@ func TestConversationCapRefusesTheThirdReplyAndHidesTheInboxItem(t *testing.T) {
 	reply := func(id string) error {
 		now = now.Add(time.Minute)
 		it := byID[id]
-		_, err := d.Dispatch(ctx, call("reply", `{"text":"ok `+id+`","target_url":"`+it.Ref+`","target_id":"`+id+`","target_username":"`+it.Author+`"}`))
+		_, err := d.Dispatch(ctx, call("reply", `{"text":"ok `+id+`","target":"`+it.Ref+`"}`))
 		return err
 	}
 	if err := reply("p1"); err != nil {
@@ -74,7 +80,7 @@ func TestConversationCapRefusesTheThirdReplyAndHidesTheInboxItem(t *testing.T) {
 		t.Fatal(err)
 	}
 	_, items = d.Inbox(ctx)
-	if len(items) != 1 || items[0].TargetID != "p3" {
+	if len(items) != 1 || items[0].Text != "late" {
 		t.Fatalf("hot conversation not listed: %+v", items)
 	}
 	if err := reply("p2"); err != nil {
@@ -90,8 +96,7 @@ func TestReplyStoresItsConversationRoot(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	d.Guard().NoteRead("", "https://www.threads.com/@xx/post/feed1?x=1", "")
-	args := `{"text":"Synthetic reply","target_username":"xx","target_url":"https://www.threads.com/@xx/post/feed1?x=1"}`
+	args := `{"text":"Synthetic reply","target":"` + readRef(t, d.Guard(), "https://www.threads.com/@xx/post/feed1?x=1", "") + `"}`
 	if _, err := d.Dispatch(context.Background(), call("reply", args)); err != nil {
 		t.Fatal(err)
 	}

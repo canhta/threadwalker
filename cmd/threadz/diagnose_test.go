@@ -83,10 +83,10 @@ func seedWake(t *testing.T, writer bool) seededWake {
 	anchor := `"hook":"trend_detail","rationale":"anchors to the price cut, devs reply with their bills"`
 	for i, c := range []struct{ name, args string }{
 		{"fetch_trends", `{}`},
-		{"read_feed", `{}`},
-		{"post", `{"text":"Giá model giảm nửa, hóa đơn dev đi đâu?","trend_ref":"https://news.google.com/rss/articles/CBMiNeverRead?oc=5","angle":"price cut","fact":"synthetic",` + anchor + `}`},
-		{"post", `{"text":"Giá model giảm nửa, hóa đơn dev đi đâu?","trend_ref":"` + strings.Replace(diagnoseNews, "Diagnose", "Dagnoise", 1) + `","angle":"price cut","fact":"synthetic",` + anchor + `}`},
-		{"post", `{"text":"Giá model giảm nửa, hóa đơn dev đi đâu?","trend_ref":"r1","angle":"price cut","fact":"synthetic",` + anchor + `}`},
+		{"find_posts", `{"source":"feed"}`},
+		{"post", `{"text":"Giá model giảm nửa, hóa đơn dev đi đâu?","trend":"t9","angle":"price cut","fact":"synthetic",` + anchor + `}`},
+		{"post", `{"text":"Giá model giảm nửa, hóa đơn dev đi đâu?","trend":"t1","angle":"price cut","fact":"synthetic",` + anchor + `}`},
+		{"post", `{"text":"Giá model giảm nửa, hóa đơn dev đi đâu?","trend":"t1","angle":"price cut","fact":"synthetic",` + anchor + `}`},
 	} {
 		now = now.Add(time.Minute)
 		call := llm.ToolCall{ID: "c" + string(rune('1'+i)), Type: "function", Function: llm.CallFunction{Name: c.name, Arguments: c.args}}
@@ -120,12 +120,11 @@ func TestWakeDiagnoseShowsTheFunnel(t *testing.T) {
 		"funnel: 5 calls; 2 reads (0 failed); 3 writes (2 blocked, 0 failed); 0 published",
 		"fetch_trends  ok",
 		"got    items 1",
-		"read_feed  ok",
+		"find_posts  ok",
 		"got    posts 1",
 		"post  blocked no_trend_anchor",
 		`text="Giá model giảm nửa, hóa đơn dev đi đâu?"`,
 		"-> no noted item (",
-		"nearest r1, ",
 		"post  ok",
 		`-> "` + diagnoseNews,
 		"action #1 post dry run",
@@ -158,7 +157,7 @@ func TestWakeDiagnoseJSON(t *testing.T) {
 	if err := json.Unmarshal([]byte(runDiagnose(t, seedWake(t, false), "--json")), &d); err != nil {
 		t.Fatal(err)
 	}
-	if d.Funnel.Writes != 3 || d.Funnel.Blocked != 2 || d.Calls[2].Ref == nil || len(d.Calls[2].Ref.Nearest) == 0 || d.Calls[2].Args["trend_ref"] == nil {
+	if d.Funnel.Writes != 3 || d.Funnel.Blocked != 2 || d.Calls[2].Ref == nil || d.Calls[2].Args["trend"] == nil {
 		t.Fatalf("%+v", d.Funnel)
 	}
 }

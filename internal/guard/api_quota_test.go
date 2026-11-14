@@ -33,29 +33,34 @@ func blockedReason(t *testing.T, err error) string {
 	return b.Reason
 }
 
-func TestReplyNeedsTheIDAndPermalinkSeenTogether(t *testing.T) {
+func TestReplyTargetResolvesToTheStoredPost(t *testing.T) {
 	for name, tc := range map[string]struct {
-		noted [2]string
-		args  string
-		want  string
+		id, target string
+		wantID     string
+		want       string
 	}{
-		"matching pair":       {[2]string{"id-1", pairURL}, `"target_id":"id-1"`, ""},
-		"other id":            {[2]string{"id-1", pairURL}, `"target_id":"id-2"`, "reply_target_unread"},
-		"id seen without url": {[2]string{"id-1", "https://threads.com/@fixture_author/post/9"}, `"target_id":"id-1"`, "reply_target_unread"},
-		"missing id":          {[2]string{"id-1", pairURL}, `"target_id":""`, "reply_target_unread"},
-		"feed post":           {[2]string{"", pairURL}, `"target_id":""`, ""},
-		"feed post, no id":    {[2]string{"", pairURL}, `"target_id":"id-1"`, "reply_target_unread"},
+		"post with an API id":     {id: "id-1", wantID: "id-1"},
+		"feed post, browser path": {id: "", wantID: ""},
+		"unknown ref":             {id: "id-1", target: "p999", want: "unknown_target"},
+		"not a ref":               {id: "id-1", target: pairURL, want: "unknown_target"},
 	} {
 		t.Run(name, func(t *testing.T) {
 			g, err := guard.New(liveOpts(t))
 			if err != nil {
 				t.Fatal(err)
 			}
-			g.NoteRead(tc.noted[0], tc.noted[1], "")
-			_, err = g.Execute(context.Background(), guard.Attempt{Tool: "reply", Arguments: `{"text":"ok","target_username":"fixture_author",` + tc.args + `,"target_url":"` + pairURL + `"}`}, func() (string, error) { return "", nil })
+			ref := readPost(t, g, pairURL, tc.id, "")
+			if tc.target != "" {
+				ref = tc.target
+			}
+			var resolved guard.ResolvedTarget
+			_, err = g.Execute(context.Background(), guard.Attempt{Tool: "reply", Target: &resolved, Arguments: `{"text":"ok","target":"` + ref + `"}`}, func() (string, error) { return "", nil })
 			if tc.want == "" {
 				if err != nil {
 					t.Fatal(err)
+				}
+				if resolved.URL != pairURL || resolved.MediaID != tc.wantID {
+					t.Fatalf("resolved %+v, want %s and id %q", resolved, pairURL, tc.wantID)
 				}
 				return
 			}
@@ -77,8 +82,7 @@ func TestAPIQuotaIsAnExtraLimit(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	g.NoteRead("id-1", pairURL, "")
-	reply := guard.Attempt{Tool: "reply", Arguments: `{"text":"ok","target_username":"fixture_author","target_id":"id-1","target_url":"` + pairURL + `"}`}
+	reply := guard.Attempt{Tool: "reply", Arguments: replyTo(t, g, pairURL, "id-1", "ok")}
 	post := guard.Attempt{Tool: "post", Arguments: `{"text":"hello"}`}
 	run := func(a guard.Attempt) error {
 		_, err := g.Execute(context.Background(), a, func() (string, error) { return "", nil })
@@ -132,8 +136,7 @@ func TestBrowserRepliesHaveTheirOwnDailyCap(t *testing.T) {
 	}
 	reply := func(user, id, post string) error {
 		now = now.Add(time.Minute)
-		g.NoteRead(id, "https://threads.com/@"+user+"/post/"+post, "")
-		_, err := g.Execute(context.Background(), guard.Attempt{Tool: "reply", Arguments: `{"text":"ok","target_username":"` + user + `","target_id":"` + id + `","target_url":"https://threads.com/@` + user + `/post/` + post + `"}`}, func() (string, error) { return "", nil })
+		_, err := g.Execute(context.Background(), guard.Attempt{Tool: "reply", Arguments: replyTo(t, g, "https://threads.com/@"+user+"/post/"+post, id, "ok")}, func() (string, error) { return "", nil })
 		return err
 	}
 	if err := reply("feed_one", "", "1"); err != nil {

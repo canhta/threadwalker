@@ -61,22 +61,20 @@ func TestIsolationAcceptancePeerAccountReplyAndMentionRefused(t *testing.T) {
 		name  string
 		tool  string
 		args  string
+		url   string // the post a TARGET in args names, read before the call
 		allow bool
 	}{
 		{
-			name: "target username is the peer after at-sign and case normalization",
-			tool: "reply",
-			args: `{"text":"synthetic reply","target_username":"@SYNTHETIC_TWO","target_id": "tid", "target_url":"https://threads.net/@ordinary_author/post/1"}`,
-		},
-		{
 			name: "peer URL alias with host case www scheme and query",
 			tool: "reply",
-			args: `{"text":"synthetic reply","target_username":"ordinary_author","target_id": "tid", "target_url":"https://WWW.THREADS.COM/@Synthetic_Two/post/1?x=1#frag"}`,
+			args: `{"text":"synthetic reply","target":"TARGET"}`,
+			url:  "https://WWW.THREADS.COM/@Synthetic_Two/post/1?x=1#frag",
 		},
 		{
 			name: "peer profile path without at-sign",
 			tool: "reply",
-			args: `{"text":"synthetic reply","target_username":"ordinary_author","target_id": "tid", "target_url":"https://threads.net/synthetic_two/post/1"}`,
+			args: `{"text":"synthetic reply","target":"TARGET"}`,
+			url:  "https://threads.net/synthetic_two/post/1",
 		},
 		{
 			name: "outbound peer mention from a post",
@@ -91,17 +89,20 @@ func TestIsolationAcceptancePeerAccountReplyAndMentionRefused(t *testing.T) {
 		{
 			name: "bare peer link in a reply mention",
 			tool: "reply",
-			args: `{"text":"synthetic reply to @ordinary_author about threads.net/@synthetic_two/post/1","target_username":"ordinary_author","target_id": "tid", "target_url":"https://threads.net/@ordinary_author/post/1"}`,
+			args: `{"text":"synthetic reply to @ordinary_author about threads.net/@synthetic_two/post/1","target":"TARGET"}`,
+			url:  "https://threads.net/@ordinary_author/post/1",
 		},
 		{
 			name: "peer mention inside a reply whose target username lies",
 			tool: "reply",
-			args: `{"text":"synthetic reply @synthetic_two","target_username":"ordinary_author","target_id": "tid", "target_url":"https://threads.net/@ordinary_author/post/1"}`,
+			args: `{"text":"synthetic reply @synthetic_two","target":"TARGET"}`,
+			url:  "https://threads.net/@ordinary_author/post/1",
 		},
 		{
 			name:  "ordinary stranger reply remains allowed",
 			tool:  "reply",
-			args:  `{"text":"synthetic reply","target_username":"ordinary_author","target_id": "tid", "target_url":"https://threads.net/@ordinary_author/post/1"}`,
+			args:  `{"text":"synthetic reply","target":"TARGET"}`,
+			url:   "https://threads.net/@ordinary_author/post/1",
 			allow: true,
 		},
 	}
@@ -118,9 +119,14 @@ func TestIsolationAcceptancePeerAccountReplyAndMentionRefused(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			g.NoteRead("tid", "https://threads.net/@ordinary_author/post/1", "")
 			called := false
-			_, err = g.Execute(context.Background(), guard.Attempt{Tool: tc.tool, Arguments: tc.args}, func() (string, error) {
+			args := strings.ReplaceAll(tc.args, "TARGET", func() string {
+				if tc.url == "" {
+					return ""
+				}
+				return readPost(t, g, tc.url, "tid", "")
+			}())
+			_, err = g.Execute(context.Background(), guard.Attempt{Tool: tc.tool, Arguments: args}, func() (string, error) {
 				called = true
 				return "synthetic result", nil
 			})
@@ -152,7 +158,7 @@ func TestIsolationAcceptanceDirectGuardKnowsItsOwnTemplateIdentity(t *testing.T)
 	called := false
 	_, err = g.Execute(context.Background(), guard.Attempt{
 		Tool:      "reply",
-		Arguments: `{"text":"synthetic reply","target_username":"@Synthetic_One","target_id": "tid", "target_url":"https://threads.net/@synthetic_one/post/1"}`,
+		Arguments: `{"text":"synthetic reply","target":"` + readPost(t, g, "https://threads.net/@synthetic_one/post/1", "tid", "") + `"}`,
 	}, func() (string, error) { called = true; return "", nil })
 	if !errors.Is(err, guard.ErrBlocked) || called || !strings.Contains(err.Error(), "own_account") {
 		t.Fatalf("direct guard missed template identity: called=%v err=%v", called, err)
@@ -233,7 +239,7 @@ func TestIsolationAcceptanceRefusalLogsAndAuditOmitIdentityAndURL(t *testing.T) 
 	const rawURL = "https://www.threads.net/@Synthetic_Two/post/1?private=marker"
 	_, err = g.Execute(context.Background(), guard.Attempt{
 		Tool:      "reply",
-		Arguments: `{"text":"synthetic reply","target_username":"ordinary_author","target_id": "tid", "target_url":"` + rawURL + `"}`,
+		Arguments: `{"text":"synthetic reply","target":"` + readPost(t, g, rawURL, "tid", "") + `"}`,
 	}, func() (string, error) { return "", nil })
 	if !errors.Is(err, guard.ErrBlocked) {
 		t.Fatalf("expected refusal, got %v", err)

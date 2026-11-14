@@ -209,11 +209,11 @@ func TestIsolationAcceptanceContactsAndRateCountersAreScoped(t *testing.T) {
 		}
 		guards[tmpl.ID] = g
 	}
-	reply := func(g *guard.Guard, target, thread string) error {
-		g.NoteRead("tid", thread, "")
+	reply := func(g *guard.Guard, thread string) error {
+		ref := g.NotePost(ctx, threads.Post{ID: "tid", URL: thread})
 		_, err := g.Execute(ctx, guard.Attempt{
 			Tool:      "reply",
-			Arguments: `{"text":"synthetic reply","target_username":"` + target + `","target_id": "tid", "target_url":"` + thread + `"}`,
+			Arguments: `{"text":"synthetic reply","target":"` + ref + `"}`,
 		}, func() (string, error) { return "synthetic result", nil })
 		return err
 	}
@@ -222,22 +222,22 @@ func TestIsolationAcceptanceContactsAndRateCountersAreScoped(t *testing.T) {
 	if err := env.store.MarkDoNotContact(ctx, isolationAgentOne, "blocked_target", "owner_request"); err != nil {
 		t.Fatal(err)
 	}
-	if err := reply(guards[isolationAgentOne], "blocked_target", "https://threads.net/@blocked_target/post/1"); !errors.Is(err, guard.ErrBlocked) || !strings.Contains(err.Error(), "do_not_contact") {
+	if err := reply(guards[isolationAgentOne], "https://threads.net/@blocked_target/post/1"); !errors.Is(err, guard.ErrBlocked) || !strings.Contains(err.Error(), "do_not_contact") {
 		t.Fatalf("agent-one ignored its own do-not-contact entry: %v", err)
 	}
-	if err := reply(guards[isolationAgentTwo], "blocked_target", "https://threads.net/@blocked_target/post/1"); err != nil {
+	if err := reply(guards[isolationAgentTwo], "https://threads.net/@blocked_target/post/1"); err != nil {
 		t.Fatalf("agent-two was blocked by agent-one's contact entry: %v", err)
 	}
 
 	// Per-user reply counters are also scoped to the replying agent.
-	if err := reply(guards[isolationAgentOne], "ordinary_author", "https://threads.net/@ordinary_author/post/1"); err != nil {
+	if err := reply(guards[isolationAgentOne], "https://threads.net/@ordinary_author/post/1"); err != nil {
 		t.Fatalf("agent-one first scoped reply: %v", err)
 	}
 	clock = env.now.Add(2 * time.Second)
-	if err := reply(guards[isolationAgentOne], "ordinary_author", "https://threads.net/@ordinary_author/post/2"); !errors.Is(err, guard.ErrBlocked) || !strings.Contains(err.Error(), "replies_per_user_7d") {
+	if err := reply(guards[isolationAgentOne], "https://threads.net/@ordinary_author/post/2"); !errors.Is(err, guard.ErrBlocked) || !strings.Contains(err.Error(), "replies_per_user_7d") {
 		t.Fatalf("agent-one per-user counter not enforced: %v", err)
 	}
-	if err := reply(guards[isolationAgentTwo], "ordinary_author", "https://threads.net/@ordinary_author/post/3"); err != nil {
+	if err := reply(guards[isolationAgentTwo], "https://threads.net/@ordinary_author/post/3"); err != nil {
 		t.Fatalf("agent-two inherited agent-one's per-user counter: %v", err)
 	}
 }

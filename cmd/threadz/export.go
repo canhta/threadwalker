@@ -9,6 +9,7 @@ import (
 	"io"
 	"path/filepath"
 	"slices"
+	"strconv"
 
 	"github.com/canhta/threadz/internal/eval"
 	"github.com/canhta/threadz/internal/llm"
@@ -18,7 +19,7 @@ import (
 // replayTools are the tools a replay case keeps: the reads that issue the refs
 // a write names, and the writes themselves.
 var (
-	replayReads  = []string{"fetch_trends", "read_feed", "read_topic", "search", "read_post", "read_replies", "profile_posts"}
+	replayReads  = []string{"fetch_trends", "find_posts", "read_post", "read_replies"}
 	replayWrites = []string{"post", "reply"}
 )
 
@@ -101,6 +102,9 @@ func exportWake(ctx context.Context, st *store.Store, agentID string, id int64, 
 	rc := &eval.ReplayCase{}
 	var tools []string
 	var topLiked *eval.TopPost // the most-liked post read so far
+	// A replay starts on an empty database, so its posts are numbered p1, p2, ...
+	// in the order the wake's reads showed them; a write names them by that number.
+	numbering := map[string]string{}
 	for i, call := range issued {
 		name := call.Function.Name
 		isRead, isWrite := slices.Contains(replayReads, name), slices.Contains(replayWrites, name)
@@ -109,6 +113,7 @@ func exportWake(ctx context.Context, st *store.Store, agentID string, id int64, 
 		}
 		step := eval.ReplayStep{Call: llm.ToolCall{Type: "function", Function: call.Function}}
 		if isWrite {
+			step.Call.Function.Arguments = renumberRefs(step.Call.Function.Arguments, numbering)
 			step.Brief = briefOf(id, name, calls[i].Detail, topLiked, keepText)
 			step.ExpectedBlocked = calls[i].BlockedBy
 			if step.ExpectedBlocked == "" {
@@ -125,6 +130,11 @@ func exportWake(ctx context.Context, st *store.Store, agentID string, id int64, 
 			if !keepText {
 				output = withoutPostText(output)
 			}
+			for _, ref := range postRefs(output) {
+				if _, ok := numbering[ref]; !ok {
+					numbering[ref] = "p" + strconv.Itoa(len(numbering)+1)
+				}
+			}
 			step.Output = output
 		}
 		rc.Steps = append(rc.Steps, step)
@@ -135,6 +145,53 @@ func exportWake(ctx context.Context, st *store.Store, agentID string, id int64, 
 	}
 	c := eval.Case{ID: fmt.Sprintf("replay_wake_%d", id), Kind: "replay", Description: fmt.Sprintf("Replay of wake %d: recorded reads, the agent's calls, the guard's verdicts.", id), Replay: rc, Expect: eval.Expectation{EndReason: "completed", Tools: tools}}
 	return &eval.Suite{Description: "Replay case exported from a stored wake; review and sanitize before committing.", Cases: []eval.Case{c}}, nil
+}
+
+// postRefs lists the refs of the posts of a recorded read, in order.
+func postRefs(output json.RawMessage) []string {
+	var wrapped struct {
+		Data struct {
+			Posts []struct {
+				Ref string `json:"ref"`
+			} `json:"posts"`
+		} `json:"data"`
+		Posts []struct {
+			Ref string `json:"ref"`
+		} `json:"posts"`
+	}
+	var refs []string
+	if json.Unmarshal(output, &wrapped) != nil {
+		return nil
+	}
+	for _, p := range append(wrapped.Data.Posts, wrapped.Posts...) {
+		if p.Ref != "" {
+			refs = append(refs, p.Ref)
+		}
+	}
+	return refs
+}
+
+// renumberRefs rewrites the post refs a write's target and trend name to their
+// replay numbers; a ref the wake's reads did not show (a post stored by an
+// earlier wake) stays, and the replay refuses it as unknown.
+func renumberRefs(arguments string, numbering map[string]string) string {
+	var args map[string]json.RawMessage
+	if json.Unmarshal([]byte(arguments), &args) != nil {
+		return arguments
+	}
+	for _, key := range []string{"target", "trend"} {
+		var ref string
+		if json.Unmarshal(args[key], &ref) == nil {
+			if n, ok := numbering[ref]; ok {
+				args[key], _ = json.Marshal(n)
+			}
+		}
+	}
+	out, err := json.Marshal(args)
+	if err != nil {
+		return arguments
+	}
+	return string(out)
 }
 
 // withoutPostText blanks the text of every post in a recorded read, keeping

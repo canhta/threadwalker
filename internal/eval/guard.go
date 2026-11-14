@@ -38,8 +38,14 @@ type GuardStep struct {
 	MarkUsername    string           `json:"mark_username,omitempty"`
 	Observe         *StopObservation `json:"observe,omitempty"`
 	ExpectedBlocked string           `json:"expected_blocked,omitempty"`
-	// NoteTrend marks a trend, search or feed item as read this wake.
+	// NoteTrend marks a trend item as read this wake; the first one is t1.
 	NoteTrend string `json:"note_trend,omitempty"`
+	// Read stores a post the agent read before the step's call; the first
+	// distinct permalink of a case is p1.
+	Read *struct {
+		URL string `json:"url"`
+		ID  string `json:"id"`
+	} `json:"read,omitempty"`
 }
 type StopObservation struct {
 	Username        string `json:"username"`
@@ -132,19 +138,14 @@ func runGuardCase(ctx context.Context, c Case, p Profile, repeat int, opts Optio
 		if step.NoteTrend != "" {
 			g.NoteTrend(step.NoteTrend)
 		}
+		if step.Read != nil {
+			g.NotePost(ctx, threads.Post{ID: step.Read.ID, URL: step.Read.URL})
+		}
 		if step.Call == nil {
 			continue
 		}
 		call := *step.Call
 		call.ID = fmt.Sprintf("synthetic-guard-%d", i)
-		if call.Function.Name == "reply" {
-			var a struct {
-				TargetURL string `json:"target_url"`
-				TargetID  string `json:"target_id"`
-			}
-			_ = json.Unmarshal([]byte(call.Function.Arguments), &a)
-			g.NoteRead(a.TargetID, a.TargetURL, "")
-		}
 		_, callErr := d.Dispatch(ctx, call)
 		blocked, err := st.LastBlockedBy(ctx)
 		if err != nil {
@@ -169,7 +170,7 @@ func runGuardCase(ctx context.Context, c Case, p Profile, repeat int, opts Optio
 		if step.Call != nil {
 			var a map[string]any
 			_ = json.Unmarshal([]byte(step.Call.Function.Arguments), &a)
-			for _, key := range []string{"text", "target_username", "target_url", "username"} {
+			for _, key := range []string{"text", "username"} {
 				if v, ok := a[key].(string); ok {
 					values = append(values, v)
 				}

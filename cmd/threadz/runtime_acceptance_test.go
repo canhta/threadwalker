@@ -227,7 +227,7 @@ func TestRuntimeCLIOnceOfflineWakePersistsCompletedAudit(t *testing.T) {
 	if auditRows < 4 {
 		t.Errorf("tool call audit rows = %d, want at least 4", auditRows)
 	}
-	for _, want := range []string{"read_feed", "fetch_trends", "post"} {
+	for _, want := range []string{"find_posts", "fetch_trends", "post"} {
 		if !seenTools[want] {
 			t.Errorf("tool call audit rows do not include %q; got %v", want, seenTools)
 		}

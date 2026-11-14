@@ -243,8 +243,8 @@ func TestBrowserReadToolsUseBackendAndLabelUntrusted(t *testing.T) {
 	}
 	h.backend.Own = threads.Metrics{Views: 123, Likes: 7, Replies: 3, Reposts: 1}
 
-	feed := decodeBrowserEnvelope(t, h.mustCall("read_feed", `{}`))
-	if feed.Source != "read_feed" {
+	feed := decodeBrowserEnvelope(t, h.mustCall("find_posts", `{"source":"feed"}`))
+	if feed.Source != "find_posts" {
 		t.Fatalf("feed source %q", feed.Source)
 	}
 	var feedPage threads.Page
@@ -261,8 +261,8 @@ func TestBrowserReadToolsUseBackendAndLabelUntrusted(t *testing.T) {
 		t.Fatalf("feed post identity %+v", feedPage.Posts[0])
 	}
 
-	search := decodeBrowserEnvelope(t, h.mustCall("search", `{"query":"synthetic"}`))
-	if search.Source != "search" {
+	search := decodeBrowserEnvelope(t, h.mustCall("find_posts", `{"source":"search","query":"synthetic"}`))
+	if search.Source != "find_posts" {
 		t.Fatalf("search source %q", search.Source)
 	}
 	var searchPage threads.Page
@@ -332,8 +332,7 @@ func TestBrowserDryRunActionsReserveIntentWithoutSubmitting(t *testing.T) {
 	}
 
 	h.next()
-	h.guard.NoteRead("tid", "https://threads.com/@synthetic_builder/post/fixture-2", "")
-	replyEnvelope := decodeBrowserEnvelope(t, h.mustCall("reply", `{"text":"Synthetic dry-run reply beta","target_id": "tid", "target_url":"https://threads.com/@synthetic_builder/post/fixture-2","target_username":"synthetic_builder"}`))
+	replyEnvelope := decodeBrowserEnvelope(t, h.mustCall("reply", `{"text":"Synthetic dry-run reply beta","target":"`+readRef(t, h.guard, "https://threads.com/@synthetic_builder/post/fixture-2", "tid")+`"}`))
 	if replyEnvelope.Source != "reply" {
 		t.Fatalf("reply source %q", replyEnvelope.Source)
 	}
@@ -432,9 +431,9 @@ func TestBrowserLiveReplyStoresConfirmedThreadURL(t *testing.T) {
 	const confirmed = "https://threads.example/post/fixture-2?reply=created"
 	h := newBrowserHarness(t, false)
 	h.backend.Results[threads.OpReply] = confirmed
-	h.guard.NoteRead("tid", "https://threads.com/@synthetic_builder/post/fixture-2", "")
+	ref := readRef(t, h.guard, "https://threads.com/@synthetic_builder/post/fixture-2", "tid")
 
-	out := decodeBrowserEnvelope(t, h.mustCall("reply", `{"text":"Synthetic live reply beta","target_id": "tid", "target_url":"https://threads.com/@synthetic_builder/post/fixture-2","target_username":"synthetic_builder"}`))
+	out := decodeBrowserEnvelope(t, h.mustCall("reply", `{"text":"Synthetic live reply beta","target":"`+ref+`"}`))
 	if h.backend.Count("reply") != 1 {
 		t.Fatalf("backend replies = %d", h.backend.Count("reply"))
 	}
@@ -490,7 +489,7 @@ func TestBrowserUnknownSubmitIsTerminalAndNeverRetried(t *testing.T) {
 	// The model cannot call another tool after an unknown submit; no replay may
 	// reach the backend, even for a read.
 	h.next()
-	if _, err = h.call("read_feed", `{}`); err == nil {
+	if _, err = h.call("find_posts", `{"source":"feed"}`); err == nil {
 		t.Fatal("dispatch continued after an unknown submit")
 	}
 	if h.backend.Count("read_feed") != 0 || h.backend.Count("post") != 1 {
@@ -514,7 +513,7 @@ func TestBrowserAuthStatesPauseAndNotify(t *testing.T) {
 			h.backend.Errors[threads.OpReadFeed] = fmt.Errorf("reading feed: %w", tc.err)
 
 			h.next()
-			_, err := h.call("read_feed", `{}`)
+			_, err := h.call("find_posts", `{"source":"feed"}`)
 			if err == nil || !errors.Is(err, tc.err) || !isTerminalToolError(err) {
 				t.Fatalf("auth error not preserved/terminal: %v", err)
 			}
@@ -534,7 +533,7 @@ func TestBrowserAuthStatesPauseAndNotify(t *testing.T) {
 			}
 
 			h.next()
-			if _, err = h.call("read_feed", `{}`); err == nil {
+			if _, err = h.call("find_posts", `{"source":"feed"}`); err == nil {
 				t.Fatal("dispatch continued after auth stop")
 			}
 			if h.backend.Count("read_feed") != 1 {
@@ -547,7 +546,7 @@ func TestBrowserAuthStatesPauseAndNotify(t *testing.T) {
 			h.backend.Errors[threads.OpReadFeed] = fmt.Errorf("reading feed: %w", tc.err)
 
 			h.next()
-			_, err := h.call("read_feed", `{}`)
+			_, err := h.call("find_posts", `{"source":"feed"}`)
 			if err == nil || !errors.Is(err, tc.err) || !isTerminalToolError(err) {
 				t.Fatalf("auth error not preserved/terminal: %v", err)
 			}
@@ -579,7 +578,7 @@ func TestBrowserAuthStatesPauseAndNotify(t *testing.T) {
 			h.backend.Errors[threads.OpReadFeed] = fmt.Errorf("reading feed: %w", tc.err)
 
 			h.next()
-			_, err := h.call("read_feed", `{}`)
+			_, err := h.call("find_posts", `{"source":"feed"}`)
 			if err == nil || !errors.Is(err, tc.err) || !isTerminalToolError(err) {
 				t.Fatalf("auth error not preserved/terminal: %v", err)
 			}
@@ -607,7 +606,7 @@ func TestBrowserAuthErrorNeverResurrectsKilledAgent(t *testing.T) {
 	h.backend.Errors[threads.OpReadFeed] = fmt.Errorf("reading feed: %w", threads.ErrCaptcha)
 
 	h.next()
-	_, err := h.call("read_feed", `{}`)
+	_, err := h.call("find_posts", `{"source":"feed"}`)
 	if err == nil || !errors.Is(err, threads.ErrCaptcha) || !isTerminalToolError(err) {
 		t.Fatalf("auth error not preserved/terminal: %v", err)
 	}
@@ -645,7 +644,7 @@ func TestBrowserToolLogsExcludePayloads(t *testing.T) {
 	}
 	h.backend.Results[threads.OpPost] = "https://threads.example/post/created-1"
 
-	h.mustCall("read_feed", `{}`)
+	h.mustCall("find_posts", `{"source":"feed"}`)
 	h.mustCall("post", `{"text":"Synthetic private post body"}`)
 
 	raw := logs.String()
@@ -681,7 +680,7 @@ func TestBrowserExternalResultsRedactConfiguredSecrets(t *testing.T) {
 		}},
 	}
 
-	out := h.mustCall("read_feed", `{}`)
+	out := h.mustCall("find_posts", `{"source":"feed"}`)
 	if strings.Contains(out, secret) {
 		t.Fatalf("tool result leaked a configured secret: %s", out)
 	}
@@ -712,9 +711,9 @@ func TestBrowserOperationFinishedLoggedOncePerOperationWithWake(t *testing.T) {
 	}
 	h := newBrowserHarnessWithLogger(t, true, logger)
 	h.backend.Pages[threads.OpReadFeed] = threads.Page{Kind: "feed"}
-	h.mustCall("read_feed", `{}`)
+	h.mustCall("find_posts", `{"source":"feed"}`)
 	h.backend.Errors[threads.OpSearch] = fmt.Errorf("search: %w", threads.ErrWriteRefused)
-	_, _ = h.call("search", `{"query":"x"}`)
+	_, _ = h.call("find_posts", `{"source":"search","query":"x"}`)
 
 	want := map[string]string{"read_feed": "completed", "search": "write_refused"}
 	got := map[string]int{}
@@ -798,9 +797,9 @@ func TestBrowserReplyToFeedPostStoresNoMediaID(t *testing.T) {
 	h := newBrowserHarness(t, false, func(o *tools.Options) { o.Threads = noReplyID{o.Threads} })
 	h.backend.Results[threads.OpReply] = confirmed
 	feedURL := "https://threads.com/@synthetic_builder/post/fixture-2"
-	h.guard.NoteRead("", feedURL, "")
+	ref := readRef(t, h.guard, feedURL, "")
 
-	out := decodeBrowserEnvelope(t, h.mustCall("reply", `{"text":"Synthetic feed reply","target_url":"`+feedURL+`","target_username":"synthetic_builder"}`))
+	out := decodeBrowserEnvelope(t, h.mustCall("reply", `{"text":"Synthetic feed reply","target":"`+ref+`"}`))
 	if got := h.backend.Last(threads.OpReply).Arg; got != feedURL {
 		t.Fatalf("reply went to %q, want the feed permalink", got)
 	}
@@ -826,8 +825,8 @@ func TestBrowserReplyToFeedPostStoresNoMediaID(t *testing.T) {
 func TestAPIReplyWithoutMediaIDIsUnknownOutcome(t *testing.T) {
 	h := newBrowserHarness(t, false, func(o *tools.Options) { o.Threads = noReplyID{o.Threads} })
 	h.backend.Results[threads.OpReply] = "https://threads.example/@me/post/R2"
-	h.guard.NoteRead("tid", "https://threads.com/@synthetic_builder/post/fixture-2", "")
-	_, err := h.call("reply", `{"text":"Synthetic api reply","target_id":"tid","target_url":"https://threads.com/@synthetic_builder/post/fixture-2","target_username":"synthetic_builder"}`)
+	ref := readRef(t, h.guard, "https://threads.com/@synthetic_builder/post/fixture-2", "tid")
+	_, err := h.call("reply", `{"text":"Synthetic api reply","target":"`+ref+`"}`)
 	if !errors.Is(err, threads.ErrUnknownOutcome) {
 		t.Fatalf("err=%v", err)
 	}
@@ -838,9 +837,9 @@ func TestAPIReplyWithoutMediaIDIsUnknownOutcome(t *testing.T) {
 func TestBrowserReplyFailedBeforeSubmitIsNotCounted(t *testing.T) {
 	h := newBrowserHarness(t, false)
 	h.backend.Errors[threads.OpReply] = threads.ErrMalformedPage
-	h.guard.NoteRead("tid", "https://threads.com/@synthetic_builder/post/fixture-2", "")
+	ref := readRef(t, h.guard, "https://threads.com/@synthetic_builder/post/fixture-2", "tid")
 	h.next()
-	if _, err := h.call("reply", `{"text":"Synthetic refused reply","target_id":"tid","target_url":"https://threads.com/@synthetic_builder/post/fixture-2","target_username":"synthetic_builder"}`); err == nil {
+	if _, err := h.call("reply", `{"text":"Synthetic refused reply","target":"`+ref+`"}`); err == nil {
 		t.Fatal("reply should have failed")
 	}
 	var failed int

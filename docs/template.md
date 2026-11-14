@@ -24,7 +24,7 @@ Hard text limits ([guards.md](guards.md)).
 | `guard.blocked_phrases` | list | none | code | Safety phrases; text containing one is refused `blocked_phrase` (case-folded substring) |
 | `guard.self_stat_units` | list | none (check off) | code | Units (`cent`, `$`, `view`, `follower`...) after which a number must match the facts sheet, else `ungrounded_number` |
 | `guard.reply_max_runes` | int 0–500 | 0 | code | A published reply longer than this many characters is refused as `text_length` with "N of MAX"; the writer gets the exact count. 0 leaves only the 500-character cap. A rough draft the writer rewrites is not measured |
-| `guard.trend_anchor` | bool | false | code | A post carries `hook`, `rationale` and a `trend_ref` read this wake; first line at most 80 characters |
+| `guard.trend_anchor` | bool | false | code | A post carries `hook`, `rationale` and a `trend` read this wake; first line at most 80 characters |
 
 ## persona
 

@@ -183,6 +183,19 @@ CREATE TABLE trend_stories (
     score INTEGER NOT NULL DEFAULT 0
 );
 
+CREATE TABLE seen_posts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    agent_id TEXT NOT NULL,
+    url TEXT NOT NULL,
+    media_id TEXT NOT NULL DEFAULT '',
+    author TEXT NOT NULL,
+    text TEXT NOT NULL,
+    likes INTEGER,
+    replies INTEGER,
+    age_minutes INTEGER,
+    read_at TEXT NOT NULL
+);
+
 CREATE TABLE wake_transcripts (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     agent_id TEXT NOT NULL,
@@ -244,3 +257,7 @@ CREATE INDEX wake_transcripts_agent ON wake_transcripts(agent_id, wake_id);
 CREATE UNIQUE INDEX wake_transcripts_seq ON wake_transcripts(wake_id, seq);
 
 CREATE UNIQUE INDEX wakes_phase_key ON wakes(agent_id,kind,phase_key) WHERE phase_key <> '';
+
+CREATE UNIQUE INDEX seen_posts_url ON seen_posts(agent_id,url);
+
+CREATE INDEX seen_posts_recent ON seen_posts(agent_id,read_at DESC);

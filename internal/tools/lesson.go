@@ -59,7 +59,7 @@ func failureReason(err error) string {
 }
 
 var (
-	errStaleRef    = errors.New("text names a per-wake ref")
+	errStaleRef    = errors.New("text names a post or trend ref")
 	errBudgetSpent = errors.New("daily budget spent")
 )
 
@@ -91,21 +91,22 @@ var (
 	numberPattern = regexp.MustCompile(`\d+(?:[.,]\d+)*`)
 	// refPattern is a name a lesson must not carry: an ISO date or an action id.
 	refPattern = regexp.MustCompile(`(?i)\b\d{4}-\d{2}-\d{2}\b|\baction(?:_id)?[\s:#]*\d+`)
-	// wakeRefPattern is a short ref such as r58. Refs restart at r1 every wake, so
-	// stored text that names one points at a different post in the next wake.
-	wakeRefPattern = regexp.MustCompile(`\br\d+\b`)
-	secretPattern  = regexp.MustCompile(`sk-[A-Za-z0-9_-]{16,}|(?i:bearer\s+[A-Za-z0-9._~+/=-]{16,})|[A-Za-z0-9_-]{40,}|-----BEGIN`)
+	// idRefPattern is a ref such as p58 or t3: an id, not content. A trend ref
+	// restarts every wake and a post ref expires after 7 days, so stored text
+	// that names one points at nothing later.
+	idRefPattern  = regexp.MustCompile(`\b[pt]\d+\b`)
+	secretPattern = regexp.MustCompile(`sk-[A-Za-z0-9_-]{16,}|(?i:bearer\s+[A-Za-z0-9._~+/=-]{16,})|[A-Za-z0-9_-]{40,}|-----BEGIN`)
 )
 
 // checkLesson accepts text only when every URL is one of the agent's own
 // action URLs and every number equals a counter measured on the cited action.
-// Text that names a date or an action id, or a short ref, is refused: a lesson
-// states what to do, not when or from which post. Refs restart every wake.
+// Text that names a date, an action id or a post or trend ref is refused: a
+// lesson states what to do, not when or from which post.
 func checkLesson(text string, ev store.ActionEvidence) error {
 	if secretPattern.MatchString(text) {
 		return errLessonSecret
 	}
-	if wakeRefPattern.MatchString(text) {
+	if idRefPattern.MatchString(text) {
 		return errStaleRef
 	}
 	if refPattern.MatchString(text) {

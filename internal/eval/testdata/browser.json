@@ -9,8 +9,8 @@
         "end_reason": "completed",
         "tools": [
           "read_own_metrics",
-          "read_feed",
-          "search",
+          "find_posts",
+          "find_posts",
           "read_post",
           "read_replies",
           "post",
@@ -26,7 +26,7 @@
         "end_reason": "completed",
         "tools": [
           "read_own_metrics",
-          "read_feed",
+          "find_posts",
           "post",
           "reply"
         ]
@@ -40,7 +40,7 @@
         "end_reason": "logged_out",
         "tools": [
           "read_own_metrics",
-          "read_feed"
+          "find_posts"
         ]
       }
     },
@@ -52,7 +52,7 @@
         "end_reason": "captcha",
         "tools": [
           "read_own_metrics",
-          "read_feed"
+          "find_posts"
         ]
       }
     },
@@ -64,7 +64,7 @@
         "end_reason": "completed",
         "tools": [
           "read_own_metrics",
-          "read_feed"
+          "find_posts"
         ]
       }
     },

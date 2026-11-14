@@ -67,16 +67,18 @@ type Guard struct {
 	stopPhrases []string
 	own         map[string]bool
 	mu          sync.Mutex
-	read        map[string]string
+	// posts are the stored posts this wake has read or resolved, by ref (p12).
+	posts map[string]store.SeenPost
 	// inbox holds the canonical threads of replies to the account noted this
 	// wake, each with the root post of its conversation.
 	inbox     map[string]string
 	readText  map[string]string
 	trendText map[string]string
 	facts     map[string]trends.ItemFacts
-	trends    map[string]bool
-	// shortRef maps a noted item to its short ref; refItem is the inverse.
+	// shortRef maps a noted item (a post permalink, a trend URL or title) to its
+	// ref, p<id> for a post and t<n> for a trend; refItem is the inverse.
 	shortRef, refItem map[string]string
+	trendN            int
 	statPattern       *regexp.Regexp
 	rejections        int
 }
@@ -92,9 +94,14 @@ type Attempt struct {
 	ReservedActionID *int64
 	// Final receives the texts to publish when the writer rewrote them.
 	Final *[]string
-	// Target receives the permalink a reply's target_url short ref resolved to.
-	Target *string
+	// Target receives what a reply's target ref resolved to.
+	Target *ResolvedTarget
 }
+
+// ResolvedTarget is the stored post a reply answers: its permalink and its API
+// post id, empty for a post only a browser read showed. The dispatcher picks
+// the API or the browser path from it.
+type ResolvedTarget struct{ URL, MediaID string }
 
 var ErrAudit = errors.New("tool audit failed")
 var ErrBlocked = errors.New(logging.ToolBlocked)
@@ -167,7 +174,7 @@ func New(opts Scope) (*Guard, error) {
 		own[user] = true
 	}
 	opts.OwnUsernames = users
-	g := &Guard{opts: opts, stopPhrases: append([]string(nil), phrases...), own: own, read: map[string]string{}, inbox: map[string]string{}, readText: map[string]string{}, trendText: map[string]string{}, facts: map[string]trends.ItemFacts{}, trends: map[string]bool{}, shortRef: map[string]string{}, refItem: map[string]string{}}
+	g := &Guard{opts: opts, stopPhrases: append([]string(nil), phrases...), own: own, posts: map[string]store.SeenPost{}, inbox: map[string]string{}, readText: map[string]string{}, trendText: map[string]string{}, facts: map[string]trends.ItemFacts{}, shortRef: map[string]string{}, refItem: map[string]string{}}
 	if units := opts.Template.Guard.SelfStatUnits; len(units) > 0 {
 		g.statPattern = statPattern(units)
 	}
@@ -213,7 +220,11 @@ func (g *Guard) Execute(ctx context.Context, a Attempt, effect func() (string, e
 		reason = g.phaseBlock(a.Tool)
 	}
 	if reason == "" {
-		intent, reason = g.content(a, g.opts.Writer != nil && g.opts.Critic != nil)
+		var cerr error
+		if intent, reason, cerr = g.content(ctx, a, g.opts.Writer != nil && g.opts.Critic != nil); cerr != nil {
+			g.event(ctx, "guard.checked", "error", "state_read_failed", a.Tool)
+			return "", &auditError{cerr}
+		}
 	}
 	if intent != nil {
 		detail.Ref = intent.refTrace
@@ -377,9 +388,9 @@ func (g *Guard) review(ctx context.Context, a Attempt, intent *actionIntent) (re
 	g.mu.Lock()
 	rejected, parent := g.rejections, g.readText[intent.thread]
 	if a.Tool == "post" {
-		parent = g.trendText[strings.TrimSpace(intent.TrendRef)]
+		parent = g.trendText[strings.TrimSpace(intent.Trend)]
 		if parent == "" {
-			parent = strings.TrimSpace(intent.TrendRef)
+			parent = strings.TrimSpace(intent.Trend)
 		}
 	}
 	g.mu.Unlock()
@@ -400,7 +411,7 @@ func (g *Guard) review(ctx context.Context, a Attempt, intent *actionIntent) (re
 	}
 	ending := "" // the overused closing token of the last draft checked
 	check := func(texts []string) []string {
-		if why, d := g.recheck(a, texts); why != "" {
+		if why, d := g.recheck(ctx, a, texts); why != "" {
 			return []string{Hint(why, d)}
 		}
 		if p := factProblem(intent.Fact, texts); p != "" {
@@ -532,7 +543,7 @@ func (g *Guard) recordDetail(ctx context.Context, id int64, d store.CallDetail) 
 }
 
 // recheck runs the content rules on the writer's texts in place of the agent's.
-func (g *Guard) recheck(a Attempt, texts []string) (reason, detail string) {
+func (g *Guard) recheck(ctx context.Context, a Attempt, texts []string) (reason, detail string) {
 	var object map[string]json.RawMessage
 	if json.Unmarshal([]byte(a.Arguments), &object) != nil {
 		return "invalid_tool_arguments", ""
@@ -540,7 +551,10 @@ func (g *Guard) recheck(a Attempt, texts []string) (reason, detail string) {
 	object["text"], _ = json.Marshal(texts[0])
 	object["parts"], _ = json.Marshal(texts[1:])
 	raw, _ := json.Marshal(object)
-	checked, why := g.content(Attempt{Tool: a.Tool, Arguments: string(raw)}, false)
+	checked, why, err := g.content(ctx, Attempt{Tool: a.Tool, Arguments: string(raw)}, false)
+	if err != nil {
+		return "critic_unavailable", ""
+	}
 	if checked != nil {
 		detail = checked.detail
 	}

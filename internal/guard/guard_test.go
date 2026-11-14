@@ -57,7 +57,7 @@ func TestGuardAuditsBeforeEffectAndKeepsPayloadsOut(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	output, err := g.Execute(context.Background(), guard.Attempt{Tool: "read_feed", Arguments: `{"secret":"private-note"}`}, func() (string, error) {
+	output, err := g.Execute(context.Background(), guard.Attempt{Tool: "find_posts", Arguments: `{"secret":"private-note"}`}, func() (string, error) {
 		var count int
 		if err := st.DB().QueryRow(`SELECT COUNT(*) FROM tool_calls WHERE result_json = ''`).Scan(&count); err != nil || count != 1 {
 			t.Fatalf("pre-effect audit: %d %v", count, err)
@@ -116,7 +116,7 @@ func TestGuardAuditFailureAndRejectedAttempts(t *testing.T) {
 				st.DB().Exec(`DROP TABLE agents`)
 			}
 			called := false
-			_, err := g.Execute(context.Background(), guard.Attempt{Tool: "read_feed", Arguments: "{}"}, func() (string, error) { called = true; return "ok", nil })
+			_, err := g.Execute(context.Background(), guard.Attempt{Tool: "find_posts", Arguments: "{}"}, func() (string, error) { called = true; return "ok", nil })
 			if !errors.Is(err, guard.ErrAudit) || called != (phase == "update") {
 				t.Fatalf("called %v err %v", called, err)
 			}

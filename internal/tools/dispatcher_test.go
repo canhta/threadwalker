@@ -46,6 +46,17 @@ func setup(t *testing.T) (*store.Store, tools.Options, *tools.Dispatcher) {
 	return st, opts, d
 }
 
+// readRef has the guard read the post at url (an API post id, empty for a post
+// only a browser read showed) and returns its ref.
+func readRef(t *testing.T, g *guard.Guard, url, id string) string {
+	t.Helper()
+	ref := g.NotePost(context.Background(), threads.Post{ID: id, URL: url})
+	if ref == "" {
+		t.Fatalf("post %q has no ref", url)
+	}
+	return ref
+}
+
 func call(name, args string) llm.ToolCall {
 	return llm.ToolCall{ID: "id", Type: "function", Function: llm.CallFunction{Name: name, Arguments: args}}
 }
@@ -64,7 +75,7 @@ func dispatch(t *testing.T, d *tools.Dispatcher, name, args string) string {
 func TestDefinitionsAndConstructor(t *testing.T) {
 	_, opts, d := setup(t)
 	defs := d.Definitions()
-	if len(defs) != 11 {
+	if len(defs) != 8 {
 		t.Fatalf("definitions %d", len(defs))
 	}
 	names := map[string]bool{}
@@ -122,7 +133,8 @@ func TestExternalWrappersAndDryRunActions(t *testing.T) {
 	opts.Now = func() time.Time { now = now.Add(time.Second); return now }
 	opts.Scope = guard.Scope{Store: st, Template: opts.Template, WakeID: 1, Now: opts.Now}
 	d, _ := tools.NewDispatcher(opts)
-	for _, tc := range []struct{ name, args string }{{"fetch_trends", "{}"}, {"read_feed", "{}"}, {"search", `{"query":"golang"}`}, {"read_post", `{"id":"fixture-3"}`}, {"read_own_metrics", "{}"}, {"post", `{"text":"synthetic own post"}`}, {"reply", `{"text":"synthetic own reply","target_id": "id-thread", "target_url":"https://www.threads.com/@synthetic_author/post/thread","target_username":"synthetic_author"}`}} {
+	target := readRef(t, d.Guard(), "https://www.threads.com/@synthetic_author/post/thread", "id-thread")
+	for _, tc := range []struct{ name, args string }{{"fetch_trends", "{}"}, {"find_posts", `{"source":"feed"}`}, {"find_posts", `{"source":"search","query":"golang"}`}, {"read_post", `{"id":"fixture-3"}`}, {"read_own_metrics", "{}"}, {"post", `{"text":"synthetic own post"}`}, {"reply", `{"text":"synthetic own reply","target":"` + target + `"}`}} {
 		out := dispatch(t, d, tc.name, tc.args)
 		var envelope struct {
 			Untrusted bool            `json:"untrusted"`
@@ -170,7 +182,7 @@ func TestRepeatGuard(t *testing.T) {
 		_, d, mem := repeatDispatcher(t)
 		for i := 0; i < 25; i++ {
 			mem.Pages[threads.OpSearch] = threads.Page{Kind: "search", Posts: []threads.Post{{ID: fmt.Sprint("id", i), URL: fmt.Sprint("https://www.threads.com/@a/post/p", i), Username: "a", Text: fmt.Sprint("t", i)}}}
-			if _, err := d.Dispatch(context.Background(), call("search", `{"query":"q"}`)); err != nil {
+			if _, err := d.Dispatch(context.Background(), call("find_posts", `{"source":"search","query":"q"}`)); err != nil {
 				t.Fatalf("call %d: %v", i, err)
 			}
 		}
@@ -179,16 +191,16 @@ func TestRepeatGuard(t *testing.T) {
 		st, d, mem := repeatDispatcher(t)
 		mem.Errors[threads.OpSearch] = errors.New("source down")
 		for i := 0; i < 3; i++ {
-			if _, err := d.Dispatch(context.Background(), call("search", `{"query":"q"}`)); err == nil || errors.Is(err, tools.ErrStallStop) {
+			if _, err := d.Dispatch(context.Background(), call("find_posts", `{"source":"search","query":"q"}`)); err == nil || errors.Is(err, tools.ErrStallStop) {
 				t.Fatalf("failure %d: %v", i, err)
 			}
 		}
-		_, err := d.Dispatch(context.Background(), call("search", ` {"query":"q"} `))
+		_, err := d.Dispatch(context.Background(), call("find_posts", ` {"source":"search","query":"q"} `))
 		var b *guard.BlockedError
 		if !errors.As(err, &b) || b.Reason != "repeat_refused" || errors.Is(err, tools.ErrStallStop) {
 			t.Fatalf("want one refusal, got %v", err)
 		}
-		if _, err := d.Dispatch(context.Background(), call("read_feed", "{}")); err != nil {
+		if _, err := d.Dispatch(context.Background(), call("find_posts", `{"source":"feed"}`)); err != nil {
 			t.Fatalf("other call refused: %v", err)
 		}
 		if n := blockedCount(st, "repeat_refused"); n != 1 {
@@ -199,9 +211,9 @@ func TestRepeatGuard(t *testing.T) {
 		st, d, mem := repeatDispatcher(t)
 		mem.Errors[threads.OpSearch] = errors.New("source down")
 		for i := 0; i < 5; i++ {
-			d.Dispatch(context.Background(), call("search", `{"query":"q"}`))
+			d.Dispatch(context.Background(), call("find_posts", `{"source":"search","query":"q"}`))
 		}
-		_, err := d.Dispatch(context.Background(), call("read_feed", "{}"))
+		_, err := d.Dispatch(context.Background(), call("find_posts", `{"source":"feed"}`))
 		if !errors.Is(err, tools.ErrStallStop) {
 			t.Fatal("stopped dispatcher accepted more calls:", err)
 		}
@@ -212,7 +224,7 @@ func TestRepeatGuard(t *testing.T) {
 	t.Run("ten identical successes end the wake", func(t *testing.T) {
 		_, d, _ := repeatDispatcher(t)
 		for i := 1; i <= 10; i++ {
-			_, err := d.Dispatch(context.Background(), call("search", `{"query":"q"}`))
+			_, err := d.Dispatch(context.Background(), call("find_posts", `{"source":"search","query":"q"}`))
 			if (i == 10) != errors.Is(err, tools.ErrStallStop) || (i < 10 && err != nil) {
 				t.Fatalf("call %d: %v", i, err)
 			}
@@ -220,7 +232,7 @@ func TestRepeatGuard(t *testing.T) {
 	})
 }
 func TestInvalidToolsAreAuditedAndCannotMutate(t *testing.T) {
-	for _, tc := range []struct{ name, args string }{{"unknown", "{}"}, {"post", "{"}, {"post", "[]"}, {"post", "null"}, {"post", `{"text":""}`}, {"post", `{"text":null}`}, {"post", `{"text":"x","extra":true}`}, {"post", `{"text":"x"} {}`}, {"reply", `{"text":"x"}`}, {"search", `{"query":""}`}, {"read_post", `{"id":""}`}, {"note_write", `{"text":"x"}`}, {"playbook_read", `{}`}, {"read_own_metrics", `{}`}, {"read_feed", `{"query":"x"}`}, {"post", `{"text":"x","hypothesis_ids":[1]}`}, {"post", `{"text":"x","explore":true}`}} {
+	for _, tc := range []struct{ name, args string }{{"unknown", "{}"}, {"post", "{"}, {"post", "[]"}, {"post", "null"}, {"post", `{"text":""}`}, {"post", `{"text":null}`}, {"post", `{"text":"x","extra":true}`}, {"post", `{"text":"x"} {}`}, {"reply", `{"text":"x"}`}, {"find_posts", `{"source":"search","query":""}`}, {"read_post", `{"id":""}`}, {"note_write", `{"text":"x"}`}, {"playbook_read", `{}`}, {"read_own_metrics", `{}`}, {"read_feed", `{"query":"x"}`}, {"post", `{"text":"x","hypothesis_ids":[1]}`}, {"post", `{"text":"x","explore":true}`}} {
 		t.Run(tc.name+tc.args, func(t *testing.T) {
 			st, _, d := setup(t)
 			_, err := d.Dispatch(context.Background(), call(tc.name, tc.args))
@@ -318,8 +330,7 @@ func TestToolsLogsContainMetadataOnly(t *testing.T) {
 	d, _ := tools.NewDispatcher(opts)
 	dispatch(t, d, "fetch_trends", "{}")
 	d.Dispatch(context.Background(), call("unknown-secret-canary", "{}"))
-	d.Guard().NoteRead("tid", "https://threads.com/@stranger_canary/post/private-url-canary", "")
-	dispatch(t, d, "reply", `{"text":"own-post-canary","target_id": "tid", "target_url":"https://threads.com/@stranger_canary/post/private-url-canary","target_username":"stranger_canary"}`)
+	dispatch(t, d, "reply", `{"text":"own-post-canary","target":"`+readRef(t, d.Guard(), "https://threads.com/@stranger_canary/post/private-url-canary", "tid")+`"}`)
 	for _, canary := range []string{"untrusted-external-text", "unknown-secret-canary", "own-post-canary", "private-url-canary", "stranger_canary"} {
 		if strings.Contains(buf.String(), canary) {
 			t.Fatalf("log leaked %s", canary)
@@ -391,7 +402,7 @@ func TestDispatcherKeepsConfiguredSecretsOutOfEffectsAndAudit(t *testing.T) {
 }
 func TestLocalValidationBeforeEffects(t *testing.T) {
 	_, _, d := setup(t)
-	for _, tc := range []struct{ name, args string }{{"post", `{"text":1}`}, {"post", `{"text":"x","parts":null}`}, {"post", `{"text":"x","parts":[""]}`}, {"search", `{"query":"x","recent":"1"}`}, {"search", `{"query":"x","recent":null}`}, {"reply", `{"text":"x","answers_note":0}`}, {"reply", `{"text":"x","answers_note":"1"}`}} {
+	for _, tc := range []struct{ name, args string }{{"post", `{"text":1}`}, {"post", `{"text":"x","parts":null}`}, {"post", `{"text":"x","parts":[""]}`}, {"find_posts", `{"source":"search","query":"x","recent":"1"}`}, {"find_posts", `{"source":"search","query":"x","recent":null}`}, {"reply", `{"text":"x","answers_note":0}`}, {"reply", `{"text":"x","answers_note":"1"}`}} {
 		if _, err := d.Dispatch(context.Background(), call(tc.name, tc.args)); err == nil {
 			t.Fatal("accepted invalid typed input")
 		}
@@ -452,11 +463,11 @@ func TestReplyTargetMustComeFromAReadResult(t *testing.T) {
 	opts.Now = func() time.Time { now = now.Add(time.Minute); return now }
 	opts.Scope = guard.Scope{Store: st, Template: opts.Template, WakeID: 1, Now: opts.Now}
 	d, _ := tools.NewDispatcher(opts)
-	reply := `{"text":"synthetic reply","target_id": "id-search", "target_url":"https://www.threads.com/@synthetic_author/post/search","target_username":"synthetic_author"}`
+	reply := `{"text":"synthetic reply","target":"p1"}`
 	if _, err := d.Dispatch(context.Background(), call("reply", reply)); !errors.Is(err, guard.ErrBlocked) {
 		t.Fatalf("reply before any read: %v", err)
 	}
-	dispatch(t, d, "search", `{"query":"golang"}`)
+	dispatch(t, d, "find_posts", `{"source":"search","query":"golang"}`)
 	dispatch(t, d, "reply", reply)
 }
 
@@ -497,28 +508,33 @@ func TestIdeasToolSeesWhatWasRead(t *testing.T) {
 	if out := dispatch(t, d, "ideas", "{}"); !strings.Contains(out, "[]") {
 		t.Fatalf("empty ideas = %s", out)
 	}
-	if len(seen) == 0 || seen[0].Ref != "r1" {
+	if len(seen) == 0 || seen[0].Ref != "t1" {
 		t.Fatalf("ideas saw %v", seen)
 	}
 }
 
-func TestOpenTargetsLeavesOutOutsideWindowPosts(t *testing.T) {
+func TestOpenCandidatesLeaveOutOutsideWindowPosts(t *testing.T) {
 	h := newBrowserHarness(t, true, func(o *tools.Options) { o.Template.Targets = config.DefaultTargets })
 	count := func(v int64) *int64 { return &v }
 	live := threads.Post{ID: "live", Username: "synthetic_author", Text: "rising", URL: "https://www.threads.com/@synthetic_author/post/live", Likes: count(100), Replies: count(2), AgeMinutes: count(10)}
 	dead := threads.Post{ID: "dead", Username: "synthetic_author", Text: "nobody cares", URL: "https://www.threads.com/@synthetic_author/post/dead", Likes: count(1), Replies: count(0), AgeMinutes: count(60)}
 	h.backend.Pages[threads.OpReadFeed] = threads.Page{Kind: "feed", Posts: []threads.Post{live, dead}}
-	h.mustCall("read_feed", `{}`)
-	open := h.dispatch.OpenTargets(context.Background())
-	if len(open) != 1 || len(h.guard.Seen()) != 2 {
-		t.Fatalf("open targets %v; seen %+v", open, h.guard.Seen())
+	h.mustCall("find_posts", `{"source":"feed"}`)
+	open, err := guard.OpenCandidates(context.Background(), h.store, h.opts.Template, nil, h.now)
+	if err != nil || len(open) != 1 || len(h.guard.Seen()) != 2 {
+		t.Fatalf("open candidates %v, %v; seen %+v", open, err, h.guard.Seen())
 	}
 	for _, it := range h.guard.Seen() {
 		if it.URL == dead.URL && (it.Score != 0 || !strings.Contains(it.Facts, "outside window")) {
 			t.Fatalf("dead post must stay listed with score 0: %+v", it)
 		}
-		if it.URL == live.URL && it.Ref != open[0] {
-			t.Fatalf("live post %+v is not the open target %v", it, open)
+		if it.URL == live.URL && it.Ref != open[0].Ref {
+			t.Fatalf("live post %+v is not the open candidate %v", it, open)
 		}
+	}
+	// Five hours on, the live post has aged out of the target window.
+	later, err := guard.OpenCandidates(context.Background(), h.store, h.opts.Template, nil, h.now.Add(5*time.Hour))
+	if err != nil || len(later) != 0 {
+		t.Fatalf("a post past the target window is still a candidate: %v, %v", later, err)
 	}
 }

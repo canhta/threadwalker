@@ -22,4 +22,4 @@ Use these terms and spellings in code, issues and docs.
 | `lesson` | One sentence of at most 240 characters on how the account should write, grounded in 2 to 5 cited episodes. Only the dream writes it; the owner can forget it. |
 | `hook type` | The kind of first line an action opens with (`number`, `contrarian`, `curiosity_gap`, `personal_stake`, `trend_detail`), stored on the action. |
 | `series` | A post of 2 to 5 parts: part 1 is the hook and each later part is published as a reply to the part before it. It is one action and counts as one post. |
-| `trend anchor` | The item (a trend, search or feed result read this wake) a post names in `trend_ref`; the guard refuses a post anchored to nothing it read. |
+| `trend anchor` | The item (a trend, or a post stored by a read) a post names in `trend` by its `t` or `p` ref; the guard refuses a post anchored to nothing it read. |

@@ -15,6 +15,7 @@ import (
 	"github.com/canhta/threadz/internal/guard"
 	"github.com/canhta/threadz/internal/llm"
 	"github.com/canhta/threadz/internal/store"
+	"github.com/canhta/threadz/internal/threads"
 	"github.com/canhta/threadz/internal/tools"
 	"github.com/canhta/threadz/internal/trends"
 )
@@ -22,19 +23,18 @@ import (
 // These are the stable rule IDs the guard must record in tool_calls.blocked_by.
 // A boundary test fails when either the effect happened or the wrong rule fired.
 const (
-	rulePostsPerDay    = "posts_per_day"
-	ruleRepliesPerDay  = "replies_per_day"
-	rulePerUser7d      = "replies_per_user_7d"
-	ruleSpacing        = "min_seconds_between_actions"
-	ruleForbidden      = "blocked_phrase"
-	ruleTextLength     = "text_length"
-	ruleReplyURL       = "reply_url"
-	ruleReplyMention   = "reply_mention"
-	ruleThreadPerDay   = "thread_per_day"
-	ruleDNC            = "do_not_contact"
-	ruleTargetHost     = "reply_target_host"
-	ruleTargetMismatch = "reply_target_mismatch"
-	ruleTargetUnread   = "reply_target_unread"
+	rulePostsPerDay   = "posts_per_day"
+	ruleRepliesPerDay = "replies_per_day"
+	rulePerUser7d     = "replies_per_user_7d"
+	ruleSpacing       = "min_seconds_between_actions"
+	ruleForbidden     = "blocked_phrase"
+	ruleTextLength    = "text_length"
+	ruleReplyURL      = "reply_url"
+	ruleReplyMention  = "reply_mention"
+	ruleThreadPerDay  = "thread_per_day"
+	ruleDNC           = "do_not_contact"
+	ruleTargetHost    = "reply_target_host"
+	ruleUnknownTarget = "unknown_target"
 )
 
 type policyClock struct{ at time.Time }
@@ -49,8 +49,6 @@ type policyHarness struct {
 	guard *guard.Guard
 	tools *tools.Dispatcher
 	calls int
-	// unread skips the automatic read of a reply's target_url.
-	unread bool
 }
 
 func policyTemplate() config.Template {
@@ -100,14 +98,17 @@ func newPolicyHarness(t *testing.T, mutate func(*config.Template)) *policyHarnes
 func (h *policyHarness) call(tool string, args any) (string, error) {
 	h.t.Helper()
 	h.calls++
+	// A reply names its target by ref: "read" is the harness's key for the post
+	// the agent read first, replaced by the ref that read issued.
+	if m, ok := args.(map[string]any); ok && tool == "reply" {
+		if u, ok := m["read"].(string); ok {
+			m["target"] = h.guard.NotePost(context.Background(), threads.Post{ID: "tid", URL: u})
+			delete(m, "read")
+		}
+	}
 	raw, err := json.Marshal(args)
 	if err != nil {
 		h.t.Fatal(err)
-	}
-	if m, ok := args.(map[string]any); ok && tool == "reply" && !h.unread {
-		if u, ok := m["target_url"].(string); ok {
-			h.guard.NoteRead("tid", u, "")
-		}
 	}
 	// Every synthetic call carries a unique ID and varying arguments so quota
 	// tests cannot trip the separate third-identical-call stall latch.
@@ -163,12 +164,9 @@ func postArgs(seq int) map[string]any {
 	return map[string]any{"text": fmt.Sprintf("topic%d", seq)}
 }
 
-func replyArgs(seq int, username, thread string) map[string]any {
-	return map[string]any{
-		"text":            fmt.Sprintf("synthetic reply %d", seq),
-		"target_username": username,
-		"target_id":       "tid", "target_url": thread,
-	}
+// replyArgs is a reply to the post at thread; the harness reads that post first (see call).
+func replyArgs(seq int, thread string) map[string]any {
+	return map[string]any{"text": fmt.Sprintf("synthetic reply %d", seq), "read": thread}
 }
 
 func TestPolicyPostAndReplyDailyCapsAllowNAndRefuseNPlusOne(t *testing.T) {
@@ -185,11 +183,11 @@ func TestPolicyPostAndReplyDailyCapsAllowNAndRefuseNPlusOne(t *testing.T) {
 	})
 	t.Run("replies", func(t *testing.T) {
 		h := newPolicyHarness(t, func(tmpl *config.Template) { tmpl.Limits.RepliesPerDay = 2 })
-		h.allow("reply", replyArgs(1, "alice", "https://threads.com/@alice/post/1"))
+		h.allow("reply", replyArgs(1, "https://threads.com/@alice/post/1"))
 		h.clock.Advance(time.Second)
-		h.allow("reply", replyArgs(2, "bob", "https://threads.com/@bob/post/2"))
+		h.allow("reply", replyArgs(2, "https://threads.com/@bob/post/2"))
 		h.clock.Advance(time.Second)
-		h.blocked("reply", replyArgs(3, "carol", "https://threads.com/@carol/post/3"), ruleRepliesPerDay)
+		h.blocked("reply", replyArgs(3, "https://threads.com/@carol/post/3"), ruleRepliesPerDay)
 		if got := h.actionCount(); got != 2 {
 			t.Fatalf("replies recorded %d want 2", got)
 		}
@@ -232,16 +230,16 @@ func TestPolicyPerUserSevenDayWindowExpiresExactly(t *testing.T) {
 		tmpl.Limits.RepliesPerDay = 100
 	})
 	start := h.clock.Now()
-	h.allow("reply", replyArgs(1, "alice", "https://threads.com/@alice/post/1"))
+	h.allow("reply", replyArgs(1, "https://threads.com/@alice/post/1"))
 
 	h.clock.at = start.Add(7*24*time.Hour - time.Second)
-	h.blocked("reply", replyArgs(2, "alice", "https://threads.com/@alice/post/2"), rulePerUser7d)
+	h.blocked("reply", replyArgs(2, "https://threads.com/@alice/post/2"), rulePerUser7d)
 
 	h.clock.at = start.Add(7 * 24 * time.Hour)
-	h.allow("reply", replyArgs(3, "alice", "https://threads.com/@alice/post/3"))
+	h.allow("reply", replyArgs(3, "https://threads.com/@alice/post/3"))
 
 	h.clock.Advance(time.Second)
-	h.blocked("reply", replyArgs(4, "alice", "https://threads.com/@alice/post/4"), rulePerUser7d)
+	h.blocked("reply", replyArgs(4, "https://threads.com/@alice/post/4"), rulePerUser7d)
 }
 
 func TestPolicySpacingEdges(t *testing.T) {
@@ -268,9 +266,8 @@ func TestPolicyForbiddenPhraseIsCaseInsensitive(t *testing.T) {
 	t.Run("reply", func(t *testing.T) {
 		h := newPolicyHarness(t, nil)
 		h.blocked("reply", map[string]any{
-			"text":            "tuy nhiên, synthetic reply",
-			"target_username": "alice",
-			"target_id":       "tid", "target_url": "https://threads.com/@alice/post/1",
+			"text": "tuy nhiên, synthetic reply",
+			"read": "https://threads.com/@alice/post/1",
 		}, ruleForbidden)
 	})
 }
@@ -292,15 +289,13 @@ func TestPolicyTextLengthCountsRunesAt500And501(t *testing.T) {
 
 	h.clock.Advance(time.Second)
 	h.allow("reply", map[string]any{
-		"text":            text500,
-		"target_username": "alice",
-		"target_id":       "tid", "target_url": "https://threads.com/@alice/post/1",
+		"text": text500,
+		"read": "https://threads.com/@alice/post/1",
 	})
 	h.clock.Advance(time.Second)
 	h.blocked("reply", map[string]any{
-		"text":            text501,
-		"target_username": "bob",
-		"target_id":       "tid", "target_url": "https://threads.com/@bob/post/2",
+		"text": text501,
+		"read": "https://threads.com/@bob/post/2",
 	}, ruleTextLength)
 }
 
@@ -315,9 +310,8 @@ func TestPolicyReplyRefusesEveryURLForm(t *testing.T) {
 		t.Run(body, func(t *testing.T) {
 			h := newPolicyHarness(t, nil)
 			h.blocked("reply", map[string]any{
-				"text":            body,
-				"target_username": "alice",
-				"target_id":       "tid", "target_url": "https://threads.com/@alice/post/1",
+				"text": body,
+				"read": "https://threads.com/@alice/post/1",
 			}, ruleReplyURL)
 		})
 	}
@@ -326,15 +320,13 @@ func TestPolicyReplyRefusesEveryURLForm(t *testing.T) {
 func TestPolicyReplyMentionsOnlyTheAnsweredAuthor(t *testing.T) {
 	h := newPolicyHarness(t, nil)
 	h.allow("reply", map[string]any{
-		"text":            "thanks @alice.dev",
-		"target_username": "alice.dev",
-		"target_id":       "tid", "target_url": "https://threads.com/@alice.dev/post/1",
+		"text": "thanks @alice.dev",
+		"read": "https://threads.com/@alice.dev/post/1",
 	})
 	h.clock.Advance(time.Second)
 	h.blocked("reply", map[string]any{
-		"text":            "thanks @bob",
-		"target_username": "alice",
-		"target_id":       "tid", "target_url": "https://threads.com/@alice/post/2",
+		"text": "thanks @bob",
+		"read": "https://threads.com/@alice/post/2",
 	}, ruleReplyMention)
 }
 
@@ -344,19 +336,17 @@ func TestPolicyOneReplyPerThreadPerDayWithoutAZoneIsUTC(t *testing.T) {
 		tmpl.Limits.RepliesPerUser7d = 100
 	})
 	h.clock.at = time.Date(2026, 11, 11, 23, 59, 57, 0, time.UTC)
-	h.allow("reply", replyArgs(1, "alice", "https://threads.com/@alice/post/42"))
+	h.allow("reply", replyArgs(1, "https://threads.com/@alice/post/42"))
 	h.clock.Advance(time.Second)
 	// Query, fragment and a trailing slash identify the same thread.
 	h.blocked("reply", map[string]any{
-		"text":            "synthetic reply 2",
-		"target_username": "alice",
-		"target_id":       "tid", "target_url": "https://threads.com/@alice/post/42/?utm_source=synthetic#fragment",
+		"text": "synthetic reply 2",
+		"read": "https://threads.com/@alice/post/42/?utm_source=synthetic#fragment",
 	}, ruleThreadPerDay)
 	h.clock.Advance(2 * time.Second) // 00:00:00 the next UTC day
 	h.allow("reply", map[string]any{
-		"text":            "synthetic reply 3",
-		"target_username": "alice",
-		"target_id":       "tid", "target_url": "https://threads.com/@alice/post/42",
+		"text": "synthetic reply 3",
+		"read": "https://threads.com/@alice/post/42",
 	})
 }
 
@@ -373,14 +363,14 @@ func TestPolicyStopRequestAddsPermanentContact(t *testing.T) {
 		if err != nil || !matched {
 			t.Fatalf("existing permanent entry = %v, %v", matched, err)
 		}
-		h.blocked("reply", replyArgs(1, "synthetic.stop", "https://threads.com/@synthetic.stop/post/1"), ruleDNC)
+		h.blocked("reply", replyArgs(1, "https://threads.com/@synthetic.stop/post/1"), ruleDNC)
 
 		matched, err = h.guard.ObserveStopRequest(context.Background(), "english.user", "please STOP now", true)
 		if err != nil || !matched {
 			t.Fatalf("English stop request = %v, %v", matched, err)
 		}
 		h.clock.Advance(time.Second)
-		h.blocked("reply", replyArgs(2, "english.user", "https://threads.com/@english.user/post/2"), ruleDNC)
+		h.blocked("reply", replyArgs(2, "https://threads.com/@english.user/post/2"), ruleDNC)
 
 		var reason string
 		if err := h.st.DB().QueryRow(`SELECT reason FROM contacts WHERE agent_id='guard-agent' AND username='english.user' AND do_not_contact=1`).Scan(&reason); err != nil || reason != "stop_request" {
@@ -394,59 +384,56 @@ func TestPolicyStopRequestAddsPermanentContact(t *testing.T) {
 		if matched, err := h.guard.ObserveStopRequest(context.Background(), "unaddressed.user", "please stop", false); err != nil || matched {
 			t.Fatalf("unaddressed stop = %v, %v", matched, err)
 		}
-		h.allow("reply", replyArgs(1, "unaddressed.user", "https://threads.com/@unaddressed.user/post/1"))
+		h.allow("reply", replyArgs(1, "https://threads.com/@unaddressed.user/post/1"))
 
 		h.clock.Advance(time.Second)
 		if matched, err := h.guard.ObserveStopRequest(context.Background(), "ordinary.user", "synthetic unrelated text", true); err != nil || matched {
 			t.Fatalf("nonmatching stop = %v, %v", matched, err)
 		}
-		h.allow("reply", replyArgs(2, "ordinary.user", "https://threads.com/@ordinary.user/post/2"))
+		h.allow("reply", replyArgs(2, "https://threads.com/@ordinary.user/post/2"))
 	})
 	t.Run("omitted configuration uses code defaults", func(t *testing.T) {
 		h := newPolicyHarness(t, nil)
 		if matched, err := h.guard.ObserveStopRequest(context.Background(), "default.user", "stop", true); err != nil || !matched {
 			t.Fatalf("default stop phrase = %v, %v", matched, err)
 		}
-		h.blocked("reply", replyArgs(1, "default.user", "https://threads.com/@default.user/post/1"), ruleDNC)
+		h.blocked("reply", replyArgs(1, "https://threads.com/@default.user/post/1"), ruleDNC)
 	})
 }
 
-func TestPolicyReplyTargetMustMatchUsername(t *testing.T) {
+// The author a reply answers is read from the stored post's permalink, never
+// from an argument, so no name can disguise whose thread it is.
+func TestPolicyReplyAuthorComesFromTheStoredPost(t *testing.T) {
 	h := newPolicyHarness(t, nil)
-	h.blocked("reply", replyArgs(1, "bob", "https://threads.com/@alice/post/1"), ruleTargetMismatch)
-	h.blocked("reply", replyArgs(2, "@Alice", "https://threads.com/@bob/post/2"), ruleTargetMismatch)
-	h.allow("reply", replyArgs(3, "@Alice", "https://threads.com/@ALICE/post/3"))
+	h.allow("reply", replyArgs(1, "https://threads.com/@ALICE/post/1"))
+	var user string
+	if err := h.st.DB().QueryRow(`SELECT target_username FROM actions WHERE kind='reply'`).Scan(&user); err != nil || user != "alice" {
+		t.Fatalf("stored author %q: %v", user, err)
+	}
 }
 
-func TestPolicyDoNotContactCannotBeBypassedByMismatchedUsername(t *testing.T) {
+func TestPolicyDoNotContactAppliesToTheStoredPostsAuthor(t *testing.T) {
 	h := newPolicyHarness(t, nil)
 	if err := h.st.MarkDoNotContact(context.Background(), "guard-agent", "alice", "owner_request"); err != nil {
 		t.Fatal(err)
 	}
-	h.blocked("reply", replyArgs(1, "bob", "https://threads.com/@alice/post/1"), ruleTargetMismatch)
-	h.blocked("reply", replyArgs(2, "alice", "https://threads.com/@alice/post/2"), ruleDNC)
-	var n int
-	if err := h.st.DB().QueryRow(`SELECT COUNT(*) FROM contacts WHERE username='bob'`).Scan(&n); err != nil || n != 0 {
-		t.Fatalf("mismatched reply charged bob: n=%d err=%v", n, err)
-	}
+	h.blocked("reply", replyArgs(1, "https://threads.com/@Alice/post/1"), ruleDNC)
+	h.allow("reply", replyArgs(2, "https://threads.com/@bob/post/2"))
 }
 
 func TestPolicyReplyTargetHostAndShape(t *testing.T) {
 	h := newPolicyHarness(t, nil)
-	h.blocked("reply", replyArgs(1, "alice", "https://example.com/@alice/post/1"), ruleTargetHost)
-	h.blocked("reply", replyArgs(2, "alice", "https://threads.com.evil.test/@alice/post/2"), ruleTargetHost)
-	h.blocked("reply", replyArgs(3, "alice", "https://threads.com/alice/post/3"), "invalid_tool_arguments")
-	h.blocked("reply", replyArgs(4, "alice", "https://threads.com/@alice/status/4"), "invalid_tool_arguments")
-	h.allow("reply", replyArgs(5, "alice", "https://www.threads.net/@alice/post/5"))
+	h.blocked("reply", replyArgs(1, "https://example.com/@alice/post/1"), ruleTargetHost)
+	h.blocked("reply", replyArgs(2, "https://threads.com.evil.test/@alice/post/2"), ruleTargetHost)
+	h.blocked("reply", replyArgs(3, "https://threads.com/alice/post/3"), ruleTargetHost)
+	h.blocked("reply", replyArgs(4, "https://threads.com/@alice/status/4"), ruleTargetHost)
+	h.allow("reply", replyArgs(5, "https://www.threads.net/@alice/post/5"))
 }
 
-func TestPolicyReplyTargetMustHaveBeenRead(t *testing.T) {
+func TestPolicyReplyTargetMustBeAStoredPost(t *testing.T) {
 	h := newPolicyHarness(t, nil)
-	h.unread = true
-	h.blocked("reply", replyArgs(1, "alice", "https://threads.com/@alice/post/1"), ruleTargetUnread)
-	h.guard.NoteRead("tid", "http://www.threads.com/@alice/post/1/?utm=x#frag", "")
-	h.allow("reply", replyArgs(2, "alice", "https://threads.com/@alice/post/1"))
-	h.blocked("reply", replyArgs(3, "alice", "https://threads.com/@alice/post/9"), ruleTargetUnread)
-	h.guard.NoteRead("tid", "not a url", "")
-	h.blocked("reply", replyArgs(4, "alice", "https://threads.com/@alice/post/9"), ruleTargetUnread)
+	h.blocked("reply", map[string]any{"text": "synthetic reply 1", "target": "p1"}, ruleUnknownTarget)
+	h.allow("reply", replyArgs(2, "https://threads.com/@alice/post/1")) // the read stores it as p1
+	h.blocked("reply", map[string]any{"text": "synthetic reply 3", "target": "p9"}, ruleUnknownTarget)
+	h.blocked("reply", map[string]any{"text": "synthetic reply 4", "target": "https://threads.com/@alice/post/9"}, ruleUnknownTarget)
 }

@@ -140,7 +140,7 @@ func (s *Store) Close() error {
 
 // schemaVersion is the one schema this build reads and writes. It is stored in
 // SQLite's user_version; bump it whenever schema.sql changes.
-const schemaVersion = 12
+const schemaVersion = 13
 
 // create builds the schema in an empty database; a database holding any other
 // schema version is refused rather than altered.

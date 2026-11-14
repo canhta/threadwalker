@@ -36,9 +36,9 @@ func TestActionStoresFeaturesOfWhatTheWakeRead(t *testing.T) {
 	topic := "https://www.threads.com/search?q=x&serp_type=trends&trend_fbid=1"
 
 	var id int64
-	g.NoteRead("tid", target+"?x=1", "")
 	// The permalink arrives with a query.
-	if _, err := g.Execute(context.Background(), guard.Attempt{Tool: "reply", Arguments: `{"text":"Synthetic reply","target_username":"fixture_author","target_id":"tid","target_url":"` + target + `?x=1"}`, ReservedActionID: &id}, func() (string, error) { return "", nil }); err != nil {
+	ref := readPost(t, g, target+"?x=1", "tid", "")
+	if _, err := g.Execute(context.Background(), guard.Attempt{Tool: "reply", Arguments: `{"text":"Synthetic reply","target":"` + ref + `"}`, ReservedActionID: &id}, func() (string, error) { return "", nil }); err != nil {
 		t.Fatal(err)
 	}
 	var scoreJSON string
@@ -59,10 +59,10 @@ func TestActionStoresFeaturesOfWhatTheWakeRead(t *testing.T) {
 	if g, err = guard.New(opts); err != nil {
 		t.Fatal(err)
 	}
-	g.NoteTrendText(topic, "topic")
+	topicRef := g.NoteTrendText(topic, "topic")
 	g.NoteFacts(topic, trends.TopicFacts(trends.Heat{Posts: n64(2000)}, now))
 	var post int64
-	if _, err := g.Execute(context.Background(), guard.Attempt{Tool: "post", Arguments: `{"text":"Synthetic post","trend_ref":"` + topic + `"}`, ReservedActionID: &post}, func() (string, error) { return "", nil }); err != nil {
+	if _, err := g.Execute(context.Background(), guard.Attempt{Tool: "post", Arguments: `{"text":"Synthetic post","trend":"` + topicRef + `"}`, ReservedActionID: &post}, func() (string, error) { return "", nil }); err != nil {
 		t.Fatal(err)
 	}
 	var heat sql.NullFloat64
@@ -87,7 +87,7 @@ func TestSeenListsBestFirstWithFactsAndCaps(t *testing.T) {
 	if len(seen) != guard.MaxSeen {
 		t.Fatalf("%d items", len(seen))
 	}
-	if seen[0].Ref != "r4" || seen[0].Facts != "[target score 0.90]" || seen[1].Score != 0.3 || seen[2].Facts != "" || seen[2].Ref != "r1" {
+	if seen[0].Ref != "t4" || seen[0].Facts != "[target score 0.90]" || seen[1].Score != 0.3 || seen[2].Facts != "" || seen[2].Ref != "t1" {
 		t.Fatalf("order: %+v", seen[:3])
 	}
 }
@@ -99,9 +99,9 @@ func TestReplyToAnOutsideWindowTargetIsRefusedUnlessInbox(t *testing.T) {
 	opts.Template.Limits.RepliesPerUser7d = 5
 	opts.Template.Limits.MinSecondsBetweenActions = 1
 	opts.Template.Targets = config.DefaultTargets
-	reply := func(g *guard.Guard, url string) error {
+	reply := func(g *guard.Guard, ref string) error {
 		var id int64
-		_, err := g.Execute(context.Background(), guard.Attempt{Tool: "reply", Arguments: `{"text":"Synthetic reply","target_username":"fixture_author","target_id":"tid","target_url":"` + url + `"}`, ReservedActionID: &id}, func() (string, error) { return "", nil })
+		_, err := g.Execute(context.Background(), guard.Attempt{Tool: "reply", Arguments: `{"text":"Synthetic reply","target":"` + ref + `"}`, ReservedActionID: &id}, func() (string, error) { return "", nil })
 		return err
 	}
 	dead := "https://threads.com/@fixture_author/post/dead1"
@@ -114,9 +114,9 @@ func TestReplyToAnOutsideWindowTargetIsRefusedUnlessInbox(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	g.NoteRead("tid", dead, "")
+	ref := readPost(t, g, dead, "tid", "")
 	g.NoteFacts(dead, facts)
-	b, hint := modelResult(t, reply(g, dead))
+	b, hint := modelResult(t, reply(g, ref))
 	if b != "target_outside_window" || !strings.Contains(hint, "likes_per_hour 1 < min_likes_per_hour 5") {
 		t.Fatalf("%q %q", b, hint)
 	}
@@ -125,9 +125,9 @@ func TestReplyToAnOutsideWindowTargetIsRefusedUnlessInbox(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	g.NoteInbox("tid", dead, "", "")
+	ref = g.NoteInbox(context.Background(), threads.Post{ID: "tid", URL: dead}, "")
 	g.NoteFacts(dead, facts)
-	if err := reply(g, dead); err != nil {
+	if err := reply(g, ref); err != nil {
 		t.Fatalf("inbox reply: %v", err)
 	}
 }

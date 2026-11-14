@@ -60,10 +60,10 @@ Status runs the rows marked live for each agent; `doctor` runs all of them. One 
 
 | Item | Fact |
 |---|---|
-| Transcript | Each wake stores, redacted and bounded, in `wake_transcripts`: the hash of the rendered messages, the data message and the system prompt text once per run (`context`); each injected nudge or stop-check message (`user`); each model turn's text and tool calls (`assistant`); each tool result cut to 64 KiB with a `truncated` flag, so `fetch_trends` and `read_topic` results stay whole (outside data keeps the `untrusted` marker); each request's tokens and USD (`usage`); the end reason and steps (`end`) |
+| Transcript | Each wake stores, redacted and bounded, in `wake_transcripts`: the hash of the rendered messages, the data message and the system prompt text once per run (`context`); each injected nudge or stop-check message (`user`); each model turn's text and tool calls (`assistant`); each tool result cut to 64 KiB with a `truncated` flag, so `fetch_trends` and `find_posts` results stay whole (outside data keeps the `untrusted` marker); each request's tokens and USD (`usage`); the end reason and steps (`end`) |
 | Bounds | At most 400 entries and 2 MiB per wake. The entry that crosses a bound becomes one `truncated` marker and later entries are dropped, except `end` |
 | Guard decisions | Not copied; `wake-show` reads them from `tool_calls`, where `blocked_by` holds the reason |
-| Call arguments and detail | `tool_call_details` holds each call's arguments (redacted, every string cut to 2 KiB; a call whose arguments held a secret keeps only its key names) and, once the call ended, its detail: the refusal's detail, how a `trend_ref` or `target_url` resolved (the ref given, the item it resolved to, or the three nearest noted refs), every draft the writer and critic produced (source, first line, length in runes, scores, problems), the length of each list a read returned, the failing browser stage and the saved snapshot path, and the action id. 8 days ([data.md](data.md)) |
+| Call arguments and detail | `tool_call_details` holds each call's arguments (redacted, every string cut to 2 KiB; a call whose arguments held a secret keeps only its key names) and, once the call ended, its detail: the refusal's detail, how a `trend` or `target` resolved (the ref given and the item it resolved to, or the number of refs noted this wake when it resolved to none), every draft the writer and critic produced (source, first line, length in runes, scores, problems), the length of each list a read returned, the failing browser stage and the saved snapshot path, and the action id. 8 days ([data.md](data.md)) |
 | Retention | 8 days, because transcripts hold the same outside text as Threads observations |
 | Log stream | One `log/slog` JSON stream with `agent_id`, `wake_id`, `phase`, `request` and `tool_call_id` where they apply. Event names are constants in `internal/logging` |
 | Browser events | `browser.launch` and `browser.close`, each with `wake_id`, `phase`, `outcome` and `duration_ms` |
@@ -80,8 +80,8 @@ Filtering a saved trace: [setup.md](setup.md).
 |---|---|
 | Funnel | Calls, reads and how many failed, writes (posts and replies) with the blocked and failed counts, published actions |
 | Every call, in order | Tool, outcome (`ok`, `blocked`, `failed`, `unfinished`) and reason code; for reads the length of each list returned |
-| Every post and reply | Its arguments that matter: first line and length of the text, `hook`, `trend_ref` or `target_url`, `target_username`, number of later parts |
-| Ref resolution | The ref given and the item it resolved to; when it resolved to none, how many refs the wake issued and the nearest three with their edit distance, so a mangled copy of a long URL is visible beside the original |
+| Every post and reply | Its arguments that matter: first line and length of the text, `hook`, `trend` or `target` (the refs as the model sent them), number of later parts |
+| Ref resolution | The ref given and the item it resolved to; when it resolved to none, how many refs the wake issued |
 | Editor drafts | Each draft in order: `agent` (the rough draft sent in), then each `writer` revision, with its length in runes, first line, critic scores and problems. A `text_length` refusal names the draft it measured by listing it as an `agent` draft; a writer text that is too long appears as a problem of its draft and ends as `critic_rejected` |
 | Browser | The failing stage, the reason code and the path of the saved snapshot |
 | Outcome | The action id, its kind, whether it is a dry run or failed, and its published URL |
@@ -159,15 +159,15 @@ Sections run in this order; missing values show `—`.
 
 `threadz update` (root) installs a GitHub release only after the tarball's sha256 and detached ed25519 signature verify against `update.ReleasePublicKey`. It refuses a downgrade, a major-version jump and release notes with a `Manual step:` line, and restores `.prev` when the restarted unit is not active and `ctl doctor` does not pass within 2 minutes. `THREADZ_UPDATE_AUTO` (default false) and `THREADZ_UPDATE_WINDOW` (local hours `H-H`) gate only the timer; Telegram `/update` and `ctl update` write `/run/threadz/update-request` for a root path unit. Steps, flags and install: [setup.md](setup.md#updates).
 
-## Manual deploy of v0.2.0
+## Manual deploy of v0.3.0
 
-v0.2.0 changes the schema (v11 to v12) and drops template keys, so its release notes carry a `Manual step:` line and `threadz update` refuses it. Before step 1, check that sqlite3 has FTS5 (the migration needs it): `sqlite3 :memory: 'PRAGMA compile_options' | grep -i fts5` must print a line. Then install by hand, in this order:
+v0.3.0 changes the schema (v12 to v13) and the tool surface, so its release notes carry a `Manual step:` line and `threadz update` refuses it. Install by hand, in this order:
 
 1. Stop both services: `systemctl stop threadz threadz-dashboard`. The dashboard runs the same binary on the same database.
-2. Back up the database and the yaml: `cp /opt/threadz/data/threadz.db /opt/threadz/data/threadz.db.v11` and `cp /opt/threadz/agents/viral.agent.yaml /opt/threadz/agents/viral.agent.yaml.v11`.
-3. Migrate the database (needs sqlite3 3.35 or later; one transaction, refuses any schema other than v11): `sqlite3 -bail /opt/threadz/data/threadz.db < deploy/migrate-12.sql`
-4. Patch the live template (writes a `.bak`, prints each change, lowers `limits.max_steps_per_dream` from 20 to 8, never touches `dry_run`; a second run changes nothing): `python3 deploy/patch-template-v12.py /opt/threadz/agents/viral.agent.yaml`
-5. Install the v0.2.0 binary over `/opt/threadz/threadz`.
+2. Back up the database and the yaml: `cp /opt/threadz/data/threadz.db /opt/threadz/data/threadz.db.v12` and `cp /opt/threadz/agents/viral.agent.yaml /opt/threadz/agents/viral.agent.yaml.v12`.
+3. Migrate the database (one transaction, refuses any schema other than v12; it only adds the `seen_posts` table): `sqlite3 -bail /opt/threadz/data/threadz.db < deploy/migrate-13.sql`
+4. Patch the live template (writes a `.bak`, prints each change, warns about any line that still names a removed tool or argument, never touches `dry_run`; a second run changes nothing): `python3 deploy/patch-template-v13.py /opt/threadz/agents/viral.agent.yaml`
+5. Install the v0.3.0 binary over `/opt/threadz/threadz`.
 6. Check with the service env: `set -a; . /etc/threadz/threadz.env; set +a; /opt/threadz/threadz check --agents /opt/threadz/agents --db /opt/threadz/data/threadz.db`
 7. Start the services: `systemctl start threadz`, then `systemctl start threadz-dashboard`, then `threadz ctl doctor`.
 

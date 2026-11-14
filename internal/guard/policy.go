@@ -18,22 +18,27 @@ import (
 	"github.com/canhta/threadz/internal/quality"
 	"github.com/canhta/threadz/internal/stdx"
 	"github.com/canhta/threadz/internal/store"
+	"github.com/canhta/threadz/internal/threads"
 	"github.com/canhta/threadz/internal/trends"
 )
 
 type actionIntent struct {
-	Text           string   `json:"text"`
-	TargetURL      string   `json:"target_url"`
-	TargetID       string   `json:"target_id"`
-	TargetUsername string   `json:"target_username"`
-	Parts          []string `json:"parts"`
-	Hook           string   `json:"hook"`
-	TrendRef       string   `json:"trend_ref"`
-	Rationale      string   `json:"rationale"`
-	AnswersNote    int64    `json:"answers_note"`
-	Angle          string   `json:"angle"`
-	Fact           string   `json:"fact"`
-	LessonIDs      []int64  `json:"lesson_ids"`
+	Text        string   `json:"text"`
+	Target      string   `json:"target"`
+	Parts       []string `json:"parts"`
+	Hook        string   `json:"hook"`
+	Trend       string   `json:"trend"`
+	Rationale   string   `json:"rationale"`
+	AnswersNote int64    `json:"answers_note"`
+	Angle       string   `json:"angle"`
+	Fact        string   `json:"fact"`
+	LessonIDs   []int64  `json:"lesson_ids"`
+	// TargetURL, TargetUsername and TargetID are what a reply's target resolved
+	// to: the stored post's permalink, author and API id (empty for a post only
+	// a browser read showed).
+	TargetURL      string `json:"-"`
+	TargetUsername string `json:"-"`
+	TargetID       string `json:"-"`
 	thread         string
 	criticJSON     string
 	detail         string
@@ -58,44 +63,102 @@ func (i *actionIntent) texts() []string { return append([]string{i.Text}, i.Part
 var mentions = regexp.MustCompile(`@[\p{L}\p{N}_.]+`)
 var links = regexp.MustCompile(`(?i)([a-z][a-z0-9+.-]*://|(?:https?|ftp|mailto|data|javascript|file|tel):|www\.|//[\p{L}\p{N}]|[\p{L}\p{N}](?:[\p{L}\p{N}-]*[\p{L}\p{N}])?(?:\.[\p{L}\p{N}](?:[\p{L}\p{N}-]*[\p{L}\p{N}])?)+)`)
 
-// NoteRead records the API post id and permalink the agent saw together in a
-// read result this wake; a feed post has an empty id. The set is memory-only
-// and dies with the guard; a reply may target only a pair in it, so a scored
-// permalink cannot be paired with a different post id. The post's text is
-// kept so a reply may quote its numbers.
-func (g *Guard) NoteRead(id, raw, text string) {
-	thread, err := store.CanonicalThread(raw)
-	if err != nil {
-		return
-	}
-	g.mu.Lock()
-	g.read[thread] = id
-	g.readText[thread] = text
-	g.mu.Unlock()
+// postRefForm is the ref of a stored post: p followed by its durable id.
+var postRefForm = regexp.MustCompile(`^[pP]([0-9]+)$`)
+
+// NotePost records a post a read returned under its durable id and returns its
+// ref (p12); the same permalink keeps its id across wakes. The post becomes
+// something the agent may reply to or anchor a post on, and its text is kept
+// so the critic can read it and a reply may quote its numbers. It returns ""
+// for a post without a usable permalink.
+func (g *Guard) NotePost(ctx context.Context, p threads.Post) string {
+	return g.notePost(ctx, p, false, "")
 }
 
-// NoteInbox is NoteRead for a reply to the account: the agent may answer it by
-// id, a conversation with the same person is not capped by
-// limits.replies_per_user_7d, and the returned short ref names it. root is the
+// NoteInbox is NotePost for a reply to the account: a conversation with the
+// same person is not capped by limits.replies_per_user_7d. root is the
 // canonical URL of the root post of its conversation; empty means the reply
 // starts its own conversation.
-func (g *Guard) NoteInbox(id, raw, text, root string) string {
-	thread, err := store.CanonicalThread(raw)
+func (g *Guard) NoteInbox(ctx context.Context, p threads.Post, root string) string {
+	return g.notePost(ctx, p, true, root)
+}
+
+func (g *Guard) notePost(ctx context.Context, p threads.Post, inbox bool, root string) string {
+	thread, err := store.CanonicalThread(p.URL)
 	if err != nil {
 		return ""
 	}
-	g.NoteRead(id, raw, text)
-	if root == "" {
-		root = thread
+	author, _ := threadAuthor(thread)
+	if author == "" {
+		author, _ = store.NormalizeUsername(p.Username)
 	}
-	g.mu.Lock()
-	g.inbox[thread] = root
-	g.mu.Unlock()
-	refs := g.NoteTrend(raw)
-	if len(refs) == 0 {
+	row := store.SeenPost{URL: thread, MediaID: p.ID, Author: author, Text: p.Text, Likes: p.Likes, Replies: p.Replies, AgeMinutes: p.AgeMinutes, ReadAt: g.opts.Now().UTC()}
+	id, err := g.opts.Store.NoteSeenPost(ctx, g.opts.Template.ID, row)
+	if err != nil {
 		return ""
 	}
-	return refs[0]
+	stored, ok, err := g.opts.Store.SeenPostByID(ctx, g.opts.Template.ID, id)
+	if err != nil || !ok {
+		return ""
+	}
+	ref := g.register(stored)
+	if inbox {
+		if root == "" {
+			root = thread
+		}
+		g.mu.Lock()
+		g.inbox[thread] = root
+		delete(g.trendText, thread) // an inbox reply is not an idea source
+		g.mu.Unlock()
+	}
+	return ref
+}
+
+// register makes a stored post known to this wake under its ref: the reply
+// target, trend anchor and critic text lookups all read what it sets. Its
+// facts are the target score of its figures aged to now.
+func (g *Guard) register(row store.SeenPost) string {
+	ref := "p" + strconv.FormatInt(row.ID, 10)
+	post := threads.Post{Likes: row.Likes, Replies: row.Replies}
+	if row.AgeMinutes != nil {
+		age := *row.AgeMinutes + int64(max(g.opts.Now().Sub(row.ReadAt), 0)/time.Minute)
+		post.AgeMinutes = &age
+	}
+	facts, err := trends.PostFacts(post, g.opts.Template.Targets)
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	g.posts[ref], g.shortRef[row.URL], g.refItem[ref] = row, ref, row.URL
+	g.trendText[row.URL], g.readText[row.URL] = row.Text, row.Text
+	if err == nil && facts.Line != "" {
+		g.facts[row.URL] = facts
+	}
+	return ref
+}
+
+// post resolves a p ref to its stored post: from this wake's reads, else from
+// the store, which keeps posts for 7 days. ok is false for anything that is not
+// the ref of one of this agent's stored posts.
+func (g *Guard) post(ctx context.Context, raw string) (store.SeenPost, bool, error) {
+	m := postRefForm.FindStringSubmatch(strings.TrimSpace(raw))
+	if m == nil {
+		return store.SeenPost{}, false, nil
+	}
+	g.mu.Lock()
+	row, ok := g.posts["p"+m[1]]
+	g.mu.Unlock()
+	if ok {
+		return row, true, nil
+	}
+	id, err := strconv.ParseInt(m[1], 10, 64)
+	if err != nil {
+		return store.SeenPost{}, false, nil
+	}
+	row, ok, err = g.opts.Store.SeenPostByID(ctx, g.opts.Template.ID, id)
+	if err != nil || !ok {
+		return store.SeenPost{}, false, err
+	}
+	g.register(row)
+	return row, true, nil
 }
 
 // IsOwn reports whether username is one of the operator-declared own accounts.
@@ -104,21 +167,20 @@ func (g *Guard) IsOwn(username string) bool {
 	return err == nil && g.own[user]
 }
 
-// NoteTrend records the URL or title of an item a trend, search or feed read
-// returned this wake and returns the short ref ("r1", "r2", ...) of each, in
-// noting order; noting the same item again returns the same ref. The set is
-// memory-only; a post may anchor only to an item in it. Models pass the short
-// ref because they miscopy long opaque URLs.
+// NoteTrend records the URL or title of a trend or web source returned this
+// wake and returns the ref ("t1", "t2", ...) of each, in noting order; noting
+// the same item again returns the same ref. Trend refs restart every wake; the
+// set is memory-only and a post may anchor only to an item in it.
 func (g *Guard) NoteTrend(refs ...string) []string {
 	g.mu.Lock()
 	defer g.mu.Unlock()
 	short := make([]string, 0, len(refs))
 	for _, ref := range refs {
 		if ref = strings.TrimSpace(ref); ref != "" {
-			g.trends[ref] = true
 			r, ok := g.shortRef[ref]
 			if !ok {
-				r = "r" + strconv.Itoa(len(g.shortRef)+1)
+				g.trendN++
+				r = "t" + strconv.Itoa(g.trendN)
 				g.shortRef[ref], g.refItem[r] = r, ref
 			}
 			short = append(short, r)
@@ -162,9 +224,9 @@ func (g *Guard) NoteFacts(ref string, f trends.ItemFacts) {
 // overlayFacts fills the context of an action from what this wake's reads
 // showed: the figures of the replied-to post and the heat of the anchored topic.
 func (g *Guard) overlayFacts(pc *trends.PostingContext, intent *actionIntent, tool string) {
-	ref, ok := g.Trend(intent.TrendRef)
+	ref, ok := g.Trend(intent.Trend)
 	if !ok {
-		ref = intent.TrendRef
+		ref = intent.Trend
 	}
 	g.mu.Lock()
 	defer g.mu.Unlock()
@@ -208,128 +270,26 @@ func (g *Guard) Seen() []quality.Item {
 	return items
 }
 
-// Trend returns the trend item noted this wake that ref names: its short ref,
-// its exact text, or a near copy. Models copy
-// long opaque URLs (Google News links, encoded queries) with a few characters
-// wrong, so a ref also matches when it decodes to a noted ref or sits within a
-// few edits of exactly one noted ref of similar length.
+// Trend returns the item a ref names: a trend noted this wake (t3) or a post
+// read in the last 7 days (p12, once resolved or read this wake).
 func (g *Guard) Trend(ref string) (string, bool) {
-	ref = strings.TrimSpace(ref)
-	if ref == "" {
-		return "", false
-	}
 	g.mu.Lock()
 	defer g.mu.Unlock()
-	if item, ok := g.refItem[strings.ToLower(ref)]; ok {
-		return item, true
-	}
-	if g.trends[ref] {
-		return ref, true
-	}
-	key := unescapeRef(ref)
-	match := ""
-	for seen := range g.trends {
-		if unescapeRef(seen) == key {
-			return seen, true
-		}
-		if len(key) >= 40 && abs(len(seen)-len(key)) <= maxRefEdits && editDistance(unescapeRef(seen), key) <= maxRefEdits {
-			if match != "" {
-				return "", false // ambiguous
-			}
-			match = seen
-		}
-	}
-	return match, match != ""
+	item, ok := g.refItem[strings.ToLower(strings.TrimSpace(ref))]
+	return item, ok
 }
 
-var shortRefForm = regexp.MustCompile(`^(?i:r)[0-9]+$`)
-
-// resolveRef maps a short ref to the item it names. isRef is true when raw has
-// the form of a short ref; item is empty when this wake noted no such ref.
-func (g *Guard) resolveRef(raw string) (item string, isRef bool) {
-	raw = strings.TrimSpace(raw)
-	if !shortRefForm.MatchString(raw) {
-		return "", false
-	}
-	g.mu.Lock()
-	defer g.mu.Unlock()
-	return g.refItem[strings.ToLower(raw)], true
-}
-
-// maxRefEdits is how many characters a copied ref may differ from the original.
-const maxRefEdits = 3
-
-func unescapeRef(ref string) string {
-	if u, err := url.QueryUnescape(ref); err == nil {
-		return u
-	}
-	return ref
-}
-
-func abs(n int) int {
-	if n < 0 {
-		return -n
-	}
-	return n
-}
-
-// editDistance is the Levenshtein distance of a and b.
-func editDistance(a, b string) int {
-	prev := make([]int, len(b)+1)
-	for j := range prev {
-		prev[j] = j
-	}
-	for i := 1; i <= len(a); i++ {
-		cur := make([]int, len(b)+1)
-		cur[0] = i
-		for j := 1; j <= len(b); j++ {
-			cost := 1
-			if a[i-1] == b[j-1] {
-				cost = 0
-			}
-			cur[j] = min(prev[j]+1, cur[j-1]+1, prev[j-1]+cost)
-		}
-		prev = cur
-	}
-	return prev[len(b)]
-}
-
-// maxNearest bounds the candidates a RefTrace names.
-const maxNearest = 3
-
-// traceRef records how a given ref resolved. A ref that resolved to nothing
-// names the noted items nearest to it, so a mangled copy can be compared with
-// the original.
+// traceRef records how a given ref resolved, for the operator's view of a call.
 func (g *Guard) traceRef(field, given, resolved string) *store.RefTrace {
-	t := &store.RefTrace{Field: field, Given: capRunes(given), Resolved: capRunes(resolved)}
-	if resolved != "" {
-		return t
-	}
 	g.mu.Lock()
 	defer g.mu.Unlock()
-	t.Noted = len(g.shortRef)
-	key := unescapeRef(strings.TrimSpace(given))
-	for item, ref := range g.shortRef {
-		t.Nearest = append(t.Nearest, store.NearRef{Ref: ref, Item: capRunes(item), Edits: editDistance(unescapeRef(item), key)})
-	}
-	slices.SortFunc(t.Nearest, func(a, b store.NearRef) int {
-		return cmp.Or(cmp.Compare(a.Edits, b.Edits), strings.Compare(a.Ref, b.Ref))
-	})
-	t.Nearest = t.Nearest[:min(len(t.Nearest), maxNearest)]
-	return t
+	return &store.RefTrace{Field: field, Given: capRunes(given), Resolved: capRunes(resolved), Noted: len(g.shortRef)}
 }
 
 // capRunes keeps a stored ref or text field within store.MaxArgField bytes.
 func capRunes(s string) string {
 	s, _ = stdx.TruncateUTF8(s, store.MaxArgField)
 	return s
-}
-
-func (g *Guard) wasRead(thread, id string) bool {
-	g.mu.Lock()
-	defer g.mu.Unlock()
-	seen, ok := g.read[thread]
-	return ok && seen == id
 }
 
 // threadAuthor extracts the author from a canonical https://threads.<tld>/@author/post/<id> URL.
@@ -351,88 +311,88 @@ func threadAuthor(thread string) (author, reason string) {
 
 // content checks a post or reply. A draft the writer will rewrite skips the
 // length checks; the rewritten text is checked in full (recheck).
-func (g *Guard) content(a Attempt, draft bool) (*actionIntent, string) {
+func (g *Guard) content(ctx context.Context, a Attempt, draft bool) (*actionIntent, string, error) {
 	if spec, ok := Spec(a.Tool); !ok || spec.Effect != EffectThreadsWrite {
-		return nil, ""
+		return nil, "", nil
 	}
 	var intent actionIntent
 	if !utf8.ValidString(a.Arguments) || json.Unmarshal([]byte(a.Arguments), &intent) != nil || strings.TrimSpace(intent.Text) == "" {
-		return nil, "invalid_tool_arguments"
+		return nil, "invalid_tool_arguments", nil
 	}
 	if !store.DistinctLessonIDs(intent.LessonIDs) {
-		return nil, "invalid_lesson_ids"
+		return nil, "invalid_lesson_ids", nil
 	}
-	if len(intent.Parts) >= store.MaxSeriesParts || (intent.Hook != "" && !slices.Contains(store.HookTypes, intent.Hook)) {
-		return nil, "invalid_tool_arguments"
+	if len(intent.Parts) >= store.MaxSeriesParts {
+		return nil, "too_many_parts", nil
 	}
 	if a.Tool == "post" && g.opts.Template.Guard.TrendAnchor {
 		first, _, _ := strings.Cut(strings.TrimSpace(intent.Text), "\n")
 		if n := utf8.RuneCountInString(first); n > MaxHookRunes && !draft {
 			intent.detail = strconv.Itoa(n) + " of " + strconv.Itoa(MaxHookRunes) + " in the first line"
-			return &intent, "text_length"
+			return &intent, "text_length", nil
 		}
 		if intent.Hook == "" || strings.TrimSpace(intent.Rationale) == "" || strings.ContainsAny(intent.Rationale, "\r\n") || utf8.RuneCountInString(intent.Rationale) > MaxRationaleRunes {
-			return nil, "invalid_tool_arguments"
+			return nil, "post_brief", nil
 		}
-		ref, ok := g.Trend(intent.TrendRef)
-		intent.refTrace = g.traceRef("trend_ref", intent.TrendRef, ref)
+		if _, _, err := g.post(ctx, intent.Trend); err != nil {
+			return nil, "", err
+		}
+		ref, ok := g.Trend(intent.Trend)
+		intent.refTrace = g.traceRef("trend", intent.Trend, ref)
 		if !ok {
-			return &intent, "no_trend_anchor"
+			return &intent, "no_trend_anchor", nil
 		}
-		intent.TrendRef = ref
+		intent.Trend = ref
 	}
 	for _, text := range intent.texts() {
 		if strings.TrimSpace(text) == "" {
-			return nil, "invalid_tool_arguments"
+			return nil, "invalid_tool_arguments", nil
 		}
 		if n := utf8.RuneCountInString(text); n > 500 && !draft {
 			intent.detail = strconv.Itoa(n) + " of 500"
-			return &intent, "text_length"
+			return &intent, "text_length", nil
 		}
 		if n, max := utf8.RuneCountInString(text), g.opts.Template.Guard.ReplyMaxRunes; a.Tool == "reply" && max > 0 && n > max && !draft {
 			intent.detail = strconv.Itoa(n) + " of " + strconv.Itoa(max)
-			return &intent, "text_length"
+			return &intent, "text_length", nil
 		}
 		if reason, detail := contentBlock(g.opts.Template.Guard.BlockedPhrases, text); reason != "" {
 			intent.detail = detail
-			return &intent, reason
+			return &intent, reason, nil
 		}
 		if g.ownInteraction(text) {
-			return nil, "own_account"
+			return nil, "own_account", nil
 		}
 	}
 	if a.Tool == "reply" {
-		username, err := store.NormalizeUsername(intent.TargetUsername)
+		row, ok, err := g.post(ctx, intent.Target)
 		if err != nil {
-			return nil, "invalid_tool_arguments"
+			return nil, "", err
 		}
-		intent.TargetUsername = username
-		if item, isRef := g.resolveRef(intent.TargetURL); isRef {
-			intent.refTrace = g.traceRef("target_url", intent.TargetURL, item)
-			if item == "" {
-				return &intent, "reply_target_unread"
-			}
-			intent.TargetURL = item
+		intent.refTrace = g.traceRef("target", intent.Target, row.URL)
+		if !ok {
+			return &intent, "unknown_target", nil
 		}
+		intent.TargetURL, intent.TargetUsername, intent.TargetID = row.URL, row.Author, row.MediaID
 		if a.Target != nil {
-			*a.Target = intent.TargetURL
+			*a.Target = ResolvedTarget{URL: row.URL, MediaID: row.MediaID}
 		}
+		username := row.Author
 		if g.own[username] || g.ownURL(intent.TargetURL) {
-			return nil, "own_account"
+			return nil, "own_account", nil
+		}
+		if username == "" {
+			return nil, "reply_target_host", nil
 		}
 		thread, err := store.CanonicalThread(intent.TargetURL)
 		if err != nil {
-			return nil, "invalid_tool_arguments"
+			return nil, "reply_target_host", nil
 		}
 		intent.thread = thread
-		author, reason := threadAuthor(thread)
-		if reason != "" {
-			return nil, reason
+		if _, reason := threadAuthor(thread); reason != "" {
+			return nil, "reply_target_host", nil
 		}
-		if author != username {
-			return nil, "reply_target_mismatch"
-		}
-		// A reply without a post id answers a feed post, through the browser.
+		// A reply without a post id answers a post only a browser read showed.
 		intent.browser = intent.TargetID == ""
 		g.mu.Lock()
 		var inboxRoot string
@@ -440,30 +400,27 @@ func (g *Guard) content(a Attempt, draft bool) (*actionIntent, string) {
 		intent.root = cmp.Or(inboxRoot, thread)
 		outside := g.facts[thread].Outside
 		g.mu.Unlock()
-		if !g.wasRead(thread, intent.TargetID) {
-			return nil, "reply_target_unread"
-		}
 		if outside != "" && !intent.inbox {
 			intent.detail = outside
-			return &intent, reasonTargetOutsideWindow
+			return &intent, reasonTargetOutsideWindow, nil
 		}
 		// An author mention may contain dots; check URL syntax separately
 		// from mention identity so mailto/HTTP links retain the URL rule ID.
 		if links.MatchString(mentions.ReplaceAllString(intent.Text, "")) {
-			return nil, "reply_url"
+			return nil, "reply_url", nil
 		}
 		for _, mention := range mentions.FindAllString(intent.Text, -1) {
 			normalized, err := store.NormalizeUsername(mention)
 			if err != nil || normalized != username {
-				return nil, "reply_mention"
+				return nil, "reply_mention", nil
 			}
 		}
 	}
 	l := g.opts.Template.Limits
 	if l.PostsPerDay <= 0 || l.RepliesPerDay <= 0 || l.RepliesPerUser7d <= 0 || l.MinSecondsBetweenActions <= 0 {
-		return nil, "invalid_policy"
+		return nil, "invalid_policy", nil
 	}
-	return &intent, ""
+	return &intent, "", nil
 }
 
 // reserve runs after the attempted-call audit is committed. One writer
@@ -529,7 +486,7 @@ func (g *Guard) reserve(ctx context.Context, a Attempt, intent *actionIntent, au
 			return nil
 		}
 		if reason == "" {
-			if id, err = tx.InsertIntent(ctx, store.NewIntent{AgentID: agent, Kind: a.Tool, Text: intent.Text, TargetURL: intent.TargetURL, TargetUsername: intent.TargetUsername, Hook: intent.Hook, Rationale: intent.Rationale, TrendRef: strings.TrimSpace(intent.TrendRef), AnswersNote: intent.AnswersNote, Angle: intent.Angle, Fact: intent.Fact, LessonIDs: intent.LessonIDs, CriticJSON: intent.criticJSON, RootURL: intent.root, Parts: intent.Parts, TargetScoreJSON: intent.posting.TargetScoreJSON, TopicHeat: intent.posting.TopicHeat, ParentReplies: intent.posting.ParentReplies, ParentAgeMinutes: intent.posting.ParentAgeMinutes, DryRun: g.opts.Template.DryRun, Browser: intent.browser, At: now}); err != nil {
+			if id, err = tx.InsertIntent(ctx, store.NewIntent{AgentID: agent, Kind: a.Tool, Text: intent.Text, TargetURL: intent.TargetURL, TargetUsername: intent.TargetUsername, Hook: intent.Hook, Rationale: intent.Rationale, TrendRef: strings.TrimSpace(intent.Trend), AnswersNote: intent.AnswersNote, Angle: intent.Angle, Fact: intent.Fact, LessonIDs: intent.LessonIDs, CriticJSON: intent.criticJSON, RootURL: intent.root, Parts: intent.Parts, TargetScoreJSON: intent.posting.TargetScoreJSON, TopicHeat: intent.posting.TopicHeat, ParentReplies: intent.posting.ParentReplies, ParentAgeMinutes: intent.posting.ParentAgeMinutes, DryRun: g.opts.Template.DryRun, Browser: intent.browser, At: now}); err != nil {
 				return err
 			}
 			if a.Tool == "reply" {
@@ -566,7 +523,7 @@ func (g *Guard) ownerNotes(ctx context.Context, tx store.ReservationTx, kind str
 				return "", nil
 			}
 		}
-		return "invalid_tool_arguments", nil
+		return "note_not_open", nil
 	}
 	if kind == "post" && len(open) > 0 {
 		return "owner_note_open", nil
@@ -581,7 +538,7 @@ func (g *Guard) repeatTopic(ctx context.Context, tx store.ReservationTx, intent 
 	if err != nil {
 		return "", err
 	}
-	ref := strings.TrimSpace(intent.TrendRef)
+	ref := strings.TrimSpace(intent.Trend)
 	hook := hookWords(intent.Text)
 	for _, p := range recent {
 		if (ref != "" && p.TrendRef == ref) || similarHooks(hook, hookWords(p.Text)) {

@@ -239,9 +239,6 @@ func renderDiagnosis(w io.Writer, d diagnosis) {
 			} else {
 				fmt.Fprintf(w, " -> no noted item (%d refs this wake)\n", r.Noted)
 			}
-			for _, n := range r.Nearest {
-				fmt.Fprintf(w, "        nearest %s, %d edits: %s\n", n.Ref, n.Edits, n.Item)
-			}
 		}
 		if c.Detail != "" {
 			fmt.Fprintf(w, "    detail %s\n", c.Detail)

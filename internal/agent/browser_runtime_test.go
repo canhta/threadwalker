@@ -40,7 +40,7 @@ func TestWakeBrowserFactoryClosesEveryExitAndPreservesPartialAccounting(t *testi
 			now := time.Date(2026, 11, 11, 0, 0, 0, 0, time.UTC)
 			tmpl := agent.OfflineTemplate()
 			fixture := agent.NewOfflineFixture(func() time.Time { return now })
-			fixture.Calls = []llm.ToolCall{agent.SyntheticCall("read_feed", `{}`)}
+			fixture.Calls = []llm.ToolCall{agent.SyntheticCall("find_posts", `{"source":"feed"}`)}
 			backend := threads.NewMemory()
 			switch mode {
 			case "cancelled":
@@ -127,7 +127,7 @@ func TestCompletedWakeWithFailedBrowserCloseStaysCompleted(t *testing.T) {
 	now := time.Date(2026, 11, 12, 11, 55, 0, 0, time.UTC)
 	tmpl := agent.OfflineTemplate()
 	fixture := agent.NewOfflineFixture(func() time.Time { return now })
-	fixture.Calls = []llm.ToolCall{agent.SyntheticCall("read_feed", `{}`)}
+	fixture.Calls = []llm.ToolCall{agent.SyntheticCall("find_posts", `{"source":"feed"}`)}
 	backend := threads.NewMemory()
 	backend.Errors[threads.OpClose] = errors.New("synthetic close failure")
 	var logs bytes.Buffer

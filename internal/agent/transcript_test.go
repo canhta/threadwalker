@@ -46,9 +46,9 @@ func TestWakeStoresRedactedBoundedTranscript(t *testing.T) {
 	const secret = "TOPSECRET-value"
 	big := strings.Repeat("é", llm.MaxTranscriptToolBytes)
 	calls := []llm.ToolCall{
-		agent.SyntheticCall("search", `{"query":"`+secret+`"}`),
-		agent.SyntheticCall("search", `{"query":"`+big+`"}`),
-		agent.SyntheticCall("read_feed", `{}`),
+		agent.SyntheticCall("find_posts", `{"source":"search","query":"`+secret+`"}`),
+		agent.SyntheticCall("find_posts", `{"source":"search","query":"`+big+`"}`),
+		agent.SyntheticCall("find_posts", `{"source":"feed"}`),
 		agent.SyntheticCall("read_replies", `{}`),
 	}
 	r, st, id := transcriptRuntime(t, calls, config.NewRedactor(config.NewSecret(secret)))

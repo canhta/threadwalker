@@ -224,3 +224,32 @@ func TestWakeContextStaysUnderSevenKilobytes(t *testing.T) {
 		t.Fatalf("a realistic state must fill every section: %d lessons, %d recent, %+v", len(data.Lessons), len(data.Recent), data.Examples)
 	}
 }
+
+// The data message lists the open reply candidates after the limits and the
+// inbox: posts read in the last hours that still score and are not answered.
+func TestWakeContextListsOpenReplyCandidates(t *testing.T) {
+	now := time.Date(2026, 1, 2, 12, 0, 0, 0, time.UTC)
+	tmpl := agent.OfflineTemplate()
+	tmpl.Targets = config.DefaultTargets
+	r, st := contextRuntime(t, tmpl, now)
+	likes, replies, age := int64(120), int64(3), int64(30)
+	id, err := st.NoteSeenPost(context.Background(), tmpl.ID, store.SeenPost{URL: "https://www.threads.com/@someone/post/abc", MediaID: "m1", Author: "someone", Text: "a rising post", Likes: &likes, Replies: &replies, AgeMinutes: &age, ReadAt: now.Add(-time.Hour)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, user, _ := wakeMessages(t, r)
+	section := user[strings.Index(user, "# Open reply candidates"):]
+	if !strings.Contains(section, fmt.Sprintf(`"ref":"p%d"`, id)) || !strings.Contains(section, `"author":"someone"`) || !strings.Contains(section, `"age_min":90`) {
+		t.Fatalf("candidates section: %s", section)
+	}
+	if strings.Index(user, "# Limits now") > strings.Index(user, "# Open reply candidates") {
+		t.Fatal("candidates come after the limits block")
+	}
+	// An answered post is no longer a candidate.
+	if _, err = st.DB().Exec(`INSERT INTO actions(agent_id,kind,text,dry_run,posted_at,target_url) VALUES(?,'reply','x',?,?,?)`, tmpl.ID, tmpl.DryRun, now.Add(-time.Minute).Format(time.RFC3339Nano), "https://threads.com/@someone/post/abc"); err != nil {
+		t.Fatal(err)
+	}
+	if _, user, _ = wakeMessages(t, r); strings.Contains(user, "# Open reply candidates") {
+		t.Fatalf("an answered post is still listed: %s", user)
+	}
+}

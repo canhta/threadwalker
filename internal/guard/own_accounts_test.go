@@ -10,14 +10,14 @@ import (
 )
 
 func TestOwnAccountsBlockedThroughEveryDeclaredAddress(t *testing.T) {
-	for _, args := range []string{
-		`{"text":"A synthetic reply","target_username":"@FIXTURE_OTHER","target_id": "tid", "target_url":"https://www.threads.net/@fixture_other/post/1"}`,
-		`{"text":"A synthetic reply","target_username":"stranger","target_id": "tid", "target_url":"https://THREADS.NET/@fixture_other/post/1?x=1"}`,
-		`{"text":"Hi @fixture_other"}`,
-		`{"text":"Read https://www.threads.com/@fixture_other/post/1"}`,
-		`{"text":"Read threads.net/@fixture_other"}`,
+	for _, c := range []struct{ args, url string }{
+		{`{"text":"A synthetic reply","target":"TARGET"}`, "https://www.threads.net/@fixture_other/post/1"},
+		{`{"text":"A synthetic reply","target":"TARGET"}`, "https://THREADS.NET/@fixture_other/post/1?x=1"},
+		{`{"text":"Hi @fixture_other"}`, ""},
+		{`{"text":"Read https://www.threads.com/@fixture_other/post/1"}`, ""},
+		{`{"text":"Read threads.net/@fixture_other"}`, ""},
 	} {
-		t.Run(args, func(t *testing.T) {
+		t.Run(c.args, func(t *testing.T) {
 			_, opts := setup(t)
 			opts.OwnUsernames = []string{"fixture_other"}
 			opts.Template.Threads.Username = "fixture_self"
@@ -26,8 +26,10 @@ func TestOwnAccountsBlockedThroughEveryDeclaredAddress(t *testing.T) {
 				t.Fatal(err)
 			}
 			tool := "post"
-			if strings.Contains(args, "target_url") {
+			args := c.args
+			if c.url != "" {
 				tool = "reply"
+				args = strings.ReplaceAll(args, "TARGET", readPost(t, g, c.url, "tid", ""))
 			}
 			called := false
 			_, err = g.Execute(context.Background(), guard.Attempt{Tool: tool, Arguments: args}, func() (string, error) { called = true; return "", nil })
@@ -39,11 +41,11 @@ func TestOwnAccountsBlockedThroughEveryDeclaredAddress(t *testing.T) {
 }
 
 func TestConfirmedOwnPublicationCannotBeDisguisedAsForeign(t *testing.T) {
-	for _, args := range []string{
-		`{"text":"Synthetic reply","target_username":"stranger","target_id": "tid", "target_url":"http://www.THREADS.NET/@stranger/post/opaque-publication/?tracking=1"}`,
-		`{"text":"See https://threads.net/@stranger/post/opaque-publication"}`,
+	for _, c := range []struct{ args, url string }{
+		{`{"text":"Synthetic reply","target":"TARGET"}`, "http://www.THREADS.NET/@stranger/post/opaque-publication/?tracking=1"},
+		{`{"text":"See https://threads.net/@stranger/post/opaque-publication"}`, ""},
 	} {
-		t.Run(args, func(t *testing.T) {
+		t.Run(c.args, func(t *testing.T) {
 			st, opts := setup(t)
 			opts.Template.Limits.PostsPerDay = 5
 			opts.Template.Limits.RepliesPerDay = 5
@@ -57,10 +59,11 @@ func TestConfirmedOwnPublicationCannotBeDisguisedAsForeign(t *testing.T) {
 				t.Fatal(err)
 			}
 			tool := "post"
-			if strings.Contains(args, "target_url") {
+			args := c.args
+			if c.url != "" {
 				tool = "reply"
+				args = strings.ReplaceAll(args, "TARGET", readPost(t, g, c.url, "tid", ""))
 			}
-			g.NoteRead("tid", "https://threads.net/@stranger/post/opaque-publication", "")
 			called := false
 			_, err = g.Execute(context.Background(), guard.Attempt{Tool: tool, Arguments: args}, func() (string, error) { called = true; return "", nil })
 			if called || !errors.Is(err, guard.ErrBlocked) || !strings.Contains(err.Error(), "own_account") {

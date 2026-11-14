@@ -115,7 +115,15 @@ func runReplayCase(ctx context.Context, c Case, p Profile, repeat int, opts Opti
 		call := step.Call
 		call.ID = fmt.Sprintf("synthetic-replay-%d", i)
 		if len(step.Output) > 0 {
-			if err = serveRecorded(mem, &fetched, call.Function.Name, step.Output); err != nil {
+			op := call.Function.Name
+			if op == "find_posts" {
+				var a struct {
+					Source string `json:"source"`
+				}
+				_ = json.Unmarshal([]byte(call.Function.Arguments), &a)
+				op = tools.FindRead(a.Source)
+			}
+			if err = serveRecorded(mem, &fetched, op, step.Output); err != nil {
 				return run.fail("replay_output_invalid")
 			}
 		}

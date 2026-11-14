@@ -7,9 +7,7 @@ import "strings"
 // codes may only appear in a title attribute or inside <details>.
 
 var toolLabels = map[string]string{
-	"search":              "Search",
-	"read_feed":           "Read feed",
-	"read_topic":          "Read topic",
+	"find_posts":          "Find posts",
 	"read_own_metrics":    "Own stats",
 	"fetch_trends":        "Trends",
 	"read_replies":        "Read replies",
@@ -90,9 +88,9 @@ func endReasonBad(raw string) bool {
 var blockedReasons = []string{
 	"agent_not_running", "invalid_policy",
 	"invalid_tool_arguments", "no_trend_anchor", "own_account", "phase_read_only",
-	"blocked_phrase", "identity_targeting", "political_recommendation", "engagement_bait", "repeat_topic", "repeat_ending", "owner_note_open", "sensitive_arguments", "min_seconds_between_actions", "min_minutes_between_posts",
+	"blocked_phrase", "identity_targeting", "political_recommendation", "engagement_bait", "repeat_topic", "repeat_ending", "owner_note_open", "note_not_open", "sensitive_arguments", "min_seconds_between_actions", "min_minutes_between_posts",
 	"posts_per_day", "replies_per_day", "browser_replies_per_day", "replies_per_hour", "reply_breaker", "replies_per_user_7d", "replies_per_conversation", "reply_mention",
-	"reply_target_host", "reply_target_mismatch", "reply_target_unread", "target_outside_window",
+	"reply_target_host", "unknown_target", "target_outside_window", "post_brief", "too_many_parts", "find_args", "limit_per_wake", "repeat_refused", "api_quota_exhausted", "api_quota_unreadable",
 	"critic_rejected", "critic_limit", "critic_unavailable", "ungrounded_number",
 	"reply_url", "shared_promotion_link", "text_length", "thread_per_day",
 	"do_not_contact", "stall_stop", "tool_closed", "tool_hidden", "tool_call_cap", "wake_not_open", "stop_request",
@@ -118,6 +116,7 @@ var blockedLabels = map[string]string{
 	"repeat_topic":                "Topic repeated",
 	"repeat_ending":               "Ending repeated",
 	"owner_note_open":             "Owner note unanswered",
+	"note_not_open":               "Owner note not open",
 	"sensitive_arguments":         "Private data",
 	"min_seconds_between_actions": "Too soon",
 	"min_minutes_between_posts":   "Post too soon",
@@ -130,8 +129,14 @@ var blockedLabels = map[string]string{
 	"replies_per_conversation":    "Reply limit per conversation",
 	"reply_mention":               "Wrong mention",
 	"reply_target_host":           "Not a Threads link",
-	"reply_target_mismatch":       "Author mismatch",
-	"reply_target_unread":         "Post not read",
+	"unknown_target":              "Post not found",
+	"post_brief":                  "Post missing its brief",
+	"too_many_parts":              "Too many parts",
+	"find_args":                   "Bad search arguments",
+	"limit_per_wake":              "Read limit for the run",
+	"repeat_refused":              "Same call failed three times",
+	"api_quota_exhausted":         "Threads publishing limit",
+	"api_quota_unreadable":        "Threads limit unreadable",
 	"target_outside_window":       "Post not taking off",
 	"reply_url":                   "Link in reply",
 	"shared_promotion_link":       "Promotion link",
@@ -183,7 +188,7 @@ var blockedLabels = map[string]string{
 	"lesson_secret":               "Lesson looks like a secret",
 	"lesson_has_ref":              "Lesson names a date or post id",
 	"lesson_old_episode":          "Lesson confirmed with an old post",
-	"stale_ref":                   "Text names a per-wake ref",
+	"stale_ref":                   "Text names a post or trend id",
 }
 
 // failureReasons is the fixed vocabulary of a failed step's reason code.

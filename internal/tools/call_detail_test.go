@@ -21,7 +21,7 @@ func TestToolArgumentsAreStoredRedactedAndCapped(t *testing.T) {
 	const secret = "sk-synthetic-detail-secret"
 	h := newBrowserHarness(t, true, func(o *tools.Options) { o.Template.LLM.APIKey = config.NewSecret(secret) })
 	long := strings.Repeat("é", store.MaxArgField)
-	h.mustCall("search", `{"query":"`+long+`"}`)
+	h.mustCall("find_posts", `{"source":"search","query":"`+long+`"}`)
 	if _, err := h.call("post", `{"text":"carries `+secret+`"}`); err == nil {
 		t.Fatal("a post with a secret was accepted")
 	}
@@ -66,9 +66,9 @@ func TestFailedBrowserStepSavesItsSnapshotUnderARing(t *testing.T) {
 	h.backend.Errors[threads.OpReply] = &threads.StageError{Stage: threads.StageComposerMissing, Origin: "https://threads.com/", Snapshot: "main\n  textbox " + secret + "\n  link \"@someone\"", Err: fmt.Errorf("threads reply: %w", threads.ErrWriteRefused)}
 	for i := 0; i < tools.EvidencePerAgent+2; i++ {
 		url := fmt.Sprintf("https://threads.com/@synthetic_user%d/post/p%d", i, i)
-		h.guard.NoteRead("", url, "")
+		ref := readRef(t, h.guard, url, "")
 		h.next()
-		if _, err = h.call("reply", fmt.Sprintf(`{"text":"Synthetic reply","target_url":%q,"target_username":"synthetic_user%d"}`, url, i)); err == nil {
+		if _, err = h.call("reply", fmt.Sprintf(`{"text":"Synthetic reply","target":%q}`, ref)); err == nil {
 			t.Fatal("reply should have failed")
 		}
 	}

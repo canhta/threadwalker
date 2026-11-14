@@ -25,8 +25,7 @@ func TestReplyRecordsTheFiguresOfTheTargetItRead(t *testing.T) {
 	}
 	reply := func(url string) int64 {
 		var id int64
-		g.NoteRead("tid", url, "")
-		if _, err := g.Execute(context.Background(), guard.Attempt{Tool: "reply", Arguments: `{"text":"Synthetic reply","target_username":"fixture_author","target_id": "tid", "target_url":"` + url + `"}`, ReservedActionID: &id}, func() (string, error) { return "", nil }); err != nil {
+		if _, err := g.Execute(context.Background(), guard.Attempt{Tool: "reply", Arguments: `{"text":"Synthetic reply","target":"` + readPost(t, g, url, "tid", "") + `"}`, ReservedActionID: &id}, func() (string, error) { return "", nil }); err != nil {
 			t.Fatal(err)
 		}
 		return id

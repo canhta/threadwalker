@@ -463,7 +463,7 @@ func (r *Runtime) execute(ctx context.Context, wake WakeResult, phase string, ca
 			if boardErr != nil {
 				return result, boardErr
 			}
-			stopCheck = board.stopCheck(hidden, func() []string { return dispatcher.OpenTargets(ctx) }, r.opts.Template.Limits.MaxUSDPerDay-board.SpendToday)
+			stopCheck = board.stopCheck(hidden, func() []string { return r.openCandidates(ctx) }, r.opts.Template.Limits.MaxUSDPerDay-board.SpendToday)
 		}
 		client, err := llm.New(r.opts.Template.LLM, r.opts.Template.Limits, r.opts.Store, dispatcher.ConfigureClient(llm.Options{StopCheck: stopCheck, Logger: r.opts.Logger, Now: r.opts.Now, Sleep: r.opts.Wait, HTTPClient: r.opts.HTTPClient, ReasoningEffort: r.opts.Template.LLM.ReasoningEffort, Phase: phase, CapUSD: capUSD, MaxSteps: maxSteps, Transcript: func(ctx context.Context, kind, body string) { r.appendTranscript(ctx, phase, result.ID, kind, body) }}))
 		if err != nil {
@@ -949,4 +949,18 @@ func NewReviewer(o ReviewerOptions, wakeID int64) Reviewer {
 		}
 	}
 	return rv
+}
+
+// openCandidates names the open reply candidates for the stop check: the same
+// list the data message shows. A failed read names none.
+func (r *Runtime) openCandidates(ctx context.Context) []string {
+	candidates, err := guard.OpenCandidates(ctx, r.opts.Store, r.opts.Template, r.opts.OwnUsernames, r.opts.Now())
+	if err != nil {
+		return nil
+	}
+	refs := make([]string, len(candidates))
+	for i, c := range candidates {
+		refs[i] = c.Ref
+	}
+	return refs
 }

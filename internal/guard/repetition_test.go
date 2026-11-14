@@ -35,7 +35,7 @@ func TestRepeatedClosingTokenIsFlaggedBeforeTheCritic(t *testing.T) {
 				calls++
 				return verdict(true), nil
 			}
-			args := `{"text":"` + tc.draft + `","target_url":"https://www.threads.com/@someone/post/abc","target_username":"someone"}`
+			args := `{"text":"` + tc.draft + `","target":"p1"}`
 			_, err := criticReply(criticGuard(t, scope), args)
 			var blocked *guard.BlockedError
 			if !tc.want {

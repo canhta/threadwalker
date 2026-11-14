@@ -149,11 +149,10 @@ func ReadInbox(ctx context.Context, in InboxRead) ([]InboxReply, int, error) {
 }
 
 // InboxItem is one inbox reply as the wake's data message shows it. Text and
-// ReplyingTo are redacted; Text is untrusted data. Ref and TargetID are the
-// target_url and target_id of the reply tool.
+// ReplyingTo are redacted; Text is untrusted data. Ref is the target of the
+// reply tool.
 type InboxItem struct {
 	Ref        string `json:"ref"`
-	TargetID   string `json:"target_id"`
 	Author     string `json:"author"`
 	Text       string `json:"text"`
 	ReplyingTo string `json:"replying_to"`
@@ -161,7 +160,7 @@ type InboxItem struct {
 }
 
 // Inbox is the harness read, before the model's first request, of the replies
-// that wait for an answer. It notes each in the guard as read, so a reply by
+// that wait for an answer. It stores each as a post with its ref, so a reply by
 // ref passes the reply checks. A failed read gives an empty inbox.
 func (d *Dispatcher) Inbox(ctx context.Context) ([]InboxReply, []InboxItem) {
 	d.mu.Lock()
@@ -180,8 +179,7 @@ func (d *Dispatcher) Inbox(ctx context.Context) ([]InboxReply, []InboxItem) {
 			first = "(a mention of the account)"
 		}
 		items = append(items, InboxItem{
-			Ref:        d.guard.NoteInbox(c.Post.ID, c.Post.URL, c.Post.Text, c.Root),
-			TargetID:   c.Post.ID,
+			Ref:        d.guard.NoteInbox(ctx, c.Post, c.Root),
 			Author:     c.Post.Username,
 			Text:       d.redactor.String(c.Post.Text),
 			ReplyingTo: d.redactor.String(first),

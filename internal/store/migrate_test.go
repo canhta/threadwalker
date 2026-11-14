@@ -67,102 +67,68 @@ func readShape(t *testing.T, db *sql.DB) shape {
 	return s
 }
 
-func TestMigrate12MatchesFreshSchema(t *testing.T) {
+// buildSchema opens a database holding a historical schema from testdata.
+func buildSchema(t *testing.T, file string, version int) *sql.DB {
+	t.Helper()
+	raw, err := os.ReadFile(filepath.Join("testdata", file))
+	if err != nil {
+		t.Fatal(err)
+	}
+	db, err := sql.Open("sqlite", filepath.Join(t.TempDir(), file+".db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	db.SetMaxOpenConns(1)
+	if _, err = db.Exec(string(raw) + fmt.Sprintf("\nPRAGMA user_version=%d;", version)); err != nil {
+		t.Fatalf("building %s: %v", file, err)
+	}
+	return db
+}
+
+func TestMigrate13MatchesFreshSchema(t *testing.T) {
 	ctx := context.Background()
-	v11, err := os.ReadFile(filepath.Join("testdata", "schema-v11.sql"))
+	migration, err := os.ReadFile(filepath.Join("..", "..", "deploy", "migrate-13.sql"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	migration, err := os.ReadFile(filepath.Join("..", "..", "deploy", "migrate-12.sql"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	old, err := sql.Open("sqlite", filepath.Join(t.TempDir(), "v11.db"))
-	if err != nil {
-		t.Fatal(err)
-	}
+	old := buildSchema(t, "schema-v12.sql", 12)
 	defer old.Close()
-	old.SetMaxOpenConns(1) // the script holds one transaction across statements
-	if _, err = old.ExecContext(ctx, string(v11)+"\nPRAGMA user_version=11;"); err != nil {
-		t.Fatalf("building v11: %v", err)
-	}
 	if _, err = old.ExecContext(ctx, `
 		INSERT INTO agents(id,status) VALUES('a','running');
-		INSERT INTO actions(agent_id,kind,text,posted_at,hypothesis_ids_json,explore) VALUES('a','post','hello','2026-11-01T00:00:00Z','[1]',1);
-		INSERT INTO notes(agent_id,text,created_at) VALUES('a','a note','2026-11-01T00:00:00Z');
-		INSERT INTO wakes(id,agent_id,started_at,kind) VALUES(1,'a','2026-11-01T00:00:00Z','agent'),(2,'a','2026-11-01T01:00:00Z','study'),(3,'a','2026-11-01T02:00:00Z','dream'),(4,'a','2026-11-01T03:00:00Z','study');
-		INSERT INTO tool_calls(agent_id,wake_id,tool,args_json,at) VALUES('a',1,'post','{}','2026-11-01T00:00:00Z'),('a',2,'note_write','{}','2026-11-01T01:00:00Z');
-		INSERT INTO wake_transcripts(agent_id,wake_id,seq,kind,body,at) VALUES('a',2,1,'start','{}','2026-11-01T01:00:00Z');
-		INSERT INTO ledger_phases(agent_id,day,phase,tokens_in,tokens_out,cost_usd) VALUES('a','2026-11-01','agent',10,1,0.5),('a','2026-11-01','study',20,2,0.25),('a','2026-11-02','study',5,1,0.1);
-		INSERT INTO trend_stories(agent_id,observed_at,phase,source,title,url) VALUES('a','2026-11-01T00:00:00Z','agent','s','kept','u'),('a','2026-11-01T00:00:00Z','study','s','gone','u');`); err != nil {
-		t.Fatalf("seeding v11: %v", err)
+		INSERT INTO actions(agent_id,kind,text,posted_at) VALUES('a','post','hello','2026-11-01T00:00:00Z');`); err != nil {
+		t.Fatalf("seeding v12: %v", err)
 	}
 	if _, err = old.ExecContext(ctx, string(migration)); err != nil {
-		t.Fatalf("applying migrate-12.sql: %v", err)
+		t.Fatalf("applying migrate-13.sql: %v", err)
 	}
-
-	fresh, err := Open(ctx, filepath.Join(t.TempDir(), "v12.db"))
+	fresh, err := Open(ctx, filepath.Join(t.TempDir(), "v13.db"))
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer fresh.Close()
-	want, got := readShape(t, fresh.db), readShape(t, old)
-	if !reflect.DeepEqual(want, got) {
-		t.Fatalf("migrated schema differs from a fresh v12 schema\nfresh:    %+v\nmigrated: %+v", want, got)
+	if want, got := readShape(t, fresh.db), readShape(t, old); !reflect.DeepEqual(want, got) {
+		t.Fatalf("migrated schema differs from a fresh v13 schema\nfresh:    %+v\nmigrated: %+v", want, got)
 	}
 	var version int
 	if err = old.QueryRow(`PRAGMA user_version`).Scan(&version); err != nil || version != schemaVersion {
 		t.Fatalf("user_version = %d, %v; want %d", version, err, schemaVersion)
 	}
-
-	// The CHECKs that listed study no longer accept it, in either database.
-	for name, db := range map[string]*sql.DB{"migrated": old, "fresh": fresh.db} {
-		if _, err = db.Exec(`INSERT INTO wakes(agent_id,started_at,kind) VALUES('a','2026-11-03T00:00:00Z','study')`); err == nil {
-			t.Errorf("%s: wakes accepts kind study", name)
-		}
-		if _, err = db.Exec(`INSERT INTO ledger_phases(agent_id,day,phase) VALUES('a','2026-11-03','study')`); err == nil {
-			t.Errorf("%s: ledger_phases accepts phase study", name)
-		}
+	// Existing rows stay and the new table takes rows; a URL keeps one id per agent.
+	var actions int
+	if err = old.QueryRow(`SELECT COUNT(*) FROM actions`).Scan(&actions); err != nil || actions != 1 {
+		t.Errorf("actions after migration = %d, %v; want 1", actions, err)
 	}
-
-	// Study wakes and their audit rows are deleted, its spend is kept under agent.
-	var wakes, calls, transcripts, stories int
-	if err = old.QueryRow(`SELECT (SELECT COUNT(*) FROM wakes),(SELECT COUNT(*) FROM tool_calls),(SELECT COUNT(*) FROM wake_transcripts),(SELECT COUNT(*) FROM trend_stories)`).Scan(&wakes, &calls, &transcripts, &stories); err != nil {
-		t.Fatal(err)
+	insert := `INSERT INTO seen_posts(agent_id,url,author,text,read_at) VALUES('a','https://threads.com/@x/post/1','x','t','2026-11-01T00:00:00Z')`
+	if _, err = old.Exec(insert); err != nil {
+		t.Fatalf("writing seen_posts after migration: %v", err)
 	}
-	if wakes != 2 || calls != 1 || transcripts != 0 || stories != 1 {
-		t.Errorf("after migration wakes=%d tool_calls=%d transcripts=%d stories=%d, want 2 1 0 1", wakes, calls, transcripts, stories)
-	}
-	// The last study wake held id 4; its deletion must not let a new wake take it.
-	var next int64
-	if err = old.QueryRow(`INSERT INTO wakes(agent_id,started_at) VALUES('a','2026-11-03T00:00:00Z') RETURNING id`).Scan(&next); err != nil || next != 5 {
-		t.Errorf("next wake id = %d, %v; want 5", next, err)
-	}
-	var tokensIn int64
-	var cost float64
-	if err = old.QueryRow(`SELECT SUM(tokens_in),SUM(cost_usd) FROM ledger_phases WHERE phase='agent'`).Scan(&tokensIn, &cost); err != nil {
-		t.Fatal(err)
-	}
-	if tokensIn != 35 || cost < 0.849 || cost > 0.851 {
-		t.Errorf("agent ledger after migration = %d tokens, $%.2f; want 35, $0.85", tokensIn, cost)
-	}
-	if err = old.QueryRow(`SELECT COUNT(*) FROM actions`).Scan(&wakes); err != nil || wakes != 1 {
-		t.Errorf("actions kept = %d, %v; want 1", wakes, err)
-	}
-
-	// Existing actions get an empty brief, and the lesson tables take rows.
-	var angle, fact string
-	if err = old.QueryRow(`SELECT angle,fact FROM actions`).Scan(&angle, &fact); err != nil || angle != "" || fact != "" {
-		t.Errorf("migrated action brief = %q %q, %v; want empty", angle, fact, err)
-	}
-	if _, err = old.Exec(`INSERT INTO lessons(agent_id,kind,polarity,text,evidence_json,created_at,confirmed_at) VALUES('a','post','do','t','[1,2]','2026-11-01T00:00:00Z','2026-11-01T00:00:00Z');
-		INSERT INTO action_lessons(action_id,lesson_id) VALUES(1,1)`); err != nil {
-		t.Errorf("writing lessons after migration: %v", err)
+	if _, err = old.Exec(insert); err == nil {
+		t.Error("seen_posts accepts the same URL twice for one agent")
 	}
 }
 
-func TestMigrate12RefusesOtherVersions(t *testing.T) {
-	migration, err := os.ReadFile(filepath.Join("..", "..", "deploy", "migrate-12.sql"))
+func TestMigrate13RefusesOtherVersions(t *testing.T) {
+	migration, err := os.ReadFile(filepath.Join("..", "..", "deploy", "migrate-13.sql"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -172,10 +138,10 @@ func TestMigrate12RefusesOtherVersions(t *testing.T) {
 	}
 	defer db.Close()
 	db.SetMaxOpenConns(1)
-	if _, err = db.Exec(`PRAGMA user_version=12`); err != nil {
+	if _, err = db.Exec(`PRAGMA user_version=13`); err != nil {
 		t.Fatal(err)
 	}
 	if _, err = db.Exec(string(migration)); err == nil {
-		t.Fatal("migration ran on a v12 database")
+		t.Fatal("migration ran on a v13 database")
 	}
 }

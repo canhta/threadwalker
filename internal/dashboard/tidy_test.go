@@ -11,9 +11,9 @@ func TestRunsExpandOnlyForFailures(t *testing.T) {
 	snap := started()
 	snap.Wakes = []store.DashboardWake{finishedWake(1, "agent", "completed", 2), finishedWake(2, "agent", "completed", 1)}
 	snap.ToolCalls = []store.DashboardToolCall{
-		call(1, 1, "search", `{"outcome":"success"}`, ""),
-		call(2, 1, "search", `{"outcome":"error","reason":"timeout"}`, ""),
-		call(3, 2, "search", `{"outcome":"success"}`, ""),
+		call(1, 1, "find_posts", `{"outcome":"success"}`, ""),
+		call(2, 1, "find_posts", `{"outcome":"error","reason":"timeout"}`, ""),
+		call(3, 2, "find_posts", `{"outcome":"success"}`, ""),
 	}
 	page := mustPage(t, newHandler(newSource(snap)))
 	if n := len(page.Wakes.Rows[0].ToolSummary) + len(page.Wakes.Rows[1].ToolSummary); n != 1 {

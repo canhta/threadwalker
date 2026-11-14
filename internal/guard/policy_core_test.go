@@ -111,7 +111,6 @@ func TestReservationPersistenceFailuresNeverInvokeEffect(t *testing.T) {
 			opts.Template.Limits.RepliesPerDay = 3
 			opts.Template.Limits.RepliesPerUser7d = 2
 			opts.Template.Limits.MinSecondsBetweenActions = 1
-			args := `{"text":"synthetic outgoing reply","target_username":"fixture_author","target_id": "tid", "target_url":"https://threads.com/@fixture_author/post/1"}`
 			switch mode {
 			case "contact-insert":
 				st.DB().Exec(`CREATE TRIGGER fail_contact BEFORE INSERT ON contacts BEGIN SELECT RAISE(FAIL,'private-contact-error'); END`)
@@ -130,7 +129,7 @@ func TestReservationPersistenceFailuresNeverInvokeEffect(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			g.NoteRead("tid", "https://threads.com/@fixture_author/post/1", "")
+			args := `{"text":"synthetic outgoing reply","target":"` + readPost(t, g, "https://threads.com/@fixture_author/post/1", "tid", "") + `"}`
 			var before int
 			st.DB().QueryRow(`SELECT COUNT(*) FROM actions`).Scan(&before)
 			called := false
@@ -155,8 +154,8 @@ func TestGuardRejectsMalformedPolicyInputsBeforeReservation(t *testing.T) {
 	}{
 		{"post", `{`, "invalid_tool_arguments", false},
 		{"post", `{"text":" "}`, "invalid_tool_arguments", false},
-		{"reply", `{"text":"synthetic reply","target_username":"bad name","target_id": "tid", "target_url":"https://threads.com/x"}`, "invalid_tool_arguments", false},
-		{"reply", `{"text":"synthetic reply","target_username":"fixture_author","target_id": "tid", "target_url":"javascript:bad"}`, "invalid_tool_arguments", false},
+		{"reply", `{"text":"synthetic reply","target":"https://threads.com/x"}`, "unknown_target", false},
+		{"reply", `{"text":"synthetic reply","target":"p999"}`, "unknown_target", false},
 		{"post", `{"text":"synthetic post"}`, "invalid_policy", true},
 	} {
 		t.Run(tc.reason+tc.args, func(t *testing.T) {

@@ -179,7 +179,7 @@ func TestNextWakeComesFromTheGap(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			r, st, fixture := kpiRuntime(t, tc.publishedAgo, tc.engagements)
-			fixture.Calls = []llm.ToolCall{llm.ToolCall{Type: "function", Function: llm.CallFunction{Name: "read_feed", Arguments: `{}`}}}
+			fixture.Calls = []llm.ToolCall{llm.ToolCall{Type: "function", Function: llm.CallFunction{Name: "find_posts", Arguments: `{"source":"feed"}`}}}
 			// The wake publishes nothing, so the publish gap stays what the seed made it.
 			if _, err := r.Wake(context.Background()); err != nil {
 				t.Fatal(err)
@@ -221,7 +221,7 @@ func TestCappedDayWaitsForTheNextUTCDayWithoutAZone(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			r, st, fixture := kpiRuntime(t, 9*time.Hour, 3) // one seeded post at 03:00 counts toward posts_per_day 3
-			fixture.Calls = []llm.ToolCall{agent.SyntheticCall("read_feed", `{}`)}
+			fixture.Calls = []llm.ToolCall{agent.SyntheticCall("find_posts", `{"source":"feed"}`)}
 			tc.setup(t, st)
 			if _, err := r.Wake(context.Background()); err != nil {
 				t.Fatal(err)
@@ -271,7 +271,7 @@ func TestCappedSpendWaitsForLocalMidnight(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			r, st, fixture := kpiRuntimeIn(t, "Asia/Ho_Chi_Minh", 9*time.Hour, 3)
-			fixture.Calls = []llm.ToolCall{agent.SyntheticCall("read_feed", `{}`)}
+			fixture.Calls = []llm.ToolCall{agent.SyntheticCall("find_posts", `{"source":"feed"}`)}
 			tc.setup(t, st)
 			if _, err := r.Wake(context.Background()); err != nil {
 				t.Fatal(err)
@@ -344,7 +344,7 @@ func TestLimitsStateHidesTheClosedWriteToolsAndSkipsAnIdleWake(t *testing.T) {
 	calls := 0
 	r, st, fixture := kpiRuntimeFull(t, "", 24*time.Hour, 3, 0)
 	fixture.Observe = func([]llm.Message) { calls++ }
-	fixture.Calls = []llm.ToolCall{agent.SyntheticCall("read_feed", `{}`)}
+	fixture.Calls = []llm.ToolCall{agent.SyntheticCall("find_posts", `{"source":"feed"}`)}
 	for i := 0; i < 3; i++ {
 		seedToday(t, st, "post", i)
 	}

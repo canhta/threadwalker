@@ -30,7 +30,7 @@ var ErrMalformedPage = errors.New("malformed page snapshot")
 // Post is one post read from Threads. Text is untrusted third-party data and
 // must be wrapped before being shown to the model.
 type Post struct {
-	// Ref is the guard's short ref for URL; the model passes it instead of copying the URL.
+	// Ref is the guard's ref for the post (p<id>, durable) or trend (t<n>, this wake); the model passes it instead of copying the URL.
 	Ref      string `json:"ref,omitempty"`
 	ID       string `json:"id"`
 	Username string `json:"username"`

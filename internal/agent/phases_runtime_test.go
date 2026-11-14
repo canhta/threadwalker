@@ -40,7 +40,7 @@ func TestDreamSpendIsSeparateFromDailyCap(t *testing.T) {
 	}
 	fixture := agent.NewOfflineFixture(clock)
 	fixture.Calls = []llm.ToolCall{
-		agent.SyntheticCall("read_feed", `{}`),
+		agent.SyntheticCall("find_posts", `{"source":"feed"}`),
 		agent.SyntheticCall("fetch_trends", `{}`),
 		agent.SyntheticCall("post", `{"text":"dream must not post"}`),
 	}

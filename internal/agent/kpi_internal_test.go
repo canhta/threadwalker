@@ -14,9 +14,9 @@ var (
 )
 
 func TestStopCheckShowsOpenTargetsToABehindAgentWhileBudgetIsLeft(t *testing.T) {
-	open := []string{"r3", "r8"}
+	open := []string{"p3", "p8"}
 	check := behindSB.stopCheck(nil, func() []string { return open }, 1.20)
-	if ask := check(nil, nil); !strings.Contains(ask, "2 posts you read") || !strings.Contains(ask, "r3, r8") {
+	if ask := check(nil, nil); !strings.Contains(ask, "2 posts you read") || !strings.Contains(ask, "p3, p8") {
 		t.Fatalf("ask %q", ask)
 	}
 	open = nil

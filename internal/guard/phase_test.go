@@ -43,7 +43,7 @@ func TestGuardBlocksThreadsAndOwnerWritesInTheDream(t *testing.T) {
 			st, g, wakeID := openPhaseGuard(t, phase)
 			writeCalls := map[string]string{
 				"post":                `{"text":"synthetic take"}`,
-				"reply":               `{"text":"synthetic reply","target_id": "tid", "target_url":"https://threads.net/@someone/post/1","target_username":"someone"}`,
+				"reply":               `{"text":"synthetic reply","target":"p1"}`,
 				"notify_owner":        `{"text":"synthetic"}`,
 				"ask_owner":           `{"text":"synthetic"}`,
 				"mark_do_not_contact": `{"username":"someone"}`,
@@ -62,7 +62,7 @@ func TestGuardBlocksThreadsAndOwnerWritesInTheDream(t *testing.T) {
 			if err := st.DB().QueryRow(`SELECT blocked_by FROM tool_calls WHERE wake_id=? ORDER BY id DESC LIMIT 1`, wakeID).Scan(&blocked); err != nil || blocked != "phase_read_only" {
 				t.Fatalf("blocked_by=%q err=%v", blocked, err)
 			}
-			for _, tool := range []string{"fetch_trends", "read_feed", "read_topic", "search", "read_post", "read_replies"} {
+			for _, tool := range []string{"fetch_trends", "find_posts", "read_post", "read_replies"} {
 				var ran bool
 				_, err := g.Execute(context.Background(), guard.Attempt{Tool: tool, Arguments: allowedArgs(tool)}, func() (string, error) {
 					ran = true
@@ -78,10 +78,10 @@ func TestGuardBlocksThreadsAndOwnerWritesInTheDream(t *testing.T) {
 
 func allowedArgs(tool string) string {
 	switch tool {
-	case "search":
-		return `{"query":"synthetic"}`
+	case "find_posts":
+		return `{"source":"search","query":"synthetic"}`
 	case "read_post":
-		return `{"url":"https://threads.net/@someone/post/1"}`
+		return `{"id":"1"}`
 	default:
 		return `{}`
 	}
@@ -136,6 +136,9 @@ func TestCodeOwnedFieldsAreRefusedAsToolInput(t *testing.T) {
 			switch a.Kind {
 			case guard.ArgText:
 				args[a.Name] = "x"
+				if a.Enum != nil {
+					args[a.Name] = a.Enum[0]
+				}
 			case guard.ArgID:
 				args[a.Name] = 1
 			case guard.ArgBool:
@@ -166,37 +169,45 @@ func TestCodeOwnedFieldsAreRefusedAsToolInput(t *testing.T) {
 
 func TestSpecParse(t *testing.T) {
 	reply, _ := guard.Spec("reply")
-	search, _ := guard.Spec("search")
+	find, _ := guard.Spec("find_posts")
+	post, _ := guard.Spec("post")
 	for _, tc := range []struct {
 		spec guard.ToolSpec
 		raw  string
 		ok   bool
 	}{
-		{reply, `{"text":"x","target_id": "tid", "target_url":"u","target_username":"n"}`, true},
+		{reply, `{"text":"x","target":"p1"}`, true},
 		{reply, `{"text":"x"}`, false},
-		{reply, `{"text":" ","target_id": "tid", "target_url":"u","target_username":"n"}`, false},
-		{reply, `{"text":null,"target_id": "tid", "target_url":"u","target_username":"n"}`, false},
-		{reply, `{"text":"x","target_id": "tid", "target_url":"u","target_username":"n","answers_note":0}`, false},
-		{reply, `{"text":"x","target_id": "tid", "target_url":"u","target_username":"n","answers_note":null}`, false},
-		{reply, `{"text":"x","target_id": "tid", "target_url":"u","target_username":"n","extra":1}`, false},
+		{reply, `{"text":"x","target_url":"u","target_username":"n"}`, false},
+		{reply, `{"text":" ","target":"p1"}`, false},
+		{reply, `{"text":null,"target":"p1"}`, false},
+		{reply, `{"text":"x","target":"p1","answers_note":0}`, false},
+		{reply, `{"text":"x","target":"p1","answers_note":null}`, false},
+		{reply, `{"text":"x","target":"p1","extra":1}`, false},
 		{reply, `[]`, false},
 		{reply, `null`, false},
 		{reply, `{`, false},
-		{reply, `{"text":"x","target_id": "tid", "target_url":"u","target_username":"n","lesson_ids":[1,2]}`, true},
-		{reply, `{"text":"x","target_id": "tid", "target_url":"u","target_username":"n","lesson_ids":[]}`, false},
-		{reply, `{"text":"x","target_id": "tid", "target_url":"u","target_username":"n","lesson_ids":[0]}`, false},
-		{reply, `{"text":"x","target_id": "tid", "target_url":"u","target_username":"n","lesson_ids":["1"]}`, false},
-		{search, `{"query":"q"}`, true},
-		{search, `{"query":"q","recent":true}`, true},
-		{search, `{"query":"q","recent":"yes"}`, false},
-		{search, `{"query":"q","limit":5}`, false},
+		{reply, `{"text":"x","target":"p1","lesson_ids":[1,2]}`, true},
+		{reply, `{"text":"x","target":"p1","lesson_ids":[]}`, false},
+		{reply, `{"text":"x","target":"p1","lesson_ids":[0]}`, false},
+		{reply, `{"text":"x","target":"p1","lesson_ids":["1"]}`, false},
+		{find, `{"source":"search","query":"q"}`, true},
+		{find, `{"source":"search","query":"q","recent":true}`, true},
+		{find, `{"source":"search","query":"q","recent":"yes"}`, false},
+		{find, `{"source":"search","query":"q","limit":5}`, false},
+		{find, `{"source":"feed"}`, true},
+		{find, `{"source":"home"}`, false},
+		{find, `{"query":"q"}`, false},
+		{post, `{"text":"x","hook":"number","trend":"t1"}`, true},
+		{post, `{"text":"x","hook":"shout"}`, false},
+		{post, `{"text":"x","trend_ref":"t1"}`, false},
 	} {
 		if _, err := tc.spec.Parse(tc.raw); (err == nil) != tc.ok {
 			t.Fatalf("%s %s: err=%v", tc.spec.Name, tc.raw, err)
 		}
 	}
-	args, err := reply.Parse(`{"text":"hi","target_id": "tid", "target_url":"u","target_username":"n","answers_note":3}`)
-	if err != nil || args.Text("text") != "hi" || args.Int("answers_note") != 3 || len(args.Texts()) != 4 {
+	args, err := reply.Parse(`{"text":"hi","target":"p1","answers_note":3}`)
+	if err != nil || args.Text("text") != "hi" || args.Int("answers_note") != 3 || len(args.Texts()) != 2 {
 		t.Fatalf("args %+v err %v", args, err)
 	}
 	read, _ := guard.Spec("read_own_metrics")

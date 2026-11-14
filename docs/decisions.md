@@ -45,7 +45,7 @@ Each row is one decision with a one-line reason. A change to a decision edits it
 
 | Limit | Detail |
 |---|---|
-| Meta App Review | Without it `search` covers only the account's own posts and `profile_posts` serves a few official accounts; both return `limited_access` ([threads.md](threads.md)) |
+| Meta App Review | Without it `find_posts` source `search` covers only the account's own posts and source `profile` serves a few official accounts; both return `limited_access` ([threads.md](threads.md)) |
 | Link keys | Redirect aliases and tracking variants are not detected |
 | Author reply | `author_replied` reads only the first page of replies |
 | Local identity | Account and session binding are not measured |

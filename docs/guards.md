@@ -26,14 +26,14 @@ flowchart TD
 | `invalid_tool_call_id` | Tool call has an empty id | code | dispatcher |
 | `unsupported_tool_type` | Only function tool calls | code | dispatcher |
 | `unknown_tool` | Tool not in `guard.Specs` | code | dispatcher |
-| `invalid_tool_arguments` | Arguments do not match the schema; also an unknown hook, a post-hook rationale that is blank, multi-line or over 300 characters, a series with 5 or more later parts, a note id that is not open | code | dispatcher, content, reserve |
+| `invalid_tool_arguments` | Arguments do not match the schema; also an unknown `source` or `hook` (enums in the schema) | code | dispatcher, content, reserve |
 | `sensitive_arguments` | Arguments contain a configured secret | code | dispatcher |
 | `repeat_refused` | Same call failed the same way 3 times | code | dispatcher |
 | `stall_stop` | Second `repeat_refused`, or 10 identical successful results; ends the wake | code | dispatcher |
-| `tool_closed` | The tool was refused 3 times for the same reason (for a reason about one post or person, the same target; time gates such as `min_minutes_between_posts`, `replies_per_hour`, `min_seconds_between_actions` and `reply_breaker` never count); closed for the rest of the wake. Does not feed `stall_stop`; the identical call repeated still ends the wake through `repeat_refused` | code | dispatcher |
-| `tool_hidden` | The tool is not offered this wake (a closed write gate, a tool the Meta app may not use); a call to it is refused. Does not feed `stall_stop`; the identical call repeated still ends the wake through `repeat_refused` | code | dispatcher |
+| `tool_closed` | The tool (for `find_posts`, the source) was refused 3 times for the same reason (for a reason about one post or person, the same `target`; time gates such as `min_minutes_between_posts`, `replies_per_hour`, `min_seconds_between_actions` and `reply_breaker` never count); closed for the rest of the wake. Does not feed `stall_stop`; the identical call repeated still ends the wake through `repeat_refused` | code | dispatcher |
+| `tool_hidden` | The tool or `find_posts` source is not offered this wake (a closed write gate, a source the Meta app may not use); a call to it is refused. Does not feed `stall_stop`; the identical call repeated still ends the wake through `repeat_refused` | code | dispatcher |
 | `tool_call_cap` | The wake made 40 tool calls; the first call past it is refused, the second ends the wake (`end_reason` `tool_call_cap`) | code | dispatcher |
-| `limit_per_wake` | A capped tool was called past its per-wake cap: `read_topic` 3, `web_search` 3, `read_feed` 2, `fetch_trends` 1, `notify_owner` 2, `ask_owner` 1, `mark_do_not_contact` 3 | code | executor |
+| `limit_per_wake` | A capped tool was called past its per-wake cap: `find_posts` source `topic` 3 and `feed` 2, `web_search` 3, `fetch_trends` 1, `notify_owner` 2, `ask_owner` 1, `mark_do_not_contact` 3 | code | executor |
 | `browser_stopped` | Browser logged out or captcha already stopped the agent | code | dispatcher |
 | `audit_failure` | Audit write failed; fail closed | code | dispatcher |
 | `agent_not_running` | Agent paused or killed | code | guard, reserve |
@@ -44,13 +44,15 @@ flowchart TD
 | `identity_targeting` | Targets a person's identity: appearance, gender, region, age, private life | code (`internal/guard/safety.go`) | content |
 | `political_recommendation` | Recommends a political choice | code | content |
 | `engagement_bait` | Asks for "comment X", "tag a friend", shares or follows | code | content |
-| `no_trend_anchor` | With `guard.trend_anchor`, `trend_ref` was neither the short ref nor the exact URL of an item returned this wake by `fetch_trends`, `search`, `read_feed`, `read_topic` or `web_search` | template flag | content |
+| `post_brief` | With `guard.trend_anchor`, a post lacks `hook` or `rationale`, or the rationale is multi-line or over 300 characters | template flag | content |
+| `too_many_parts` | A series with 5 or more later parts | code | content |
+| `find_args` | `find_posts` arguments do not fit the `source`, or `topic` is not the `t` ref of a Threads topic that `feed` returned this wake | code | executor |
+| `no_trend_anchor` | With `guard.trend_anchor`, `trend` was not the `t` ref of a trend or source noted this wake, or the `p` ref of a post stored in the last 7 days | template flag | content |
 | `own_account` | Interaction with a configured own username, own profile or post URL, or a confirmed own publication URL, even when the supplied author disagrees; mentions and Threads links to own accounts | template (`threads.username`) | content, reserve |
 | `shared_promotion_link` | A post promotes a link already reserved by another agent; checks all prior intents including dry-run, failed and uncertain | code | reserve |
-| `reply_target_host` | Target is not a `threads.com` or `threads.net` post URL (optional `www.`, http normalized to https) | code | content |
-| `reply_target_mismatch` | `target_username` differs from the URL's author | code | content |
-| `reply_target_unread` | `target_url` was a short ref this wake did not issue, or the id and permalink pair was not shown by a `search`, `read_post` or `read_replies` result this wake; a feed post needs its permalink in a `read_feed` or `read_topic` result this wake | code | content |
-| `target_outside_window` | This wake's read of the target showed it outside the `targets.*` window ([wake.md](wake.md)); the hint names each broken knob with the post's figure and the limit. An answer to a reply listed in the wake's inbox is exempt; a target with no figures this wake is not checked | template (`targets.*`) | content |
+| `reply_target_host` | The stored post has no usable author in a `threads.com` or `threads.net` post URL (optional `www.`, http normalized to https) | code | content |
+| `unknown_target` | `reply.target` is not the `p` ref of a post this agent has stored in the last 7 days; the hint says to pick one from the candidates or call `find_posts` | code | content |
+| `target_outside_window` | The stored figures of the target, aged to now, are outside the `targets.*` window ([wake.md](wake.md)); the hint names each broken knob with the post's figure and the limit. An answer to a reply listed in the wake's inbox is exempt; a target that never showed figures is not checked | template (`targets.*`) | content |
 | `reply_url` | A reply contains a URL | code | content |
 | `reply_mention` | A reply mentions a username other than the author it answers | code | content |
 | `invalid_policy` | A limit is not positive | template | content |
@@ -71,11 +73,14 @@ flowchart TD
 | `replies_per_conversation` | The agent already made `limits.replies_per_conversation` replies under the same root post (the hint names the count), unless its first reply there reached `limits.conversation_hot_likes` likes or `limits.conversation_hot_replies` replies in its newest stored metric. A reply to a feed or search post is rooted at that post; an answer to an inbox reply inherits the root of our reply it answers, and a reply to a comment on our own post is rooted at that comment, so one commenter is one conversation. Rows stored without a root, and mentions, are their own conversations. The inbox lists no reply from a capped conversation | template | reserve |
 | `min_seconds_between_actions` | Spacing since the newest action under `limits.min_seconds_between_actions`; the hint names the next allowed time | template | reserve |
 | `min_minutes_between_posts` | A post within `limits.min_minutes_between_posts` of the newest own post; replies are not affected; the hint names the next allowed time | template | reserve |
+| `note_not_open` | `answers_note` names a note that is not open | code | reserve |
 | `owner_note_open` | An owner note is open and the post names none via `answers_note` | code | reserve |
 | `repeat_ending` | The final text's closing token (trailing emoticon or emoji run, or a laugh such as `kkk`) already ends 3 of the agent's last 10 live actions (dry-run actions count only in dry-run mode); the writer gets two rewrites first, the hint names the token and says to end differently | code | reserve |
-| `repeat_topic` | Post's `trend_ref` equals that of an own post of the last 24 h, or its first line shares at least two words (4+ letters, links left out) and half of the smaller word set with one | code | reserve |
+| `repeat_topic` | Post's anchor (the stored URL or title) equals that of an own post of the last 24 h, or its first line shares at least two words (4+ letters, links left out) and half of the smaller word set with one | code | reserve |
 
-Dashboard-only codes: the `lesson_*` reasons of a lesson the text gate refused, and `stale_ref`, show as "blocked", not as guard codes.
+Dashboard-only codes: the `lesson_*` reasons of a lesson the text gate refused, and `stale_ref` (a lesson that names a `p` or `t` ref), show as "blocked", not as guard codes.
+
+Every refusal the model reads carries one sentence: what happened and the next valid action (`internal/guard/blocked.go`; `TestEveryReasonCodeHasAFixedHint`). The second refusal of a tool for one reason adds a sentence naming the next valid action; the third closes the tool. The hints are the only place the policy is stated to the model: tool descriptions do not repeat it.
 
 ## Rules behind several codes
 

@@ -153,7 +153,7 @@ type WebSearchConfig struct {
 // SelfStatUnits are the units after which a number in a post or reply is a claim
 // about the agent itself and must match its facts sheet; empty disables the check.
 //
-// TrendAnchor makes a post carry a hook type, a one-line rationale and a trend_ref
+// TrendAnchor makes a post carry a hook type, a one-line rationale and a trend
 // that names an item read this wake, with a first line of at most 80 characters.
 type GuardConfig struct {
 	StopPhrases, BlockedPhrases, SelfStatUnits []string

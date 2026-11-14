@@ -61,11 +61,11 @@ func TestSystemPromptNeverForcesAWriteOrNamesARemovedTool(t *testing.T) {
 func TestHiddenToolsLeaveTheWakeInstructions(t *testing.T) {
 	tmpl := OfflineTemplate()
 	full := systemPrompt(tmpl, guard.PhaseAgent)
-	if !strings.Contains(full, "without target_id") || !strings.Contains(full, "Threads search hit") || strings.Contains(full, "profile_posts") || strings.Contains(full, "read_post,") {
+	if !strings.Contains(full, "target = its ref") || !strings.Contains(full, "Threads search hit") || strings.Contains(full, "profile_posts") || strings.Contains(full, "read_post,") {
 		t.Fatal("full prompt should mention search and the permalink reply path only")
 	}
-	hidden := systemPrompt(tmpl, guard.PhaseAgent, "search", "profile_posts")
-	for _, word := range []string{"profile_posts", "Threads search hit", " search,"} {
+	hidden := systemPrompt(tmpl, guard.PhaseAgent, "find_posts:search")
+	for _, word := range []string{"profile_posts", "Threads search hit"} {
 		if strings.Contains(hidden, word) {
 			t.Fatalf("hidden prompt still mentions %q", word)
 		}

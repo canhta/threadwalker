@@ -32,22 +32,13 @@ type CallDetail struct {
 	ActionID int64  `json:"action_id,omitempty"`
 }
 
-// RefTrace is the ref the agent gave, what the guard resolved it to, and the
-// nearest refs noted this wake when it resolved to none.
+// RefTrace is the ref the agent gave and what the guard resolved it to.
 type RefTrace struct {
-	Field    string    `json:"field"`
-	Given    string    `json:"given"`
-	Resolved string    `json:"resolved,omitempty"`
-	Nearest  []NearRef `json:"nearest,omitempty"`
+	Field    string `json:"field"`
+	Given    string `json:"given"`
+	Resolved string `json:"resolved,omitempty"`
 	// Noted is how many refs this wake issued.
 	Noted int `json:"noted,omitempty"`
-}
-
-// NearRef is a ref noted this wake, with its edit distance from the ref given.
-type NearRef struct {
-	Ref   string `json:"ref"`
-	Item  string `json:"item"`
-	Edits int    `json:"edits"`
 }
 
 // TryTrace is one draft: who wrote it, its first line and part lengths in

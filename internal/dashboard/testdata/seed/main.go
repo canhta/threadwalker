@@ -205,12 +205,12 @@ func seed(ctx context.Context, s *store.Store, now time.Time) error {
 		switch sl.kind {
 		case "agent":
 			do("read_own_metrics")
-			do("read_feed")
+			do("find_posts")
 			if i == failSearchAt {
-				step("search", "error", "timeout", "")
+				step("find_posts", "error", "timeout", "")
 				steps++
 			} else {
-				do("search")
+				do("find_posts")
 			}
 			if lastTrend != sl.at.YearDay() {
 				do("fetch_trends")

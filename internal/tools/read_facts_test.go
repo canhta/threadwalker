@@ -22,11 +22,11 @@ func TestReadFeedShowsNumbersAndStoresThemOnTheReply(t *testing.T) {
 			{Username: "synthetic_viet", Text: "cold", URL: cold, AgeMinutes: num(2000), Likes: num(3), Replies: num(90)},
 			{Username: "synthetic_viet", Text: "hot", URL: hot, AgeMinutes: num(30), Likes: num(80), Replies: num(4)},
 		}}
-	if out := h.mustCall("read_feed", `{}`); !strings.Contains(out, `"likes":80`) || !strings.Contains(out, `"post_count":2000`) || !strings.Contains(out, `"age_minutes":30`) || !strings.Contains(out, `"ref":"r2"`) {
+	if out := h.mustCall("find_posts", `{"source":"feed"}`); !strings.Contains(out, `"likes":80`) || !strings.Contains(out, `"post_count":2000`) || !strings.Contains(out, `"age_minutes":30`) || !strings.Contains(out, `"ref":"p2"`) {
 		t.Fatalf("the tool output dropped the figures: %s", out)
 	}
 	seen := h.guard.Seen()
-	if len(seen) != 3 || seen[0].Ref != "r3" && seen[0].Ref != "r2" || seen[2].Ref != "r1" {
+	if len(seen) != 3 || seen[0].Ref != "t1" && seen[0].Ref != "p2" || seen[2].Ref != "p1" {
 		t.Fatalf("not best first: %+v", seen)
 	}
 	if !strings.HasPrefix(seen[0].Facts, "[") || !strings.Contains(seen[2].Facts, "outside window: age, replies") {
@@ -34,7 +34,7 @@ func TestReadFeedShowsNumbersAndStoresThemOnTheReply(t *testing.T) {
 	}
 	topicFacts := ""
 	for _, item := range seen {
-		if item.Ref == "r3" {
+		if item.Ref == "t1" {
 			topicFacts = item.Facts
 		}
 	}
@@ -43,14 +43,14 @@ func TestReadFeedShowsNumbersAndStoresThemOnTheReply(t *testing.T) {
 	}
 
 	h.next()
-	h.mustCall("reply", `{"text":"Synthetic reply","target_url":"r2","target_username":"synthetic_viet"}`)
+	h.mustCall("reply", `{"text":"Synthetic reply","target":"p2"}`)
 	var replies, age sql.NullInt64
 	if err := h.store.DB().QueryRow(`SELECT parent_replies,parent_age_minutes FROM actions WHERE kind='reply' ORDER BY id DESC LIMIT 1`).Scan(&replies, &age); err != nil {
 		t.Fatal(err)
 	}
 	var stored string
-	if err := h.store.DB().QueryRow(`SELECT target_url FROM actions WHERE kind='reply' ORDER BY id DESC LIMIT 1`).Scan(&stored); err != nil || stored != hot {
-		t.Fatalf("stored target %q, want the permalink: %v", stored, err)
+	if err := h.store.DB().QueryRow(`SELECT target_url FROM actions WHERE kind='reply' ORDER BY id DESC LIMIT 1`).Scan(&stored); err != nil || stored != "https://threads.com/@synthetic_viet/post/hot" {
+		t.Fatalf("stored target %q, want the canonical permalink: %v", stored, err)
 	}
 	if replies.Int64 != 4 || age.Int64 != 30 || !replies.Valid || !age.Valid {
 		t.Fatalf("stored features: %+v %+v", replies, age)

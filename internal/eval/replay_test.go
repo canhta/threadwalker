@@ -39,7 +39,7 @@ func TestReplaySuiteRejectsMalformedCases(t *testing.T) {
 }
 
 func TestReplayFailsWhenTheGuardVerdictDiffers(t *testing.T) {
-	call := `{"type":"function","function":{"name":"post","arguments":"{\"text\":\"hi\",\"hook\":\"trend_detail\",\"rationale\":\"r\",\"trend_ref\":\"r9\"}"}}`
+	call := `{"type":"function","function":{"name":"post","arguments":"{\"text\":\"hi\",\"hook\":\"trend_detail\",\"rationale\":\"r\",\"trend\":\"t9\"}"}}`
 	for expected, want := range map[string]string{`"expected_blocked":"no_trend_anchor"`: "", `"expected_blocked":"text_length"`: "replay_outcome_mismatch", `"expected_detail":"nowhere"`: "replay_outcome_mismatch"} {
 		suite, err := loadReplay(t, `{"steps":[{"call":`+call+`,`+expected+`}]}`)
 		if err != nil {

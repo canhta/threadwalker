@@ -12,7 +12,7 @@ import (
 )
 
 func volumeReply(seq int) map[string]any {
-	return replyArgs(seq, fmt.Sprintf("user%d", seq), fmt.Sprintf("https://threads.com/@user%d/post/%d", seq, seq))
+	return replyArgs(seq, fmt.Sprintf("https://threads.com/@user%d/post/%d", seq, seq))
 }
 
 func TestSeventhReplyInAnHourIsRefused(t *testing.T) {

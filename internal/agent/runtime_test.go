@@ -76,8 +76,8 @@ func TestWakeStopReasonsAndScheduleDefaults(t *testing.T) {
 		after  time.Duration
 	}{
 		{"default", nil, 30, "completed", time.Hour},
-		{"step_limit", []agentCall{{"read_feed", `{}`}, {"fetch_trends", `{}`}}, 1, "step_limit", time.Hour},
-		{"stall_stop", slices.Repeat([]agentCall{{"search", `{"query":"synthetic"}`}}, 10), 30, "stall_stop", time.Hour},
+		{"step_limit", []agentCall{{"find_posts", `{"source":"feed"}`}, {"fetch_trends", `{}`}}, 1, "step_limit", time.Hour},
+		{"stall_stop", slices.Repeat([]agentCall{{"find_posts", `{"source":"search","query":"synthetic"}`}}, 10), 30, "stall_stop", time.Hour},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx := context.Background()
@@ -195,7 +195,7 @@ func TestEveryExternalToolResultIsUntrustedAndLogsAreRedacted(t *testing.T) {
 	defer st.Close()
 	now := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 	fixture := agent.NewOfflineFixture(func() time.Time { return now })
-	fixture.Calls = []llm.ToolCall{agent.SyntheticCall("read_feed", `{}`), agent.SyntheticCall("search", `{"query":"private query"}`), agent.SyntheticCall("read_post", `{"id":"fixture-post"}`), agent.SyntheticCall("read_replies", `{}`), agent.SyntheticCall("fetch_trends", `{}`)}
+	fixture.Calls = []llm.ToolCall{agent.SyntheticCall("find_posts", `{"source":"feed"}`), agent.SyntheticCall("find_posts", `{"source":"search","query":"private query"}`), agent.SyntheticCall("read_post", `{"id":"fixture-post"}`), agent.SyntheticCall("read_replies", `{}`), agent.SyntheticCall("fetch_trends", `{}`)}
 	seen := 0
 	fixture.Observe = func(messages []llm.Message) {
 		for _, m := range messages {

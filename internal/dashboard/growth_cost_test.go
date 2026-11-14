@@ -32,7 +32,7 @@ func scored() store.DashboardSnapshot {
 	w := finishedWake(1, "agent", "completed", 3)
 	w.CostUSD = 0.3
 	snap.Wakes = []store.DashboardWake{w}
-	snap.ToolCalls = []store.DashboardToolCall{call(1, 1, "post", `{"outcome":"error"}`, "engagement_bait"), call(2, 1, "search", `{"outcome":"success"}`, "")}
+	snap.ToolCalls = []store.DashboardToolCall{call(1, 1, "post", `{"outcome":"error"}`, "engagement_bait"), call(2, 1, "find_posts", `{"outcome":"success"}`, "")}
 	return snap
 }
 

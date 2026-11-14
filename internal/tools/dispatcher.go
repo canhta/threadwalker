@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"regexp"
 	"slices"
 	"strings"
 	"sync"
@@ -90,23 +89,22 @@ type Dispatcher struct {
 	redactor     *config.Redactor
 	trendProfile trends.TrendProfile
 	reads        map[string]int
-	refused      map[string]int // refusals per tool and reason
+	refused      map[string]int // refusals per call scope and reason
 	closed       map[string]bool
-	calls        int             // model tool calls this wake, refused ones included
-	shown        map[string]bool // refs the model was shown, after clipping
+	calls        int // model tool calls this wake, refused ones included
 	capRefusals  int
 }
 
-// MaxTopicReadsPerWake bounds read_topic in a normal wake: each opens a page in
-// the wake's one browser.
+// MaxTopicReadsPerWake bounds find_posts source topic in a normal wake: each
+// opens a page in the wake's one browser.
 const MaxTopicReadsPerWake = 3
 
 // MaxWebSearchesPerWake bounds web_search in a normal wake; each call also
 // counts against the daily budget.
 const MaxWebSearchesPerWake = 3
 
-// MaxFeedReadsPerWake and MaxTrendFetchesPerWake: the home feed and the trend
-// list are snapshots, so a second look in the same wake is retry room at most.
+// MaxFeedReadsPerWake and MaxTrendFetchesPerWake: the home feed (find_posts
+// source feed) and the trend list are snapshots, so a second look in the same wake is retry room at most.
 const (
 	MaxFeedReadsPerWake    = 2
 	MaxTrendFetchesPerWake = 1
@@ -123,22 +121,39 @@ const MaxResultBytes = 6 << 10
 // wakeCaps are the per-wake call caps of the tools that have one: paid or
 // slow reads, and the tools that reach the owner or add a permanent record.
 var wakeCaps = map[string]int{
-	"read_topic":          MaxTopicReadsPerWake,
+	"find_posts:topic":    MaxTopicReadsPerWake,
 	"web_search":          MaxWebSearchesPerWake,
-	"read_feed":           MaxFeedReadsPerWake,
+	"find_posts:feed":     MaxFeedReadsPerWake,
 	"fetch_trends":        MaxTrendFetchesPerWake,
 	"notify_owner":        2,
 	"ask_owner":           1,
 	"mark_do_not_contact": 3,
 }
 
+// callScope is what a refusal counter, a close and a hide apply to: the tool,
+// or for find_posts the tool and its source, so a closed feed leaves topic open.
+func callScope(tool, arguments string) string {
+	if tool != "find_posts" {
+		return tool
+	}
+	var a struct {
+		Source string `json:"source"`
+	}
+	_ = json.Unmarshal([]byte(arguments), &a)
+	if a.Source == "" {
+		return tool
+	}
+	return tool + ":" + a.Source
+}
+
 // countCall counts one call of a capped tool in a normal wake and refuses
 // the one past its cap. Dispatch already holds d.mu.
 func (d *Dispatcher) countCall(name string) error {
-	if d.opts.Phase != guard.PhaseAgent {
+	limit, capped := wakeCaps[name]
+	if d.opts.Phase != guard.PhaseAgent || !capped {
 		return nil
 	}
-	if d.reads[name]++; d.reads[name] > wakeCaps[name] {
+	if d.reads[name]++; d.reads[name] > limit {
 		return &guard.BlockedError{Reason: "limit_per_wake", Detail: name}
 	}
 	return nil
@@ -156,29 +171,30 @@ var uncounted = []string{"tool_closed", "tool_hidden", "tool_call_cap", "repeat_
 var timeGated = []string{"min_minutes_between_posts", "replies_per_hour", "min_seconds_between_actions", "reply_breaker"}
 
 // perTarget refusals are about one post or person: another target starts a new count.
-var perTarget = []string{"reply_target_unread", "target_outside_window", "thread_per_day", "replies_per_user_7d", "replies_per_conversation", "stale_ref", "do_not_contact", "own_account", "reply_target_host", "reply_target_mismatch"}
+var perTarget = []string{"unknown_target", "target_outside_window", "thread_per_day", "replies_per_user_7d", "replies_per_conversation", "stale_ref", "do_not_contact", "own_account", "reply_target_host"}
 
-// countRefusal tallies a refusal by (tool, reason), or (tool, reason, target)
-// for a per-target reason, annotating it on the 2nd and closing the tool on
+// countRefusal tallies a refusal by (scope, reason), or (scope, reason, target)
+// for a per-target reason, annotating it on the 2nd and closing the scope on
 // the 3rd.
 func (d *Dispatcher) countRefusal(tool, arguments string, err error) {
 	var blocked *guard.BlockedError
 	if !errors.As(err, &blocked) || slices.Contains(uncounted, blocked.Reason) || slices.Contains(timeGated, blocked.Reason) {
 		return
 	}
-	key := tool + "\x00" + blocked.Reason
+	scope := callScope(tool, arguments)
+	key := scope + "\x00" + blocked.Reason
 	if slices.Contains(perTarget, blocked.Reason) {
 		var a struct {
-			TargetURL string `json:"target_url"`
+			Target string `json:"target"`
 		}
 		_ = json.Unmarshal([]byte(arguments), &a)
-		key += "\x00" + a.TargetURL
+		key += "\x00" + a.Target
 	}
 	switch d.refused[key]++; {
 	case d.refused[key] == 2:
 		blocked.Next = guard.NextAction(blocked.Reason)
 	case d.refused[key] >= closeAtRefusals:
-		d.closed[tool] = true
+		d.closed[scope] = true
 		blocked.Next = "this tool is closed for the rest of the wake"
 	}
 }
@@ -206,7 +222,7 @@ func NewDispatcher(opts Options) (*Dispatcher, error) {
 	if opts.FetchTrends == nil || (opts.Template.WebSearch.Enabled && opts.SearchWeb == nil) {
 		return nil, errors.New("configuring tools: injected trend and web-search fetchers required")
 	}
-	d := &Dispatcher{guard: g, opts: opts, registry: map[string]executor{}, seen: map[[32]byte]seenCall{}, reads: map[string]int{}, refused: map[string]int{}, closed: map[string]bool{}, shown: map[string]bool{}}
+	d := &Dispatcher{guard: g, opts: opts, registry: map[string]executor{}, seen: map[[32]byte]seenCall{}, reads: map[string]int{}, refused: map[string]int{}, closed: map[string]bool{}}
 	include, avoid := opts.Template.TrendKeywords()
 	d.trendProfile = trends.TrendProfile{Include: include, Avoid: avoid}
 	d.redactor = config.NewRedactor(opts.Redactor, opts.Template)
@@ -229,32 +245,6 @@ func (d *Dispatcher) attach(executors map[string]executor) error {
 
 // Definitions lists the tools this wake's phase may call; a tool the guard
 // would refuse is never offered.
-// OpenTargetScore is the target score from which a post read this wake counts
-// as worth answering when the agent wants to stop.
-const OpenTargetScore = 0.5
-
-// shownRef finds the refs in a result as the model receives it.
-var shownRef = regexp.MustCompile(`"ref":"(r\d+)"`)
-
-// OpenTargets lists the refs of posts read this wake that score at least
-// OpenTargetScore and that the account has not replied to in the last day,
-// best first. The agent decides which deserve a reply; code only shows them.
-func (d *Dispatcher) OpenTargets(ctx context.Context) []string {
-	replied, err := d.opts.Store.RepliedSince(ctx, d.opts.Template.ID, d.opts.Template.DryRun, d.opts.Now().Add(-24*time.Hour))
-	if err != nil {
-		return nil
-	}
-	d.mu.Lock()
-	defer d.mu.Unlock()
-	var refs []string
-	for _, it := range d.guard.Seen() {
-		if d.shown[it.Ref] && it.Score >= OpenTargetScore && strings.Contains(it.URL, "/post/") && !replied[it.URL] {
-			refs = append(refs, it.Ref)
-		}
-	}
-	return refs
-}
-
 func (d *Dispatcher) Definitions() []llm.Tool {
 	definitions := []llm.Tool{}
 	for _, spec := range guard.Specs() {
@@ -302,6 +292,7 @@ func (d *Dispatcher) Dispatch(ctx context.Context, call llm.ToolCall) (string, e
 	}
 	d.event(ctx, logging.ToolStarted, "started", "", safeTool, started)
 	key := canonicalCall(call)
+	scope := callScope(safeTool, call.Function.Arguments)
 	block := llm.RejectedReason(ctx)
 	var args arguments
 	var parseErr error
@@ -335,11 +326,11 @@ func (d *Dispatcher) Dispatch(ctx context.Context, call llm.ToolCall) (string, e
 		}
 	} else if d.calls > MaxToolCallsPerWake {
 		block = "tool_call_cap"
-	} else if !harness && slices.Contains(d.opts.Hidden, safeTool) {
+	} else if !harness && slices.Contains(d.opts.Hidden, scope) {
 		block = "tool_hidden"
 	} else if prior := d.seen[key]; !prior.ok && prior.streak >= repeatFailures {
 		block = "repeat_refused"
-	} else if d.closed[safeTool] {
+	} else if d.closed[scope] {
 		block = "tool_closed"
 	}
 	// A thrice-failed call is refused without running; the second such
@@ -356,12 +347,10 @@ func (d *Dispatcher) Dispatch(ctx context.Context, call llm.ToolCall) (string, e
 	}
 	var reservedID int64
 	var final []string
-	var target string
+	var target guard.ResolvedTarget
 	output, err := d.guard.Execute(ctx, guard.Attempt{Tool: safeTool, Arguments: call.Function.Arguments, Logged: d.redactedArgs(call.Function.Arguments, block == "sensitive_arguments"), BlockedBy: block, ReservedActionID: &reservedID, Final: &final, Target: &target}, func() (string, error) {
 		args.ReservedActionID = reservedID
-		if target != "" {
-			args.Args = args.Args.WithText("target_url", target)
-		}
+		args.Target = target
 		if len(final) > 0 {
 			args.Args = args.Args.Rewrite(final)
 		}
@@ -434,9 +423,6 @@ func (d *Dispatcher) Dispatch(ctx context.Context, call llm.ToolCall) (string, e
 	d.event(ctx, logging.ToolFinished, outcome(err), why, safeTool, started)
 	if !harness && err == nil {
 		output = clipResult(output, MaxResultBytes)
-		for _, m := range shownRef.FindAllStringSubmatch(output, -1) { // d.mu is held
-			d.shown[m[1]] = true
-		}
 	}
 	return output, err
 }

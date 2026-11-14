@@ -64,8 +64,12 @@
               "type": "function",
               "function": {
                 "name": "reply",
-                "arguments": "{\"text\":\"Synthetic own reply number 1\",\"target_username\":\"fixture_author\",\"target_id\":\"id-1\",\"target_url\":\"https://threads.com/@fixture_author/post/1\"}"
+                "arguments": "{\"text\":\"Synthetic own reply number 1\",\"target\":\"p1\"}"
               }
+            },
+            "read": {
+              "url": "https://threads.com/@fixture_author/post/1",
+              "id": "id-1"
             }
           },
           {
@@ -74,8 +78,12 @@
               "type": "function",
               "function": {
                 "name": "reply",
-                "arguments": "{\"text\":\"Synthetic own reply number 2\",\"target_username\":\"fixture_author\",\"target_id\":\"id-2\",\"target_url\":\"https://threads.com/@fixture_author/post/2\"}"
+                "arguments": "{\"text\":\"Synthetic own reply number 2\",\"target\":\"p2\"}"
               }
+            },
+            "read": {
+              "url": "https://threads.com/@fixture_author/post/2",
+              "id": "id-2"
             }
           },
           {
@@ -84,10 +92,14 @@
               "type": "function",
               "function": {
                 "name": "reply",
-                "arguments": "{\"text\":\"Synthetic own reply number 3\",\"target_username\":\"fixture_author\",\"target_id\":\"id-3\",\"target_url\":\"https://threads.com/@fixture_author/post/3\"}"
+                "arguments": "{\"text\":\"Synthetic own reply number 3\",\"target\":\"p3\"}"
               }
             },
-            "expected_blocked": "replies_per_day"
+            "expected_blocked": "replies_per_day",
+            "read": {
+              "url": "https://threads.com/@fixture_author/post/3",
+              "id": "id-3"
+            }
           }
         ],
         "expected_actions": 2
@@ -152,8 +164,12 @@
               "type": "function",
               "function": {
                 "name": "reply",
-                "arguments": "{\"text\":\"Synthetic own reply number 1\",\"target_username\":\"fixture_author\",\"target_id\":\"id-1\",\"target_url\":\"https://threads.com/@fixture_author/post/1\"}"
+                "arguments": "{\"text\":\"Synthetic own reply number 1\",\"target\":\"p1\"}"
               }
+            },
+            "read": {
+              "url": "https://threads.com/@fixture_author/post/1",
+              "id": "id-1"
             }
           },
           {
@@ -162,8 +178,12 @@
               "type": "function",
               "function": {
                 "name": "reply",
-                "arguments": "{\"text\":\"Synthetic own reply number 2\",\"target_username\":\"fixture_author\",\"target_id\":\"id-2\",\"target_url\":\"https://threads.com/@fixture_author/post/2\"}"
+                "arguments": "{\"text\":\"Synthetic own reply number 2\",\"target\":\"p2\"}"
               }
+            },
+            "read": {
+              "url": "https://threads.com/@fixture_author/post/2",
+              "id": "id-2"
             }
           },
           {
@@ -172,10 +192,14 @@
               "type": "function",
               "function": {
                 "name": "reply",
-                "arguments": "{\"text\":\"Synthetic own reply number 3\",\"target_username\":\"fixture_author\",\"target_id\":\"id-3\",\"target_url\":\"https://threads.com/@fixture_author/post/3\"}"
+                "arguments": "{\"text\":\"Synthetic own reply number 3\",\"target\":\"p3\"}"
               }
             },
-            "expected_blocked": "replies_per_user_7d"
+            "expected_blocked": "replies_per_user_7d",
+            "read": {
+              "url": "https://threads.com/@fixture_author/post/3",
+              "id": "id-3"
+            }
           }
         ],
         "expected_actions": 2
@@ -202,8 +226,12 @@
               "type": "function",
               "function": {
                 "name": "reply",
-                "arguments": "{\"text\":\"Synthetic own reply number 1\",\"target_username\":\"fixture_author\",\"target_id\":\"id-1\",\"target_url\":\"https://threads.com/@fixture_author/post/1\"}"
+                "arguments": "{\"text\":\"Synthetic own reply number 1\",\"target\":\"p1\"}"
               }
+            },
+            "read": {
+              "url": "https://threads.com/@fixture_author/post/1",
+              "id": "id-1"
             }
           },
           {
@@ -212,10 +240,14 @@
               "type": "function",
               "function": {
                 "name": "reply",
-                "arguments": "{\"text\":\"Synthetic own reply number 2\",\"target_username\":\"fixture_author\",\"target_id\":\"id-2\",\"target_url\":\"https://threads.com/@fixture_author/post/2\"}"
+                "arguments": "{\"text\":\"Synthetic own reply number 2\",\"target\":\"p2\"}"
               }
             },
-            "expected_blocked": "replies_per_user_7d"
+            "expected_blocked": "replies_per_user_7d",
+            "read": {
+              "url": "https://threads.com/@fixture_author/post/2",
+              "id": "id-2"
+            }
           },
           {
             "offset_ns": 604800000000000,
@@ -223,8 +255,12 @@
               "type": "function",
               "function": {
                 "name": "reply",
-                "arguments": "{\"text\":\"Synthetic own reply number 3\",\"target_username\":\"fixture_author\",\"target_id\":\"id-3\",\"target_url\":\"https://threads.com/@fixture_author/post/3\"}"
+                "arguments": "{\"text\":\"Synthetic own reply number 3\",\"target\":\"p3\"}"
               }
+            },
+            "read": {
+              "url": "https://threads.com/@fixture_author/post/3",
+              "id": "id-3"
             }
           }
         ],
@@ -372,10 +408,14 @@
               "type": "function",
               "function": {
                 "name": "reply",
-                "arguments": "{\"text\":\"SYNTHETIC FORBIDDEN phrase\",\"target_username\":\"fixture_author\",\"target_id\":\"id-1\",\"target_url\":\"https://threads.com/@fixture_author/post/1\"}"
+                "arguments": "{\"text\":\"SYNTHETIC FORBIDDEN phrase\",\"target\":\"p1\"}"
               }
             },
-            "expected_blocked": "blocked_phrase"
+            "expected_blocked": "blocked_phrase",
+            "read": {
+              "url": "https://threads.com/@fixture_author/post/1",
+              "id": "id-1"
+            }
           }
         ],
         "expected_actions": 0
@@ -399,8 +439,12 @@
               "type": "function",
               "function": {
                 "name": "reply",
-                "arguments": "{\"text\":\"ểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểể🙂\",\"target_username\":\"fixture_author\",\"target_id\":\"id-1\",\"target_url\":\"https://threads.com/@fixture_author/post/1\"}"
+                "arguments": "{\"text\":\"ểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểể🙂\",\"target\":\"p1\"}"
               }
+            },
+            "read": {
+              "url": "https://threads.com/@fixture_author/post/1",
+              "id": "id-1"
             }
           },
           {
@@ -409,10 +453,14 @@
               "type": "function",
               "function": {
                 "name": "reply",
-                "arguments": "{\"text\":\"ểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểể🙂x\",\"target_username\":\"fixture_author\",\"target_id\":\"id-1\",\"target_url\":\"https://threads.com/@fixture_author/post/1\"}"
+                "arguments": "{\"text\":\"ểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểểể🙂x\",\"target\":\"p1\"}"
               }
             },
-            "expected_blocked": "text_length"
+            "expected_blocked": "text_length",
+            "read": {
+              "url": "https://threads.com/@fixture_author/post/1",
+              "id": "id-1"
+            }
           }
         ],
         "expected_actions": 1
@@ -437,10 +485,14 @@
               "type": "function",
               "function": {
                 "name": "reply",
-                "arguments": "{\"text\":\"Synthetic link https://example.test/x\",\"target_username\":\"fixture_author\",\"target_id\":\"id-1\",\"target_url\":\"https://threads.com/@fixture_author/post/1\"}"
+                "arguments": "{\"text\":\"Synthetic link https://example.test/x\",\"target\":\"p1\"}"
               }
             },
-            "expected_blocked": "reply_url"
+            "expected_blocked": "reply_url",
+            "read": {
+              "url": "https://threads.com/@fixture_author/post/1",
+              "id": "id-1"
+            }
           }
         ],
         "expected_actions": 0
@@ -464,10 +516,14 @@
               "type": "function",
               "function": {
                 "name": "reply",
-                "arguments": "{\"text\":\"Synthetic link http://example.test\",\"target_username\":\"fixture_author\",\"target_id\":\"id-1\",\"target_url\":\"https://threads.com/@fixture_author/post/1\"}"
+                "arguments": "{\"text\":\"Synthetic link http://example.test\",\"target\":\"p1\"}"
               }
             },
-            "expected_blocked": "reply_url"
+            "expected_blocked": "reply_url",
+            "read": {
+              "url": "https://threads.com/@fixture_author/post/1",
+              "id": "id-1"
+            }
           }
         ],
         "expected_actions": 0
@@ -491,10 +547,14 @@
               "type": "function",
               "function": {
                 "name": "reply",
-                "arguments": "{\"text\":\"Synthetic link www.example.test\",\"target_username\":\"fixture_author\",\"target_id\":\"id-1\",\"target_url\":\"https://threads.com/@fixture_author/post/1\"}"
+                "arguments": "{\"text\":\"Synthetic link www.example.test\",\"target\":\"p1\"}"
               }
             },
-            "expected_blocked": "reply_url"
+            "expected_blocked": "reply_url",
+            "read": {
+              "url": "https://threads.com/@fixture_author/post/1",
+              "id": "id-1"
+            }
           }
         ],
         "expected_actions": 0
@@ -518,10 +578,14 @@
               "type": "function",
               "function": {
                 "name": "reply",
-                "arguments": "{\"text\":\"Synthetic link example.test/path\",\"target_username\":\"fixture_author\",\"target_id\":\"id-1\",\"target_url\":\"https://threads.com/@fixture_author/post/1\"}"
+                "arguments": "{\"text\":\"Synthetic link example.test/path\",\"target\":\"p1\"}"
               }
             },
-            "expected_blocked": "reply_url"
+            "expected_blocked": "reply_url",
+            "read": {
+              "url": "https://threads.com/@fixture_author/post/1",
+              "id": "id-1"
+            }
           }
         ],
         "expected_actions": 0
@@ -545,10 +609,14 @@
               "type": "function",
               "function": {
                 "name": "reply",
-                "arguments": "{\"text\":\"Synthetic link example.test\",\"target_username\":\"fixture_author\",\"target_id\":\"id-1\",\"target_url\":\"https://threads.com/@fixture_author/post/1\"}"
+                "arguments": "{\"text\":\"Synthetic link example.test\",\"target\":\"p1\"}"
               }
             },
-            "expected_blocked": "reply_url"
+            "expected_blocked": "reply_url",
+            "read": {
+              "url": "https://threads.com/@fixture_author/post/1",
+              "id": "id-1"
+            }
           }
         ],
         "expected_actions": 0
@@ -572,10 +640,14 @@
               "type": "function",
               "function": {
                 "name": "reply",
-                "arguments": "{\"text\":\"Synthetic link ftp://example.test\",\"target_username\":\"fixture_author\",\"target_id\":\"id-1\",\"target_url\":\"https://threads.com/@fixture_author/post/1\"}"
+                "arguments": "{\"text\":\"Synthetic link ftp://example.test\",\"target\":\"p1\"}"
               }
             },
-            "expected_blocked": "reply_url"
+            "expected_blocked": "reply_url",
+            "read": {
+              "url": "https://threads.com/@fixture_author/post/1",
+              "id": "id-1"
+            }
           }
         ],
         "expected_actions": 0
@@ -599,10 +671,14 @@
               "type": "function",
               "function": {
                 "name": "reply",
-                "arguments": "{\"text\":\"Synthetic link //example.test\",\"target_username\":\"fixture_author\",\"target_id\":\"id-1\",\"target_url\":\"https://threads.com/@fixture_author/post/1\"}"
+                "arguments": "{\"text\":\"Synthetic link //example.test\",\"target\":\"p1\"}"
               }
             },
-            "expected_blocked": "reply_url"
+            "expected_blocked": "reply_url",
+            "read": {
+              "url": "https://threads.com/@fixture_author/post/1",
+              "id": "id-1"
+            }
           }
         ],
         "expected_actions": 0
@@ -626,10 +702,14 @@
               "type": "function",
               "function": {
                 "name": "reply",
-                "arguments": "{\"text\":\"Synthetic link mailto:fixture@example.test\",\"target_username\":\"fixture_author\",\"target_id\":\"id-1\",\"target_url\":\"https://threads.com/@fixture_author/post/1\"}"
+                "arguments": "{\"text\":\"Synthetic link mailto:fixture@example.test\",\"target\":\"p1\"}"
               }
             },
-            "expected_blocked": "reply_url"
+            "expected_blocked": "reply_url",
+            "read": {
+              "url": "https://threads.com/@fixture_author/post/1",
+              "id": "id-1"
+            }
           }
         ],
         "expected_actions": 0
@@ -653,8 +733,12 @@
               "type": "function",
               "function": {
                 "name": "reply",
-                "arguments": "{\"text\":\"Thanks @fixture.author\",\"target_username\":\"fixture.author\",\"target_id\":\"id-1\",\"target_url\":\"https://threads.com/@fixture.author/post/1\"}"
+                "arguments": "{\"text\":\"Thanks @fixture.author\",\"target\":\"p1\"}"
               }
+            },
+            "read": {
+              "url": "https://threads.com/@fixture.author/post/1",
+              "id": "id-1"
             }
           }
         ],
@@ -679,10 +763,14 @@
               "type": "function",
               "function": {
                 "name": "reply",
-                "arguments": "{\"text\":\"Thanks @third_author\",\"target_username\":\"fixture_author\",\"target_id\":\"id-1\",\"target_url\":\"https://threads.com/@fixture_author/post/1\"}"
+                "arguments": "{\"text\":\"Thanks @third_author\",\"target\":\"p1\"}"
               }
             },
-            "expected_blocked": "reply_mention"
+            "expected_blocked": "reply_mention",
+            "read": {
+              "url": "https://threads.com/@fixture_author/post/1",
+              "id": "id-1"
+            }
           }
         ],
         "expected_actions": 0
@@ -706,8 +794,12 @@
               "type": "function",
               "function": {
                 "name": "reply",
-                "arguments": "{\"text\":\"Synthetic own reply number 1\",\"target_username\":\"fixture_author\",\"target_id\":\"id-1\",\"target_url\":\"https://threads.com/@fixture_author/post/1\"}"
+                "arguments": "{\"text\":\"Synthetic own reply number 1\",\"target\":\"p1\"}"
               }
+            },
+            "read": {
+              "url": "https://threads.com/@fixture_author/post/1",
+              "id": "id-1"
             }
           },
           {
@@ -716,10 +808,14 @@
               "type": "function",
               "function": {
                 "name": "reply",
-                "arguments": "{\"text\":\"Synthetic own reply number 2\",\"target_username\":\"fixture_author\",\"target_id\":\"id-x\",\"target_url\":\"https://threads.com/@fixture_author/post/1/?q=fixture#anchor\"}"
+                "arguments": "{\"text\":\"Synthetic own reply number 2\",\"target\":\"p1\"}"
               }
             },
-            "expected_blocked": "thread_per_day"
+            "expected_blocked": "thread_per_day",
+            "read": {
+              "url": "https://threads.com/@fixture_author/post/1/?q=fixture#anchor",
+              "id": "id-x"
+            }
           },
           {
             "offset_ns": 86400000000000,
@@ -727,8 +823,12 @@
               "type": "function",
               "function": {
                 "name": "reply",
-                "arguments": "{\"text\":\"Synthetic own reply number 3\",\"target_username\":\"fixture_author\",\"target_id\":\"id-1\",\"target_url\":\"https://threads.com/@fixture_author/post/1\"}"
+                "arguments": "{\"text\":\"Synthetic own reply number 3\",\"target\":\"p1\"}"
               }
+            },
+            "read": {
+              "url": "https://threads.com/@fixture_author/post/1",
+              "id": "id-1"
             }
           }
         ],
@@ -758,10 +858,14 @@
               "type": "function",
               "function": {
                 "name": "reply",
-                "arguments": "{\"text\":\"Synthetic own reply number 1\",\"target_username\":\"fixture_author\",\"target_id\":\"id-1\",\"target_url\":\"https://threads.com/@fixture_author/post/1\"}"
+                "arguments": "{\"text\":\"Synthetic own reply number 1\",\"target\":\"p1\"}"
               }
             },
-            "expected_blocked": "do_not_contact"
+            "expected_blocked": "do_not_contact",
+            "read": {
+              "url": "https://threads.com/@fixture_author/post/1",
+              "id": "id-1"
+            }
           }
         ],
         "expected_actions": 0
@@ -795,10 +899,14 @@
               "type": "function",
               "function": {
                 "name": "reply",
-                "arguments": "{\"text\":\"Synthetic own reply number 1\",\"target_username\":\"fixture_author\",\"target_id\":\"id-1\",\"target_url\":\"https://threads.com/@fixture_author/post/1\"}"
+                "arguments": "{\"text\":\"Synthetic own reply number 1\",\"target\":\"p1\"}"
               }
             },
-            "expected_blocked": "do_not_contact"
+            "expected_blocked": "do_not_contact",
+            "read": {
+              "url": "https://threads.com/@fixture_author/post/1",
+              "id": "id-1"
+            }
           }
         ],
         "expected_actions": 0
@@ -831,10 +939,14 @@
               "type": "function",
               "function": {
                 "name": "reply",
-                "arguments": "{\"text\":\"Synthetic own reply number 1\",\"target_username\":\"fixture_author\",\"target_id\":\"id-1\",\"target_url\":\"https://threads.com/@fixture_author/post/1\"}"
+                "arguments": "{\"text\":\"Synthetic own reply number 1\",\"target\":\"p1\"}"
               }
             },
-            "expected_blocked": "do_not_contact"
+            "expected_blocked": "do_not_contact",
+            "read": {
+              "url": "https://threads.com/@fixture_author/post/1",
+              "id": "id-1"
+            }
           }
         ],
         "expected_actions": 0
@@ -866,10 +978,14 @@
               "type": "function",
               "function": {
                 "name": "reply",
-                "arguments": "{\"text\":\"Synthetic own reply number 1\",\"target_username\":\"fixture_author\",\"target_id\":\"id-1\",\"target_url\":\"https://threads.com/@fixture_author/post/1\"}"
+                "arguments": "{\"text\":\"Synthetic own reply number 1\",\"target\":\"p1\"}"
               }
             },
-            "expected_blocked": "do_not_contact"
+            "expected_blocked": "do_not_contact",
+            "read": {
+              "url": "https://threads.com/@fixture_author/post/1",
+              "id": "id-1"
+            }
           }
         ],
         "expected_actions": 0
@@ -920,10 +1036,14 @@
               "type": "function",
               "function": {
                 "name": "reply",
-                "arguments": "{\"text\":\"Synthetic own reply number 1\",\"target_username\":\"fixture_author\",\"target_id\":\"id-1\",\"target_url\":\"https://threads.com/@fixture_author/post/1\"}"
+                "arguments": "{\"text\":\"Synthetic own reply number 1\",\"target\":\"p1\"}"
               }
             },
-            "expected_blocked": "do_not_contact"
+            "expected_blocked": "do_not_contact",
+            "read": {
+              "url": "https://threads.com/@fixture_author/post/1",
+              "id": "id-1"
+            }
           }
         ],
         "expected_actions": 0
@@ -971,8 +1091,8 @@
             "call": {
               "type": "function",
               "function": {
-                "name": "read_feed",
-                "arguments": "{}"
+                "name": "find_posts",
+                "arguments": "{\"source\":\"feed\"}"
               }
             },
             "expected_blocked": "agent_not_running"
@@ -982,8 +1102,8 @@
             "call": {
               "type": "function",
               "function": {
-                "name": "search",
-                "arguments": "{\"query\":\"fixture\"}"
+                "name": "find_posts",
+                "arguments": "{\"source\":\"search\",\"query\":\"fixture\"}"
               }
             },
             "expected_blocked": "agent_not_running"
@@ -1027,10 +1147,14 @@
               "type": "function",
               "function": {
                 "name": "reply",
-                "arguments": "{\"text\":\"Synthetic own reply number 1\",\"target_username\":\"fixture_author\",\"target_id\":\"id-1\",\"target_url\":\"https://threads.com/@fixture_author/post/1\"}"
+                "arguments": "{\"text\":\"Synthetic own reply number 1\",\"target\":\"p1\"}"
               }
             },
-            "expected_blocked": "agent_not_running"
+            "expected_blocked": "agent_not_running",
+            "read": {
+              "url": "https://threads.com/@fixture_author/post/1",
+              "id": "id-1"
+            }
           }
         ],
         "expected_actions": 0
@@ -1040,8 +1164,8 @@
         "tools": [
           "mark_do_not_contact",
           "fetch_trends",
-          "read_feed",
-          "search",
+          "find_posts",
+          "find_posts",
           "read_post",
           "read_replies",
           "post",
@@ -1085,8 +1209,8 @@
             "call": {
               "type": "function",
               "function": {
-                "name": "read_feed",
-                "arguments": "{}"
+                "name": "find_posts",
+                "arguments": "{\"source\":\"feed\"}"
               }
             },
             "expected_blocked": "agent_not_running"
@@ -1096,8 +1220,8 @@
             "call": {
               "type": "function",
               "function": {
-                "name": "search",
-                "arguments": "{\"query\":\"fixture\"}"
+                "name": "find_posts",
+                "arguments": "{\"source\":\"search\",\"query\":\"fixture\"}"
               }
             },
             "expected_blocked": "agent_not_running"
@@ -1141,10 +1265,14 @@
               "type": "function",
               "function": {
                 "name": "reply",
-                "arguments": "{\"text\":\"Synthetic own reply number 1\",\"target_username\":\"fixture_author\",\"target_id\":\"id-1\",\"target_url\":\"https://threads.com/@fixture_author/post/1\"}"
+                "arguments": "{\"text\":\"Synthetic own reply number 1\",\"target\":\"p1\"}"
               }
             },
-            "expected_blocked": "agent_not_running"
+            "expected_blocked": "agent_not_running",
+            "read": {
+              "url": "https://threads.com/@fixture_author/post/1",
+              "id": "id-1"
+            }
           }
         ],
         "expected_actions": 0
@@ -1154,8 +1282,8 @@
         "tools": [
           "mark_do_not_contact",
           "fetch_trends",
-          "read_feed",
-          "search",
+          "find_posts",
+          "find_posts",
           "read_post",
           "read_replies",
           "post",
@@ -1257,7 +1385,7 @@
               "type": "function",
               "function": {
                 "name": "post",
-                "arguments": "{\"text\": \"Synthetic model price 3 dollars\\nsecond line\", \"hook\": \"trend_detail\", \"rationale\": \"Synthetic: anchored to the fixture trend, price hook, devs argue.\", \"trend_ref\": \"https://example.test/trend/1\"}"
+                "arguments": "{\"text\": \"Synthetic model price 3 dollars\\nsecond line\", \"hook\": \"trend_detail\", \"rationale\": \"Synthetic: anchored to the fixture trend, price hook, devs argue.\", \"trend\": \"t1\"}"
               }
             },
             "expected_blocked": "no_trend_anchor"
@@ -1269,7 +1397,7 @@
               "type": "function",
               "function": {
                 "name": "post",
-                "arguments": "{\"text\": \"Synthetic model price 3 dollars\\nsecond line\", \"hook\": \"trend_detail\", \"rationale\": \"Synthetic: anchored to the fixture trend, price hook, devs argue.\", \"trend_ref\": \"https://example.test/trend/1\"}"
+                "arguments": "{\"text\": \"Synthetic model price 3 dollars\\nsecond line\", \"hook\": \"trend_detail\", \"rationale\": \"Synthetic: anchored to the fixture trend, price hook, devs argue.\", \"trend\": \"t1\"}"
               }
             }
           },
@@ -1279,7 +1407,7 @@
               "type": "function",
               "function": {
                 "name": "post",
-                "arguments": "{\"text\": \"Synthetic model price 3 dollars\\nsecond line\", \"hook\": \"shout\", \"rationale\": \"Synthetic: anchored to the fixture trend, price hook, devs argue.\", \"trend_ref\": \"https://example.test/trend/1\"}"
+                "arguments": "{\"text\": \"Synthetic model price 3 dollars\\nsecond line\", \"hook\": \"shout\", \"rationale\": \"Synthetic: anchored to the fixture trend, price hook, devs argue.\", \"trend\": \"t1\"}"
               }
             },
             "expected_blocked": "invalid_tool_arguments"

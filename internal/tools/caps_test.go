@@ -27,7 +27,7 @@ func TestRefusalsOfDifferentTargetsNeverCloseATool(t *testing.T) {
 	_, _, d := setup(t)
 	for i := 1; i <= 5; i++ {
 		_, err := d.Dispatch(context.Background(), call("reply", unreadReply(i)))
-		if reason := notClosedOrStalled(t, err); reason != "reply_target_unread" {
+		if reason := notClosedOrStalled(t, err); reason != "unknown_target" {
 			t.Fatalf("call %d: %s", i, reason)
 		}
 	}
@@ -63,13 +63,13 @@ func TestTimeGatedRefusalsNeverCloseATool(t *testing.T) {
 // A hidden tool is refused, and refusing it never ends the wake.
 func TestHiddenToolIsRefusedWithoutStalling(t *testing.T) {
 	_, opts, _ := setup(t)
-	opts.Hidden = []string{"search"}
+	opts.Hidden = []string{"find_posts:search"}
 	d, err := tools.NewDispatcher(opts)
 	if err != nil {
 		t.Fatal(err)
 	}
 	for i := 1; i <= 5; i++ {
-		_, err := d.Dispatch(context.Background(), call("search", `{"query":"q"}`))
+		_, err := d.Dispatch(context.Background(), call("find_posts", `{"source":"search","query":"q"}`))
 		if errors.Is(err, tools.ErrStallStop) {
 			t.Fatal("stalled")
 		}

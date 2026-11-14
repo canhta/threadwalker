@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"path/filepath"
 	goruntime "runtime"
+	"strconv"
 	"strings"
 	"time"
 
@@ -146,10 +147,15 @@ func RunIsolationSoak(ctx context.Context, dbPath string, hours int, logger *slo
 			fixtures = append(fixtures, fixture)
 			// The synthetic transport requests these actual guarded tools each wake.
 			// A blocked own-account reply is nonterminal and cannot reach the backend.
+			other := templates[1-i].Threads.Username
+			stored, err := st.NoteSeenPost(ctx, t.ID, store.SeenPost{URL: "https://threads.net/@" + other + "/post/1", MediaID: "fixture-id", Author: other, ReadAt: clock()})
+			if err != nil {
+				return err
+			}
 			fixture.Calls = []llm.ToolCall{
-				SyntheticCall("read_feed", `{}`),
+				SyntheticCall("find_posts", `{"source":"feed"}`),
 				SyntheticCall("fetch_trends", `{}`),
-				SyntheticCall("reply", string(mustJSON(map[string]string{"text": "Synthetic refused own-account reply.", "target_username": templates[1-i].Threads.Username, "target_id": "fixture-id", "target_url": "https://threads.net/@" + templates[1-i].Threads.Username + "/post/1"}))),
+				SyntheticCall("reply", string(mustJSON(map[string]string{"text": "Synthetic refused own-account reply.", "target": "p" + strconv.FormatInt(stored, 10)}))),
 				SyntheticCall("post", ""),
 				SyntheticCall("post", ""),
 			}

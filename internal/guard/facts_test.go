@@ -127,9 +127,9 @@ func TestReplyMayQuoteNumbersOfThePostItAnswers(t *testing.T) {
 		t.Fatal(err)
 	}
 	const url = "https://www.threads.com/@someone/post/Abc"
-	g.NoteRead("", url, "giá rẻ $8 in / $40 out")
+	ref := readPost(t, g, url, "", "giá rẻ $8 in / $40 out")
 	reply := func(text string) error {
-		_, err := g.Execute(context.Background(), guard.Attempt{Tool: "reply", Arguments: `{"text":"` + text + `","target_url":"` + url + `","target_username":"someone"}`}, func() (string, error) { return "ok", nil })
+		_, err := g.Execute(context.Background(), guard.Attempt{Tool: "reply", Arguments: `{"text":"` + text + `","target":"` + ref + `"}`}, func() (string, error) { return "ok", nil })
 		return err
 	}
 	if err := reply("$9 would be fairer"); !errors.Is(err, guard.ErrBlocked) {

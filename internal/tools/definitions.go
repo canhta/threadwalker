@@ -16,6 +16,8 @@ type executor func(context.Context, arguments) (any, error)
 type arguments struct {
 	guard.Args
 	ReservedActionID int64
+	// Target is the stored post a reply answers, resolved by the guard.
+	Target guard.ResolvedTarget
 }
 
 func definition(s guard.ToolSpec) llm.Tool {

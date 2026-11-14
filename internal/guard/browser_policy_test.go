@@ -26,8 +26,7 @@ func TestBrowserCapabilityPreservesPolicyAndUnconfirmedIntent(t *testing.T) {
 	}
 	var reserved int64
 	calls := 0
-	g.NoteRead("tid", "https://threads.com/@fixture_author/post/1", "")
-	_, err = g.Execute(context.Background(), guard.Attempt{Tool: "reply", Arguments: `{"text":"Synthetic reply","target_username":"fixture_author","target_id": "tid", "target_url":"https://threads.com/@fixture_author/post/1?tracking=x"}`, ReservedActionID: &reserved}, func() (string, error) {
+	_, err = g.Execute(context.Background(), guard.Attempt{Tool: "reply", Arguments: `{"text":"Synthetic reply","target":"` + readPost(t, g, "https://threads.com/@fixture_author/post/1?tracking=x", "tid", "") + `"}`, ReservedActionID: &reserved}, func() (string, error) {
 		calls++
 		var dry bool
 		var confirmed string
@@ -41,8 +40,7 @@ func TestBrowserCapabilityPreservesPolicyAndUnconfirmedIntent(t *testing.T) {
 	}
 	opts.Now = func() time.Time { return time.Date(2026, 11, 11, 0, 1, 0, 0, time.UTC) }
 	g, _ = guard.New(opts)
-	g.NoteRead("tid", "https://threads.com/@fixture_author/post/1", "")
-	_, err = g.Execute(context.Background(), guard.Attempt{Tool: "reply", Arguments: `{"text":"Another reply","target_username":"fixture_author","target_id": "tid", "target_url":"https://threads.com/@fixture_author/post/1#fragment"}`}, func() (string, error) { calls++; return "", nil })
+	_, err = g.Execute(context.Background(), guard.Attempt{Tool: "reply", Arguments: `{"text":"Another reply","target":"` + readPost(t, g, "https://threads.com/@fixture_author/post/1#fragment", "tid", "") + `"}`}, func() (string, error) { calls++; return "", nil })
 	if !errors.Is(err, guard.ErrBlocked) || calls != 1 {
 		t.Fatalf("unknown intent must count toward thread quota: %v calls=%d", err, calls)
 	}

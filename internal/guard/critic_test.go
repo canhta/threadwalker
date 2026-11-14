@@ -13,6 +13,7 @@ import (
 	"github.com/canhta/threadz/internal/guard"
 	"github.com/canhta/threadz/internal/quality"
 	"github.com/canhta/threadz/internal/store"
+	"github.com/canhta/threadz/internal/threads"
 )
 
 func verdict(pass bool, problems ...string) quality.CriticVerdict {
@@ -31,10 +32,18 @@ func criticGuard(t *testing.T, scope guard.Scope) *guard.Guard {
 	return g
 }
 
-const criticReplyArgs = `{"text":"giá vé tăng gấp đôi mà vẫn hết trong 5 phút, ai mua được vậy?","target_url":"https://www.threads.com/@someone/post/abc","target_username":"someone"}`
+// criticReplyArgs answers the post criticParent stored: the first post of a fresh store is p1.
+const criticReplyArgs = `{"text":"giá vé tăng gấp đôi mà vẫn hết trong 5 phút, ai mua được vậy?","target":"p1"}`
+
+const criticPostURL = "https://www.threads.com/@someone/post/abc"
+
+// criticParent has g read the post the critic tests reply to, with the text the critic sees as its parent.
+func criticParent(g *guard.Guard, text string) {
+	g.NotePost(context.Background(), threads.Post{URL: criticPostURL, Text: text})
+}
 
 func criticReply(g *guard.Guard, args string) (string, error) {
-	g.NoteRead("", "https://www.threads.com/@someone/post/abc", "vé concert tăng giá gấp đôi")
+	criticParent(g, "vé concert tăng giá gấp đôi")
 	return g.Execute(context.Background(), guard.Attempt{Tool: "reply", Arguments: args}, func() (string, error) { return "sent", nil })
 }
 
@@ -114,7 +123,7 @@ func TestWriterRevisesWithProblemsAndFinalTextIsPublishedAndStored(t *testing.T)
 		return verdict(true), nil
 	}
 	g := criticGuard(t, scope)
-	g.NoteRead("", "https://www.threads.com/@someone/post/abc", "bài gốc")
+	criticParent(g, "bài gốc")
 	var final []string
 	_, err := g.Execute(context.Background(), guard.Attempt{Tool: "reply", Arguments: criticReplyArgs, Final: &final}, func() (string, error) { return "sent", nil })
 	if err != nil {
@@ -152,7 +161,7 @@ func TestALongDraftReachesTheWriterWhoseTextIsCheckedInFull(t *testing.T) {
 	short := "vé concert hết trong 5 phút, ai mua được vậy?"
 	final := short
 	scope.Writer = func(context.Context, quality.WriterInput) ([]string, error) { return []string{final}, nil }
-	long := `{"text":"` + strings.Repeat("rất dài ", 80) + `","target_url":"https://www.threads.com/@someone/post/abc","target_username":"someone"}`
+	long := `{"text":"` + strings.Repeat("rất dài ", 80) + `","target":"p1"}`
 	if out, err := criticReply(criticGuard(t, scope), long); err != nil || out != "sent" {
 		t.Fatalf("a long rough draft never reached the writer: %q %v", out, err)
 	}
@@ -191,8 +200,8 @@ func TestAReviewedDraftWaitsOutThePacingRuleInsteadOfBeingLost(t *testing.T) {
 		}
 		reply := func(user string) error {
 			url := "https://www.threads.com/@" + user + "/post/abc"
-			g.NoteRead("", url, "vé concert tăng giá gấp đôi")
-			_, err := g.Execute(context.Background(), guard.Attempt{Tool: "reply", Arguments: `{"text":"giá vé tăng gấp đôi mà vẫn hết trong 5 phút","target_url":"` + url + `","target_username":"` + user + `"}`}, func() (string, error) { return "sent", nil })
+			ref := g.NotePost(context.Background(), threads.Post{URL: url, Text: "vé concert tăng giá gấp đôi"})
+			_, err := g.Execute(context.Background(), guard.Attempt{Tool: "reply", Arguments: `{"text":"giá vé tăng gấp đôi mà vẫn hết trong 5 phút","target":"` + ref + `"}`}, func() (string, error) { return "sent", nil })
 			return err
 		}
 		if err := reply("first"); err != nil {
@@ -266,8 +275,8 @@ func TestTraceKeepsTheBriefAndEveryDraftBounded(t *testing.T) {
 		return verdict(true), nil
 	}
 	g := criticGuard(t, scope)
-	g.NoteRead("", "https://www.threads.com/@someone/post/abc", strings.Repeat("gốc ", 500))
-	args := `{"text":"nháp thô","target_url":"https://www.threads.com/@someone/post/abc","target_username":"someone","hook":"trend_detail","angle":"góc nhìn","fact":"một con số"}`
+	criticParent(g, strings.Repeat("gốc ", 500))
+	args := `{"text":"nháp thô","target":"p1","hook":"trend_detail","angle":"góc nhìn","fact":"một con số"}`
 	// The second draft is over the length rule, so the call is refused after it.
 	if _, err := g.Execute(context.Background(), guard.Attempt{Tool: "reply", Arguments: args}, func() (string, error) { return "sent", nil }); err == nil {
 		t.Fatal("an over-long draft was published")
@@ -284,7 +293,7 @@ func TestTraceKeepsTheBriefAndEveryDraftBounded(t *testing.T) {
 	if b == nil || b.Kind != "reply" || b.Angle != "góc nhìn" || b.Fact != "một con số" || b.Hook != "trend_detail" || len(b.Rough) != 1 || b.Rough[0] != "nháp thô" {
 		t.Fatalf("brief %+v", b)
 	}
-	if n := utf8.RuneCountInString(b.Parent); n != store.MaxTraceParent {
+	if n := utf8.RuneCountInString(b.Parent); n != store.MaxSeenText {
 		t.Fatalf("parent kept %d runes", n)
 	}
 	if len(d.Tries) != 4 || len(d.Tries[0].Texts) != 0 || d.Tries[1].Texts[0] != "bản nháp đầu" || utf8.RuneCountInString(d.Tries[3].Texts[0]) != store.MaxTraceText || d.Tries[3].Pass {

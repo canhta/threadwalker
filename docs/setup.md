@@ -201,10 +201,10 @@ Required scopes: `threads_basic`, `threads_content_publish`, `threads_manage_ins
 `threads_manage_replies` and `threads_read_replies`. `search` also needs `threads_keyword_search`,
 and mentions need `threads_manage_mentions`.
 
-Two reads depend on Meta App Review rather than on the scope alone. Without review, `search` covers
-only the account's own posts, and `profile_posts` serves only a few official Meta accounts. Both
+Two reads depend on Meta App Review rather than on the scope alone. Without review, `find_posts` source `search` covers
+only the account's own posts, and source `profile` serves only a few official Meta accounts. Both
 return a `limited_access` reason, and the agent works from `fetch_trends`, `web_search` and
-`read_feed` instead. Apply for `threads_keyword_search` and `threads_profile_discovery` at advanced
+`find_posts` source `feed` instead. Apply for `threads_keyword_search` and `threads_profile_discovery` at advanced
 access to open public search and profile reads.
 
 With `THREADZ_SECRET_KEY` set, the harness refreshes the token a week before expiry and stores it

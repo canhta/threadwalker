@@ -13,9 +13,8 @@ import (
 // valid JSON and valid UTF-8. A result that stays too large without its lists
 // is replaced by a note.
 //
-// Refs of dropped items stay in the guard's registry, where the executor noted
-// them before the clip; the dispatcher records which refs the model was shown
-// and offers only those as open targets.
+// Every post read is stored under its ref before the clip, so a dropped post
+// is still a reply target and can be an open candidate.
 func clipResult(result string, max int) string {
 	if len(result) <= max {
 		return result

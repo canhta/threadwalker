@@ -5,9 +5,11 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"slices"
 	"strings"
 	"time"
 
+	"github.com/canhta/threadz/internal/guard"
 	"github.com/canhta/threadz/internal/logging"
 	"github.com/canhta/threadz/internal/threads"
 	"github.com/canhta/threadz/internal/trends"
@@ -44,7 +46,6 @@ func (d *Dispatcher) executors() map[string]executor {
 					key = t.Title
 				}
 				ranked[i].Ref = d.guard.NoteTrendText(key, t.Title)
-				d.guard.NoteTrend(t.Title)
 			}
 			for i, heat := range trends.StoryHeats(stories, history, now) {
 				d.guard.NoteFacts(stories[i].URL, trends.TopicFacts(heat, now))
@@ -53,40 +54,12 @@ func (d *Dispatcher) executors() map[string]executor {
 			return ranked, nil
 		},
 	}
-	for _, name := range []string{"read_feed", "read_topic", "search", "profile", "profile_posts", "read_post", "read_replies", "read_own_metrics"} {
+	tools["find_posts"] = d.findPosts
+	for _, name := range []string{"profile", "read_post", "read_replies", "read_own_metrics"} {
 		tools[name] = func(ctx context.Context, a arguments) (any, error) {
-			if name == "read_own_metrics" {
-				return d.browserRead(ctx, name, a)
-			}
-			if name == "read_topic" {
-				if err := d.checkTopic(&a); err != nil {
-					return nil, err
-				}
-			}
-			if name == "read_feed" {
-				if err := d.countCall(name); err != nil {
-					return nil, err
-				}
-			}
 			data, err := d.browserRead(ctx, name, a)
-			if err == nil && name != "profile" {
-				d.noteRead(data)
-			}
-			if err == nil && (name == "search" || name == "read_feed" || name == "read_topic") {
-				if page, ok := data.(threads.Page); ok {
-					for i, p := range page.Posts {
-						page.Posts[i].Ref = d.guard.NoteTrendText(p.URL, p.Text)
-					}
-					for i, t := range page.Trends {
-						page.Trends[i].Ref = d.guard.NoteTrendText(t.URL, t.Title+". "+t.Summary)
-						d.guard.NoteTrend(t.Title)
-						d.guard.NoteFacts(t.URL, trends.TopicFacts(trends.Heat{Posts: t.PostCount, Rank: i}, d.opts.Now()))
-					}
-				}
-			}
-			if page, ok := data.(threads.Page); ok && err == nil && page.LimitedAccess != "" && (name == "search" || name == "profile_posts") {
-				// Best-effort: the next wake hides the tool for a day.
-				_ = d.opts.Store.RefuseTool(ctx, d.opts.Template.ID, name, d.opts.Now())
+			if err == nil && name != "profile" && name != "read_own_metrics" {
+				d.noteRead(ctx, data)
 			}
 			return data, err
 		}
@@ -195,17 +168,78 @@ func (d *Dispatcher) webSearch(ctx context.Context, query string) (trends.WebSea
 	return result, nil
 }
 
-// noteRead tells the guard which post id and permalink pairs this wake has seen.
-func (d *Dispatcher) noteRead(data any) {
+// findSources maps each find_posts source to the backend read it runs and the
+// arguments it takes besides source.
+var findSources = map[string]struct {
+	read string
+	args []string
+}{
+	"feed":    {threads.OpReadFeed, nil},
+	"topic":   {threads.OpReadTopic, []string{"topic", "query"}},
+	"search":  {threads.OpSearch, []string{"query", "recent"}},
+	"profile": {threads.OpProfilePosts, []string{"username"}},
+}
+
+// FindRead is the backend operation a find_posts source runs (threads.OpReadFeed,
+// OpReadTopic, OpSearch or OpProfilePosts); empty for an unknown source.
+func FindRead(source string) string { return findSources[source].read }
+
+// findPosts is the one finder: it checks the arguments the source takes, the
+// source's per-wake cap and whether the source is closed, runs the read, and
+// gives every post and trend in the page its ref.
+func (d *Dispatcher) findPosts(ctx context.Context, a arguments) (any, error) {
+	source := a.Text("source")
+	src := findSources[source]
+	scope := "find_posts:" + source
+	given := map[string]bool{"topic": a.Text("topic") != "", "query": a.Text("query") != "", "username": a.Text("username") != "", "recent": a.Bool("recent")}
+	for arg, set := range given {
+		if set && !slices.Contains(src.args, arg) {
+			return nil, &guard.BlockedError{Reason: "find_args"}
+		}
+	}
+	switch {
+	case source == "topic" && given["topic"] == given["query"],
+		source == "search" && !given["query"],
+		source == "profile" && !given["username"]:
+		return nil, &guard.BlockedError{Reason: "find_args"}
+	}
+	if given["topic"] {
+		seen, ok := d.guard.Trend(a.Text("topic"))
+		// Only a Threads topic link opens; a news link would fail in the
+		// browser and still use up a read.
+		if !ok || !threads.IsTopicURL(seen) {
+			return nil, &guard.BlockedError{Reason: "find_args"}
+		}
+		a.Args = a.Args.WithText("url", seen)
+	}
+	if err := d.countCall(scope); err != nil {
+		return nil, err
+	}
+	data, err := d.browserRead(ctx, src.read, a)
+	if err != nil {
+		return nil, err
+	}
+	d.noteRead(ctx, data)
+	if page, ok := data.(threads.Page); ok && page.LimitedAccess != "" && (source == "search" || source == "profile") {
+		// Best-effort: the next wake closes this source for a day.
+		_ = d.opts.Store.RefuseTool(ctx, d.opts.Template.ID, scope, d.opts.Now())
+	}
+	return data, nil
+}
+
+// noteRead gives every post and trend a read returned its ref: p<id> for a post
+// (durable, stored with its figures), t<n> for a trend (this wake only).
+func (d *Dispatcher) noteRead(ctx context.Context, data any) {
 	page, ok := data.(threads.Page)
 	if !ok {
 		return
 	}
-	for _, p := range page.Posts {
-		d.guard.NoteRead(p.ID, p.URL, p.Text)
-		if facts, err := trends.PostFacts(p, d.opts.Template.Targets); err == nil && facts.Line != "" {
-			d.guard.NoteFacts(p.URL, facts)
-		}
+	for i, p := range page.Posts {
+		page.Posts[i].Ref = d.guard.NotePost(ctx, p)
+	}
+	for i, t := range page.Trends {
+		page.Trends[i].Ref = d.guard.NoteTrendText(t.URL, t.Title+". "+t.Summary)
+		d.guard.NoteFacts(t.URL, trends.TopicFacts(trends.Heat{Posts: t.PostCount, Rank: i}, d.opts.Now()))
 	}
 }
 

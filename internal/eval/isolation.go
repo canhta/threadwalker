@@ -102,21 +102,21 @@ func runIsolationCaptured(ctx context.Context, c Case, p Profile, repeat int, op
 	call := func(i int, name string, args any) (string, error) {
 		call := agent.SyntheticCall(name, string(isolationJSON(args)))
 		call.ID = fmt.Sprintf("synthetic-local-%d", len(r.ToolCalls)+1)
-		if m, ok := args.(map[string]string); ok && name == "reply" {
-			guards[i].NoteRead(m["target_id"], m["target_url"], "")
-		}
 		return dispatchers[i].Dispatch(ctx, call)
+	}
+	// replyTo is a reply to a post agent i has read: the post is stored under its ref first.
+	replyTo := func(i int, postURL string) map[string]string {
+		return map[string]string{"text": "Synthetic reply", "target": guards[i].NotePost(ctx, threads.Post{ID: "fixture-id", URL: postURL})}
 	}
 	switch c.Scenario {
 	case "data":
 		if _, err = guards[0].ObserveStopRequest(ctx, "fixture_stranger", "stop", true); err != nil {
 			return r
 		}
-		reply := map[string]string{"text": "Synthetic permitted reply", "target_username": "fixture_stranger", "target_id": "fixture-id", "target_url": "https://threads.net/@fixture_stranger/post/1"}
-		if _, err = call(0, "reply", reply); !errors.Is(err, guard.ErrBlocked) {
+		if _, err = call(0, "reply", replyTo(0, "https://threads.net/@fixture_stranger/post/1")); !errors.Is(err, guard.ErrBlocked) {
 			return fail("contact_refusal_missing")
 		}
-		if _, err = call(1, "reply", reply); err != nil {
+		if _, err = call(1, "reply", replyTo(1, "https://threads.net/@fixture_stranger/post/1")); err != nil {
 			return fail("contact_cross_agent")
 		}
 		if err = st.RecordLLMUsage(ctx, templates[0].ID, wakes[0], now.Format("2006-01-02"), store.LLMUsage{TokensIn: 100, TokensOut: 10, CostUSD: 0.25}); err != nil {
@@ -190,13 +190,13 @@ func runIsolationCaptured(ctx context.Context, c Case, p Profile, repeat int, op
 		}
 	case "own_accounts":
 		for _, args := range []map[string]string{
-			{"text": "Synthetic reply", "target_username": "@FIXTURE_ACCOUNT_B", "target_id": "fixture-id", "target_url": "https://threads.net/@fixture_account_b/post/1"},
-			{"text": "Synthetic reply", "target_username": "fixture_stranger", "target_id": "fixture-id", "target_url": "https://www.threads.com/@fixture_account_b/post/1"},
+			replyTo(0, "https://threads.net/@fixture_account_b/post/1"),
+			replyTo(0, "https://www.threads.com/@fixture_account_b/post/1"),
 			{"text": "Mention @fixture_account_b"},
 			{"text": "https://threads.net/fixture_account_b"},
 		} {
 			tool := "post"
-			if args["target_url"] != "" {
+			if args["target"] != "" {
 				tool = "reply"
 			}
 			if _, err = call(0, tool, args); !errors.Is(err, guard.ErrBlocked) || !strings.Contains(err.Error(), "own_account") {
@@ -207,7 +207,7 @@ func runIsolationCaptured(ctx context.Context, c Case, p Profile, repeat int, op
 		if _, err = st.SeedAction(ctx, store.SeededAction{AgentID: templates[1].ID, Kind: "post", Text: "synthetic confirmed fixture", DryRun: templates[1].DryRun, ThreadURL: "https://threads.net/@fixture_stranger/post/opaque-publication", PostedAt: now}); err != nil {
 			return r
 		}
-		if _, err = call(0, "reply", map[string]string{"text": "Synthetic opaque reply", "target_username": "fixture_stranger", "target_id": "fixture-id", "target_url": "https://threads.net/@fixture_stranger/post/opaque-publication?alias=1"}); !errors.Is(err, guard.ErrBlocked) {
+		if _, err = call(0, "reply", replyTo(0, "https://threads.net/@fixture_stranger/post/opaque-publication?alias=1")); !errors.Is(err, guard.ErrBlocked) {
 			return fail("own_publication_allowed")
 		}
 	case "shared_links":

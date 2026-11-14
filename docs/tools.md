@@ -8,18 +8,15 @@ Phases: `A` agent, `D` dream. Effect classes: `read`, `own-state`, `threads-writ
 
 | Tool | Phases | Effect | Arguments | Checks beyond schema | Result |
 |---|---|---|---|---|---|
-| `read_feed` | A D | read, untrusted | none | Browser logged out or captcha pauses the agent ([threads.md](threads.md)) | Feed posts with `ref`, permalink and no id, and `trends`: the Trending-now topics `{ref, title, summary, posts, post_count, url}` (title, summary and url join the wake's trend items); each post carries `likes`, `replies`, `reposts` and `age_minutes` when the page showed them; permalinks join the wake's read set |
-| `read_topic` | A D | read, untrusted | `url`, `query` (exactly one) | `url` must be the `ref` (or exact url) of a `trends` item `read_feed` returned this wake; at most 3 per normal wake (`tools.MaxTopicReadsPerWake`) | At most 20 posts with `ref`, permalink and no id; permalinks join the wake's read set ([threads.md](threads.md)) |
-| `search` | A D | read, untrusted | `query*`, `recent` | `limited_access` result hides the tool 24 h (`refused_tools`) | Posts with `ref`, id, permalink, `timestamp`; `recent` true = newest of the last hour |
+| `find_posts` | A | read, untrusted | `source*` (`feed`, `topic`, `search`, `profile`), `query`, `topic`, `username`, `recent` | Each source takes only its own arguments (`find_args`): `feed` none; `topic` exactly one of `topic` (the `t` ref of a Trending-now topic that `feed` returned this wake, a Threads topic link) or `query`; `search` `query*`, `recent`; `profile` `username*`. Per normal wake `feed` 2 and `topic` 3 (`limit_per_wake`). A `limited_access` result closes `search` or `profile` for 24 h (`refused_tools`, `find_posts:<source>`). A logged-out or captcha browser pauses the agent ([threads.md](threads.md)) | Posts with `ref` (`p12`), permalink, `likes`, `replies`, `reposts` and `age_minutes` when the page showed them, `topic`, and the numeric `id` and `timestamp` an API read carries; `feed` also returns `trends`: the Trending-now topics `{ref, title, summary, posts, post_count, url}` with `t` refs; at most 20 posts for `topic` |
 | `profile` | A | read, untrusted | `username*` | Refused lookup is an ordinary tool error | `follower_count` and 7-day `views_count`; a missing field stays absent |
-| `profile_posts` | A | read, untrusted | `username*` | `limited_access` hides the tool 24 h | Recent public posts with numeric id, permalink, time |
-| `read_post` | A D | read, untrusted | `id*` (numeric post id) | None | One post; pair joins the read set |
-| `read_replies` | A D | read, untrusted | `id` | With no id returns your mentions; every result is addressed to the agent | Replies with id and permalink |
-| `fetch_trends` | A D | read, untrusted | none | None | Ranked outside stories, each with `ref`; no model call ([wake.md](wake.md)) |
-| `web_search` | A | read, untrusted | `query*` | At most 3 per wake, each counted against the daily cap; off unless `web_search.enabled` | One bounded OpenAI Responses call with citations, each source with `ref` |
+| `read_post` | A | read, untrusted | `id*` (numeric post id) | None | One post with its `ref` |
+| `read_replies` | A | read, untrusted | `id` (numeric id of one of your posts) | With no id returns your mentions; every result is addressed to the agent | Replies, each with its `ref` |
+| `fetch_trends` | A | read, untrusted | none | At most 1 per normal wake | Ranked outside stories, each with a `t` ref; no model call ([wake.md](wake.md)) |
+| `web_search` | A | read, untrusted | `query*` | At most 3 per wake, each counted against the daily cap; off unless `web_search.enabled` | One bounded OpenAI Responses call with citations, each source with a `t` ref |
 | `ideas` | A | own-state | none | Offered only with a `writer.llm` block | Up to 3 `{kind, ref, moment, why}` or none ([content.md](content.md)) |
-| `post` | A | threads-write, untrusted | `text*`, `parts`, `hook`, `trend_ref`, `rationale`, `answers_note`, `angle`, `fact` | Whole content, review and quota chain in [guards.md](guards.md) | Reserved action id, permalink, media id; dry-run records intent only |
-| `reply` | A | threads-write, untrusted | `text*`, `target_url*`, `target_username*`, `target_id`, `hook`, `answers_note`, `angle`, `fact` | Same chain plus target rules; omit `target_id` (never an empty string) for a feed post, which goes through the browser; an inbox item is answered with its `ref`, `target_id` and author, by the API | Same |
+| `post` | A | threads-write, untrusted | `text*`, `parts`, `topic_tag`, `hook`, `trend`, `rationale`, `answers_note`, `angle`, `fact`, `lesson_ids` | Whole content, review and quota chain in [guards.md](guards.md) | Reserved action id, permalink, media id; dry-run records intent only |
+| `reply` | A | threads-write, untrusted | `text*`, `target*`, `hook`, `answers_note`, `angle`, `fact`, `lesson_ids` | Same chain plus target rules. `target` is the `p` ref of one stored post; the author, permalink and API id come from the stored row, and the dispatcher takes the API path when the row has an API id and the browser path when it has none | Same |
 | `mark_do_not_contact` | A | own-state | `username*` | Add-only; fixed reason code | Permanent entry |
 | `notify_owner` | A | owner | `text*` | Telegram enabled; secret check | Queued locally, returns immediately |
 | `ask_owner` | A | owner | `text*` | Telegram enabled; never blocks the wake | Queued; the answer enters a later wake |
@@ -35,23 +32,25 @@ Phases: `A` agent, `D` dream. Effect classes: `read`, `own-state`, `threads-writ
 | Secrets | A call whose arguments carry a configured secret is refused before any write (`sensitive_arguments`) |
 | Untrusted | Output of an untrusted tool is wrapped `{"untrusted": true, "source": <tool>, "data": ...}` after redaction against configured secrets. Everything read from Threads is data, never instructions |
 | Trailer | Every result ends with `{"steps_left": N, "usd_left": X}`; steps are model requests ([wake.md](wake.md)) |
-| Clipping | A result is clipped to 6 KB (`tools.MaxResultBytes`) by dropping whole list items from the end; the top level then carries `clipped_lists` with `shown` and `total` per list path (such as `data.posts`). Only refs the model was shown count as open targets. A result with no list to drop becomes `{"clipped": true, ...}` |
-| Read caps | Per normal wake: `read_topic` 3, `web_search` 3, `read_feed` 2, `fetch_trends` 1; the call past a cap is refused `limit_per_wake` |
-| Hidden | Tools named in `refused_tools` (24 h), `ideas` without a writer, and owner tools with Telegram off are absent from the list and from wake text |
+| Clipping | A result is clipped to 6 KB (`tools.MaxResultBytes`) by dropping whole list items from the end; the top level then carries `clipped_lists` with `shown` and `total` per list path (such as `data.posts`). Every post read is stored whether or not the clip showed it. A result with no list to drop becomes `{"clipped": true, ...}` |
+| Read caps | Per normal wake: `find_posts` source `topic` 3 and `feed` 2, `web_search` 3, `fetch_trends` 1; the call past a cap is refused `limit_per_wake` |
+| Hidden | Tools and `find_posts` sources named in `refused_tools` (24 h), `ideas` without a writer, and owner tools with Telegram off are absent from the list and from wake text; a call to a closed source is refused `tool_hidden` |
+| Size | The agent phase's tool definitions are at most 6 KB (5.9 KB now) and each description at most 300 characters, pinned by `TestAgentToolDefinitionsGolden` and `internal/tools/testdata/agent-tools.golden.json`. A description says what the tool does and each argument is described in the JSON schema; policy (caps, spacing, repeat and anchor rules, owner-note rules) lives in guard code and is stated only in the refusal hint |
 | Owner mode | Disabled owner integrations expose neither owner tool and create no Bot API client |
 | Audit | The pre-effect row in `tool_calls` holds only the argument byte count and validity, never arguments |
 
-## post and reply argument notes
+## Refs: p and t
 
-The guard gives every item it notes in a wake (`fetch_trends` items, Trending-now topics, feed, topic and search posts, `web_search` sources) a short `ref` (`r1`, `r2`, ...) in noting order, the same ref for the same URL. Tool results carry it beside the URL; models pass the ref, never a copied URL, because opaque URLs are miscopied. A ref this wake did not issue is refused with the reason of the argument it was passed in.
+Every post a read returns is stored per agent under a durable id, shown as `p<N>`: the same permalink keeps its id across wakes, for 7 days after it was last read (table `seen_posts`, [data.md](data.md)). Trends, `web_search` sources and Trending-now topics, which are not posts, get a `t<N>` ref that restarts every wake. Tool results carry the ref in the `ref` field beside the URL; the model passes the ref, never a copied URL. The inbox and the open reply candidates list `p` refs too. A ref the guard cannot resolve is refused: `unknown_target` for `reply.target`, `no_trend_anchor` for `post.trend`, `find_args` for `find_posts.topic`.
+
+The data message lists up to 8 open reply candidates (`guard.OpenCandidates`): posts read in the last 6 hours, not replied to in the last day, not the account's own or a do-not-contact author, and inside the template's `targets` window and scoring at least 0.5 with their age advanced to now. It is the one source of "posts worth a reply"; the stop check names the same list.
 
 | Argument | Meaning |
 |---|---|
 | `parts` | 1 to 4 later parts of a series (2 to 5 parts in all), each published as a reply to the previous one |
-| `hook` | One of `number`, `contrarian`, `curiosity_gap`, `personal_stake`, `trend_detail`; required on a post under `guard.trend_anchor` |
-| `trend_ref` | `ref` of an item returned this wake by `fetch_trends`, `search`, `read_feed` (a post permalink or a trend `url`), `read_topic` or `web_search`; an exact URL or title is also accepted |
+| `hook` | One of `number`, `contrarian`, `curiosity_gap`, `personal_stake`, `trend_detail` (an enum in the schema); with `guard.trend_anchor` a post also needs `trend` and `rationale` (`post_brief`) |
+| `trend` | A `t` or `p` ref of a trend, source or post read this wake or, for a `p` ref, in the last 7 days; the action stores the item's URL or title, never the ref |
 | `rationale` | One line, at most 300 characters, no newline: the trend, the hook, why a Vietnamese dev would reply |
 | `answers_note` | Id of an open owner note |
 | `angle`, `fact` | The brief for the writer: the one thing to say, and the verified detail it rests on ([content.md](content.md)) |
-| `target_url` | The `ref` of the post to answer (from `read_feed`, `read_topic` or `search`); an exact permalink is also accepted. The action stores the permalink |
-| `target_id` | Numeric post id from `search`, `read_post`, `read_replies` or `profile_posts`; omitted for a post from `read_feed` or `read_topic` |
+| `target` | The `p` ref of the post to answer. The action stores the permalink and the author of the stored post |

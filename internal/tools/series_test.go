@@ -104,7 +104,7 @@ func TestPostIsAnchoredToATrendReadThisWake(t *testing.T) {
 		o.Template.Limits.RepliesPerDay = 10
 		o.Template.Limits.RepliesPerUser7d = 3
 	})
-	args := `{"text":"giá mới 3 đô\nvà thế là xong","hook":"number","rationale":"bám giá mới, hook là con số, dev sẽ cãi","trend_ref":"https://example.test/trend"}`
+	args := `{"text":"giá mới 3 đô\nvà thế là xong","hook":"number","rationale":"bám giá mới, hook là con số, dev sẽ cãi","trend":"t1"}`
 	h.next()
 	if _, err := h.call("post", args); err == nil || countActions(t, h) != 0 {
 		t.Fatalf("err=%v actions=%d, want a post before any trend read refused", err, countActions(t, h))
@@ -121,7 +121,7 @@ func TestRecentSearchAndProfileLookup(t *testing.T) {
 	h := newBrowserHarness(t, true)
 	followers := int64(900)
 	h.backend.Profiles = map[string]threads.Profile{"big_one": {Username: "big_one", Followers: &followers}}
-	h.mustCall("search", `{"query":"vibe code","recent":true}`)
+	h.mustCall("find_posts", `{"source":"search","query":"vibe code","recent":true}`)
 	out := h.mustCall("profile", `{"username":"big_one"}`)
 	if got := decodeBrowserEnvelope(t, out); got.Source != "profile" {
 		t.Fatalf("profile source=%q", got.Source)

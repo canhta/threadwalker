@@ -115,8 +115,8 @@ func TestPermanentDoNotContactRefusesRepliesWithNoAction(t *testing.T) {
 
 	for _, username := range []string{"synthetic.contact", "paused.target"} {
 		beforeActions := h.actionRows()
-		h.guard.NoteRead("tid", fmt.Sprintf("https://threads.com/@%s/post/1", username), "")
-		_, err := h.dispatch("reply", fmt.Sprintf(`{"text":"synthetic reply to @%s","target_username":%q,"target_id": "tid", "target_url":"https://threads.com/@%s/post/1"}`, username, username, username))
+		ref := readRef(t, h.guard, fmt.Sprintf("https://threads.com/@%s/post/1", username), "tid")
+		_, err := h.dispatch("reply", fmt.Sprintf(`{"text":"synthetic reply to @%s","target":%q}`, username, ref))
 		if err == nil || !errors.Is(err, guard.ErrBlocked) {
 			t.Fatalf("%s reply was not refused by the guard: %v", username, err)
 		}
@@ -228,7 +228,8 @@ func requiredArguments(t *testing.T, parameters json.RawMessage) string {
 	var schema struct {
 		Required   []string `json:"required"`
 		Properties map[string]struct {
-			Type string `json:"type"`
+			Type string   `json:"type"`
+			Enum []string `json:"enum"`
 		} `json:"properties"`
 	}
 	if err := json.Unmarshal(parameters, &schema); err != nil {
@@ -241,14 +242,15 @@ func requiredArguments(t *testing.T, parameters json.RawMessage) string {
 			switch key {
 			case "at":
 				args[key] = time.Date(2026, 11, 11, 11, 0, 0, 0, time.UTC).Format(time.RFC3339)
-			case "id", "target_id":
+			case "id":
 				args[key] = "synthetic-id"
-			case "url", "target_url":
-				args[key] = "https://threads.com/@synthetic/post/1"
-			case "target_username":
-				args[key] = "synthetic_author"
+			case "target":
+				args[key] = "p1"
 			default:
 				args[key] = "synthetic body"
+				if e := schema.Properties[key].Enum; len(e) > 0 {
+					args[key] = e[0]
+				}
 			}
 		case "integer":
 			args[key] = 5
@@ -281,7 +283,7 @@ func TestGuardDecisionLogsKeepRuleIDsAndOmitPayloads(t *testing.T) {
 
 	username := "synthetic-contact-7f3a"
 	body := "TUY NHIÊN, synthetic-body-9c1e"
-	_, err = h.dispatch("reply", fmt.Sprintf(`{"text":%q,"target_username":%q,"target_id": "tid", "target_url":"https://threads.com/@%s/post/1"}`, body, username, username))
+	_, err = h.dispatch("reply", fmt.Sprintf(`{"text":%q,"target":%q}`, body, readRef(t, h.guard, "https://threads.com/@"+username+"/post/1", "tid")))
 	if err == nil {
 		t.Fatal("forbidden phrase reply was allowed")
 	}

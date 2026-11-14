@@ -33,8 +33,7 @@ func TestReplyStoresBriefAndAppliedLessonsTogether(t *testing.T) {
 	const target = "https://threads.com/@fixture_author/post/1"
 	reply := func(ids string) (int64, error) {
 		var id int64
-		g.NoteRead("tid", target, "")
-		_, err := g.Execute(context.Background(), guard.Attempt{Tool: "reply", ReservedActionID: &id, Arguments: `{"text":"Synthetic reply","target_username":"fixture_author","target_id":"tid","target_url":"` + target + `","angle":"the point","fact":"the detail"` + ids + `}`}, func() (string, error) { return "", nil })
+		_, err := g.Execute(context.Background(), guard.Attempt{Tool: "reply", ReservedActionID: &id, Arguments: `{"text":"Synthetic reply","target":"` + readPost(t, g, target, "tid", "") + `","angle":"the point","fact":"the detail"` + ids + `}`}, func() (string, error) { return "", nil })
 		return id, err
 	}
 	for _, tc := range []struct{ name, ids string }{
@@ -96,8 +95,7 @@ func TestReplyAndAppliedLessonsCommitTogether(t *testing.T) {
 		t.Fatal(err)
 	}
 	const target = "https://threads.com/@fixture_author/post/1"
-	g.NoteRead("tid", target, "")
-	_, err := g.Execute(context.Background(), guard.Attempt{Tool: "reply", Arguments: `{"text":"Synthetic reply","target_username":"fixture_author","target_id":"tid","target_url":"` + target + `","lesson_ids":[1]}`}, func() (string, error) { return "", nil })
+	_, err := g.Execute(context.Background(), guard.Attempt{Tool: "reply", Arguments: `{"text":"Synthetic reply","target":"` + readPost(t, g, target, "tid", "") + `","lesson_ids":[1]}`}, func() (string, error) { return "", nil })
 	if err == nil {
 		t.Fatal("reply succeeded")
 	}

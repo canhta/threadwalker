@@ -24,8 +24,8 @@ const (
 	// replyWindow is the guard's per-contact reply-count window.
 	replyWindow = 7 * day
 
-	// outsideTextRetention bounds the tables that hold other people's text:
-	// wake transcripts and tool call details.
+	// outsideTextRetention bounds the tables that hold other people's text
+	// besides seen_posts (7 days): wake transcripts and tool call details.
 	outsideTextRetention = 8 * day
 )
 
@@ -35,6 +35,7 @@ const (
 // contacts has its own rule in Prune.
 var retention = []retentionPolicy{
 	{table: "trend_stories", ageCol: "observed_at", maxAge: 7 * day, maxRows: 500},
+	{table: "seen_posts", ageCol: "read_at", maxAge: 7 * day},
 	{table: "wake_transcripts", ageCol: "at", maxAge: outsideTextRetention},
 	{table: "tool_call_details", ageCol: "at", maxAge: outsideTextRetention},
 	{table: "tool_calls", ageCol: "at", maxAge: 90 * day},

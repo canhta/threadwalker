@@ -37,7 +37,7 @@ func TestPageProjectsOnlySelectedSafeMetadata(t *testing.T) {
 	// A foreign-link action and its samples must never become a public row.
 	snap.Publications = append([]store.DashboardPublication{pub(2, "reply", ago(3*day), "https://www.threads.net/@foreign_handle/post/XYZ")}, snap.Publications...)
 	snap.Metrics = append(snap.Metrics, sample(2, ago(2*day), 999, 99, 9, 9))
-	snap.ToolCalls = []store.DashboardToolCall{call(1, 1, "search", private, "")}
+	snap.ToolCalls = []store.DashboardToolCall{call(1, 1, "find_posts", private, "")}
 	snap.Wakes = []store.DashboardWake{finishedWake(1, "agent", "provider_error", 3)}
 	snap.Ledger = []store.DashboardLedgerDay{{Day: fixedNow().Format("2006-01-02"), CostUSD: 0.25}}
 	snap.Trends = []store.DashboardTrend{{Title: "Synthetic public topic", Source: "hacker_news", Rank: 1, ObservedAt: fixedNow()}}
@@ -427,7 +427,7 @@ func TestStatsStepRowOnlyAfterAPost(t *testing.T) {
 	snap := started()
 	snap.Wakes = []store.DashboardWake{finishedWake(1, "agent", "completed", 4)}
 	for i := 0; i < 2; i++ {
-		snap.ToolCalls = append(snap.ToolCalls, call(int64(2*i+1), 1, "search", `{"outcome":"error"}`, ""), call(int64(2*i+2), 1, "read_own_metrics", `{"outcome":"error"}`, ""))
+		snap.ToolCalls = append(snap.ToolCalls, call(int64(2*i+1), 1, "find_posts", `{"outcome":"error"}`, ""), call(int64(2*i+2), 1, "read_own_metrics", `{"outcome":"error"}`, ""))
 	}
 	src := newSource(snap)
 	h := newHandler(src)
@@ -478,7 +478,7 @@ func TestGuardRefusalIsCountedAsBlockedNotFailed(t *testing.T) {
 	}
 
 	// A real error stays separate from the refusal.
-	snap.ToolCalls = append(snap.ToolCalls, call(2, 1, "search", `{"outcome":"error"}`, ""))
+	snap.ToolCalls = append(snap.ToolCalls, call(2, 1, "find_posts", `{"outcome":"error"}`, ""))
 	src.snaps["alpha"] = snap
 	page = mustPage(t, h)
 	if row = toolRow(page.ToolCalls.Rows, "Message owner"); row == nil || row.Blocked != 1 || row.Failed != 0 {
@@ -490,7 +490,7 @@ func TestEmptyOrInvalidResultJSONNeverBreaksThePage(t *testing.T) {
 	snap := started()
 	snap.Wakes = []store.DashboardWake{finishedWake(1, "agent", "completed", 3)}
 	snap.ToolCalls = []store.DashboardToolCall{
-		call(1, 1, "search", "", ""),
+		call(1, 1, "find_posts", "", ""),
 		call(2, 1, "fetch_trends", "not json at all", ""),
 		call(3, 1, "notify_owner", "{broken", "phase_read_only"),
 	}
@@ -501,7 +501,7 @@ func TestEmptyOrInvalidResultJSONNeverBreaksThePage(t *testing.T) {
 	}
 	// Unusable results are unfinished, never failed; the refusal keeps the
 	// blocked label even though its result is not JSON.
-	if row := toolRow(page.ToolCalls.Rows, "Search"); row == nil || row.Other != 1 || row.Failed != 0 {
+	if row := toolRow(page.ToolCalls.Rows, "Find posts"); row == nil || row.Other != 1 || row.Failed != 0 {
 		t.Fatalf("empty result row: %+v", row)
 	}
 	if row := toolRow(page.ToolCalls.Rows, "Trends"); row == nil || row.Other != 1 || row.Failed != 0 {
@@ -533,7 +533,7 @@ func toolRow(rows []dashboard.ToolStat, name string) *dashboard.ToolStat {
 func TestRenderedCountsUseSingularForms(t *testing.T) {
 	snap := started()
 	snap.Wakes = []store.DashboardWake{finishedWake(1, "agent", "browser_error", 1)}
-	snap.ToolCalls = []store.DashboardToolCall{call(1, 1, "search", `{"outcome":"success"}`, "")}
+	snap.ToolCalls = []store.DashboardToolCall{call(1, 1, "find_posts", `{"outcome":"success"}`, "")}
 	snap.Publications = []store.DashboardPublication{pub(1, "post", ago(time.Hour), ownLink("ONE1"))}
 	snap.Metrics = []store.DashboardMetric{sample(1, ago(30*time.Minute), 1, 0, 0, 0)}
 	snap.Trends = []store.DashboardTrend{{Title: "A synthetic topic", Source: "hacker_news", Rank: 1, ObservedAt: fixedNow()}}
@@ -580,13 +580,13 @@ func TestFailedStepsShowReasonCodes(t *testing.T) {
 	snap := started()
 	snap.Wakes = []store.DashboardWake{finishedWake(1, "agent", "completed", 4)}
 	snap.ToolCalls = []store.DashboardToolCall{
-		call(1, 1, "search", `{"outcome":"error","reason":"timeout"}`, ""),
-		call(2, 1, "search", `{"outcome":"error","reason":"timeout"}`, ""),
-		call(3, 1, "search", `{"outcome":"error","reason":"private text"}`, ""),
+		call(1, 1, "find_posts", `{"outcome":"error","reason":"timeout"}`, ""),
+		call(2, 1, "find_posts", `{"outcome":"error","reason":"timeout"}`, ""),
+		call(3, 1, "find_posts", `{"outcome":"error","reason":"private text"}`, ""),
 		call(4, 1, "post", `{"outcome":"error","reason":"lesson_number_mismatch"}`, ""),
 	}
 	page := mustPage(t, newHandler(newSource(snap)))
-	if wt := wakeTool(page.Wakes.Rows[0].ToolSummary, "Search"); wt == nil || wt.Failed != 3 || wt.Why != "timeout 2, failed 1" {
+	if wt := wakeTool(page.Wakes.Rows[0].ToolSummary, "Find posts"); wt == nil || wt.Failed != 3 || wt.Why != "timeout 2, failed 1" {
 		t.Fatalf("failed search reasons: %+v", page.Wakes.Rows[0].ToolSummary)
 	}
 	if row := toolRow(page.ToolCalls.Rows, "Post"); row == nil || row.Failed != 0 || row.Blocked != 1 {

@@ -1,7 +1,6 @@
 package tools_test
 
 import (
-	"strings"
 	"testing"
 
 	"github.com/canhta/threadz/internal/threads"
@@ -17,9 +16,9 @@ func TestLimitedAccessReadIsRecordedAndHiddenNextWake(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	dispatch(t, d, "search", `{"query":"agents"}`)
+	dispatch(t, d, "find_posts", `{"source":"search","query":"agents"}`)
 	hidden, err := st.RefusedTools(t.Context(), "agent", opts.Now())
-	if err != nil || len(hidden) != 1 || hidden[0] != "search" {
+	if err != nil || len(hidden) != 1 || hidden[0] != "find_posts:search" {
 		t.Fatalf("hidden=%v err=%v", hidden, err)
 	}
 	opts.Hidden = hidden
@@ -27,11 +26,12 @@ func TestLimitedAccessReadIsRecordedAndHiddenNextWake(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	names := []string{}
-	for _, def := range next.Definitions() {
-		names = append(names, def.Function.Name)
+	// The closed source is refused with a hint; the other sources stay open.
+	_, err = next.Dispatch(t.Context(), call("find_posts", `{"source":"search","query":"agents"}`))
+	if reason, _ := blockedResult(t, err); reason != "tool_hidden" {
+		t.Fatalf("closed source: %v", err)
 	}
-	if got := " " + strings.Join(names, " ") + " "; strings.Contains(got, " search ") || !strings.Contains(got, " profile_posts ") {
-		t.Fatalf("tools=%s", got)
+	if _, err = next.Dispatch(t.Context(), call("find_posts", `{"source":"profile","username":"someone"}`)); err != nil {
+		t.Fatalf("profile source: %v", err)
 	}
 }

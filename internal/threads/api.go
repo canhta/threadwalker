@@ -203,7 +203,7 @@ func (a *API) Search(ctx context.Context, query string, recent bool) (Page, erro
 	}
 	page, err := a.list(ctx, "search", "/keyword_search", q)
 	if err == nil && len(page.Posts) == 0 {
-		page.LimitedAccess = "No results. Without Meta App Review for threads_keyword_search, search covers only your own posts. Use fetch_trends, web_search, read_feed and profile_posts to find what to post on or reply to."
+		page.LimitedAccess = "No results. Without Meta App Review for threads_keyword_search, search covers only your own posts. Use fetch_trends, web_search and find_posts with source feed or topic to find what to post on or reply to."
 	}
 	return page, err
 }

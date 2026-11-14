@@ -64,14 +64,14 @@ func TestInboxListsNewRepliesAndAnswerUsesTheAPIPath(t *testing.T) {
 	if len(items) != 2 || items[0].Author != "hank" || items[1].Author != "alice" {
 		t.Fatalf("%+v", items)
 	}
-	if items[1].ReplyingTo != "Our post" || items[0].ReplyingTo != "(a mention of the account)" || items[1].AgeMinutes != 30 || !strings.HasPrefix(items[1].Ref, "r") {
+	if items[1].ReplyingTo != "Our post" || items[0].ReplyingTo != "(a mention of the account)" || items[1].AgeMinutes != 30 || !strings.HasPrefix(items[1].Ref, "p") {
 		t.Fatalf("%+v", items)
 	}
 
-	// Answering by ref uses the API path (target_id), is no browser reply and
+	// Answering by ref uses the API path (the stored post has an API id), is no browser reply and
 	// is not capped by replies_per_user_7d, so a back-and-forth continues.
 	args := func(item tools.InboxItem, text string) string {
-		return `{"text":"` + text + `","target_url":"` + item.Ref + `","target_id":"` + item.TargetID + `","target_username":"` + item.Author + `"}`
+		return `{"text":"` + text + `","target":"` + item.Ref + `"}`
 	}
 	if _, err := d.Dispatch(ctx, call("reply", args(items[1], "chao alice"))); err != nil {
 		t.Fatal(err)
@@ -93,7 +93,7 @@ func TestInboxListsNewRepliesAndAnswerUsesTheAPIPath(t *testing.T) {
 			second = it
 		}
 	}
-	if len(again) != 2 || second.TargetID != "a2" {
+	if len(again) != 2 || second.Text != "and another" {
 		t.Fatalf("answered reply listed again or new one missing: %+v", again)
 	}
 	now = now.Add(time.Minute)
