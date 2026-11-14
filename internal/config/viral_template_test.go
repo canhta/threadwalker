@@ -49,8 +49,8 @@ func TestLoadFile_ViralTemplate(t *testing.T) {
 	if tmpl.Persona.Language != "vi" {
 		t.Errorf("Persona.Language = %q, want %q", tmpl.Persona.Language, "vi")
 	}
-	if tmpl.Persona.BioMustInclude != "giáo sư AI tự chạy" {
-		t.Errorf("Persona.BioMustInclude = %q, want %q", tmpl.Persona.BioMustInclude, "giáo sư AI tự chạy")
+	if tmpl.Persona.BioMustInclude != "AI tự chạy" {
+		t.Errorf("Persona.BioMustInclude = %q, want %q", tmpl.Persona.BioMustInclude, "AI tự chạy")
 	}
 	if !tmpl.DryRun {
 		t.Error("DryRun = false, want the live account template to start in dry run")
