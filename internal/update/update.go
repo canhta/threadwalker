@@ -63,7 +63,7 @@ type Updater struct {
 	APIBase   string // https://api.github.com
 	Repo      string // owner/name
 	Current   string
-	Arch      string
+	Platform  string // GOOS_GOARCH of the release asset, such as linux_amd64
 	Binary    string // installed binary path
 	CachePath string // ETag and release body of the last "latest" answer
 	PubKey    ed25519.PublicKey
@@ -220,7 +220,7 @@ func (u *Updater) waitIdle(ctx context.Context) error {
 // stage downloads the tarball, verifies sha256 and signature, and writes the
 // binary beside the installed one so the swap is a rename.
 func (u *Updater) stage(ctx context.Context, rel release) (string, error) {
-	base := "threadz_" + strings.TrimPrefix(rel.Tag, "v") + "_linux_" + u.Arch + ".tar.gz"
+	base := "threadz_" + strings.TrimPrefix(rel.Tag, "v") + "_" + u.Platform + ".tar.gz"
 	tgz, err := u.asset(ctx, rel, base)
 	if err != nil {
 		return "", u.fail(StepFetch, "download_failed", err)

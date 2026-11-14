@@ -19,39 +19,48 @@ jobs:
           go-version-file: go.mod
           cache: true
 
-      - name: Build release bundle
+      - name: Build release bundles
         env:
           TAG: ${{ github.ref_name }}
         run: |
           set -euo pipefail
           version="${TAG#v}"
-          stage="dist/threadz_${version}_linux_amd64"
-          mkdir -p "$stage"
-          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath \
-            -ldflags "-s -w -X main.buildVersion=${version}" \
-            -o "$stage/threadz" ./cmd/threadz
-          cp deploy/apparmor-chrome deploy/threadz.service deploy/threadz-dashboard.service deploy/threadz-update.service \
-            deploy/threadz-update.timer deploy/threadz-update.path "$stage/"
-          awk '
-            /^  backend: stub( |$)/ {
-              print "  backend: api"
-              print "  base_url: https://www.threads.com"
-              print "  executable_path: /opt/chrome/chrome"
-              print "  agent_browser_path: /opt/threadz/bin/agent-browser"
-              next
-            }
-            /^  profile_dir: data\/profiles\/viral$/ { print "  profile_dir: /opt/threadz/data/profiles/viral"; next }
-            /^  enabled: false/ { print "  enabled: true"; next }
-            { print }
-          ' templates/viral.agent.yaml > "$stage/viral.agent.yaml"
-          grep -qx '  backend: api' "$stage/viral.agent.yaml"
-          grep -qx '  profile_dir: /opt/threadz/data/profiles/viral' "$stage/viral.agent.yaml"
-          grep -qx '  enabled: true' "$stage/viral.agent.yaml"
-          grep -qx 'dry_run: true' "$stage/viral.agent.yaml"
-          tar -czf "dist/threadz_${version}_linux_amd64.tar.gz" -C "$stage" .
-          (cd dist && sha256sum "threadz_${version}_linux_amd64.tar.gz" \
-            > "threadz_${version}_linux_amd64.tar.gz.sha256")
-          "$stage/threadz" version
+          for target in linux/amd64 darwin/arm64; do
+            goos="${target%/*}"; goarch="${target#*/}"
+            name="threadz_${version}_${goos}_${goarch}"
+            stage="dist/$name"
+            mkdir -p "$stage"
+            CGO_ENABLED=0 GOOS="$goos" GOARCH="$goarch" go build -trimpath \
+              -ldflags "-s -w -X main.buildVersion=${version}" \
+              -o "$stage/threadz" ./cmd/threadz
+            if [ "$goos" = linux ]; then
+              # The server bundle: systemd units, AppArmor profile and the live-shaped template.
+              cp deploy/apparmor-chrome deploy/threadz.service deploy/threadz-dashboard.service deploy/threadz-update.service \
+                deploy/threadz-update.timer deploy/threadz-update.path "$stage/"
+              awk '
+                /^  backend: stub( |$)/ {
+                  print "  backend: api"
+                  print "  base_url: https://www.threads.com"
+                  print "  executable_path: /opt/chrome/chrome"
+                  print "  agent_browser_path: /opt/threadz/bin/agent-browser"
+                  next
+                }
+                /^  profile_dir: data\/profiles\/viral$/ { print "  profile_dir: /opt/threadz/data/profiles/viral"; next }
+                /^  enabled: false/ { print "  enabled: true"; next }
+                { print }
+              ' templates/viral.agent.yaml > "$stage/viral.agent.yaml"
+              grep -qx '  backend: api' "$stage/viral.agent.yaml"
+              grep -qx '  profile_dir: /opt/threadz/data/profiles/viral' "$stage/viral.agent.yaml"
+              grep -qx '  enabled: true' "$stage/viral.agent.yaml"
+              "$stage/threadz" version
+            else
+              # The local bundle: the repo template as is, stub backend.
+              cp templates/viral.agent.yaml "$stage/viral.agent.yaml"
+            fi
+            grep -qx 'dry_run: true' "$stage/viral.agent.yaml"
+            tar -czf "dist/$name.tar.gz" -C "$stage" .
+            (cd dist && sha256sum "$name.tar.gz" > "$name.tar.gz.sha256")
+          done
 
       - name: Sign
         env:

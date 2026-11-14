@@ -108,7 +108,7 @@ func runUpdate(ctx context.Context, args []string, getenv func(string) string, s
 	notify := func(ctx context.Context, text string) { notifyOwner(ctx, httpClient, common, getenv, logger, text) }
 	u := &update.Updater{
 		HTTP: httpClient, APIBase: updateAPI, Repo: updateRepo,
-		Current: versionText(), Arch: runtime.GOARCH, Binary: *bin,
+		Current: versionText(), Platform: runtime.GOOS + "_" + runtime.GOARCH, Binary: *bin,
 		CachePath: *bin + ".release.json", PubKey: pub,
 		Verify: func(ctx context.Context, newBin string) error {
 			return runAs(ctx, *common.db, newBin, "check", "--agents", *common.agents, "--db", *common.db)

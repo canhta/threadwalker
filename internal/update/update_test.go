@@ -53,7 +53,7 @@ func newFixture(t *testing.T, current, tag string) *fixture {
 		t.Fatal(err)
 	}
 	f.u = &Updater{
-		HTTP: f.srv.Client(), APIBase: f.srv.URL, Repo: "o/r", Current: current, Arch: "amd64",
+		HTTP: f.srv.Client(), APIBase: f.srv.URL, Repo: "o/r", Current: current, Platform: "linux_amd64",
 		Binary: bin, CachePath: filepath.Join(dir, "cache.json"), PubKey: f.pub,
 		Verify: func(_ context.Context, b string) error {
 			if got, _ := os.ReadFile(b); string(got) != "new-"+f.tag {

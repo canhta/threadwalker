@@ -119,9 +119,11 @@ interrupted actions.
 
 ## Deploy to a Linux host
 
-A `v*` tag builds a bundle with `.github/workflows/release.yml`: the `linux/amd64` binary, the
-prepared viral template, the systemd units, the AppArmor profile and a detached ed25519 signature
-of the tarball. The host needs no Go or Node. Install the first release by hand; later ones use
+A `v*` tag builds two signed bundles with `.github/workflows/release.yml`. `linux_amd64` is the
+server bundle: the binary, the prepared viral template, the systemd units and the AppArmor profile.
+`darwin_arm64` is the Apple silicon bundle for local runs and rehearsals: the binary and the repo
+template (stub backend, dry run). Each tarball has a `.sha256` and a detached ed25519 signature, and
+`threadz update` fetches the bundle of the platform it runs on. The host needs no Go or Node. Install the first release by hand; later ones use
 `threadz update`.
 
 ```sh
